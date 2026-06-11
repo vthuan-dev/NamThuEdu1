@@ -621,10 +621,15 @@ class BlogController extends Controller
         }
 
         if ($post->pStatus === 'active') {
+            // Idempotent: bài đã duyệt rồi thì coi như thành công, không báo lỗi
             return response()->json([
-                'status' => 'error',
-                'message' => 'Bài viết đã được duyệt rồi.'
-            ], 400);
+                'status' => 'success',
+                'message' => 'Bài viết đã ở trạng thái đã duyệt.',
+                'data' => [
+                    'post_id' => $post->pId,
+                    'post_title' => $post->pTitle,
+                ]
+            ]);
         }
 
         $post->update([
