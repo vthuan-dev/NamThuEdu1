@@ -313,12 +313,28 @@ export function ExamLobby() {
       <div className="pointer-events-none absolute -top-24 -left-16 h-72 w-72 rounded-full bg-[#DBEAFE] blur-3xl opacity-70" />
       <div className="pointer-events-none absolute -bottom-24 -right-12 h-80 w-80 rounded-full bg-[#FFE8D6] blur-3xl opacity-70" />
 
-      {autoStarting ? (
+      {!statusMessage ? (
         <div className="relative max-w-[640px] mx-auto mt-24 flex flex-col items-center justify-center gap-4 text-center">
           <Loader2 className="w-12 h-12 animate-spin text-[#2563EB]" />
           <p className="text-lg font-bold text-[#1E293B]">{t("student.examLobby.startingSession")}</p>
         </div>
       ) : (
+        <div className="relative max-w-[480px] mx-auto mt-24 flex flex-col items-center justify-center gap-4 text-center rounded-3xl border-2 border-[#FECACA] bg-white p-8">
+          <AlertCircle className="w-12 h-12 text-red-500" />
+          <p className="text-lg font-bold text-[#1E293B]">{statusMessage}</p>
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate(`${STUDENT_BASE_PATH}/bai-tap`)}
+              className="px-5 py-2.5 rounded-xl border-2 border-slate-200 font-bold text-slate-600 hover:bg-slate-50">
+              {t("common.back")}
+            </button>
+            <button onClick={() => { setStatusMessage(""); autoStartedRef.current = false; loadExamInfo(); }}
+              className="px-5 py-2.5 rounded-xl font-bold text-white" style={{ background: "linear-gradient(90deg,#7C3AED,#2563EB)" }}>
+              {t("common.retry")}
+            </button>
+          </div>
+        </div>
+      )}
+      {false && (
       <div className="relative max-w-[1360px] mx-auto rounded-[32px] border-[3px] border-[#BFDBFE] bg-white p-4 md:p-8 shadow-[0_18px_60px_rgba(15,23,42,0.12)]">
         <button
           onClick={() => navigate(`${STUDENT_BASE_PATH}/bai-tap`)}
