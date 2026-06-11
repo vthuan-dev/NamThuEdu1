@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, useLocation, useParams } from "react-router";
 import { ArrowLeft, BookOpen, Headphones, PenTool, Mic, CheckCircle2, Save, FileText, Clock, ChevronRight, Loader2, Upload } from "lucide-react";
-import { useToast } from "../../../../../hooks/useToast";
+import { useToastContext } from "../../../../../contexts/ToastContext";
 import { useTranslation } from "react-i18next";
 import { teacherApi } from "../../../../../services/teacherApi";
 
@@ -28,7 +28,7 @@ interface SkillTab {
 export const CreateVstepFull = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { success, error } = useToast();
+  const { success, error } = useToastContext();
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const params = useParams();
@@ -217,18 +217,21 @@ export const CreateVstepFull = () => {
       if (res.status === "success" && res.data) {
         const id = String(res.data.eId);
         setRealExamId(id);
-        // Log activity (best-effort)
-        const { logTeacherActivity } = await import("../../../../../services/teacherActivityLog");
-        logTeacherActivity({
-          action: "exam.create",
-          entity_type: "exam",
-          entity_id: Number(id),
-          detail: `Tạo đề thi VSTEP: ${examTitle.trim()}`,
-          meta: { type: "VSTEP", skill: "mixed", duration },
-        });
+        // Chuyển step NGAY — không để bất kỳ tác vụ phụ nào chặn luồng
         navigate(`/giao-vien/de-thi/vstep/full/sua/${id}`, { replace: true });
         setStep(1);
         success("Đề thi đã được tạo! Bắt đầu nhập nội dung.");
+        // Ghi log hoạt động — best-effort, lỗi (vd: load chunk) không được phép
+        // làm hỏng việc chuyển step.
+        import("../../../../../services/teacherActivityLog")
+          .then(({ logTeacherActivity }) => logTeacherActivity({
+            action: "exam.create",
+            entity_type: "exam",
+            entity_id: Number(id),
+            detail: `Tạo đề thi VSTEP: ${examTitle.trim()}`,
+            meta: { type: "VSTEP", skill: "mixed", duration },
+          }))
+          .catch(() => { /* bỏ qua lỗi ghi log */ });
       } else {
         throw new Error(res.message || "Không thể tạo đề thi");
       }
