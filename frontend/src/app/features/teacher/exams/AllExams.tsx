@@ -959,7 +959,7 @@ export function AllExams() {
                       toggleSelect(exam.eId);
                     }
                   }}
-                  className={`group relative bg-white rounded-xl border transition-all duration-200 ${
+                  className={`group relative bg-white rounded-xl border transition-all duration-200 flex flex-col h-full ${
                     isOwner ? "cursor-pointer" : ""
                   } ${
                     isSelected
@@ -982,7 +982,7 @@ export function AllExams() {
                   </div>
 
                   {/* Card body */}
-                  <div className="relative p-4">
+                  <div className="relative p-4 flex-1 flex flex-col">
                     {/* Top row: checkbox/owner-badge + status */}
                     <div className="flex items-center justify-between gap-2 mb-3 min-h-[24px]">
                       {isOwner ? (
@@ -1050,15 +1050,14 @@ export function AllExams() {
                       {exam.eTitle}
                     </h3>
 
-                    {/* Description */}
-                    {exam.eDescription && (
-                      <p className="text-xs text-gray-500 leading-relaxed line-clamp-2 mb-3">
-                        {exam.eDescription}
-                      </p>
-                    )}
+                    {/* Description — luôn reserve chỗ (min-height) để các thẻ thẳng hàng
+                        dù có hay không có mô tả */}
+                    <p className="text-xs text-gray-500 leading-relaxed line-clamp-2 mb-3 min-h-[2rem]">
+                      {exam.eDescription || ""}
+                    </p>
 
                     {/* Meta row: questions · duration · date */}
-                    <div className="flex items-center gap-3 text-[11px] text-gray-500">
+                    <div className="flex items-center gap-3 text-[11px] text-gray-500 mt-auto">
                       <span className="inline-flex items-center gap-1">
                         <FileText className="w-3.5 h-3.5 text-gray-400" />
                         {countExamQuestions(exam)} câu
