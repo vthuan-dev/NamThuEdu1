@@ -42,8 +42,22 @@ function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("vi-VN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+function decodeEntities(str: string) {
+  return str
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#0?39;/gi, "'")
+    .replace(/&apos;/gi, "'")
+    .replace(/&#x?[0-9a-f]+;/gi, " ");
+}
+
 function stripHtml(html: string) {
-  return html.replace(/<[^>]*>/g, "");
+  return decodeEntities((html ?? "").replace(/<[^>]*>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function readTime(html: string) {

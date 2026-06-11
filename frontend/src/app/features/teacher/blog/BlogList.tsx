@@ -115,7 +115,17 @@ export function BlogList() {
     new Date(d).toLocaleDateString("vi-VN", { day: "numeric", month: "short", year: "numeric" });
 
   const stripHtml = (html: string, max = 100) => {
-    const clean = html.replace(/<[^>]*>/g, "");
+    const clean = (html ?? "")
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/&quot;/gi, '"')
+      .replace(/&#0?39;|&apos;/gi, "'")
+      .replace(/&#x?[0-9a-f]+;/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
     return clean.length > max ? clean.slice(0, max) + "…" : clean;
   };
 

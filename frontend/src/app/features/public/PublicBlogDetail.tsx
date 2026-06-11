@@ -187,7 +187,18 @@ export function PublicBlogDetail() {
   const Icon = cfg.icon;
 
   const seoDescription = post.pContent
-    ? post.pContent.replace(/<[^>]*>/g, "").slice(0, 160).trim()
+    ? post.pContent
+        .replace(/<[^>]*>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#0?39;|&apos;/gi, "'")
+        .replace(/&#x?[0-9a-f]+;/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 160)
     : undefined;
 
   return (
