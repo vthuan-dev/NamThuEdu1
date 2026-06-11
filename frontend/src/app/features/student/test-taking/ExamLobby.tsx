@@ -329,7 +329,7 @@ export function ExamLobby() {
             </button>
             <button onClick={() => { setStatusMessage(""); autoStartedRef.current = false; loadExamInfo(); }}
               className="px-5 py-2.5 rounded-xl font-bold text-white" style={{ background: "linear-gradient(90deg,#7C3AED,#2563EB)" }}>
-              {t("common.retry")}
+              Thử lại
             </button>
           </div>
         </div>
