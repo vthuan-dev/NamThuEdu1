@@ -83,6 +83,7 @@ type Settings = {
   allowRegistration: boolean;
   maxLoginAttempts: number;
   examAutoApprove: boolean;  // Tự động duyệt đề thi
+  blogAutoApprove: boolean;  // Tự động duyệt bài viết
 };
 
 const DEFAULTS: Settings = {
@@ -94,6 +95,7 @@ const DEFAULTS: Settings = {
   allowRegistration: true,
   maxLoginAttempts: 5,
   examAutoApprove: true,  // Mặc định auto-approve
+  blogAutoApprove: true,  // Mặc định auto-approve bài viết
 };
 
 type Session = {
@@ -177,6 +179,7 @@ export function AdminSettingsPage() {
         allowRegistration: sys.allowRegistration !== undefined ? Boolean(sys.allowRegistration) : DEFAULTS.allowRegistration,
         maxLoginAttempts: sys.maxLoginAttempts !== undefined ? Number(sys.maxLoginAttempts) : DEFAULTS.maxLoginAttempts,
         examAutoApprove: sys.examAutoApprove !== undefined ? Boolean(sys.examAutoApprove) : DEFAULTS.examAutoApprove,
+        blogAutoApprove: sys.blogAutoApprove !== undefined ? Boolean(sys.blogAutoApprove) : DEFAULTS.blogAutoApprove,
       };
       setSettings(merged);
       setInitial(merged);
@@ -314,6 +317,7 @@ export function AdminSettingsPage() {
         allowRegistration: next.allowRegistration,
         maxLoginAttempts: next.maxLoginAttempts,
         examAutoApprove: next.examAutoApprove,
+        blogAutoApprove: next.blogAutoApprove,
       });
       setInitial(next);
       setSaveState("saved");
@@ -345,6 +349,7 @@ export function AdminSettingsPage() {
         allowRegistration: settings.allowRegistration,
         maxLoginAttempts: settings.maxLoginAttempts,
         examAutoApprove: settings.examAutoApprove,
+        blogAutoApprove: settings.blogAutoApprove,
       });
       setInitial(settings);
       setSaveState("saved");
@@ -919,6 +924,35 @@ export function AdminSettingsPage() {
                           <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-amber-500 mt-0.5" />
                           <p className="leading-normal">
                             <strong>Chú ý:</strong> Chế độ duyệt thủ công đang bật. Đề thi của giáo viên sẽ ở trạng thái "Chờ duyệt" cho đến khi Admin phê duyệt.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Blog Auto Approve */}
+                      <div className="flex items-start justify-between gap-4 pt-2">
+                        <div className="flex-1">
+                          <label className="text-sm font-semibold text-slate-800">Tự động duyệt bài viết</label>
+                          <p className="text-xs text-slate-400 leading-normal">Khi GV gửi duyệt bài viết sẽ tự động xuất bản, ngược lại cần Admin phê duyệt</p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={saveState === "saving"}
+                          onClick={() => toggleSystemValue("blogAutoApprove", !settings.blogAutoApprove)}
+                          className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer items-center rounded-full transition-colors disabled:opacity-50 ${
+                            settings.blogAutoApprove ? "bg-emerald-600" : "bg-amber-600"
+                          }`}
+                        >
+                          <span className={`inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow transition-transform ${
+                            settings.blogAutoApprove ? "translate-x-[16px]" : "translate-x-[2px]"
+                          }`} />
+                        </button>
+                      </div>
+
+                      {!settings.blogAutoApprove && (
+                        <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-700 flex items-start gap-2">
+                          <AlertTriangle className="h-4.5 w-4.5 shrink-0 text-amber-500 mt-0.5" />
+                          <p className="leading-normal">
+                            <strong>Chú ý:</strong> Chế độ duyệt thủ công đang bật. Bài viết của giáo viên sẽ ở trạng thái "Chờ duyệt" cho đến khi Admin phê duyệt.
                           </p>
                         </div>
                       )}

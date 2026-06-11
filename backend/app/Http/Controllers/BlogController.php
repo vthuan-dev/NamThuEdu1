@@ -51,6 +51,16 @@ class BlogController extends Controller
     }
 
     /**
+     * Đọc cài đặt tự động duyệt bài viết (admin_settings.blogAutoApprove).
+     * Mặc định TRUE khi chưa cấu hình -> bài gửi duyệt sẽ tự xuất bản.
+     */
+    private function blogAutoApproveEnabled(): bool
+    {
+        $val = \App\Models\AdminSetting::where('key', 'blogAutoApprove')->value('value');
+        return $val === null ? true : filter_var($val, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    /**
      * @OA\Get(
      *     path="/teacher/blogs",
      *     tags={"Blog Management"},
@@ -159,6 +169,14 @@ class BlogController extends Controller
             ], 400);
         }
 
+        // Trạng thái yêu cầu; nếu là 'pending' và admin bật auto-duyệt -> xuất bản luôn
+        $requestedStatus = $request->blogStatus ?? 'draft';
+        $autoApproved = false;
+        if ($requestedStatus === 'pending' && $this->blogAutoApproveEnabled()) {
+            $requestedStatus = 'active';
+            $autoApproved = true;
+        }
+
         $blog = Post::create([
             'pTitle' => $request->blogName,
             'pContent' => $request->blogContent,
@@ -167,7 +185,8 @@ class BlogController extends Controller
             'pUrl' => $request->blogUrl ?? '',
             'pThumbnail' => $this->saveBase64Thumbnail($request->blogThumbnail),
             'pAuthor_id' => $user->uId,
-            'pStatus' => $request->blogStatus ?? 'draft',
+            'pStatus' => $requestedStatus,
+            'pApproved_at' => $autoApproved ? now() : null,
             'pView' => 0,
             'pLike' => 0,
         ]);
@@ -175,7 +194,7 @@ class BlogController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => $blog,
-            'message' => 'Tạo blog thành công.'
+            'message' => $autoApproved ? 'Bài viết đã được xuất bản.' : 'Tạo blog thành công.'
         ]);
     }
 
@@ -330,7 +349,15 @@ class BlogController extends Controller
         if ($request->has('blogCategory')) $updateData['pCategory'] = $request->blogCategory;
         if ($request->has('blogUrl')) $updateData['pUrl'] = $request->blogUrl;
         if ($request->has('blogThumbnail')) $updateData['pThumbnail'] = $this->saveBase64Thumbnail($request->blogThumbnail);
-        if ($request->has('blogStatus')) $updateData['pStatus'] = $request->blogStatus;
+        if ($request->has('blogStatus')) {
+            $newStatus = $request->blogStatus;
+            // Gửi duyệt + admin bật auto-duyệt -> xuất bản luôn
+            if ($newStatus === 'pending' && $this->blogAutoApproveEnabled()) {
+                $newStatus = 'active';
+                $updateData['pApproved_at'] = now();
+            }
+            $updateData['pStatus'] = $newStatus;
+        }
 
         $blog->update($updateData);
 

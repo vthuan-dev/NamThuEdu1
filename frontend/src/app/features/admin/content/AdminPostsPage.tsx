@@ -24,6 +24,7 @@ export function AdminPostsPage() {
   const [search, setSearch] = useState("");
   const [busyId, setBusyId] = useState<number | null>(null);
   const [rejectTarget, setRejectTarget] = useState<AdminPost | null>(null);
+  const [actionMsg, setActionMsg] = useState<{ text: string; type: "ok" | "err" } | null>(null);
 
   const loadPosts = async () => {
     try {
@@ -44,6 +45,12 @@ export function AdminPostsPage() {
   useEffect(() => {
     loadPosts();
   }, []);
+
+  useEffect(() => {
+    if (!actionMsg) return;
+    const t = setTimeout(() => setActionMsg(null), 3000);
+    return () => clearTimeout(t);
+  }, [actionMsg]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -68,7 +75,10 @@ export function AdminPostsPage() {
     try {
       setBusyId(id);
       await adminApi.approvePost(id);
+      setActionMsg({ text: "Đã duyệt bài viết.", type: "ok" });
       await loadPosts();
+    } catch (e: any) {
+      setActionMsg({ text: e?.response?.data?.message || "Duyệt bài viết thất bại.", type: "err" });
     } finally {
       setBusyId(null);
     }
@@ -86,7 +96,10 @@ export function AdminPostsPage() {
       setBusyId(id);
       await adminApi.rejectPost(id, reason);
       setRejectTarget(null);
+      setActionMsg({ text: "Đã từ chối bài viết.", type: "ok" });
       await loadPosts();
+    } catch (e: any) {
+      setActionMsg({ text: e?.response?.data?.message || "Từ chối bài viết thất bại.", type: "err" });
     } finally {
       setBusyId(null);
     }
@@ -190,20 +203,24 @@ export function AdminPostsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleApprove(id)}
-                          disabled={busyId === id}
-                          className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-200 disabled:opacity-60"
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Duyệt
-                        </button>
-                        <button
-                          onClick={() => handleReject(id)}
-                          disabled={busyId === id}
-                          className="inline-flex items-center gap-1 rounded-lg bg-amber-100 px-2.5 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-200 disabled:opacity-60"
-                        >
-                          <XCircle className="h-3.5 w-3.5" /> Từ chối
-                        </button>
+                        {status !== "active" && (
+                          <button
+                            onClick={() => handleApprove(id)}
+                            disabled={busyId === id}
+                            className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-200 disabled:opacity-60"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Duyệt
+                          </button>
+                        )}
+                        {status !== "inactive" && (
+                          <button
+                            onClick={() => handleReject(id)}
+                            disabled={busyId === id}
+                            className="inline-flex items-center gap-1 rounded-lg bg-amber-100 px-2.5 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-200 disabled:opacity-60"
+                          >
+                            <XCircle className="h-3.5 w-3.5" /> {status === "active" ? "Gỡ xuống" : "Từ chối"}
+                          </button>
+                        )}
                         <button
                           onClick={() => handleDelete(id)}
                           disabled={busyId === id}
@@ -229,6 +246,18 @@ export function AdminPostsPage() {
         onCancel={() => setRejectTarget(null)}
         onConfirm={submitReject}
       />
+
+      {actionMsg && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 rounded-xl px-4 py-3 text-sm font-medium shadow-lg ${
+            actionMsg.type === "ok"
+              ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+              : "border border-rose-200 bg-rose-50 text-rose-700"
+          }`}
+        >
+          {actionMsg.text}
+        </div>
+      )}
     </div>
   );
 }

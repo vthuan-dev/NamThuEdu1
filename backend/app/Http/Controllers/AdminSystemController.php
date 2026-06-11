@@ -145,9 +145,10 @@ class AdminSystemController extends Controller
             'allowRegistration' => true,
             'maxLoginAttempts'  => 5,
             'examAutoApprove'   => true,  // Mặc định tự động duyệt đề thi
+            'blogAutoApprove'   => true,  // Mặc định tự động duyệt bài viết
         ];
 
-        $boolKeys = ['autoRefresh', 'emailAlert', 'maintenanceMode', 'allowRegistration', 'examAutoApprove'];
+        $boolKeys = ['autoRefresh', 'emailAlert', 'maintenanceMode', 'allowRegistration', 'examAutoApprove', 'blogAutoApprove'];
         $intKeys  = ['refreshInterval', 'maxLoginAttempts'];
 
         $settings = [];
@@ -201,6 +202,7 @@ class AdminSystemController extends Controller
             'allowRegistration' => 'sometimes|boolean',
             'maxLoginAttempts'  => 'sometimes|integer|min:3|max:20',
             'examAutoApprove'   => 'sometimes|boolean',  // Auto-approve exam toggle
+            'blogAutoApprove'   => 'sometimes|boolean',  // Auto-approve blog toggle
         ];
 
         $allowedKeys = array_keys($allowedRules);
