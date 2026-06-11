@@ -97,13 +97,8 @@ export function StudentLogin() {
       
       // Navigate after fade out
       setTimeout(() => {
-        // Check if student has class
-        if (!user.class_id) {
-          navigate('/hoc-vien/cho-xep-lop');
-          return;
-        }
-
-        // Redirect based on age_group
+        // Class system đã bỏ — học viên login là vào thẳng dashboard theo age_group,
+        // không cần chờ xếp lớp nữa.
         switch (user.age_group) {
           case 'kids':
             navigate('/hoc-vien');

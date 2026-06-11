@@ -26,11 +26,9 @@ export const StudentProtectedRoute: React.FC<StudentProtectedRouteProps> = ({
       return <Navigate to="/" replace />;
     }
     
-    // No class assigned yet
-    if (!user.class_id as unknown) {
-      return <Navigate to="/hoc-vien/cho-xep-lop" replace />;
-    }
-    
+    // Class system đã bỏ — không chặn theo class_id nữa.
+    // Mọi học viên login xong vào thẳng dashboard theo age_group.
+
     // Wrong age group - redirect to correct dashboard
     // teens no longer has /hoc-vien/teens prefix; redirect to /hoc-vien directly
     const userAgeGroup = (user.age_group as string) || 'teens';
