@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { IELTS_STRUCTURE, IELTS_LISTENING_QUESTION_TYPES, type IeltsTestType } from "../structure";
 import { api } from "../../../../../../services/api";
+import { transcribeAudio as transcribeGroq } from "../../../../../../services/groqApi";
 import { transcribeLocal } from "../../../../../../services/whisperLocal";
 
 interface ListeningQuestion {
@@ -249,8 +250,8 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
   };
 
   /**
-   * Chạy Speech-to-Text bằng Whisper LOCAL (transformers.js).
-   * Free, không cần API key. Lần đầu sẽ tải model (~40MB) cache offline.
+   * Chạy Speech-to-Text. Ưu tiên Groq Whisper (whisper-large-v3-turbo) — nhanh,
+   * không tốn RAM trình duyệt. Fallback Whisper LOCAL (transformers.js) khi Groq lỗi.
    *
    * Nếu enableDiarization = true: sau khi có text, gửi lên backend Groq LLM
    * để phân tách speaker A/B dựa trên ngữ nghĩa (chính xác hơn pitch).
@@ -275,12 +276,22 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
         }
       };
 
-      // Step 1: Whisper local → raw text
-      const rawText = await transcribeLocal(file, { language: "en", onProgress });
+      // Step 1: STT. Ưu tiên Groq Whisper (whisper-large-v3-turbo) — nhanh vài
+      // giây, không tải model ~40MB vào trình duyệt, không tốn RAM (tránh lỗi
+      // std::bad_alloc của Whisper local). Nếu Groq lỗi → fallback Whisper-in-browser.
+      let rawText = "";
+      try {
+        const groqFile =
+          file instanceof File ? file : new File([file], "audio.mp3", { type: "audio/mpeg" });
+        rawText = (await transcribeGroq(groqFile, "en")).trim();
+      } catch (groqErr: any) {
+        console.warn("Groq STT failed, fallback to in-browser Whisper:", groqErr?.message);
+        rawText = (await transcribeLocal(file, { language: "en", onProgress })).trim();
+      }
       setModelLoadingPct(null);
 
       if (!rawText) {
-        setTranscribeError("Whisper không trả về text. Vui lòng nhập thủ công.");
+        setTranscribeError("Không nhận được transcript. Vui lòng nhập thủ công.");
         return;
       }
 
