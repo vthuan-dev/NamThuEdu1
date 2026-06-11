@@ -481,8 +481,8 @@ export function CreatePost() {
             </div>
           </div>
 
-          {/* Right Column - Settings */}
-          <div className="space-y-4">
+          {/* Right Column - Settings (sticky, cuộn độc lập) */}
+          <div className="space-y-4 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-1 blog-settings-scroll">
             {/* Post Type */}
             <div className="bg-white rounded-xl border border-slate-200/80 p-5">
               <div className="flex items-center justify-between mb-3">
