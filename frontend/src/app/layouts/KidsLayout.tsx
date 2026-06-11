@@ -23,6 +23,7 @@ import {
   X,
 } from 'lucide-react';
 import { NotificationDropdown } from '../components/student/NotificationDropdown';
+import { LogoutOverlay } from '../../components/shared/LogoutOverlay';
 import { logout } from '../../services/authApi';
 import { getAuthUser } from '../../utils/authStorage';
 
@@ -33,6 +34,7 @@ export function KidsLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const readUser = () => getAuthUser();
 
@@ -56,8 +58,15 @@ export function KidsLayout() {
     user?.uName || user?.name || user?.full_name || user?.fullName || 'Bạn';
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/dang-nhap', { replace: true });
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setMenuOpen(false);
+    try {
+      await logout();
+    } finally {
+      // Cho animation chạy trọn vẹn rồi mới chuyển trang
+      setTimeout(() => navigate('/dang-nhap', { replace: true }), 900);
+    }
   };
 
   const navItems: NavItem[] = [
@@ -83,6 +92,7 @@ export function KidsLayout() {
 
   return (
     <div className="kids-scope min-h-screen" style={{ background: 'linear-gradient(160deg, #FFF1F2 0%, #FFF7ED 50%, #F0FDF4 100%)' }}>
+      <LogoutOverlay show={loggingOut} />
       <NotificationPermissionBanner push={push} />
 
       {/* ─── Top Header (sticky, ngang) ──────────────────────────────── */}

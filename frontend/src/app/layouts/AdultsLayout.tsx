@@ -18,6 +18,7 @@ import { usePushNotification } from '../../hooks/usePushNotification';
 import { NotificationPermissionBanner } from '../../components/NotificationPermissionBanner';
 import { logout } from '../../services/authApi';
 import { getAuthUser } from '../../utils/authStorage';
+import { LogoutOverlay } from '../../components/shared/LogoutOverlay';
 import {
   Home,
   BookOpen,
@@ -125,12 +126,19 @@ export function AdultsLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const user = getAuthUser();
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/dang-nhap', { replace: true });
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setSidebarOpen(false);
+    try {
+      await logout();
+    } finally {
+      setTimeout(() => navigate('/dang-nhap', { replace: true }), 900);
+    }
   };
 
   const closeMobileSidebar = () => setSidebarOpen(false);
@@ -140,6 +148,7 @@ export function AdultsLayout() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <LogoutOverlay show={loggingOut} />
       <NotificationPermissionBanner push={push} />
       {/* ─── Mobile Top Bar ──────────────────────────────────────── */}
       <header className="lg:hidden sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
