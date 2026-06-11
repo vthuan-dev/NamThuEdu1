@@ -185,12 +185,12 @@ export function ExamLobby() {
         const startRes: any = await studentApi.startTest(assignmentId);
         const sid = Number(startRes?.data?.data?.submissionId ?? 0);
         if (!sid) throw new Error("missing-submission-id");
+        const routeId = examId ?? assignmentId;
         try {
           await studentApi.connectTestWebsocket(sid);
         } catch {
-          await studentApi.reconnectTestWebsocket(sid);
+          try { await studentApi.reconnectTestWebsocket(sid); } catch { /* real-time optional */ }
         }
-        const routeId = examId ?? assignmentId;
         navigate(
           `${STUDENT_BASE_PATH}/lam-bai-ielts/${routeId}?submissionId=${sid}`,
           { replace: true }
@@ -281,7 +281,7 @@ export function ExamLobby() {
       try {
         await studentApi.connectTestWebsocket(sid);
       } catch {
-        await studentApi.reconnectTestWebsocket(sid);
+        try { await studentApi.reconnectTestWebsocket(sid); } catch { /* real-time optional */ }
       }
       setStatusMessage(t("student.examLobby.sessionConnected"));
       const isVstep =

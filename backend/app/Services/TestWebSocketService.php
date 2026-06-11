@@ -19,33 +19,42 @@ class TestWebSocketService
      */
     public static function handleConnection($submissionId, $userId)
     {
-        // Lưu thông tin connection với Redis
-        $connectionKey = "test_session:{$submissionId}";
-        Redis::hset($connectionKey, [
-            'user_id' => $userId,
-            'connected' => true,
-            'connected_at' => now()->toISOString(),
-            'last_seen' => now()->toISOString(),
-            'connection_count' => Redis::hincrby($connectionKey, 'connection_count', 1)
-        ]);
-        Redis::expire($connectionKey, 7200); // 2 hours
+        try {
+            // Lưu thông tin connection với Redis
+            $connectionKey = "test_session:{$submissionId}";
+            Redis::hset($connectionKey, [
+                'user_id' => $userId,
+                'connected' => true,
+                'connected_at' => now()->toISOString(),
+                'last_seen' => now()->toISOString(),
+                'connection_count' => Redis::hincrby($connectionKey, 'connection_count', 1)
+            ]);
+            Redis::expire($connectionKey, 7200); // 2 hours
 
-        // Broadcast connection event
-        broadcast(new TestSessionEvent($submissionId, $userId, 'connected', [
-            'message' => 'Kết nối thành công đến phiên thi',
-            'connection_quality' => 'good'
-        ]));
+            // Broadcast connection event
+            broadcast(new TestSessionEvent($submissionId, $userId, 'connected', [
+                'message' => 'Kết nối thành công đến phiên thi',
+                'connection_quality' => 'good'
+            ]));
 
-        // Notify teacher
-        self::notifyTeacher($submissionId, 'student_connected', [
-            'student_id' => $userId,
-            'submission_id' => $submissionId
-        ]);
+            // Notify teacher
+            self::notifyTeacher($submissionId, 'student_connected', [
+                'student_id' => $userId,
+                'submission_id' => $submissionId
+            ]);
 
-        Log::info("Student connected to test session", [
-            'submission_id' => $submissionId,
-            'user_id' => $userId
-        ]);
+            Log::info("Student connected to test session", [
+                'submission_id' => $submissionId,
+                'user_id' => $userId
+            ]);
+        } catch (\Throwable $e) {
+            // Real-time (Redis/broadcast) là tính năng phụ — KHÔNG được chặn việc vào thi.
+            Log::warning("WebSocket connect degraded (Redis/broadcast unavailable)", [
+                'submission_id' => $submissionId,
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -162,37 +171,44 @@ class TestWebSocketService
      */
     public static function sendTimeSync($submissionId, $userId)
     {
-        $submission = Submission::with('exam')->find($submissionId);
-        
-        if (!$submission) {
-            return;
-        }
+        try {
+            $submission = Submission::with('exam')->find($submissionId);
 
-        $timeElapsed = now()->diffInMinutes($submission->sStart_time);
-        $timeRemaining = max(0, $submission->exam->eDuration_minutes - $timeElapsed);
+            if (!$submission) {
+                return;
+            }
 
-        // Warning thresholds
-        $warningLevel = 'normal';
-        if ($timeRemaining <= 5) {
-            $warningLevel = 'critical';
-        } elseif ($timeRemaining <= 15) {
-            $warningLevel = 'warning';
-        }
+            $timeElapsed = now()->diffInMinutes($submission->sStart_time);
+            $timeRemaining = max(0, $submission->exam->eDuration_minutes - $timeElapsed);
 
-        broadcast(new TestSessionEvent($submissionId, $userId, 'time_sync', [
-            'server_time' => now()->toISOString(),
-            'time_remaining_minutes' => $timeRemaining,
-            'time_elapsed_minutes' => $timeElapsed,
-            'warning_level' => $warningLevel,
-            'auto_submit_in' => $timeRemaining <= 1 ? ($timeRemaining * 60) : null
-        ]));
+            // Warning thresholds
+            $warningLevel = 'normal';
+            if ($timeRemaining <= 5) {
+                $warningLevel = 'critical';
+            } elseif ($timeRemaining <= 15) {
+                $warningLevel = 'warning';
+            }
 
-        // Auto-submit warning
-        if ($timeRemaining <= 5 && $timeRemaining > 0) {
-            broadcast(new TestSessionEvent($submissionId, $userId, 'auto_submit_warning', [
-                'message' => "⚠️ Còn {$timeRemaining} phút! Bài thi sẽ tự động nộp khi hết thời gian.",
-                'minutes_remaining' => $timeRemaining
+            broadcast(new TestSessionEvent($submissionId, $userId, 'time_sync', [
+                'server_time' => now()->toISOString(),
+                'time_remaining_minutes' => $timeRemaining,
+                'time_elapsed_minutes' => $timeElapsed,
+                'warning_level' => $warningLevel,
+                'auto_submit_in' => $timeRemaining <= 1 ? ($timeRemaining * 60) : null
             ]));
+
+            // Auto-submit warning
+            if ($timeRemaining <= 5 && $timeRemaining > 0) {
+                broadcast(new TestSessionEvent($submissionId, $userId, 'auto_submit_warning', [
+                    'message' => "⚠️ Còn {$timeRemaining} phút! Bài thi sẽ tự động nộp khi hết thời gian.",
+                    'minutes_remaining' => $timeRemaining
+                ]));
+            }
+        } catch (\Throwable $e) {
+            Log::warning("WebSocket time-sync degraded (Redis/broadcast unavailable)", [
+                'submission_id' => $submissionId,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
@@ -201,66 +217,75 @@ class TestWebSocketService
      */
     public static function handleReconnection($submissionId, $userId)
     {
-        $submission = Submission::with(['exam', 'answers'])->find($submissionId);
-        
-        if (!$submission || $submission->sStatus !== 'in_progress') {
-            broadcast(new TestSessionEvent($submissionId, $userId, 'reconnection_failed', [
-                'message' => 'Không thể kết nối lại - bài thi không còn hoạt động'
+        try {
+            $submission = Submission::with(['exam', 'answers'])->find($submissionId);
+
+            if (!$submission || $submission->sStatus !== 'in_progress') {
+                broadcast(new TestSessionEvent($submissionId, $userId, 'reconnection_failed', [
+                    'message' => 'Không thể kết nối lại - bài thi không còn hoạt động'
+                ]));
+                return;
+            }
+
+            // Check if test expired
+            $timeElapsed = now()->diffInMinutes($submission->sStart_time);
+            $timeRemaining = $submission->exam->eDuration_minutes - $timeElapsed;
+
+            if ($timeRemaining <= 0) {
+                broadcast(new TestSessionEvent($submissionId, $userId, 'test_expired', [
+                    'message' => 'Bài thi đã hết thời gian và sẽ được tự động nộp'
+                ]));
+                return;
+            }
+
+            // Update connection status
+            $connectionKey = "test_session:{$submissionId}";
+            Redis::hset($connectionKey, [
+                'connected' => true,
+                'reconnected_at' => now()->toISOString(),
+                'last_seen' => now()->toISOString(),
+                'reconnection_count' => Redis::hincrby($connectionKey, 'reconnection_count', 1)
+            ]);
+
+            // Get disconnection info
+            $disconnectedAt = Redis::hget($connectionKey, 'disconnected_at');
+            $offlineDuration = $disconnectedAt ? now()->diffInSeconds($disconnectedAt) : 0;
+
+            // Successful reconnection with recovery data
+            broadcast(new TestSessionEvent($submissionId, $userId, 'reconnected', [
+                'message' => '✓ Kết nối lại thành công! Tiếp tục làm bài.',
+                'time_remaining_minutes' => $timeRemaining,
+                'offline_duration_seconds' => $offlineDuration,
+                'saved_answers' => $submission->answers->map(function($answer) {
+                    return [
+                        'question_id' => $answer->question_id,
+                        'answer_text' => $answer->saAnswer_text
+                    ];
+                }),
+                'recovery_successful' => true
             ]));
-            return;
+
+            // Notify teacher about reconnection
+            self::notifyTeacher($submissionId, 'student_reconnected', [
+                'student_id' => $userId,
+                'submission_id' => $submissionId,
+                'offline_duration' => $offlineDuration
+            ]);
+
+            Log::info("Student reconnected to test session", [
+                'submission_id' => $submissionId,
+                'user_id' => $userId,
+                'time_remaining' => $timeRemaining,
+                'offline_duration' => $offlineDuration
+            ]);
+        } catch (\Throwable $e) {
+            // Real-time (Redis/broadcast) là tính năng phụ — KHÔNG được chặn việc vào thi.
+            Log::warning("WebSocket reconnect degraded (Redis/broadcast unavailable)", [
+                'submission_id' => $submissionId,
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
         }
-
-        // Check if test expired
-        $timeElapsed = now()->diffInMinutes($submission->sStart_time);
-        $timeRemaining = $submission->exam->eDuration_minutes - $timeElapsed;
-
-        if ($timeRemaining <= 0) {
-            broadcast(new TestSessionEvent($submissionId, $userId, 'test_expired', [
-                'message' => 'Bài thi đã hết thời gian và sẽ được tự động nộp'
-            ]));
-            return;
-        }
-
-        // Update connection status
-        $connectionKey = "test_session:{$submissionId}";
-        Redis::hset($connectionKey, [
-            'connected' => true,
-            'reconnected_at' => now()->toISOString(),
-            'last_seen' => now()->toISOString(),
-            'reconnection_count' => Redis::hincrby($connectionKey, 'reconnection_count', 1)
-        ]);
-
-        // Get disconnection info
-        $disconnectedAt = Redis::hget($connectionKey, 'disconnected_at');
-        $offlineDuration = $disconnectedAt ? now()->diffInSeconds($disconnectedAt) : 0;
-
-        // Successful reconnection with recovery data
-        broadcast(new TestSessionEvent($submissionId, $userId, 'reconnected', [
-            'message' => '✓ Kết nối lại thành công! Tiếp tục làm bài.',
-            'time_remaining_minutes' => $timeRemaining,
-            'offline_duration_seconds' => $offlineDuration,
-            'saved_answers' => $submission->answers->map(function($answer) {
-                return [
-                    'question_id' => $answer->question_id,
-                    'answer_text' => $answer->saAnswer_text
-                ];
-            }),
-            'recovery_successful' => true
-        ]));
-
-        // Notify teacher about reconnection
-        self::notifyTeacher($submissionId, 'student_reconnected', [
-            'student_id' => $userId,
-            'submission_id' => $submissionId,
-            'offline_duration' => $offlineDuration
-        ]);
-
-        Log::info("Student reconnected to test session", [
-            'submission_id' => $submissionId,
-            'user_id' => $userId,
-            'time_remaining' => $timeRemaining,
-            'offline_duration' => $offlineDuration
-        ]);
     }
 
     /**
