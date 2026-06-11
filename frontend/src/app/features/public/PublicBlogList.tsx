@@ -244,7 +244,8 @@ export function PublicBlogList() {
       .getPosts({ type: activeType || undefined, search: search || undefined, page, per_page: 12 })
       .then((res: any) => {
         if (cancelled) return;
-        const paginator = res?.data?.data;
+        // cachedGet đã unwrap 1 tầng -> res chính là paginator {current_page, data, last_page, total}
+        const paginator = res;
         setPosts(paginator?.data ?? []);
         setLastPage(paginator?.last_page ?? 1);
         setTotal(paginator?.total ?? 0);

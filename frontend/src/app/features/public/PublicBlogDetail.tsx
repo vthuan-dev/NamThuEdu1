@@ -136,7 +136,8 @@ export function PublicBlogDetail() {
       .getPost(slug)
       .then((res: any) => {
         if (cancelled) return;
-        const data: Blog = res?.data?.data;
+        // cachedGet đã unwrap -> res chính là object bài viết
+        const data: Blog = res;
         if (!data) { setNotFound(true); return; }
         setPost(data);
         postId = data.pId;
@@ -144,7 +145,8 @@ export function PublicBlogDetail() {
       })
       .then((res: any) => {
         if (cancelled || !res) return;
-        const items: Blog[] = res?.data?.data?.data ?? [];
+        // res là paginator -> mảng nằm ở res.data
+        const items: Blog[] = res?.data ?? [];
         setRelated(items.filter((p) => p.pId !== postId).slice(0, 3));
       })
       .catch(() => { if (!cancelled) setNotFound(true); })
