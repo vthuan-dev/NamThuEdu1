@@ -7,6 +7,7 @@ import { NotificationPermissionBanner } from '../../components/NotificationPermi
 import { PwaInstallBanner } from '../../components/PwaInstallBanner';
 import { ResultDetail } from '../features/student/test-taking/ResultDetail';
 import { studentApi } from '../../services/studentApi';
+import { logout } from '../../services/authApi';
 import {
   Home, BookOpen, TrendingUp, Trophy, BarChart3,
   LogOut, Menu, X, Bell, Clock, User, ChevronDown,
@@ -146,12 +147,9 @@ export function TeensLayout() {
     return () => window.removeEventListener('keydown', onKey);
   }, [activeSubmissionId]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_role');
-    localStorage.removeItem('user');
-    sessionStorage.removeItem('auth_token');
-    navigate('/dang-nhap');
+  const handleLogout = async () => {
+    await logout();
+    navigate('/dang-nhap', { replace: true });
   };
 
   const navItems: NavItem[] = [

@@ -23,6 +23,8 @@ import {
   X,
 } from 'lucide-react';
 import { NotificationDropdown } from '../components/student/NotificationDropdown';
+import { logout } from '../../services/authApi';
+import { getAuthUser } from '../../utils/authStorage';
 
 type NavItem = { icon: any; label: string; path: string };
 
@@ -32,14 +34,7 @@ export function KidsLayout() {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const readUser = () => {
-    try {
-      const raw = localStorage.getItem('user');
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  };
+  const readUser = () => getAuthUser();
 
   const [user, setUser] = useState<any>(readUser);
 
@@ -60,11 +55,9 @@ export function KidsLayout() {
   const displayName: string =
     user?.uName || user?.name || user?.full_name || user?.fullName || 'Bạn';
 
-  const handleLogout = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_role');
-    localStorage.removeItem('user');
-    navigate('/dang-nhap');
+  const handleLogout = async () => {
+    await logout();
+    navigate('/dang-nhap', { replace: true });
   };
 
   const navItems: NavItem[] = [

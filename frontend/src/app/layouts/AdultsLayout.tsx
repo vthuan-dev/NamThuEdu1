@@ -16,6 +16,8 @@ import { useState } from 'react';
 import { Outlet, useNavigate, useLocation, NavLink } from 'react-router';
 import { usePushNotification } from '../../hooks/usePushNotification';
 import { NotificationPermissionBanner } from '../../components/NotificationPermissionBanner';
+import { logout } from '../../services/authApi';
+import { getAuthUser } from '../../utils/authStorage';
 import {
   Home,
   BookOpen,
@@ -124,14 +126,11 @@ export function AdultsLayout() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const userStr = localStorage.getItem('user');
-  const user = userStr ? JSON.parse(userStr) : null;
+  const user = getAuthUser();
 
-  const handleLogout = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_role');
-    localStorage.removeItem('user');
-    navigate('/dang-nhap');
+  const handleLogout = async () => {
+    await logout();
+    navigate('/dang-nhap', { replace: true });
   };
 
   const closeMobileSidebar = () => setSidebarOpen(false);

@@ -7,6 +7,7 @@
 import { api } from './api';
 import { AgeGroup } from '../utils/ageDetection';
 import { ThemePreference } from '../themes/types';
+import { clearAuthData } from '../utils/authStorage';
 
 export interface RegisterFormData {
   name: string;
@@ -84,6 +85,8 @@ export async function logout(): Promise<void> {
   } catch {
     // token invalid/expired: still clear local auth state on client
   }
-  localStorage.removeItem('auth_token');
-  localStorage.removeItem('auth_role');
+  // Clear auth from BOTH localStorage and sessionStorage.
+  // Token may live in sessionStorage when "remember me" is off, so removing
+  // only from localStorage would leave a valid token and bounce the user back.
+  clearAuthData();
 }
