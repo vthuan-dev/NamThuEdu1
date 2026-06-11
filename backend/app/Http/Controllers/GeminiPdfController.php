@@ -121,6 +121,179 @@ class GeminiPdfController extends Controller
     }
 
     /**
+     * Parse PDF đề VSTEP (Listening + Reading + Writing) → JSON theo schema import.
+     * Dùng chung pipeline upload + generateContent + xoay vòng key như parsePdf,
+     * nhưng prompt riêng cho cấu trúc VSTEP (không gồm Speaking).
+     *
+     * Route: POST /api/teacher/vstep/parse-pdf
+     * Body (multipart): { file: PDF }
+     * Return: { success, data: { listening?, reading?, writing? } }
+     */
+    public function parseVstepPdf(Request $request)
+    {
+        @set_time_limit(180);
+        @ini_set('max_execution_time', '180');
+
+        $request->validate([
+            'file' => 'required|file|mimes:pdf|max:20480', // 20MB
+        ]);
+
+        if (empty($this->apiKeys)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'GEMINI_API_KEY chưa được cấu hình trong .env backend.',
+            ], 500);
+        }
+
+        $file   = $request->file('file');
+        $prompt = $this->buildVstepPrompt();
+
+        $lastError = '';
+        $totalKeys = count($this->apiKeys);
+
+        foreach ($this->apiKeys as $idx => $apiKey) {
+            try {
+                $fileUri = $this->uploadToGemini($file, $apiKey);
+                $result  = $this->generateContent($fileUri, $prompt, $apiKey);
+                $result  = $this->postProcessVstep($result);
+
+                return response()->json([
+                    'success' => true,
+                    'data'    => $result,
+                ]);
+            } catch (\Exception $e) {
+                $lastError = $e->getMessage();
+                $keyNo = $idx + 1;
+                if ($this->shouldRotateKey($lastError) && $keyNo < $totalKeys) {
+                    Log::warning("Gemini key #{$keyNo} lỗi ({$lastError}) — xoay sang key #" . ($keyNo + 1));
+                    continue;
+                }
+                Log::error('Gemini VSTEP parse error: ' . $lastError);
+                break;
+            }
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => $lastError ?: 'Gemini parse VSTEP thất bại.',
+        ], 500);
+    }
+
+    /**
+     * Chuẩn hoá kết quả VSTEP từ Gemini về đúng schema mà VstepImportModal cần.
+     * - options luôn là object {A,B,C,D}
+     * - đảm bảo các mảng tồn tại
+     */
+    private function postProcessVstep(array $data): array
+    {
+        $normQuestions = function (array $questions): array {
+            foreach ($questions as &$q) {
+                // options: nếu thiếu/empty → object rỗng 4 lựa chọn
+                $opts = $q['options'] ?? null;
+                if (!is_array($opts)) $opts = [];
+                $q['options'] = [
+                    'A' => (string) ($opts['A'] ?? ''),
+                    'B' => (string) ($opts['B'] ?? ''),
+                    'C' => (string) ($opts['C'] ?? ''),
+                    'D' => (string) ($opts['D'] ?? ''),
+                ];
+                $ca = strtoupper(trim((string) ($q['correctAnswer'] ?? '')));
+                $q['correctAnswer'] = in_array($ca, ['A', 'B', 'C', 'D'], true) ? $ca : '';
+            }
+            unset($q);
+            return $questions;
+        };
+
+        if (isset($data['listening']['parts']) && is_array($data['listening']['parts'])) {
+            foreach ($data['listening']['parts'] as &$part) {
+                if (!isset($part['sections']) || !is_array($part['sections'])) $part['sections'] = [];
+                foreach ($part['sections'] as &$sec) {
+                    $sec['questions'] = $normQuestions($sec['questions'] ?? []);
+                }
+                unset($sec);
+            }
+            unset($part);
+        }
+
+        if (isset($data['reading']['parts']) && is_array($data['reading']['parts'])) {
+            foreach ($data['reading']['parts'] as &$part) {
+                $part['questions'] = $normQuestions($part['questions'] ?? []);
+            }
+            unset($part);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Prompt cho Gemini parse đề VSTEP → JSON.
+     */
+    private function buildVstepPrompt(): string
+    {
+        return 'You are an expert at extracting Vietnamese VSTEP (B1-C1) English exam content from a PDF.
+Extract Listening, Reading and Writing into structured JSON. DO NOT extract Speaking.
+
+Return ONLY valid JSON in EXACTLY this shape (omit a top-level key entirely if that skill is not present in the PDF):
+{
+  "listening": {
+    "parts": [
+      {
+        "partNumber": 1,
+        "sections": [
+          {
+            "sectionNumber": 1,
+            "sectionName": "short topic of this conversation/talk",
+            "transcript": "the full listening transcript/script if present, else empty string",
+            "questions": [
+              {
+                "questionNumber": 1,
+                "questionText": "the question stem (no question number prefix)",
+                "options": { "A": "...", "B": "...", "C": "...", "D": "..." },
+                "correctAnswer": "A"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "reading": {
+    "parts": [
+      {
+        "partNumber": 1,
+        "partName": "short passage title",
+        "passage": "the full clean reading passage text",
+        "questions": [
+          {
+            "questionNumber": 1,
+            "questionText": "the question stem (no number prefix)",
+            "options": { "A": "...", "B": "...", "C": "...", "D": "..." },
+            "correctAnswer": "B"
+          }
+        ]
+      }
+    ]
+  },
+  "writing": {
+    "tasks": [
+      { "taskNumber": 1, "taskName": "Task 1", "prompt": "full task prompt text", "wordCount": [80,120], "timeLimit": 20 },
+      { "taskNumber": 2, "taskName": "Task 2", "prompt": "full task prompt text", "wordCount": [200,250], "timeLimit": 40 }
+    ]
+  }
+}
+
+CRITICAL RULES:
+1. VSTEP Listening typically has 3 parts. Group each part s questions into one or more sections. If sections are not clearly separated, put all of a part s questions into a single section with sectionNumber=1. Keep the transcript/script text in the transcript field when available (very important for auto-grading later).
+2. VSTEP Reading typically has 4 passages/parts, each is multiple-choice A/B/C/D. passage = the FULL clean reading text only (strip instructions like "Read the passage and answer questions...", question lists, page headers/footers).
+3. Every Listening/Reading question MUST be multiple-choice with options A,B,C,D filled from the PDF. If only 3 options exist, leave D as empty string "".
+4. questionText = the actual question stem. NEVER include the leading question number (e.g. "12.") in questionText.
+5. correctAnswer = the letter A/B/C/D if an answer key is present in the PDF, otherwise empty string "".
+6. Writing: extract each task prompt fully. Task 1 is usually an email/letter (~120 words), Task 2 is an essay (~250 words). Infer reasonable wordCount and timeLimit if not stated ([80,120]/20 for Task 1, [200,250]/40 for Task 2).
+7. Keep numbering continuous and faithful to the PDF. Do NOT invent questions that are not in the PDF.
+8. Output MUST be valid JSON only — no markdown, no commentary.';
+    }
+
+    /**
      * Phát hiện lỗi có nên xoay sang key Gemini khác không.
      * Áp dụng cho: hết quota (429), key sai/không hợp lệ (401/403/400 API key),
      * quá tải (503), billing/permission.

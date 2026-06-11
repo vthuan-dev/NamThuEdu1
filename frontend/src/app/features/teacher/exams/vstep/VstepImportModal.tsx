@@ -1,11 +1,13 @@
-import { useState } from 'react';
-import { X, Upload, Download, FileJson, FileText, CheckCircle2, Loader2, AlertCircle, Headphones, BookOpen, PenTool, Sparkles, Code2, Copy, Check } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { X, Upload, Download, FileJson, FileText, CheckCircle2, Loader2, AlertCircle, Headphones, BookOpen, PenTool, Sparkles, Code2, Copy, Check, Bot } from 'lucide-react';
 import {
   saveVstepListeningSection,
   saveVstepPart,
   saveVstepWritingTask,
 } from '../../../../../services/vstepApi';
 import { parseVstepExamSmart } from './vstepParser';
+import { PdfPageSelector } from '../ielts/components/PdfPageSelector';
+import { API_BASE_URL } from '../../../../../utils/apiConfig';
 
 interface ImportPayload {
   listening?: {
@@ -122,7 +124,11 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
   const [fileName, setFileName] = useState('');
   const [parseError, setError]  = useState('');
   const [importing, setImporting] = useState(false);
-  const [pdfStage, setPdfStage]   = useState<'idle' | 'extract' | 'scanned' | 'ai'>('idle');
+  const [pdfStage, setPdfStage]   = useState<'idle' | 'trim' | 'extract' | 'scanned' | 'ai'>('idle');
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const pdfFileRef = useRef<File | null>(null);
+  const [aiParsing, setAiParsing] = useState(false);
+  const [parseMethod, setParseMethod] = useState<'local' | 'ai' | 'json' | null>(null);
   const [pdfProgress, setPdfProgress] = useState({ label: '', done: 0, total: 0 });
   const [scannedText, setScannedText] = useState('');
   const [showJson, setShowJson] = useState(false);
@@ -143,35 +149,9 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
     const isJson = f.type === 'application/json' || /\.json$/i.test(f.name);
 
     if (isPdf) {
-      try {
-        // Step 1 ONLY: extract text from PDF (no AI yet)
-        setPdfStage('extract');
-        setPdfProgress({ label: 'Trang 0/0', done: 0, total: 0 });
-        const pdfjs = await import('pdfjs-dist');
-        pdfjs.GlobalWorkerOptions.workerSrc =
-          `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-        const buf = await f.arrayBuffer();
-        const pdf = await pdfjs.getDocument({ data: buf }).promise;
-        let fullText = '';
-        for (let i = 1; i <= pdf.numPages; i++) {
-          setPdfProgress({ label: `Trang ${i}/${pdf.numPages}`, done: i, total: pdf.numPages });
-          const page    = await pdf.getPage(i);
-          const content = await page.getTextContent();
-          let lastY: number | null = null;
-          let pageText = '';
-          for (const item of content.items as any[]) {
-            if (lastY !== null && Math.abs(item.transform[5] - lastY) > 5) pageText += '\n';
-            pageText += item.str;
-            lastY = item.transform[5];
-          }
-          fullText += `\n=== Page ${i} ===\n${pageText.trim()}\n`;
-        }
-        setScannedText(fullText);
-        setPdfStage('scanned');
-      } catch (e: any) {
-        setError(e.message || 'Lỗi đọc PDF');
-        setPdfStage('idle');
-      }
+      // PDF → hiện bước chọn/cắt trang trước khi trích xuất.
+      setPendingFile(f);
+      setPdfStage('trim');
       return;
     }
 
@@ -182,6 +162,7 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
         if (!parsed.listening && !parsed.reading && !parsed.writing) {
           throw new Error('JSON phải có ít nhất 1 trong 3 key: listening, reading, writing');
         }
+        setParseMethod('json');
         setPayload(parsed);
       } catch (e: any) {
         setError(e.message || 'JSON không hợp lệ');
@@ -190,6 +171,80 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
     }
 
     setError('Chỉ hỗ trợ file .json hoặc .pdf');
+  };
+
+  /** Trích xuất text từ PDF (đã cắt trang nếu cần) để dùng cho parser local. */
+  const extractPdfText = async (f: File) => {
+    setError('');
+    setPayload(null);
+    setFileName(f.name);
+    setPendingFile(null);
+    pdfFileRef.current = f; // giữ file (đã cắt) để gửi Gemini
+
+    try {
+      setPdfStage('extract');
+      setPdfProgress({ label: 'Trang 0/0', done: 0, total: 0 });
+      const pdfjs = await import('pdfjs-dist');
+      pdfjs.GlobalWorkerOptions.workerSrc =
+        `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+      const buf = await f.arrayBuffer();
+      const pdf = await pdfjs.getDocument({ data: buf }).promise;
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        setPdfProgress({ label: `Trang ${i}/${pdf.numPages}`, done: i, total: pdf.numPages });
+        const page    = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        let lastY: number | null = null;
+        let pageText = '';
+        for (const item of content.items as any[]) {
+          if (lastY !== null && Math.abs(item.transform[5] - lastY) > 5) pageText += '\n';
+          pageText += item.str;
+          lastY = item.transform[5];
+        }
+        fullText += `\n=== Page ${i} ===\n${pageText.trim()}\n`;
+      }
+      setScannedText(fullText);
+      setPdfStage('scanned');
+    } catch (e: any) {
+      setError(e.message || 'Lỗi đọc PDF');
+      setPdfStage('idle');
+    }
+  };
+
+  /** Gọi Gemini (backend) parse PDF → JSON đề VSTEP. */
+  const handleGeminiParse = async () => {
+    const file = pdfFileRef.current;
+    if (!file) { setError('Không tìm thấy file PDF để phân tích.'); return; }
+    setError('');
+    setAiParsing(true);
+    setPdfStage('ai');
+    setPdfProgress({ label: 'Gemini đang đọc & phân tích PDF...', done: 0, total: 0 });
+    try {
+      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`${API_BASE_URL}/teacher/vstep/parse-pdf`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || `Lỗi server: ${res.status}`);
+      }
+      const data = json.data as ImportPayload;
+      if (!data.listening && !data.reading && !data.writing) {
+        throw new Error('Gemini không nhận dạng được nội dung VSTEP trong PDF này.');
+      }
+      setParseMethod('ai');
+      setPayload(data);
+      setPdfStage('idle');
+    } catch (e: any) {
+      setError(e.message || 'Lỗi phân tích bằng AI');
+      setPdfStage('scanned');
+    } finally {
+      setAiParsing(false);
+    }
   };
 
   const downloadSample = () => {
@@ -306,6 +361,7 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
         throw new Error('Không nhận dạng được cấu trúc VSTEP trong PDF này');
       }
       setPayload(result as ImportPayload);
+      setParseMethod('local');
       setPdfStage('idle');
     } catch (e: any) {
       setError(e.message || 'Lỗi phân tích');
@@ -318,6 +374,8 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
     setProgress({ current: 0, total: 0, label: '' });
     setStatus({ listening: 'idle', reading: 'idle', writing: 'idle' });
     setScannedText(''); setPdfStage('idle');
+    setPendingFile(null); pdfFileRef.current = null;
+    setAiParsing(false); setParseMethod(null);
   };
 
   const summary = payload && {
@@ -339,7 +397,7 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => !importing && onClose()}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div
-        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-hidden flex flex-col z-10"
+        className={`relative bg-white rounded-2xl shadow-2xl w-full ${pdfStage === 'trim' ? 'max-w-5xl' : 'max-w-4xl'} max-h-[92vh] overflow-hidden flex flex-col z-10`}
         style={{ animation: 'vstepImportIn .2s cubic-bezier(0.34,1.56,0.64,1)' }}
         onClick={e => e.stopPropagation()}
       >
@@ -369,6 +427,7 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
           {/* Sample download */}
+          {pdfStage !== 'trim' && (
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between gap-4">
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-blue-900">Chưa có file mẫu?</p>
@@ -383,6 +442,17 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
               <Download className="w-4 h-4" /> Tải mẫu
             </button>
           </div>
+          )}
+
+          {/* PDF: chọn / cắt trang trước khi xử lý */}
+          {pdfStage === 'trim' && pendingFile && (
+            <PdfPageSelector
+              file={pendingFile}
+              accentColor="#F97316"
+              onConfirm={(result) => extractPdfText(result)}
+              onCancel={resetState}
+            />
+          )}
 
           {/* PDF processing state (extract / ai) */}
           {(pdfStage === 'extract' || pdfStage === 'ai') && (
@@ -448,7 +518,7 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
                 </div>
                 <div>
                   <p className="font-semibold text-gray-900">Click hoặc kéo thả file</p>
-                  <p className="text-xs text-gray-500 mt-1">Hỗ trợ: <span className="font-bold text-orange-600">.pdf</span> (AI tự động phân tích) hoặc <span className="font-bold text-blue-600">.json</span></p>
+                  <p className="text-xs text-gray-500 mt-1">Hỗ trợ: <span className="font-bold text-orange-600">.pdf</span> (cắt trang + AI Gemini phân tích) hoặc <span className="font-bold text-blue-600">.json</span></p>
                 </div>
               </div>
             </label>
@@ -458,7 +528,18 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
                 <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-emerald-900 truncate">{fileName}</p>
-                  <p className="text-xs text-emerald-700">Sẵn sàng import</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <p className="text-xs text-emerald-700">Sẵn sàng import</p>
+                    {parseMethod === 'ai' && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 border border-violet-200">🤖 Gemini AI</span>
+                    )}
+                    {parseMethod === 'local' && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 border border-orange-200">⚡ Local</span>
+                    )}
+                    {parseMethod === 'json' && (
+                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">JSON</span>
+                    )}
+                  </div>
                 </div>
                 <button
                   onClick={() => setShowJson(s => !s)}
@@ -541,6 +622,7 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50">
+          {pdfStage !== 'trim' && (
           <button
             onClick={() => !importing && onClose()}
             disabled={importing}
@@ -548,14 +630,28 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
           >
             Hủy
           </button>
+          )}
           {pdfStage === 'scanned' ? (
-            <button
-              onClick={handleAiParse}
-              className="h-10 px-6 bg-gradient-to-r from-orange-500 to-rose-500 text-white rounded-lg text-sm font-semibold hover:from-orange-600 hover:to-rose-600 transition-all flex items-center gap-2 shadow-md"
-            >
-              <Sparkles className="w-4 h-4" /> Phân tích nội dung
-            </button>
-          ) : (
+            <>
+              <button
+                onClick={handleAiParse}
+                disabled={aiParsing}
+                className="h-10 px-5 bg-white border border-orange-300 text-orange-700 rounded-lg text-sm font-semibold hover:bg-orange-50 transition-all flex items-center gap-2 disabled:opacity-40"
+                title="Phân tích nhanh bằng thư viện (miễn phí, không cần mạng AI)"
+              >
+                <Sparkles className="w-4 h-4" /> Phân tích nhanh
+              </button>
+              <button
+                onClick={handleGeminiParse}
+                disabled={aiParsing}
+                className="h-10 px-6 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-lg text-sm font-semibold hover:from-violet-600 hover:to-fuchsia-600 transition-all flex items-center gap-2 shadow-md disabled:opacity-50"
+                title="Dùng AI Gemini đọc PDF (chính xác hơn, kể cả PDF scan)"
+              >
+                {aiParsing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
+                {aiParsing ? 'Đang phân tích...' : 'Phân tích bằng AI Gemini'}
+              </button>
+            </>
+          ) : pdfStage === 'trim' || pdfStage === 'extract' || pdfStage === 'ai' ? null : (
             <button
               onClick={runImport}
               disabled={!payload || importing}

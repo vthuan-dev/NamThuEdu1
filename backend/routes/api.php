@@ -251,6 +251,8 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         
         // IELTS-specific routes
         Route::post('/ielts/parse-pdf', [GeminiPdfController::class, 'parsePdf']); // Gemini PDF → JSON
+        // VSTEP: Gemini PDF → JSON (Listening/Reading/Writing) cho import đề full
+        Route::post('/vstep/parse-pdf', [GeminiPdfController::class, 'parseVstepPdf']);
         Route::post('/ielts/diarize-transcript', [GeminiPdfController::class, 'diarizeTranscript']); // Gemini phân tách speaker A/B
         Route::post('/ielts/transcribe-audio', [GeminiPdfController::class, 'transcribeAudio']); // Groq Whisper STT (server-side, nhanh)
         Route::post('/ielts/suggest-answers', [GeminiPdfController::class, 'suggestIeltsAnswers']); // Groq gợi ý đáp án từ transcript/passage
