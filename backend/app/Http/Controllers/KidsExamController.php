@@ -116,6 +116,9 @@ class KidsExamController extends Controller
             'kids_exam_config' => [
                 'exam_type' => $request->exam_type_code,
                 'mode' => $request->mode ?? 'flexible', // Add mode field
+                'scope' => $request->scope ?? 'full', // Phạm vi: full | skill | part
+                'scope_skill' => $request->scope_skill, // listening | reading_writing | speaking
+                'scope_part' => $request->scope_part, // số part trong kỹ năng (khi scope=part)
                 'level' => $templateConfig['level'],
                 'age_range' => $templateConfig['age_range'],
                 'vocabulary_size' => $templateConfig['vocabulary_size'],
@@ -249,6 +252,15 @@ class KidsExamController extends Controller
         if ($request->has('mode')) {
             $config = $exam->kids_exam_config ?? [];
             $config['mode'] = $request->mode;
+            $updateData['kids_exam_config'] = $config;
+        }
+
+        // Update scope (phạm vi đề) in kids_exam_config if provided
+        if ($request->has('scope') || $request->has('scope_skill') || $request->has('scope_part')) {
+            $config = $updateData['kids_exam_config'] ?? ($exam->kids_exam_config ?? []);
+            if ($request->has('scope')) $config['scope'] = $request->scope;
+            if ($request->has('scope_skill')) $config['scope_skill'] = $request->scope_skill;
+            if ($request->has('scope_part')) $config['scope_part'] = $request->scope_part;
             $updateData['kids_exam_config'] = $config;
         }
 

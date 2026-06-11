@@ -160,6 +160,32 @@ const PART_TO_SKILL: Record<number, keyof CambridgeLevelStructure> = {
   3: 'speaking',
 };
 
+// Khoá kỹ năng dùng cho phạm vi đề (scope)
+export type SkillKey = keyof CambridgeLevelStructure;
+
+// map kỹ năng → partId (1/2/3) và ngược lại
+export const SKILL_TO_PART: Record<SkillKey, number> = {
+  listening: 1,
+  reading_writing: 2,
+  speaking: 3,
+};
+
+// Nhãn + icon cho từng kỹ năng (dùng ở picker phạm vi & sidebar)
+export const SKILL_META: Record<SkillKey, { label: string; icon: string }> = {
+  listening: { label: 'Nghe', icon: '🎧' },
+  reading_writing: { label: 'Đọc & Viết', icon: '📖' },
+  speaking: { label: 'Nói', icon: '🗣️' },
+};
+
+export const SKILL_ORDER: SkillKey[] = ['listening', 'reading_writing', 'speaking'];
+
+/** Lấy danh sách part của 1 kỹ năng trong 1 cấp độ (rỗng nếu không hợp lệ). */
+export function getSkillParts(examType: string, skill: SkillKey): CambridgePart[] {
+  const level = CAMBRIDGE_PARTS_STRUCTURE[examType?.toLowerCase()];
+  if (!level || !level[skill]) return [];
+  return level[skill].parts;
+}
+
 /**
  * Lấy taskType chuẩn (blueprint) cho 1 part/subPart của 1 cấp độ.
  * Trả về null nếu không tìm thấy (vd cấp độ không hợp lệ).

@@ -24,6 +24,9 @@ export interface KidsExamData {
   eDuration: number;
   exam_type_code: string;
   mode?: 'flexible' | 'cambridge'; // Add mode field
+  scope?: 'full' | 'skill' | 'part';
+  scope_skill?: 'listening' | 'reading_writing' | 'speaking' | null;
+  scope_part?: number | null;
 }
 
 // Get all exam types (Starters, Movers, Flyers)

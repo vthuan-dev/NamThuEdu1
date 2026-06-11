@@ -42,6 +42,9 @@ interface ExamData {
   duration: number;
   questions: any[];
   mode?: 'flexible' | 'cambridge';
+  scope?: 'full' | 'skill' | 'part';
+  scopeSkill?: 'listening' | 'reading_writing' | 'speaking' | null;
+  scopePart?: number | null;
 }
 
 const CreateKidsExam: React.FC = () => {
@@ -57,6 +60,9 @@ const CreateKidsExam: React.FC = () => {
     duration: 60,
     questions: [],
     mode: 'flexible', // Default to flexible mode
+    scope: 'full', // Phạm vi đề: full | skill | part
+    scopeSkill: null,
+    scopePart: null,
   });
 
   // Load existing exam if examId exists
@@ -116,6 +122,9 @@ const CreateKidsExam: React.FC = () => {
           duration: exam.eDuration || 60,
           questions: transformedQuestions,
           mode: exam.kids_exam_config?.mode || 'flexible', // Load mode from database
+          scope: exam.kids_exam_config?.scope || 'full',
+          scopeSkill: exam.kids_exam_config?.scope_skill || null,
+          scopePart: exam.kids_exam_config?.scope_part ?? null,
         });
         setCurrentExamId(id);
         
@@ -152,6 +161,9 @@ const CreateKidsExam: React.FC = () => {
         eDuration: examData.duration,
         exam_type_code: examTypeCode,
         mode: examData.mode || 'flexible', // Send mode to server
+        scope: examData.scope || 'full',
+        scope_skill: examData.scopeSkill ?? null,
+        scope_part: examData.scopePart ?? null,
       });
 
       if (response.exam?.eId) {

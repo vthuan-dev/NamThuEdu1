@@ -43,6 +43,7 @@ import { CreateVstepWriting } from "../features/teacher/exams/vstep/CreateVstepW
 import { CreateVstepSpeaking } from "../features/teacher/exams/vstep/CreateVstepSpeaking";
 import { CreateVstepFull } from "../features/teacher/exams/vstep/CreateVstepFull";
 import CreateIeltsExam from "../features/teacher/exams/ielts/CreateIeltsExam";
+import { CreateIeltsFullExam } from "../features/teacher/exams/ielts/CreateIeltsFullExam";
 import { CreateThptExam } from "../features/teacher/exams/thpt/CreateThptExam";
 import { IeltsPreviewPage } from "../features/teacher/exams/ielts/IeltsPreviewPage";
 import { IeltsTestPreviewPage } from "../features/teacher/exams/ielts/IeltsTestPreviewPage";
@@ -138,7 +139,10 @@ export const teacherRoutes = {
     { path: "de-thi/vstep/full/tao-moi", Component: CreateVstepFull },
     { path: "de-thi/vstep/full/sua/:examId", Component: CreateVstepFull },
 
-    // ── IELTS routes (1 đề = 1 skill, không có "full" mode) ──────────────
+    // ── IELTS routes ────────────────────────────────────────────────────
+    // Full test (4 kỹ năng) — tạo 4 đề con liên kết bằng full_group_id.
+    { path: "de-thi/ielts/full/tao-moi", Component: CreateIeltsFullExam },
+    // Single-skill (1 đề = 1 kỹ năng).
     { path: "de-thi/ielts/listening/tao-moi", Component: () => <CreateIeltsExam initialSkill="listening" /> },
     { path: "de-thi/ielts/listening/edit/:examId", Component: () => <CreateIeltsExam initialSkill="listening" /> },
     { path: "de-thi/ielts/reading/tao-moi", Component: () => <CreateIeltsExam initialSkill="reading" /> },

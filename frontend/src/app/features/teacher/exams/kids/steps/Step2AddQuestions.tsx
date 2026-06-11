@@ -106,26 +106,46 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
   const hasCambridgeStructure = !!cambridgeStructure;
   const showSubParts = hasCambridgeStructure;
 
-  // Tiến độ: số sub-part đã có câu hỏi / tổng sub-part theo blueprint
-  const allSubParts = cambridgeStructure
+  // ── Phạm vi đề (scope): full | skill | part ──────────────────────────
+  const scope: 'full' | 'skill' | 'part' = examData.scope || 'full';
+  const scopeSkill: string | null = examData.scopeSkill ?? null;
+  const scopePart: number | null = examData.scopePart ?? null;
+
+  // Các section gốc theo cấu trúc Cambridge
+  const baseSections = cambridgeStructure
     ? [
-        ...cambridgeStructure.listening.parts.map((p: any) => ({ part: 1, sub: p.partNumber })),
-        ...cambridgeStructure.reading_writing.parts.map((p: any) => ({ part: 2, sub: p.partNumber })),
-        ...cambridgeStructure.speaking.parts.map((p: any) => ({ part: 3, sub: p.partNumber })),
+        { partId: 1, skill: 'listening', label: 'Nghe', data: cambridgeStructure.listening },
+        { partId: 2, skill: 'reading_writing', label: 'Đọc & Viết', data: cambridgeStructure.reading_writing },
+        { partId: 3, skill: 'speaking', label: 'Nói', data: cambridgeStructure.speaking },
       ]
     : [];
+
+  // Lọc theo phạm vi đã chọn
+  const scopedSections = baseSections
+    .filter((s) => (scope === 'full' ? true : s.skill === scopeSkill))
+    .map((s) => {
+      if (scope === 'part' && scopePart != null) {
+        return { ...s, data: { ...s.data, parts: s.data.parts.filter((p: any) => p.partNumber === scopePart) } };
+      }
+      return s;
+    });
+
+  // Tiến độ: số sub-part đã có câu hỏi / tổng sub-part TRONG PHẠM VI
+  const allSubParts = scopedSections.flatMap((s) =>
+    s.data.parts.map((p: any) => ({ part: s.partId, sub: p.partNumber }))
+  );
   const totalSubParts = allSubParts.length;
   const filledSubParts = allSubParts.filter((sp) =>
     examData.questions.some((q: any) => q.part === sp.part && q.subPart === sp.sub)
   ).length;
   const progressPct = totalSubParts > 0 ? Math.round((filledSubParts / totalSubParts) * 100) : 0;
 
-  // Mở sẵn cả 3 phần khi có blueprint
+  // Mở sẵn các phần trong phạm vi khi có blueprint
   React.useEffect(() => {
     if (showSubParts) {
-      setExpandedParts([1, 2, 3]);
+      setExpandedParts(scopedSections.map((s) => s.partId));
     }
-  }, [showSubParts]);
+  }, [showSubParts, scope, scopeSkill, scopePart]);
 
   const togglePart = (partId: number) => {
     setExpandedParts((prev) =>
@@ -302,7 +322,13 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
           </div>
           <p className="mt-0.5 text-sm font-semibold text-slate-800">
             {showSubParts
-              ? `${examData.examType?.toUpperCase() || 'Cambridge'} · 3 kỹ năng`
+              ? `${examData.examType?.toUpperCase() || 'Cambridge'} · ${
+                  scope === 'full'
+                    ? '3 kỹ năng'
+                    : scope === 'skill'
+                    ? scopedSections[0]?.label || '1 kỹ năng'
+                    : `${scopedSections[0]?.label || ''} · Part ${scopePart}`
+                }`
               : '3 phần cố định'}
           </p>
           {showSubParts && (
@@ -351,12 +377,7 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
 
           {/* Chế độ Cambridge (có sub-part) */}
           {showSubParts &&
-            cambridgeStructure &&
-            [
-              { partId: 1, label: 'Nghe', data: cambridgeStructure.listening },
-              { partId: 2, label: 'Đọc & Viết', data: cambridgeStructure.reading_writing },
-              { partId: 3, label: 'Nói', data: cambridgeStructure.speaking },
-            ].map((section) => {
+            scopedSections.map((section) => {
               const expanded = expandedParts.includes(section.partId);
               const doneCount = section.data.parts.filter(
                 (p: any) => getSubPartQuestionCount(section.partId, p.partNumber) > 0

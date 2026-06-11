@@ -11,8 +11,17 @@ import {
   X,
   Clock,
   FileText,
+  Layers,
+  LayoutGrid,
+  SquareStack,
   type LucideIcon,
 } from 'lucide-react';
+import {
+  SKILL_META,
+  SKILL_ORDER,
+  getSkillParts,
+  type SkillKey,
+} from '../constants/cambridgeStructure';
 
 interface Step1ExamTypeProps {
   examData: any;
@@ -68,6 +77,14 @@ const LEVEL_TONES = {
   movers: { accent: '#3B82F6', soft: '#EFF6FF' },
   flyers: { accent: '#10B981', soft: '#ECFDF5' },
 };
+
+// Lựa chọn phạm vi đề thi (scope)
+type ScopeId = 'full' | 'skill' | 'part';
+const SCOPE_OPTIONS: { id: ScopeId; name: string; desc: string; icon: LucideIcon }[] = [
+  { id: 'full', name: 'Đề đầy đủ', desc: 'Cả 3 kỹ năng, mọi phần', icon: LayoutGrid },
+  { id: 'skill', name: 'Theo kỹ năng', desc: 'Chỉ 1 kỹ năng', icon: Layers },
+  { id: 'part', name: 'Theo phần', desc: 'Chỉ 1 phần nhỏ', icon: SquareStack },
+];
 
 // Metadata từng cấp độ Cambridge YLE để tạo gợi ý tên đề & mô tả ngay trong dự án
 const LEVEL_META: Record<
@@ -133,6 +150,36 @@ const Step1ExamType: React.FC<Step1ExamTypeProps> = ({
     });
   };
 
+  // Chọn phạm vi đề: full | skill | part
+  const handleSelectScope = (scope: ScopeId) => {
+    if (scope === 'full') {
+      setExamData({ ...examData, scope, scopeSkill: null, scopePart: null });
+      return;
+    }
+    // skill / part: mặc định kỹ năng đầu (Nghe) nếu chưa chọn
+    const skill = (examData.scopeSkill as SkillKey) || 'listening';
+    const firstPart = getSkillParts(examData.examType, skill)[0]?.partNumber ?? 1;
+    setExamData({
+      ...examData,
+      scope,
+      scopeSkill: skill,
+      scopePart: scope === 'part' ? (examData.scopePart ?? firstPart) : null,
+    });
+  };
+
+  const handleSelectScopeSkill = (skill: SkillKey) => {
+    const firstPart = getSkillParts(examData.examType, skill)[0]?.partNumber ?? 1;
+    setExamData({
+      ...examData,
+      scopeSkill: skill,
+      scopePart: examData.scope === 'part' ? firstPart : null,
+    });
+  };
+
+  const handleSelectScopePart = (partNumber: number) => {
+    setExamData({ ...examData, scopePart: partNumber });
+  };
+
   const handleInputChange = (field: string, value: any) => {
     setExamData({ ...examData, [field]: value });
   };
@@ -175,7 +222,14 @@ const Step1ExamType: React.FC<Step1ExamTypeProps> = ({
     runSuggest();
   };
 
-  const canProceed = examData.examType && examData.title;
+  const scope: ScopeId = (examData.scope as ScopeId) || 'full';
+  const scopeSkill = (examData.scopeSkill as SkillKey) || 'listening';
+  const skillParts = examData.examType ? getSkillParts(examData.examType, scopeSkill) : [];
+
+  const canProceed =
+    examData.examType &&
+    examData.title &&
+    (scope !== 'part' || (examData.scopeSkill && examData.scopePart));
 
   // Màu nhấn theo cấp độ đang chọn (mặc định cam khi chưa chọn)
   const activeTone = examData.examType
@@ -298,11 +352,143 @@ const Step1ExamType: React.FC<Step1ExamTypeProps> = ({
         </div>
       </section>
 
-      {/* ── 2. Thông tin đề thi ──────────────────────────────────────────── */}
+      {/* ── 2. Phạm vi đề thi ────────────────────────────────────────────── */}
       <section>
         <div className="flex items-center gap-2.5 mb-4">
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
             2
+          </span>
+          <h2 className="text-[15px] font-semibold text-slate-900">
+            Phạm vi đề thi
+          </h2>
+          <span className="ml-auto text-xs text-slate-400">
+            Cho học viên làm trọn đề hay chỉ một phần nhỏ
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {SCOPE_OPTIONS.map((opt) => {
+            const Icon = opt.icon;
+            const isSelected = scope === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => handleSelectScope(opt.id)}
+                aria-pressed={isSelected}
+                className={`group flex items-start gap-3 rounded-xl border bg-white p-4 text-left transition-all duration-200 cursor-pointer ${
+                  isSelected
+                    ? 'border-orange-300 bg-orange-50/50 ring-2 ring-orange-200'
+                    : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
+                }`}
+              >
+                <div
+                  className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg transition-colors ${
+                    isSelected ? 'bg-orange-500 text-white' : 'bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  <Icon className="h-[18px] w-[18px]" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="text-sm font-bold text-slate-900">{opt.name}</h3>
+                    {opt.id === 'full' && (
+                      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-500">
+                        Mặc định
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-[11px] leading-snug text-slate-500">{opt.desc}</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Chi tiết khi chọn theo kỹ năng / theo phần */}
+        {scope !== 'full' && (
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-4">
+            {!examData.examType ? (
+              <p className="text-xs text-slate-400">
+                Hãy chọn cấp độ Cambridge ở trên trước để chọn kỹ năng/phần.
+              </p>
+            ) : (
+              <>
+                {/* Chọn kỹ năng */}
+                <div>
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                    Chọn kỹ năng
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {SKILL_ORDER.map((sk) => {
+                      const meta = SKILL_META[sk];
+                      const active = scopeSkill === sk;
+                      return (
+                        <button
+                          key={sk}
+                          type="button"
+                          onClick={() => handleSelectScopeSkill(sk)}
+                          className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-all ${
+                            active
+                              ? 'border-orange-300 bg-white text-orange-700 ring-1 ring-orange-200'
+                              : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                          }`}
+                        >
+                          <span className="text-base">{meta.icon}</span>
+                          {meta.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Chọn phần (chỉ khi scope = part) */}
+                {scope === 'part' && (
+                  <div>
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      Chọn phần
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {skillParts.map((p) => {
+                        const active = examData.scopePart === p.partNumber;
+                        return (
+                          <button
+                            key={p.partNumber}
+                            type="button"
+                            onClick={() => handleSelectScopePart(p.partNumber)}
+                            className={`rounded-lg border px-3 py-2 text-left transition-all ${
+                              active
+                                ? 'border-orange-300 bg-white ring-1 ring-orange-200'
+                                : 'border-slate-200 bg-white hover:border-slate-300'
+                            }`}
+                          >
+                            <span
+                              className={`block text-xs font-bold ${
+                                active ? 'text-orange-700' : 'text-slate-700'
+                              }`}
+                            >
+                              {p.name}
+                            </span>
+                            <span className="block text-[10px] font-medium text-slate-400">
+                              {p.description}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* ── 3. Thông tin đề thi ──────────────────────────────────────────── */}
+      <section>
+        <div className="flex items-center gap-2.5 mb-4">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-[11px] font-bold text-white">
+            3
           </span>
           <h2 className="text-[15px] font-semibold text-slate-900">
             Thông tin đề thi
