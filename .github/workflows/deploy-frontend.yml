@@ -1,0 +1,76 @@
+name: Deploy Frontend to VPS
+
+# Build frontend trên runner rồi đẩy thư mục dist lên VPS, nginx phục vụ static.
+# Chạy khi có thay đổi trong frontend/ trên nhánh main, hoặc chạy tay.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        working-directory: frontend
+        env:
+          HUSKY: 0
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (mode production)
+        working-directory: frontend
+        env:
+          VITE_API_URL: https://api.namthuedu.vn/api
+          VITE_API_BASE_URL: https://api.namthuedu.vn
+          VITE_API_TIMEOUT: '30000'
+          VITE_ADDRESS_API: https://api.namthuedu.vn/api/address
+          VITE_APP_NAME: NamThu Education
+          VITE_APP_ENV: production
+          VITE_WS_URL: wss://api.namthuedu.vn
+          VITE_WS_KEY: namthuedu
+          VITE_ENABLE_MONITORING: 'true'
+          VITE_ENABLE_ANALYTICS: 'true'
+          VITE_ENABLE_DEBUG: 'false'
+          VITE_USE_MOCK_DATA: 'false'
+        run: pnpm run build
+
+      - name: Package dist
+        run: tar -czf dist.tar.gz -C frontend/dist .
+
+      - name: Upload dist to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_PORT }}
+          source: dist.tar.gz
+          target: /var/www/namthuedu-fe
+
+      - name: Swap & reload nginx
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_PORT }}
+          script: bash /var/www/namthuedu-fe/deploy-fe.sh
