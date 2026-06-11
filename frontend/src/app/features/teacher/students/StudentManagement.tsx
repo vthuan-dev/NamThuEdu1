@@ -825,16 +825,13 @@ export function StudentManagement() {
 
   const getAgeGroupBadge = (ageGroup: string) => {
     const config = {
-      kids: { label: t('teacher.students.management.ageGroup.kids'), icon: "👶", color: "#EC4899", bg: "#FCE7F3" },
-      teens: { label: t('teacher.students.management.ageGroup.teens'), icon: "🎓", color: "#F97316", bg: "#FFEDD5" },
-      adults: { label: t('teacher.students.management.ageGroup.adults'), icon: "👔", color: "#6366F1", bg: "#E0E7FF" },
+      kids: { label: t('teacher.students.management.ageGroup.kids'), icon: "👶" },
+      teens: { label: t('teacher.students.management.ageGroup.teens'), icon: "🎓" },
+      adults: { label: t('teacher.students.management.ageGroup.adults'), icon: "👔" },
     };
-    const { label, icon, color, bg } = config[ageGroup as keyof typeof config] || config.teens;
+    const { label, icon } = config[ageGroup as keyof typeof config] || config.teens;
     return (
-      <span
-        className="px-3 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1"
-        style={{ color, backgroundColor: bg }}
-      >
+      <span className="px-2.5 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 bg-slate-100 text-slate-600">
         <span>{icon}</span>
         <span>{label}</span>
       </span>
@@ -879,32 +876,36 @@ export function StudentManagement() {
       {/* Tab Content */}
       {activeTab === "list" && (
         <div>
-          {/* Stats Cards */}
-          <div className="grid grid-cols-4 gap-4 mb-5">
+          {/* Stats Cards — compact, neutral */}
+          <div className="grid grid-cols-4 gap-3 mb-5">
             {studentStats.map((stat, index) => {
               const Icon = stat.icon;
               const TrendIcon = stat.trend === "up" ? TrendingUp : TrendingDown;
               return (
                 <div
                   key={index}
-                  className="bg-white rounded-xl p-4 border border-slate-200"
+                  className="bg-white rounded-lg px-3.5 py-3 border border-slate-200 flex items-center gap-3"
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <div
-                      className="w-10 h-10 rounded-lg flex items-center justify-center"
-                      style={{ backgroundColor: `${stat.color}15` }}
-                    >
-                      <Icon className="w-5 h-5" style={{ color: stat.color }} />
-                    </div>
-                    <div className="flex items-center gap-0.5 text-[11px] font-semibold" style={{ color: stat.trend === "up" ? "#10B981" : "#EF4444" }}>
-                      <TrendIcon className="w-3 h-3" />
-                      {Math.abs(stat.change)}%
-                    </div>
+                  <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                    <Icon className="w-[18px] h-[18px] text-slate-500" />
                   </div>
-                  <p className="text-xl font-bold text-slate-900 mb-0.5">
-                    {stat.value.toLocaleString()}
-                  </p>
-                  <p className="text-[11px] text-slate-500">{stat.label}</p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline gap-1.5">
+                      <p className="text-lg font-bold text-slate-900 leading-none">
+                        {stat.value.toLocaleString()}
+                      </p>
+                      {stat.change !== 0 && (
+                        <span
+                          className="flex items-center gap-0.5 text-[10px] font-medium"
+                          style={{ color: stat.trend === "up" ? "#16A34A" : "#DC2626" }}
+                        >
+                          <TrendIcon className="w-2.5 h-2.5" />
+                          {Math.abs(stat.change)}%
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500 truncate mt-0.5">{stat.label}</p>
+                  </div>
                 </div>
               );
             })}
@@ -1058,9 +1059,6 @@ export function StudentManagement() {
                       {t('teacher.students.management.table.ageGroup')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wider">
-                      {t('teacher.students.management.table.course')}
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wider">
                       {t('teacher.students.management.table.status')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wider">
@@ -1101,7 +1099,7 @@ export function StudentManagement() {
                               className="w-10 h-10 rounded-full object-cover border-2 border-[#E5E7EB]"
                             />
                           ) : (
-                            <div className="w-10 h-10 rounded-full bg-[#2563EB] text-white flex items-center justify-center font-semibold text-sm">
+                            <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-semibold text-sm">
                               {student.avatar}
                             </div>
                           )}
@@ -1118,9 +1116,6 @@ export function StudentManagement() {
                       </td>
                       <td className="px-6 py-4 text-sm text-[#6B7280]">
                         {getAgeGroupBadge(student.ageGroup)}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-[#6B7280]">
-                        {student.course}
                       </td>
                       <td className="px-6 py-4">{getStatusBadge(student.status)}</td>
                       <td className="px-6 py-4 text-sm text-[#6B7280]">
