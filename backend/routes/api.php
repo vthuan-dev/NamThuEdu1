@@ -432,6 +432,11 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         // Exam browser (VSTEP/IELTS public exams for adults)
         Route::get('/exams/browse', [StudentTestController::class, 'browseExams']);
 
+        // Kids exam browser — TẤT CẢ đề Cambridge YL đã publish (kèm cờ is_assigned)
+        Route::get('/exams/browse-kids', [StudentTestController::class, 'browseKidsExams']);
+        // Kids direct exam (start/resume by exam ID without assignment)
+        Route::post('/exams/{examId}/start-kids', [StudentTestController::class, 'startKidsExamDirect']);
+
         // VSTEP direct exam (start by exam ID without assignment)
         Route::post('/exams/{examId}/start-direct',   [StudentTestController::class, 'startDirectExam']);
         Route::get('/exams/{examId}/vstep/listening', [StudentTestController::class, 'loadVstepListening']);
