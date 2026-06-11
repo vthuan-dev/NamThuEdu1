@@ -1,0 +1,43 @@
+name: Diag Queue Worker (VPS)
+
+# Chạy TAY để kiem tra VPS co queue worker dang chay khong + so job pending/failed.
+on:
+  workflow_dispatch:
+
+jobs:
+  diag:
+    name: SSH Diag Queue
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect queue worker on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_PORT }}
+          command_timeout: 5m
+          script: |
+            echo "===== 1) QUEUE_CONNECTION trong .env ====="
+            grep -E "^QUEUE_CONNECTION" /var/www/namthuedu/backend/.env || echo "(khong tim thay)"
+            echo ""
+            echo "===== 2) Tien trinh queue:work / queue:listen ====="
+            ps aux | grep -E "artisan (queue:work|queue:listen)" | grep -v grep || echo "(KHONG co tien trinh queue dang chay)"
+            echo ""
+            echo "===== 3) Supervisor status ====="
+            (command -v supervisorctl >/dev/null 2>&1 && supervisorctl status) || echo "(supervisor khong cai dat / khong dung)"
+            echo ""
+            echo "===== 4) systemd services lien quan ====="
+            (systemctl list-units --type=service --all 2>/dev/null | grep -iE "queue|horizon|namthu|laravel") || echo "(khong thay service queue qua systemd)"
+            echo ""
+            echo "===== 5) Laravel Horizon? ====="
+            (command -v php >/dev/null 2>&1 && cd /var/www/namthuedu/backend && php artisan list 2>/dev/null | grep -i horizon) || echo "(khong co horizon)"
+            echo ""
+            echo "===== 6) So luong job pending / failed ====="
+            cd /var/www/namthuedu/backend
+            php artisan tinker --execute="echo 'jobs(pending)=' . (\Schema::hasTable('jobs') ? \DB::table('jobs')->count() : 'no-table') . PHP_EOL; echo 'failed_jobs=' . (\Schema::hasTable('failed_jobs') ? \DB::table('failed_jobs')->count() : 'no-table') . PHP_EOL;" 2>/dev/null || echo "(khong chay duoc tinker)"
+            echo ""
+            echo "===== 7) Crontab (co schedule:run / queue khong) ====="
+            (crontab -l 2>/dev/null | grep -iE "artisan|queue|schedule") || echo "(crontab trong hoac khong co)"
+            echo ""
+            echo "===== DONE ====="
