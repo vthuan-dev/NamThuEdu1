@@ -32,10 +32,13 @@ async function subscribeToPush(): Promise<boolean> {
     }
 
     const token = getAuthToken();
-    if (!token) return false;
+    if (!token) {
+      console.warn('[Push] No auth token — bỏ qua đăng ký subscription.');
+      return false;
+    }
 
     const subJson = subscription.toJSON();
-    await fetch(getApiUrl('push/subscribe'), {
+    const res = await fetch(getApiUrl('push/subscribe'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
@@ -44,6 +47,12 @@ async function subscribeToPush(): Promise<boolean> {
         auth_key: subJson.keys?.auth,
       }),
     });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      console.error(`[Push] Subscribe failed: HTTP ${res.status} — ${text}`);
+      return false;
+    }
 
     console.log('[Push] Subscription registered successfully.');
     return true;

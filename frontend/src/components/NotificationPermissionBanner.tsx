@@ -12,8 +12,8 @@ export function NotificationPermissionBanner({ push }: Props) {
   if (push.permissionState !== 'default' || dismissed) return null;
 
   return (
-    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-full max-w-sm mx-auto px-4">
-      <div className="bg-white border border-orange-200 rounded-2xl shadow-lg shadow-orange-100/50 p-4 flex items-start gap-3">
+    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-sm mx-auto px-4">
+      <div className="bg-white border border-orange-200 rounded-2xl shadow-2xl shadow-orange-100/50 p-4 flex items-start gap-3">
         <div className="w-9 h-9 rounded-xl bg-orange-50 border border-orange-200 flex items-center justify-center shrink-0 mt-0.5">
           <Bell className="w-4 h-4 text-orange-500" />
         </div>

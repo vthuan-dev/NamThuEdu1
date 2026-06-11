@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\PushSubscription;
+use Illuminate\Support\Facades\Log;
 use Minishlink\WebPush\WebPush;
 use Minishlink\WebPush\Subscription;
 
@@ -47,6 +48,11 @@ class PushNotificationService
     {
         $subscriptions = PushSubscription::where('user_id', $userId)->get();
 
+        if ($subscriptions->isEmpty()) {
+            Log::info("[Push] No subscriptions for user {$userId} — student chưa bật/đăng ký thông báo.");
+            return;
+        }
+
         foreach ($subscriptions as $sub) {
             $subscription = Subscription::create([
                 'endpoint'        => $sub->endpoint,
@@ -68,9 +74,21 @@ class PushNotificationService
         }
 
         foreach ($this->webPush->flush() as $report) {
-            if ($report->isSubscriptionExpired()) {
-                PushSubscription::where('endpoint', $report->getRequest()->getUri()->__toString())->delete();
+            $endpoint = $report->getRequest()->getUri()->__toString();
+
+            if ($report->isSuccess()) {
+                Log::info("[Push] Sent OK to user {$userId} (endpoint: {$endpoint})");
+                continue;
             }
+
+            if ($report->isSubscriptionExpired()) {
+                Log::warning("[Push] Subscription expired, removing (user {$userId}): {$endpoint}");
+                PushSubscription::where('endpoint', $endpoint)->delete();
+                continue;
+            }
+
+            // Any other failure: log the reason so we can diagnose (bad key, 4xx, etc.)
+            Log::error("[Push] Failed to send to user {$userId} (endpoint: {$endpoint}): " . $report->getReason());
         }
     }
 

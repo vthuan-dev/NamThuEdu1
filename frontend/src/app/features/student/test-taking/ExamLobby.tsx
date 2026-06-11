@@ -153,7 +153,7 @@ export function ExamLobby() {
   };
 
   useEffect(() => {
-    requestCameraAndMic(true);
+    // Đã bỏ màn chờ kiểm tra thiết bị (camera/mic) — không xin quyền nữa.
     loadExamInfo();
 
     return () => {
@@ -163,21 +163,17 @@ export function ExamLobby() {
     };
   }, []);
 
-  // Auto-skip lobby for IELTS — go straight to exam, no device check needed
+  // Bỏ màn chờ: tự động vào thẳng làm bài cho MỌI loại đề (không kiểm tra thiết bị).
   const autoStartedRef = useRef(false);
   const [autoStarting, setAutoStarting] = useState(false);
   useEffect(() => {
     if (loadingExam || autoStartedRef.current || !assignmentId) return;
-    const isIelts =
-      String(examInfo.examType ?? "").toUpperCase() === "IELTS" ||
-      examInfo.title.toLowerCase().includes("ielts");
-    if (!isIelts) return;
 
     autoStartedRef.current = true;
     setAutoStarting(true);
     (async () => {
       try {
-        // Stop camera/mic streams since we're skipping the device-check flow
+        // Dừng mọi stream camera/mic (nếu lỡ có) vì đã bỏ luồng kiểm tra thiết bị.
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((track) => track.stop());
           streamRef.current = null;
@@ -185,18 +181,29 @@ export function ExamLobby() {
         const startRes: any = await studentApi.startTest(assignmentId);
         const sid = Number(startRes?.data?.data?.submissionId ?? 0);
         if (!sid) throw new Error("missing-submission-id");
-        const routeId = examId ?? assignmentId;
+
+        // Kết nối real-time là tùy chọn — không được chặn vào thi.
         try {
           await studentApi.connectTestWebsocket(sid);
         } catch {
           try { await studentApi.reconnectTestWebsocket(sid); } catch { /* real-time optional */ }
         }
-        navigate(
-          `${STUDENT_BASE_PATH}/lam-bai-ielts/${routeId}?submissionId=${sid}`,
-          { replace: true }
-        );
+
+        const typeStr = String(examInfo.examType ?? "").toUpperCase();
+        const titleStr = examInfo.title.toLowerCase();
+        const isIelts = typeStr === "IELTS" || titleStr.includes("ielts");
+        const isVstep = typeStr === "VSTEP" || titleStr.includes("vstep");
+        const routeId = examId ?? assignmentId;
+
+        if (isIelts) {
+          navigate(`${STUDENT_BASE_PATH}/lam-bai-ielts/${routeId}?submissionId=${sid}`, { replace: true });
+        } else if (isVstep) {
+          navigate(`${STUDENT_BASE_PATH}/lam-bai-vstep/${routeId}?submissionId=${sid}`, { replace: true });
+        } else {
+          navigate(`${STUDENT_BASE_PATH}/lam-bai/${assignmentId}?autostart=1&submissionId=${sid}`, { replace: true });
+        }
       } catch {
-        // Fallback: keep lobby visible if auto-start fails
+        // Nếu tự động vào bài thất bại → hiện thông báo (không còn lobby thiết bị).
         autoStartedRef.current = false;
         setAutoStarting(false);
         setStatusMessage(t("student.examLobby.sessionFailed"));
