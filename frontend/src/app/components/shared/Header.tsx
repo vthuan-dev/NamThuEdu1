@@ -3,7 +3,6 @@ import { useNavigate, Link } from "react-router";
 import { Bell, Plus, ChevronRight, User, Settings, LogOut, ChevronDown, BookOpen, ExternalLink, Send, Volume2, VolumeX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../ui/button";
-import { LanguageSwitcher } from "./LanguageSwitcher";
 import { logout } from "../../../services/authApi";
 import { api } from "../../../services/api";
 import { getAuthUser } from "../../../utils/authStorage";
@@ -344,8 +343,6 @@ export function Header({ breadcrumb, action }: HeaderProps) {
             {action.label}
           </Button>
         )}
-
-        <LanguageSwitcher />
 
         {/* Notification Sound Toggle */}
         <button
