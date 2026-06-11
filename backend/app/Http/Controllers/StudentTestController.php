@@ -711,15 +711,15 @@ class StudentTestController extends Controller
                 ], 400);
             }
         } else {
+            // Cổng mềm: chỉ chặn khi CHƯA trả lời câu nào. Câu bỏ trống sẽ được chấm 0 điểm.
+            // (Khớp với UX: frontend đã cảnh báo "còn N câu chưa trả lời, vẫn nộp?" và cho nộp.)
             $totalQuestions = $submission->exam->questions->count();
             $answeredQuestions = $submission->answers->count();
-            if ($answeredQuestions < $totalQuestions) {
-                $answeredQuestionIds = $submission->answers->pluck('question_id')->toArray();
-                $allQuestionIds = $submission->exam->questions->pluck('qId')->toArray();
-                $unansweredQuestions = array_diff($allQuestionIds, $answeredQuestionIds);
+            if ($totalQuestions > 0 && $answeredQuestions === 0) {
+                $unansweredQuestions = $submission->exam->questions->pluck('qId')->toArray();
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Vui lòng trả lời tất cả các câu hỏi trước khi nộp bài.',
+                    'message' => 'Bạn chưa trả lời bất kỳ câu hỏi nào.',
                     'unansweredQuestions' => array_values($unansweredQuestions)
                 ], 400);
             }

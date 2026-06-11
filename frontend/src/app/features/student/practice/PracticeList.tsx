@@ -16,6 +16,7 @@ import {
   Mic,
 } from "lucide-react";
 import { studentApi } from "../../../../services/studentApi";
+import { getAuthUser } from "../../../../utils/authStorage";
 import { getSkillColor, getSkillIcon, getSkillName } from "../../../../utils/skillHelpers";
 
 type SkillFilter = 'all' | 'listening' | 'reading' | 'writing' | 'speaking';
@@ -29,9 +30,10 @@ export function PracticeList() {
   const [skill, setSkill] = useState<SkillFilter>('all');
   const [difficulty, setDifficulty] = useState<DifficultyFilter>('all');
 
-  // Hide VSTEP content for kids (Cambridge YL audience)
-  const userStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
-  const ageGroup = userStr ? (JSON.parse(userStr)?.age_group as string) : '';
+  // Hide VSTEP content for kids (Cambridge YL audience).
+  // Dùng getAuthUser() để đọc từ CẢ localStorage lẫn sessionStorage (login không "ghi nhớ").
+  const authUser = getAuthUser();
+  const ageGroup = (authUser?.age_group ?? authUser?.ageGroup ?? '') as string;
   const isKids = ageGroup === 'kids';
 
   // Theme palette switches based on age group (rose for kids, purple for others)

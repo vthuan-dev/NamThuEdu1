@@ -25,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { studentApi } from "../../../../services/studentApi";
+import { getAuthUser } from "../../../../utils/authStorage";
 import { getSkillColor, getSkillIcon } from "../../../../utils/skillHelpers";
 
 type TestStatus = 'all' | 'pending' | 'in_progress' | 'completed';
@@ -95,9 +96,10 @@ export function TestList() {
     }),
   });
 
-  // Hide VSTEP/IELTS/TOEIC for kids (Cambridge YL audience)
-  const userStr = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
-  const ageGroup = userStr ? (JSON.parse(userStr)?.age_group as string) : '';
+  // Hide VSTEP/IELTS/TOEIC for kids (Cambridge YL audience).
+  // Dùng getAuthUser() để đọc CẢ localStorage lẫn sessionStorage (login không "ghi nhớ").
+  const authUser = getAuthUser();
+  const ageGroup = (authUser?.age_group ?? authUser?.ageGroup ?? '') as string;
   const isKids = ageGroup === 'kids';
 
   // Theme palette switches based on age group
