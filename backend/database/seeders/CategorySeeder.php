@@ -14,13 +14,17 @@ class CategorySeeder extends Seeder
      */
     public function run()
     {
+        // caId phải khớp với categoryOptions hardcode ở frontend (CreatePost.tsx)
         $categories = [
-            ['caName' => 'VSTEP'],
-            ['caName' => 'IELTS'],
+            ['caId' => 1, 'caName' => 'IELTS',           'caType' => 'IELTS'],
+            ['caId' => 2, 'caName' => 'TOEFL',           'caType' => 'GENERAL'],
+            ['caId' => 3, 'caName' => 'Cambridge',       'caType' => 'GENERAL'],
+            ['caId' => 4, 'caName' => 'General English', 'caType' => 'GENERAL'],
+            ['caId' => 5, 'caName' => 'VSTEP',           'caType' => 'VSTEP'],
         ];
 
         foreach ($categories as $category) {
-            Category::create($category);
+            Category::updateOrCreate(['caId' => $category['caId']], $category);
         }
     }
 }
