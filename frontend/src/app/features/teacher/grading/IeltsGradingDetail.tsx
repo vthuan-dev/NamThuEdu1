@@ -16,7 +16,7 @@
  *  • Reading   = 3 passages × ~13-14 (not 4 parts)
  *  • Speaking Part 2 has cue card UI
  */
-import { Fragment, useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useToastContext } from "../../../../contexts/ToastContext";
 import { api } from "../../../../services/api";
@@ -24,7 +24,7 @@ import { gradingApi } from "../../../../services/gradingApi";
 import {
   ChevronLeft, Save, Loader2, AlertCircle, CheckCircle2,
   Headphones, BookOpen, PenLine, Mic, Award, Sparkles,
-  Eye, MessageSquare, Flag, Bot,
+  Eye, MessageSquare, Bot,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -110,6 +110,7 @@ export function IeltsGradingDetail() {
   const [submissionMeta, setSubmissionMeta] = useState({
     time: new Date(),
     attemptNumber: 1,
+    status: "" as string,
   });
 
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -146,16 +147,19 @@ export function IeltsGradingDetail() {
           id: d.user?.uPhone ?? "",
         });
         setSubmissionMeta({
-          time: d.submission?.sSubmit_time ? new Date(d.submission.sSubmit_time) : new Date(),
-          attemptNumber: d.submission?.sAttempt_number ?? 1,
+          // Backend `show()` returns the Submission model directly under `data`,
+          // so submission fields live on `d` (not `d.submission`). Mirror VSTEP detail.
+          time: d.sSubmit_time ? new Date(d.sSubmit_time) : new Date(),
+          attemptNumber: d.sAttempt ?? d.sAttempt_number ?? 1,
+          status: d.sStatus ?? "",
         });
 
         // Pre-fill skill bands from sGemini_feedback.ielts_scores
         const raw = (() => {
           try {
-            return typeof d.submission?.sGemini_feedback === "string"
-              ? JSON.parse(d.submission.sGemini_feedback)
-              : (d.submission?.sGemini_feedback ?? {});
+            return typeof d.sGemini_feedback === "string"
+              ? JSON.parse(d.sGemini_feedback)
+              : (d.sGemini_feedback ?? {});
           } catch { return {}; }
         })();
         const ieltsScores = raw?.ielts_scores ?? {};
@@ -164,7 +168,7 @@ export function IeltsGradingDetail() {
           if (ieltsScores[sk] != null) initOverrides[sk] = String(ieltsScores[sk]);
         });
         setBandOverrides(initOverrides);
-        setOverallFeedback(d.submission?.sTeacher_feedback ?? "");
+        setOverallFeedback(d.sTeacher_feedback ?? "");
 
         // Map answers → questions
         const qs: Question[] = (d.answers ?? []).map((sa: any, idx: number): Question => {
@@ -403,6 +407,65 @@ export function IeltsGradingDetail() {
     (sk) => (ieltsGroups[sk]?.length ?? 0) > 0
   );
 
+  // ── Skill-vs-Full detection ───────────────────────────────────────────────
+  // Full test = nhiều hơn 1 skill có câu hỏi → overall = trung bình các skill.
+  // Single skill (vd: Reading Practice) → "overall" chính là band của skill đó,
+  // nên ta đổi nhãn cho đúng UX thay vì gọi "Overall band".
+  const singleSkill = availableSkills.length === 1 ? availableSkills[0] : null;
+  const isFullTest = availableSkills.length > 1;
+  const resultLabel = singleSkill ? `${IELTS_SKILLS[singleSkill].label} band` : "Overall band";
+  const isInProgress = submissionMeta.status === "in_progress";
+
+  // ── Empty state: bài chưa nộp / không có câu trả lời ───────────────────────
+  if (questions.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-50">
+        <div className="sticky top-0 z-30 bg-white border-b border-slate-200">
+          <div className="max-w-7xl mx-auto px-6 h-14 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="p-2 rounded-lg hover:bg-slate-100 cursor-pointer transition-colors"
+              aria-label="Back"
+            >
+              <ChevronLeft className="w-5 h-5 text-slate-600" />
+            </button>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="px-2 py-0.5 rounded-md bg-red-100 text-red-700 text-[10px] font-bold uppercase tracking-wider">IELTS</span>
+                <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-wider">{exam.testType}</span>
+              </div>
+              <h1 className="text-base font-bold text-slate-900 truncate">{exam.title}</h1>
+              <p className="text-xs text-slate-500 truncate">{student.name}{student.id ? ` · ${student.id}` : ""}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-2xl mx-auto px-4 py-20 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-amber-500" />
+          </div>
+          <h2 className="text-lg font-bold text-slate-900 mb-1.5">
+            {isInProgress ? "Học viên đang làm bài" : "Chưa có câu trả lời để chấm"}
+          </h2>
+          <p className="text-sm text-slate-500 max-w-md mx-auto mb-6">
+            {isInProgress
+              ? "Bài thi này chưa được nộp (trạng thái: đang làm bài). Bạn chỉ có thể chấm sau khi học viên bấm nộp bài."
+              : "Bài làm này không có dữ liệu câu trả lời. Có thể học viên chưa trả lời câu nào hoặc bài chưa được nộp."}
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate("/giao-vien/cham-diem")}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Về danh sách chấm điểm
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header - compact */}
@@ -434,9 +497,9 @@ export function IeltsGradingDetail() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Overall band display */}
+            {/* Overall / single-skill band display */}
             <div className="hidden sm:flex flex-col items-end pr-3 border-r border-slate-200">
-              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Overall band</span>
+              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{resultLabel}</span>
               <div className="flex items-baseline gap-1">
                 <span className="text-2xl font-bold tabular-nums" style={{ color: bandColor(overallBand) }}>
                   {overallBand.toFixed(1)}
@@ -554,7 +617,7 @@ export function IeltsGradingDetail() {
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-3">
               <Award className="w-4 h-4 text-amber-500" />
-              <h3 className="text-sm font-bold text-slate-900">Overall band</h3>
+              <h3 className="text-sm font-bold text-slate-900">{resultLabel}</h3>
             </div>
             <div className="text-center py-3">
               <div className="text-5xl font-black tabular-nums" style={{ color: bandColor(overallBand) }}>
@@ -562,19 +625,21 @@ export function IeltsGradingDetail() {
               </div>
               <div className="mt-1 text-xs text-slate-500 font-medium">{bandDescriptor(overallBand)}</div>
             </div>
-            <div className="border-t border-slate-100 pt-3 space-y-1.5">
-              {availableSkills.map((sk) => (
-                <div key={sk} className="flex items-center justify-between text-xs">
-                  <span className="text-slate-600">{IELTS_SKILLS[sk].label}</span>
-                  <span
-                    className="font-bold tabular-nums"
-                    style={{ color: bandColor(skillBands[sk]) }}
-                  >
-                    {skillBands[sk].toFixed(1)}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {isFullTest && (
+              <div className="border-t border-slate-100 pt-3 space-y-1.5">
+                {availableSkills.map((sk) => (
+                  <div key={sk} className="flex items-center justify-between text-xs">
+                    <span className="text-slate-600">{IELTS_SKILLS[sk].label}</span>
+                    <span
+                      className="font-bold tabular-nums"
+                      style={{ color: bandColor(skillBands[sk]) }}
+                    >
+                      {skillBands[sk].toFixed(1)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
@@ -599,7 +664,9 @@ export function IeltsGradingDetail() {
             <ul className="space-y-1 text-blue-800">
               <li>· Band 5-7 là phổ biến nhất</li>
               <li>· Band 8+ rất hiếm</li>
-              <li>· Overall = trung bình 4 skills, làm tròn 0.5</li>
+              {isFullTest
+                ? <li>· Overall = trung bình 4 skills, làm tròn 0.5</li>
+                : <li>· Bài 1 kỹ năng: kết quả chính là band của kỹ năng đó</li>}
               <li>· Click "Chấm bằng AI" để có gợi ý nhanh</li>
             </ul>
           </div>

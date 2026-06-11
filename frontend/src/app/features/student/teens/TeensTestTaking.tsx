@@ -279,6 +279,7 @@ export function TeensTestTaking() {
   const assignmentId = Number(id);
 
   const autoStart = useMemo(() => new URLSearchParams(location.search).get('autostart') === '1', [location.search]);
+  const direct = useMemo(() => new URLSearchParams(location.search).get('direct') === '1', [location.search]);
   const querySubmissionId = useMemo(() => {
     const raw = Number(new URLSearchParams(location.search).get('submissionId') ?? 0);
     return Number.isFinite(raw) && raw > 0 ? raw : null;
@@ -307,6 +308,10 @@ export function TeensTestTaking() {
 
   const startMutation = useMutation({
     mutationFn: async () => {
+      // Đề tự do (browse, chưa giao) → start trực tiếp bằng examId, không cần assignment.
+      if (direct) {
+        return studentApi.startTeensExamDirect(assignmentId);
+      }
       const startRes: any = await studentApi.startTest(assignmentId);
       const startData = startRes?.data?.data;
       if (!startData?.exam && (startData?.canResume || querySubmissionId)) {

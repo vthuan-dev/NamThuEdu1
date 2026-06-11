@@ -348,6 +348,98 @@ Questions:
     }
 
     /**
+     * Transcribe audio → text bằng Groq Whisper (whisper-large-v3-turbo).
+     * Nhanh hơn rất nhiều so với Whisper chạy trong trình duyệt và không bắt
+     * học viên/giáo viên tải model ~40MB. Dùng cho STT đề IELTS Listening.
+     *
+     * Route: POST /api/teacher/ielts/transcribe-audio
+     * Body (multipart): { file: audio } HOẶC (json) { audio_url: string }
+     *                   + language? (mặc định 'en')
+     * Return: { success, data: { text } }
+     */
+    public function transcribeAudio(Request $request)
+    {
+        @set_time_limit(180);
+        @ini_set('max_execution_time', '180');
+
+        $groqKey = config('services.groq.api_key');
+        if (empty($groqKey)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'GROQ_API_KEY chưa được cấu hình.',
+            ], 500);
+        }
+
+        $language = $request->input('language', 'en');
+
+        // Lấy bytes audio: ưu tiên file upload, fallback audio_url.
+        $tmpPath = null;
+        $cleanup = false;
+        try {
+            if ($request->hasFile('file')) {
+                $request->validate([
+                    'file' => 'required|file|max:51200', // 50MB
+                ]);
+                $tmpPath = $request->file('file')->getRealPath();
+                $filename = $request->file('file')->getClientOriginalName() ?: 'audio.mp3';
+            } elseif ($request->filled('audio_url')) {
+                $audioUrl = (string) $request->input('audio_url');
+                $bytes = @file_get_contents($audioUrl);
+                if ($bytes === false || strlen($bytes) === 0) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Không tải được file audio từ URL.',
+                    ], 422);
+                }
+                $tmpPath = tempnam(sys_get_temp_dir(), 'stt_');
+                file_put_contents($tmpPath, $bytes);
+                $cleanup = true;
+                $filename = basename(parse_url($audioUrl, PHP_URL_PATH) ?: 'audio.mp3');
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cần cung cấp file audio hoặc audio_url.',
+                ], 422);
+            }
+
+            $verifySsl = !app()->environment('local');
+            $response = Http::withOptions(['verify' => $verifySsl])
+                ->withHeaders(['Authorization' => 'Bearer ' . $groqKey])
+                ->timeout(120)
+                ->attach('file', file_get_contents($tmpPath), $filename)
+                ->post('https://api.groq.com/openai/v1/audio/transcriptions', [
+                    'model'           => 'whisper-large-v3-turbo',
+                    'language'        => $language,
+                    'response_format' => 'json',
+                ]);
+
+            if (!$response->successful()) {
+                Log::error('Groq transcribe-audio failed: ' . $response->body());
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Groq Whisper lỗi: ' . $response->status(),
+                ], 502);
+            }
+
+            $text = trim((string) ($response->json()['text'] ?? ''));
+            return response()->json([
+                'success' => true,
+                'data' => ['text' => $text],
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('transcribeAudio error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        } finally {
+            if ($cleanup && $tmpPath && file_exists($tmpPath)) {
+                @unlink($tmpPath);
+            }
+        }
+    }
+
+    /**
      * Diarize transcript: dùng Groq LLM (free tier) phân tách speaker A/B
      * dựa trên ngữ nghĩa hội thoại — chính xác hơn pitch-based vì hiểu context.
      * Tiết kiệm Gemini API quota cho task PDF parsing.

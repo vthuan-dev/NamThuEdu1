@@ -186,6 +186,45 @@ export function getSkillParts(examType: string, skill: SkillKey): CambridgePart[
   return level[skill].parts;
 }
 
+// Nhãn tiếng Việt cho mọi taskType (đồng bộ với KidsTaskTypesSeeder).
+// Dùng để hiển thị "đúng dạng bài thực tế" trên sidebar khi giáo viên đổi dạng.
+export const TASK_TYPE_LABELS: Record<string, string> = {
+  // Listening
+  listen_and_draw_lines: 'Nghe & nối',
+  listen_and_write: 'Nghe & viết',
+  listen_and_tick: 'Nghe & chọn tranh',
+  listen_colour_write: 'Nghe & tô màu',
+  listen_colour: 'Nghe & tô màu',
+  listening_letter_match: 'Nghe & ghép chữ cái',
+  // Reading & Writing
+  look_and_read: 'Nhìn & đọc',
+  look_read_write: 'Nhìn, đọc & viết',
+  unscramble_words: 'Sắp xếp chữ cái',
+  cloze_test: 'Điền từ vào chỗ trống',
+  dialogue_matching: 'Ghép hội thoại',
+  story_completion: 'Hoàn thành câu chuyện',
+  word_definition_matching: 'Ghép từ với định nghĩa',
+  word_bank_fill: 'Điền từ từ ngân hàng',
+  reading_comprehension: 'Đọc hiểu',
+  open_cloze: 'Tự điền từ',
+  picture_story_writing: 'Viết truyện theo tranh',
+  picture_sentence_writing: 'Viết câu mô tả tranh',
+  // Speaking
+  find_differences: 'Tìm điểm khác biệt',
+  picture_story_narration: 'Kể chuyện theo tranh',
+  odd_one_out: 'Tìm hình khác loại',
+  information_exchange: 'Trao đổi thông tin',
+  object_placement: 'Đặt thẻ vào tranh',
+  picture_questions: 'Trả lời câu hỏi về hình',
+  picture_card_questions: 'Hỏi-đáp về thẻ hình',
+};
+
+/** Trả nhãn tiếng Việt cho 1 taskType code; fallback chính code nếu chưa có. */
+export function getTaskTypeLabel(code?: string | null): string {
+  if (!code) return '';
+  return TASK_TYPE_LABELS[code] ?? code;
+}
+
 /**
  * Lấy taskType chuẩn (blueprint) cho 1 part/subPart của 1 cấp độ.
  * Trả về null nếu không tìm thấy (vd cấp độ không hợp lệ).

@@ -9,7 +9,6 @@ import {
   Clock,
   AlertCircle,
   Award,
-  TrendingUp,
   ChevronDown,
   UserCheck,
   Bot,
@@ -245,24 +244,25 @@ export function GradingQueue() {
         <div className="px-8 py-6 space-y-5">
 
           {/* ── Stats ── */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {[
               { label: t("teacher.grading.queuePage.statsCards.total"),      showBar: false, value: stats.total,              icon: Inbox,       color: "#6366F1", bg: "#EEF2FF" },
               { label: t("teacher.grading.queuePage.statsCards.pending"),    showBar: false, value: stats.pending,            icon: Clock,       color: "#F59E0B", bg: "#FEF3C7" },
               { label: t("teacher.grading.queuePage.statsCards.reviewed"),   showBar: false, value: stats.reviewed,           icon: UserCheck,   color: "#10B981", bg: "#D1FAE5" },
               { label: t("teacher.grading.queuePage.statsCards.reviewRate"), showBar: true,  value: `${stats.reviewRate}%`,   icon: Award,       color: "#8B5CF6", bg: "#EDE9FE" },
             ].map(({ label, value, showBar, icon: Icon, color, bg }) => (
-              <div key={label} className="bg-white rounded-2xl border border-slate-100 p-5 hover:shadow-md transition-all">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: bg }}>
-                    <Icon className="w-5 h-5" style={{ color }} />
+              <div key={label} className="bg-white rounded-xl border border-slate-100 px-3.5 py-3 hover:shadow-sm transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: bg }}>
+                    <Icon className="w-[18px] h-[18px]" style={{ color }} />
                   </div>
-                  <TrendingUp className="w-4 h-4 text-slate-300" />
+                  <div className="min-w-0">
+                    <p className="text-slate-500 text-[11px] truncate">{label}</p>
+                    <p className="text-xl font-bold text-slate-800 leading-tight">{value}</p>
+                  </div>
                 </div>
-                <p className="text-slate-500 text-xs mb-1">{label}</p>
-                <p className="text-2xl font-black text-slate-800">{value}</p>
                 {showBar && (
-                  <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="mt-2 h-1 bg-slate-100 rounded-full overflow-hidden">
                     <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${stats.reviewRate}%` }} />
                   </div>
                 )}

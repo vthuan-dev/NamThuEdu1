@@ -166,6 +166,24 @@ export interface BrowseKidsExam {
   score: number | null;
 }
 
+export interface BrowseTeensExam {
+  id: number;
+  title: string;
+  type: string;
+  skill: string;
+  duration: number;
+  description: string | null;
+  age_group: string | null;
+  questions_count: number;
+  created_at: string;
+  is_assigned: boolean;
+  assignment_id: number | null;
+  deadline: string | null;
+  submission_status: 'pending' | 'in_progress' | 'completed';
+  submission_id: number | null;
+  score: number | null;
+}
+
 export const studentApi = {
   // Tests — always real backend
   getTests: (params?: { status?: string; type?: string; skill?: string }) =>
@@ -323,9 +341,17 @@ export const studentApi = {
   browseKidsExams: () =>
     api.get<{ status: string; data: BrowseKidsExam[] }>('/student/exams/browse-kids'),
 
+  // Teens exam browser — TẤT CẢ đề teens đã publish (kèm cờ is_assigned)
+  browseTeensExams: () =>
+    api.get<{ status: string; data: BrowseTeensExam[] }>('/student/exams/browse-teens'),
+
   // Kids direct exam — start/resume by exam ID (no assignment needed)
   startKidsExamDirect: (examId: number) =>
     api.post(`/student/exams/${examId}/start-kids`),
+
+  // Teens direct exam — start/resume by exam ID (no assignment needed)
+  startTeensExamDirect: (examId: number) =>
+    api.post(`/student/exams/${examId}/start-teens`),
 
   // VSTEP direct exam — start by exam ID (no assignment needed)
   startDirectVstepExam: (examId: number, resume = false) =>

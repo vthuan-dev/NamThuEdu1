@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, MousePointerClick } from 'lucide-react';
-import { CAMBRIDGE_PARTS_STRUCTURE } from '../constants/cambridgeStructure';
+import { CAMBRIDGE_PARTS_STRUCTURE, getTaskTypeLabel } from '../constants/cambridgeStructure';
 import ListenDrawLinesEditor from '../editors/ListenDrawLinesEditor';
 import ListenWriteEditor from '../editors/ListenWriteEditor';
 import ListenTickEditor from '../editors/ListenTickEditor';
@@ -416,6 +416,24 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
                         const isSelected =
                           selectedPart === section.partId &&
                           selectedSubPart === subPart.partNumber;
+                        // Ưu tiên hiển thị: 
+                        // 1) Nếu đang chỉnh sửa CHÍNH part này → dùng selectedTaskType (kể cả khi
+                        //    chưa lưu, vd vừa "Đổi dạng bài" → sidebar đổi nhãn theo).
+                        // 2) Nếu có câu hỏi đã lưu → đọc q.type của câu hỏi đó.
+                        // 3) Cuối cùng fallback về dạng blueprint Cambridge.
+                        const isEditing =
+                          showEditor &&
+                          selectedPart === section.partId &&
+                          selectedSubPart === subPart.partNumber;
+                        const existingQ = examData.questions.find(
+                          (q: any) => q.part === section.partId && q.subPart === subPart.partNumber
+                        );
+                        const description =
+                          isEditing && selectedTaskType
+                            ? getTaskTypeLabel(selectedTaskType)
+                            : existingQ?.type
+                            ? getTaskTypeLabel(existingQ.type)
+                            : subPart.description;
                         return (
                           <button
                             key={subPart.partNumber}
@@ -446,7 +464,7 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
                                 {subPart.name}
                               </div>
                               <div className="truncate text-[10px] font-medium text-slate-400">
-                                {subPart.description}
+                                {description}
                               </div>
                             </div>
                           </button>

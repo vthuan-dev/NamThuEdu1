@@ -252,6 +252,7 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         // IELTS-specific routes
         Route::post('/ielts/parse-pdf', [GeminiPdfController::class, 'parsePdf']); // Gemini PDF → JSON
         Route::post('/ielts/diarize-transcript', [GeminiPdfController::class, 'diarizeTranscript']); // Gemini phân tách speaker A/B
+        Route::post('/ielts/transcribe-audio', [GeminiPdfController::class, 'transcribeAudio']); // Groq Whisper STT (server-side, nhanh)
         Route::post('/ielts/suggest-answers', [GeminiPdfController::class, 'suggestIeltsAnswers']); // Groq gợi ý đáp án từ transcript/passage
         Route::post('/exams/{examId}/ielts/listening/sections/{sectionNumber}/audio', [ExamController::class, 'uploadIeltsListeningAudio']);
 
@@ -434,8 +435,14 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
 
         // Kids exam browser — TẤT CẢ đề Cambridge YL đã publish (kèm cờ is_assigned)
         Route::get('/exams/browse-kids', [StudentTestController::class, 'browseKidsExams']);
+
+        // Teens exam browser — TẤT CẢ đề teens đã publish (kèm cờ is_assigned)
+        Route::get('/exams/browse-teens', [StudentTestController::class, 'browseTeensExams']);
         // Kids direct exam (start/resume by exam ID without assignment)
         Route::post('/exams/{examId}/start-kids', [StudentTestController::class, 'startKidsExamDirect']);
+
+        // Teens direct exam (start/resume by exam ID without assignment)
+        Route::post('/exams/{examId}/start-teens', [StudentTestController::class, 'startTeensExamDirect']);
 
         // VSTEP direct exam (start by exam ID without assignment)
         Route::post('/exams/{examId}/start-direct',   [StudentTestController::class, 'startDirectExam']);

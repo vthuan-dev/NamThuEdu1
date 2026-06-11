@@ -31,6 +31,8 @@ const TeensDashboard = lazy(() =>
   import('../features/student/teens/TeensDashboard').then(m => ({ default: m.TeensDashboard })));
 const TeensTestTaking = lazy(() =>
   import('../features/student/teens/TeensTestTaking').then(m => ({ default: m.TeensTestTaking })));
+const TeensTests = lazy(() =>
+  import('../features/student/teens/TeensTests').then(m => ({ default: m.TeensTests })));
 const AdultsDashboard = lazy(() =>
   import('../features/student/adults/AdultsDashboard').then(m => ({ default: m.AdultsDashboard })));
 
@@ -187,11 +189,11 @@ function AdaptiveSettings() {
   );
 }
 
-// Bài thi được giao: kids dùng bản sạch/nhẹ, còn lại dùng TestList chung.
+// Bài thi được giao: kids dùng bản sạch/nhẹ, teens dùng bản browse + giao, còn lại dùng TestList chung.
 function AdaptiveTests() {
   return (
     <Suspense fallback={<LoadingFallback />}>
-      {isKidsUser() ? <KidsTests /> : <TestList />}
+      {isKidsUser() ? <KidsTests /> : isTeensUser() ? <TeensTests /> : <TestList />}
     </Suspense>
   );
 }

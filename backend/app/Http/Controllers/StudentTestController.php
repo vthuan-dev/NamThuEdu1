@@ -3824,4 +3824,168 @@ class StudentTestController extends Controller
             ],
         ]);
     }
+
+    /**
+     * GET /api/student/exams/browse-teens
+     * Duyệt TẤT CẢ đề dành cho học viên teens (age_group=teens) đã publish — kèm cờ is_assigned
+     * và trạng thái bài làm (pending/in_progress/completed) cho từng đề.
+     *
+     * Quy ước (theo yêu cầu): giáo viên publish đề teens là học viên teen thấy luôn
+     * (không bắt buộc phải "giao" mới hiển thị). Việc "giao riêng" chỉ gắn thêm nhãn.
+     */
+    public function browseTeensExams(Request $request)
+    {
+        $user = $request->user();
+        if (!$user || $user->uRole !== 'student') {
+            return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
+        }
+
+        $exams = Exam::withCount('questions')
+            ->where('age_group', 'teens')
+            ->where('eStatus', 'published')
+            // Ẩn VSTEP (chỉ dành cho adults) cho chắc chắn
+            ->where('eType', '!=', 'VSTEP')
+            ->where(function ($q) {
+                $q->whereNull('eIs_private')->orWhere('eIs_private', false);
+            })
+            ->orderBy('eCreated_at', 'desc')
+            ->get();
+
+        if ($exams->isEmpty()) {
+            return response()->json(['status' => 'success', 'data' => []]);
+        }
+
+        // Assignments của học viên (cá nhân + lớp) → map theo exam_id
+        $classIds = $user->class_id ? [$user->class_id] : [];
+        $assignments = TestAssignment::where(function ($q) use ($user, $classIds) {
+                $q->where(function ($qq) use ($user) {
+                    $qq->where('taTarget_type', 'student')->where('taTarget_id', $user->uId);
+                })->orWhere(function ($qq) use ($classIds) {
+                    $qq->where('taTarget_type', 'class')->whereIn('taTarget_id', $classIds);
+                });
+            })
+            ->orderByDesc('taId')
+            ->get()
+            ->keyBy('exam_id');
+
+        // Submissions của học viên cho các đề này → group theo exam_id
+        $examIds = $exams->pluck('eId')->all();
+        $submissions = Submission::where('user_id', $user->uId)
+            ->whereIn('exam_id', $examIds)
+            ->orderByDesc('sId')
+            ->get()
+            ->groupBy('exam_id');
+
+        $data = $exams->map(function ($exam) use ($assignments, $submissions) {
+            $assignment = $assignments->get($exam->eId);
+            $subs       = $submissions->get($exam->eId, collect());
+            $inProgress = $subs->firstWhere('sStatus', 'in_progress');
+            $finished   = $subs->first(fn($s) => in_array($s->sStatus, ['submitted', 'graded', 'auto_submitted']));
+
+            if ($inProgress) {
+                $subStatus = 'in_progress';
+            } elseif ($finished) {
+                $subStatus = 'completed';
+            } else {
+                $subStatus = 'pending';
+            }
+            $relevant = $inProgress ?? $finished;
+
+            return [
+                'id'                => $exam->eId,
+                'title'             => $exam->eTitle,
+                'type'              => $exam->eType,
+                'skill'             => $exam->eSkill,
+                'duration'          => $exam->eDuration_minutes,
+                'description'       => $exam->eDescription,
+                'age_group'         => $exam->age_group,
+                'questions_count'   => $exam->questions_count,
+                'created_at'        => $exam->eCreated_at,
+                'is_assigned'       => (bool) $assignment,
+                'assignment_id'     => $assignment ? $assignment->taId : null,
+                'deadline'          => $assignment ? $assignment->taDeadline : null,
+                'submission_status' => $subStatus,
+                'submission_id'     => $relevant ? $relevant->sId : null,
+                'score'             => $finished ? (float) $finished->sScore : null,
+            ];
+        });
+
+        return response()->json(['status' => 'success', 'data' => $data]);
+    }
+
+    /**
+     * POST /api/student/exams/{examId}/start-teens
+     * Bắt đầu (hoặc resume) đề teens trực tiếp từ examId — KHÔNG cần assignment.
+     * Trả về cùng shape với start(): { submissionId, exam, savedAnswers, timeRemaining }.
+     */
+    public function startTeensExamDirect(Request $request, $examId)
+    {
+        $user = $request->user();
+        if (!$user || $user->uRole !== 'student') {
+            return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
+        }
+
+        $exam = Exam::with(['questions.answers', 'contentBlocks'])
+            ->where('eId', $examId)
+            ->where('age_group', 'teens')
+            ->where('eStatus', 'published')
+            ->where('eType', '!=', 'VSTEP')
+            ->first();
+
+        if (!$exam) {
+            return response()->json(['status' => 'error', 'message' => 'Không tìm thấy bài thi.'], 404);
+        }
+
+        $duration = $exam->eDuration_minutes ?? 30;
+
+        // Resume nếu có bài đang làm dở (direct → assignment_id null)
+        $existing = Submission::with('answers')
+            ->where('user_id', $user->uId)
+            ->where('exam_id', $examId)
+            ->whereNull('assignment_id')
+            ->where('sStatus', 'in_progress')
+            ->orderByDesc('sId')
+            ->first();
+
+        if ($existing) {
+            $timeElapsed   = now()->diffInMinutes($existing->sStart_time);
+            $timeRemaining = max(0, $duration - $timeElapsed);
+            $submission    = $existing;
+            $savedAnswers  = $existing->answers;
+        } else {
+            $attemptsUsed = Submission::where('user_id', $user->uId)
+                ->where('exam_id', $examId)
+                ->whereNull('assignment_id')
+                ->count();
+            $submission = Submission::create([
+                'user_id'     => $user->uId,
+                'exam_id'     => $exam->eId,
+                'sAttempt'    => $attemptsUsed + 1,
+                'sStart_time' => now(),
+                'sStatus'     => 'in_progress',
+            ]);
+            $timeRemaining = $duration;
+            $savedAnswers  = collect();
+        }
+
+        // Ẩn đáp án đúng + thêm alias cho frontend
+        $exam->questions->each(function ($question) {
+            $question->qPassage = $question->qPassage_text;
+            $question->qSkill   = $question->qSkill ?? $question->qSection;
+            $question->answers->each(function ($answer) {
+                unset($answer->aIs_correct);
+            });
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => [
+                'submissionId'  => $submission->sId,
+                'sStart_time'   => $submission->sStart_time,
+                'timeRemaining' => $timeRemaining,
+                'exam'          => $this->buildExamData($exam),
+                'savedAnswers'  => $savedAnswers,
+            ],
+        ]);
+    }
 }
