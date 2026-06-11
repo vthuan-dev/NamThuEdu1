@@ -10,6 +10,47 @@ use App\Models\User;
 class BlogController extends Controller
 {
     /**
+     * Lưu thumbnail: nếu là chuỗi base64 (data URI) thì decode, ghi ra file
+     * trong public/uploads/blog và trả về đường dẫn tương đối để lưu DB.
+     * Nếu đã là URL/đường dẫn thì giữ nguyên.
+     */
+    private function saveBase64Thumbnail(?string $value): string
+    {
+        if (empty($value)) {
+            return '';
+        }
+
+        // Không phải base64 data URI -> coi như đã là URL/đường dẫn, giữ nguyên
+        if (!preg_match('/^data:image\/([a-zA-Z0-9.+\-]+);base64,/', $value, $matches)) {
+            return $value;
+        }
+
+        $extension = strtolower($matches[1]);
+        if ($extension === 'svg+xml') {
+            $extension = 'svg';
+        }
+        if (!in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'])) {
+            $extension = 'png';
+        }
+
+        $data = base64_decode(substr($value, strpos($value, ',') + 1), true);
+        if ($data === false) {
+            return '';
+        }
+
+        $dir = public_path('uploads/blog');
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+
+        $fileName = time() . '_' . uniqid() . '.' . $extension;
+        file_put_contents($dir . DIRECTORY_SEPARATOR . $fileName, $data);
+
+        // Trả về URL tuyệt đối (theo APP_URL) để hiển thị trực tiếp ở mọi nơi
+        return asset('uploads/blog/' . $fileName);
+    }
+
+    /**
      * @OA\Get(
      *     path="/teacher/blogs",
      *     tags={"Blog Management"},
@@ -124,7 +165,7 @@ class BlogController extends Controller
             'pType' => $request->blogType ?? 'teaching',
             'pCategory' => $request->blogCategory ?? 1,
             'pUrl' => $request->blogUrl ?? '',
-            'pThumbnail' => $request->blogThumbnail ?? '',
+            'pThumbnail' => $this->saveBase64Thumbnail($request->blogThumbnail),
             'pAuthor_id' => $user->uId,
             'pStatus' => $request->blogStatus ?? 'draft',
             'pView' => 0,
@@ -288,7 +329,7 @@ class BlogController extends Controller
         if ($request->has('blogType')) $updateData['pType'] = $request->blogType;
         if ($request->has('blogCategory')) $updateData['pCategory'] = $request->blogCategory;
         if ($request->has('blogUrl')) $updateData['pUrl'] = $request->blogUrl;
-        if ($request->has('blogThumbnail')) $updateData['pThumbnail'] = $request->blogThumbnail;
+        if ($request->has('blogThumbnail')) $updateData['pThumbnail'] = $this->saveBase64Thumbnail($request->blogThumbnail);
         if ($request->has('blogStatus')) $updateData['pStatus'] = $request->blogStatus;
 
         $blog->update($updateData);
