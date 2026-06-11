@@ -17,4 +17,4 @@ Allow: /
 User-agent: Google-Extended
 Allow: /
 
-Sitemap: https://namthuedu.com/sitemap.xml
+Sitemap: https://namthuedu.vn/sitemap.xml

@@ -7,6 +7,8 @@
 
 NamThuEdu cung cấp hệ thống quản lý học tập (LMS) tích hợp AI chấm bài tự động cho kỹ năng Writing và Speaking. Nền tảng phục vụ 3 nhóm học viên: Kids (6–12 tuổi), Teens (13–17 tuổi) và Adults (18+).
 
+Website chính thức: https://namthuedu.vn
+
 ## Các kỳ thi được hỗ trợ
 
 - **VSTEP** (B1–C1): Luyện thi chứng chỉ tiếng Anh quốc gia Việt Nam
@@ -23,5 +25,5 @@ NamThuEdu cung cấp hệ thống quản lý học tập (LMS) tích hợp AI ch
 ## Địa chỉ
 
 Cần Thơ, Việt Nam  
-Website: https://namthuedu.com  
+Website: https://namthuedu.vn  
 Liên hệ: qua trang web chính thức

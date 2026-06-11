@@ -4,44 +4,44 @@
 
   <!-- Public pages — high priority -->
   <url>
-    <loc>https://namthuedu.com/</loc>
-    <lastmod>2025-06-07</lastmod>
+    <loc>https://namthuedu.vn/</loc>
+    <lastmod>2026-06-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
 
   <url>
-    <loc>https://namthuedu.com/bai-viet</loc>
-    <lastmod>2025-06-07</lastmod>
+    <loc>https://namthuedu.vn/bai-viet</loc>
+    <lastmod>2026-06-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://namthuedu.com/ve-chung-toi</loc>
-    <lastmod>2025-06-07</lastmod>
+    <loc>https://namthuedu.vn/ve-chung-toi</loc>
+    <lastmod>2026-06-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
 
   <url>
-    <loc>https://namthuedu.com/tinh-nang</loc>
-    <lastmod>2025-06-07</lastmod>
+    <loc>https://namthuedu.vn/tinh-nang</loc>
+    <lastmod>2026-06-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
 
   <!-- Auth pages -->
   <url>
-    <loc>https://namthuedu.com/dang-nhap</loc>
-    <lastmod>2025-06-07</lastmod>
+    <loc>https://namthuedu.vn/dang-nhap</loc>
+    <lastmod>2026-06-11</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
 
   <url>
-    <loc>https://namthuedu.com/dang-ky</loc>
-    <lastmod>2025-06-07</lastmod>
+    <loc>https://namthuedu.vn/dang-ky</loc>
+    <lastmod>2026-06-11</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>
   </url>
