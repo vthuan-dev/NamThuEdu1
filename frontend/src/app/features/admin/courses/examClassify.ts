@@ -103,6 +103,11 @@ function normalizeTypeKey(raw: string): string | null {
 
 /** Trả về metadata loại đề cho 1 exam (luôn có giá trị, fallback GENERAL). */
 export function classifyExamType(exam: AdminExam): ExamTypeMeta {
+  // Ưu tiên age_group=kids: đề cho trẻ luôn là Cambridge YLE, bất kể eType
+  // (nhiều đề kids bị lưu eType='VSTEP' do default DB → phải chặn ở đây).
+  const ag = (exam.age_group || "").trim().toLowerCase();
+  if (ag === "kids") return EXAM_TYPE_META.KIDS;
+
   const candidates = [exam.eType, exam.content_type, exam.ielts_test_type].filter(Boolean) as string[];
   for (const c of candidates) {
     const key = normalizeTypeKey(c);

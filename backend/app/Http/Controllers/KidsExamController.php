@@ -110,6 +110,7 @@ class KidsExamController extends Controller
             'eDescription' => $request->eDescription,
             'eDuration' => $request->eDuration,
             'age_group' => 'kids',
+            'eType' => 'GENERAL', // Kids (Cambridge YLE) — KHÔNG phải VSTEP; tránh default 'VSTEP' của cột eType
             'eTeacher_id' => auth()->id(),
             'eStatus' => 'draft',
             'kids_exam_config' => [
