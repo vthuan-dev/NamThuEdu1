@@ -21,6 +21,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { useToastContext } from "../../../../contexts/ToastContext";
 import { api } from "../../../../services/api";
 import { gradingApi } from "../../../../services/gradingApi";
+import { getFullMediaUrl } from "../../../../utils/mediaUtils";
 import {
   ChevronLeft, Save, Loader2, AlertCircle, CheckCircle2,
   Headphones, BookOpen, PenLine, Mic, Award, Sparkles,
@@ -163,6 +164,7 @@ export function IeltsGradingDetail() {
           } catch { return {}; }
         })();
         const ieltsScores = raw?.ielts_scores ?? {};
+        const speakingResults = raw?.ielts_speaking_results ?? raw?.speaking_results ?? {};
         const initOverrides: Partial<Record<IeltsSkill, string>> = {};
         (["listening", "reading", "writing", "speaking"] as IeltsSkill[]).forEach((sk) => {
           if (ieltsScores[sk] != null) initOverrides[sk] = String(ieltsScores[sk]);
@@ -210,6 +212,12 @@ export function IeltsGradingDetail() {
             aiCriteria: sa.saAi_criteria?.criteria ?? null,
             aiCriterionComments: sa.saAi_criteria?.criterion_comments ?? null,
             reviewStatus: sa.saReview_status ?? null,
+            audioUrl: skill === "speaking" && /^https?:\/\/|\/storage\//.test(String(sa.saAnswer_text ?? ""))
+              ? String(sa.saAnswer_text)
+              : undefined,
+            transcript: skill === "speaking"
+              ? (speakingResults?.[`part_${q.qPart ?? 1}`]?.transcript ?? undefined)
+              : undefined,
           };
         });
         setQuestions(qs);
@@ -856,8 +864,22 @@ function QuestionRow({
 
       {/* Student answer (always shown) */}
       <div className="mb-2.5 pl-10">
-        <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Học viên trả lời</div>
-        {isSubjective ? (
+        <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+          {q.audioUrl ? "Bài nói của học viên" : "Học viên trả lời"}
+        </div>
+        {q.audioUrl ? (
+          <div className="space-y-2">
+            <audio controls preload="none" src={getFullMediaUrl(q.audioUrl) ?? q.audioUrl} className="w-full h-9">
+              Trình duyệt không hỗ trợ phát audio.
+            </audio>
+            {q.transcript && (
+              <div className="bg-white border border-slate-200 rounded p-2.5 text-xs text-slate-700 max-h-40 overflow-y-auto whitespace-pre-wrap">
+                <span className="font-semibold text-slate-500">Transcript (AI): </span>
+                {q.transcript}
+              </div>
+            )}
+          </div>
+        ) : isSubjective ? (
           <div className="bg-white border border-slate-200 rounded p-2.5 text-sm text-slate-800 max-h-40 overflow-y-auto whitespace-pre-wrap">
             {q.studentAnswer || <em className="text-slate-400">Để trống</em>}
           </div>

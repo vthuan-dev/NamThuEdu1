@@ -133,7 +133,8 @@ class GradingController extends Controller
         }
 
         $isVstep = strtoupper($submission->exam->eType ?? '') === 'VSTEP';
-        if ($isVstep) {
+        $isIelts = strtoupper($submission->exam->eType ?? '') === 'IELTS';
+        if ($isVstep || $isIelts) {
             $raw = $submission->sGemini_feedback
                 ? (is_array($submission->sGemini_feedback)
                     ? $submission->sGemini_feedback
@@ -184,6 +185,8 @@ class GradingController extends Controller
                     $saAiScore = null;
                     if (isset($raw['speaking_results']["part_{$part}"]['score'])) {
                         $saAiScore = $raw['speaking_results']["part_{$part}"]['score'];
+                    } elseif (isset($raw['ielts_speaking_results']["part_{$part}"]['band'])) {
+                        $saAiScore = $raw['ielts_speaking_results']["part_{$part}"]['band'];
                     }
 
                     \App\Models\SubmissionAnswer::create([
