@@ -146,8 +146,21 @@ export function AllExams() {
         ...teensList.map((e) => ({ ...e, _group: "teens" as const })),
       ];
 
+      // Dedup theo eId — 1 đề có thể xuất hiện ở nhiều endpoint (vd vừa adult/vstep
+      // vừa kids do eType='GENERAL'+age_group='kids'). Ưu tiên giữ bản KIDS để
+      // route Sửa/Xem đúng và tránh trùng key React.
+      const isKidsTagged = (e: any) =>
+        e?.age_group === "kids" || e?._group === "kids" || Boolean(e?.kids_exam_config);
+      const byId = new Map<number, (typeof tagged)[number]>();
+      for (const e of tagged) {
+        const existing = byId.get(e.eId);
+        if (!existing) { byId.set(e.eId, e); continue; }
+        if (isKidsTagged(e) && !isKidsTagged(existing)) byId.set(e.eId, e);
+      }
+      const deduped = Array.from(byId.values());
+
       // Lọc bỏ exam không hợp lệ + sort theo ngày tạo
-      const merged = tagged
+      const merged = deduped
         .filter((e) => e && e.eId && e.eTitle)
         .sort(
           (a, b) =>
@@ -526,17 +539,26 @@ export function AllExams() {
   const isEditorPreview = (exam: KidsExam) => {
     const eType = (exam.eType || "").toUpperCase();
     const group = (exam as any)._group || "";
+    // Kids giờ dùng trang xem chung (read-only), KHÔNG mở editor → không phải editor preview.
     if (eType === "THPT" || group === "thpt") return true;
-    const isKidsExam =
-      (exam as any).age_group === "kids" ||
-      Boolean(exam.kids_exam_config) ||
-      eType === "KIDS";
-    return isKidsExam;
+    return false;
   };
 
   const getPreviewLink = (exam: KidsExam) => {
     const eType = (exam.eType || "").toUpperCase();
     const group = (exam as any)._group || "";
+
+    // Kids ưu tiên TRƯỚC mọi loại khác: đề kids có thể bị lưu eType='VSTEP'/'GENERAL'
+    // hoặc lọt nhầm nhóm vstep/adult → phải chặn ở đây để không mở preview VSTEP.
+    // Dùng trang xem chung (ExamPlayer + QuestionRenderer) — render đủ dạng kids,
+    // KHÔNG mở editor (editor strict shape, dễ crash với dữ liệu cũ/seed).
+    const isKidsExam =
+      (exam as any).age_group === "kids" ||
+      Boolean(exam.kids_exam_config) ||
+      eType === "KIDS";
+    if (isKidsExam) {
+      return `/giao-vien/de-thi/${exam.eId}/xem-moi`;
+    }
 
     // IELTS preview: cần skill để route đúng
     if (eType === "IELTS" || group === "ielts") {
@@ -557,15 +579,6 @@ export function AllExams() {
     // legacy /de-thi/:id/xem không hiểu thpt_config nên hiện "0 câu hỏi".
     if (eType === "THPT" || group === "thpt") {
       return `/giao-vien/de-thi/thpt/${exam.eId}/sua`;
-    }
-
-    // Kids — cũng dùng editor chung
-    const isKidsExam =
-      (exam as any).age_group === "kids" ||
-      Boolean(exam.kids_exam_config) ||
-      eType === "KIDS";
-    if (isKidsExam) {
-      return `/giao-vien/de-thi/kids/tao-moi/${exam.eId}`;
     }
 
     return `/giao-vien/de-thi/${exam.eId}/xem`;

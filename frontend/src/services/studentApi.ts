@@ -149,6 +149,23 @@ export interface BrowseExam {
   created_at: string;
 }
 
+export interface BrowseKidsExam {
+  id: number;
+  title: string;
+  type: string;
+  skill: string;
+  duration: number;
+  description: string | null;
+  age_group: string | null;
+  questions_count: number;
+  created_at: string;
+  is_assigned: boolean;
+  assignment_id: number | null;
+  submission_status: 'pending' | 'in_progress' | 'completed';
+  submission_id: number | null;
+  score: number | null;
+}
+
 export const studentApi = {
   // Tests — always real backend
   getTests: (params?: { status?: string; type?: string; skill?: string }) =>
@@ -301,6 +318,14 @@ export const studentApi = {
   // Exam browser — public VSTEP/IELTS exams for adults
   browseExams: (params?: { type?: 'VSTEP' | 'IELTS' }) =>
     api.get<{ status: string; data: BrowseExam[] }>('/student/exams/browse', { params }),
+
+  // Kids exam browser — TẤT CẢ đề Cambridge YL đã publish (kèm cờ is_assigned)
+  browseKidsExams: () =>
+    api.get<{ status: string; data: BrowseKidsExam[] }>('/student/exams/browse-kids'),
+
+  // Kids direct exam — start/resume by exam ID (no assignment needed)
+  startKidsExamDirect: (examId: number) =>
+    api.post(`/student/exams/${examId}/start-kids`),
 
   // VSTEP direct exam — start by exam ID (no assignment needed)
   startDirectVstepExam: (examId: number, resume = false) =>

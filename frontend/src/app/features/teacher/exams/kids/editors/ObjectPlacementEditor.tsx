@@ -31,8 +31,18 @@ const ObjectPlacementEditor: React.FC<ObjectPlacementEditorProps> = ({
   examId,
 }) => {
   const [title, setTitle] = useState(initialData?.title || '');
-  const [baseImageUrl, setBaseImageUrl] = useState(initialData?.config?.base_image_url || '');
-  const [items, setItems] = useState<PlacementItem[]>(initialData?.config?.items || []);
+  const [baseImageUrl, setBaseImageUrl] = useState(
+    initialData?.config?.base_image_url || initialData?.config?.imageUrl || initialData?.config?.image_url || ''
+  );
+  const [items, setItems] = useState<PlacementItem[]>(
+    (initialData?.config?.items || []).map((it: any, idx: number) => ({
+      id: it?.id ?? `item-${idx + 1}`,
+      name: it?.name ?? it?.label ?? '',
+      cardImageUrl: it?.cardImageUrl ?? it?.card_image_url ?? it?.image_url ?? it?.imageUrl ?? '',
+      correctX: it?.correctX ?? it?.correct_position?.x ?? 50,
+      correctY: it?.correctY ?? it?.correct_position?.y ?? 50,
+    }))
+  );
 
   const addItem = () => {
     setItems([
@@ -109,7 +119,7 @@ const ObjectPlacementEditor: React.FC<ObjectPlacementEditorProps> = ({
           <FieldLabel hint={`${items.length} thẻ`}>Thẻ hình nhỏ</FieldLabel>
           <div className="space-y-2">
             {items.map((item, index) => (
-              <ItemCard key={item.id} index={index} onRemove={() => removeItem(item.id)}>
+              <ItemCard key={item.id ?? index} index={index} onRemove={() => removeItem(item.id)}>
                 <div className="flex gap-3">
                   <ImageUpload
                     value={item.cardImageUrl}

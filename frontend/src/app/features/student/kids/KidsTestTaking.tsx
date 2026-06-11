@@ -11,10 +11,19 @@ import { useMutation } from '@tanstack/react-query';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Volume2, AlertTriangle, PartyPopper } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
-import KidsTaskRenderer from './player/KidsTaskRenderer';
-import { parseKidsAnswer, serializeKidsAnswer, countFilled } from './player/kidsAnswer';
+import { QuestionRenderer } from '../../../../components/exam/QuestionRenderer';
 
 const BASE = '/hoc-vien';
+
+// Đáp án kids task được lưu dạng chuỗi JSON (saAnswer_text). Parse về object cho QuestionRenderer.
+function parseAnswerObject(raw: string | undefined | null): any {
+  if (!raw) return {};
+  const t = String(raw).trim();
+  if (t.startsWith('{') || t.startsWith('[')) {
+    try { return JSON.parse(t); } catch { /* ignore */ }
+  }
+  return {};
+}
 
 // ─── Helpers (đồng bộ cách đọc dữ liệu với TestTaking) ────────────────────────
 function getQuestionId(q: any): string {
@@ -103,6 +112,8 @@ export function KidsTestTaking() {
   const assignmentId = Number(id);
 
   const autoStart = useMemo(() => new URLSearchParams(location.search).get('autostart') === '1', [location.search]);
+  // direct=1 → `id` là examId, bắt đầu trực tiếp không cần assignment (đề chưa được giao)
+  const isDirect = useMemo(() => new URLSearchParams(location.search).get('direct') === '1', [location.search]);
   const querySubmissionId = useMemo(() => {
     const raw = Number(new URLSearchParams(location.search).get('submissionId') ?? 0);
     return Number.isFinite(raw) && raw > 0 ? raw : null;
@@ -123,7 +134,6 @@ export function KidsTestTaking() {
   const q = questions[current];
   const qid = q ? getQuestionId(q) : '';
   const kidsConfig = q?.kids_task_config ?? null;
-  const kidsTaskType: string = kidsConfig?.task_type ?? '';
   const kidsTaskData: any = kidsConfig?.task_data ?? null;
   const isKidsTask = !!kidsConfig && !!kidsTaskData;
   const options = q && !isKidsTask ? getOptions(q) : [];
@@ -136,6 +146,10 @@ export function KidsTestTaking() {
 
   const startMutation = useMutation({
     mutationFn: async () => {
+      // Đề chưa được giao → start/resume trực tiếp bằng examId
+      if (isDirect) {
+        return studentApi.startKidsExamDirect(assignmentId);
+      }
       const startRes: any = await studentApi.startTest(assignmentId);
       const startData = startRes?.data?.data;
       if (!startData?.exam && (startData?.canResume || querySubmissionId)) {
@@ -202,10 +216,16 @@ export function KidsTestTaking() {
     }
   }, [q, qid, submissionId, saveAnswerMutation]);
 
-  // Kids task: nhiều ô con gói thành 1 JSON. Rỗng thì lưu '' để không tính là đã trả lời.
-  const handleKidsAnswer = useCallback((map: Record<string, string>) => {
-    const serialized = countFilled(map) > 0 ? serializeKidsAnswer(map) : '';
-    handleAnswer(serialized);
+  // Kids task: QuestionRenderer trả về answer dạng object → gói JSON lưu saAnswer_text.
+  // Rỗng thì lưu '' để không tính là đã trả lời.
+  const handleKidsAnswer = useCallback((obj: any) => {
+    const hasContent = obj && typeof obj === 'object' && Object.values(obj).some((v) => {
+      if (v == null) return false;
+      if (typeof v === 'string') return v.trim() !== '';
+      if (typeof v === 'object') return Object.keys(v as object).length > 0;
+      return true;
+    });
+    handleAnswer(hasContent ? JSON.stringify(obj) : '');
   }, [handleAnswer]);
 
   const playAudio = () => {
@@ -290,23 +310,20 @@ export function KidsTestTaking() {
               dangerouslySetInnerHTML={{ __html: q.qPassage }} />
           )}
 
-          {/* Question */}
-          <h1 className="text-lg sm:text-xl font-extrabold leading-snug" style={{ color: '#1A1040' }}
-            dangerouslySetInnerHTML={{ __html: q?.qContent ?? `Câu ${current + 1}` }} />
-
-          {/* Kids task instruction */}
-          {isKidsTask && kidsConfig?.instructions && (
-            <p className="mt-2 text-sm font-medium text-slate-500">{kidsConfig.instructions}</p>
+          {/* Question (đề thường — kids task để component tự render tiêu đề/hướng dẫn) */}
+          {!isKidsTask && (
+            <h1 className="text-lg sm:text-xl font-extrabold leading-snug" style={{ color: '#1A1040' }}
+              dangerouslySetInnerHTML={{ __html: q?.qContent ?? `Câu ${current + 1}` }} />
           )}
 
           {/* Answers */}
           {isKidsTask ? (
-            <div className="mt-5">
-              <KidsTaskRenderer
-                taskType={kidsTaskType}
-                taskData={kidsTaskData}
-                answer={parseKidsAnswer(selected)}
-                onChange={handleKidsAnswer}
+            <div className="mt-1">
+              <QuestionRenderer
+                question={q}
+                mode="student"
+                answer={parseAnswerObject(selected)}
+                onAnswer={handleKidsAnswer}
               />
             </div>
           ) : isWriting ? (

@@ -9,6 +9,32 @@ import { createKidsExam, updateKidsExam, getKidsExam } from '../../../../../serv
 import { ToastProvider } from '../../../../../contexts/ToastContext';
 import { getFullMediaUrl } from '../../../../../utils/mediaUtils';
 
+/**
+ * Gán id ổn định cho mọi phần tử mảng-object trong config (đệ quy nông).
+ * Nhiều đề (seed / dữ liệu cũ) không lưu `id` cho từng item → các editor dùng
+ * key={x.id} bị cảnh báo "unique key". Chuẩn hóa 1 chỗ ở đây để mọi editor an toàn.
+ */
+function ensureItemIds(config: any): any {
+  if (!config || typeof config !== 'object') return config;
+  const out: any = Array.isArray(config) ? [] : { ...config };
+  for (const [key, val] of Object.entries(config)) {
+    if (Array.isArray(val)) {
+      out[key] = val.map((el: any, idx: number) => {
+        if (el && typeof el === 'object' && !Array.isArray(el)) {
+          const withId = el.id != null ? el : { ...el, id: `${key}-${idx + 1}` };
+          return ensureItemIds(withId);
+        }
+        return el;
+      });
+    } else if (val && typeof val === 'object') {
+      out[key] = ensureItemIds(val);
+    } else {
+      out[key] = val;
+    }
+  }
+  return out;
+}
+
 interface ExamData {
   examType: string;
   title: string;
@@ -65,11 +91,11 @@ const CreateKidsExam: React.FC = () => {
           const imageUrl = imageMedia ? getFullMediaUrl(imageMedia.file_url) : null;
           
           // Add media URLs to config if they exist
-          const configWithMedia = {
+          const configWithMedia = ensureItemIds({
             ...baseConfig,
             ...(audioUrl && { audioUrl }),
             ...(imageUrl && { imageUrl }),
-          };
+          });
 
           return {
             qId: q.qId,

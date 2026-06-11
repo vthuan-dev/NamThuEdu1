@@ -27,6 +27,45 @@ interface TickItem {
   isExample?: boolean;
 }
 
+// Chuẩn hóa items khi nạp từ DB/seed: hỗ trợ cả shape cũ `options:[{id,imageUrl}]`
+// lẫn shape editor `optionA/optionB/optionC`. Luôn đảm bảo optionA/B/C tồn tại để
+// tránh crash khi render (item.optionX.imageUrl).
+function normalizeTickItems(raw: any): TickItem[] {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return [{
+      id: '1',
+      questionText: 'Where is Lucy now?',
+      optionA: { imageUrl: '', label: 'A' },
+      optionB: { imageUrl: '', label: 'B' },
+      optionC: { imageUrl: '', label: 'C' },
+      correctAnswer: 'A',
+      isExample: true,
+    }];
+  }
+  return raw.map((it: any, idx: number) => {
+    const opts: any[] = Array.isArray(it?.options) ? it.options : [];
+    const indexByLetter: Record<string, number> = { A: 0, B: 1, C: 2 };
+    const buildOpt = (letter: 'A' | 'B' | 'C'): TickOption => {
+      const existing = it?.[`option${letter}`];
+      if (existing && typeof existing === 'object') {
+        return { imageUrl: existing.imageUrl ?? existing.image_url ?? '', label: letter };
+      }
+      const fromArr = opts.find((o) => (o?.id ?? o?.label) === letter) ?? opts[indexByLetter[letter]];
+      return { imageUrl: fromArr?.imageUrl ?? fromArr?.image_url ?? '', label: letter };
+    };
+    return {
+      id: String(it?.id ?? idx + 1),
+      questionText: it?.questionText ?? it?.question ?? '',
+      optionA: buildOpt('A'),
+      optionB: buildOpt('B'),
+      optionC: buildOpt('C'),
+      correctAnswer: (it?.correctAnswer ?? 'A') as 'A' | 'B' | 'C',
+      audioUrl: it?.audioUrl,
+      isExample: it?.isExample ?? false,
+    };
+  });
+}
+
 const ListenTickEditor: React.FC<ListenTickEditorProps> = ({
   onSave,
   onCancel,
@@ -41,17 +80,7 @@ const ListenTickEditor: React.FC<ListenTickEditorProps> = ({
   const [title, setTitle] = useState(initialData?.title || 'Nghe và đánh dấu (✓) vào ô. Có một ví dụ.');
   const [points, setPoints] = useState(initialData?.points || 5);
   const [items, setItems] = useState<TickItem[]>(
-    initialData?.config?.items || [
-      {
-        id: '1',
-        questionText: 'Where is Lucy now?',
-        optionA: { imageUrl: '', label: 'A' },
-        optionB: { imageUrl: '', label: 'B' },
-        optionC: { imageUrl: '', label: 'C' },
-        correctAnswer: 'A',
-        isExample: true,
-      },
-    ]
+    normalizeTickItems(initialData?.config?.items)
   );
   const [mainAudioUrl, setMainAudioUrl] = useState(initialData?.config?.mainAudioUrl || '');
   const [mainImageUrl, setMainImageUrl] = useState(initialData?.config?.mainImageUrl || '');
@@ -537,7 +566,7 @@ const ListenTickEditor: React.FC<ListenTickEditorProps> = ({
                     <p className="text-xs text-indigo-600 font-medium">
                       💡 Nhấn vào ô và Ctrl+V
                     </p>
-                    {item[`option${option}`].imageUrl ? (
+                    {item[`option${option}`]?.imageUrl ? (
                       <div className="relative">
                         <img
                           src={item[`option${option}`].imageUrl}

@@ -25,11 +25,18 @@ const ClozeTestEditor: React.FC<ClozeTestEditorProps> = ({
   const [text, setText] = useState(
     initialData?.config?.text || 'Tom likes to play __1__ in the park. He has a __2__ ball.'
   );
-  const [gaps, setGaps] = useState<Gap[]>(
-    initialData?.config?.gaps || [
-      { gap_id: 1, options: ['', '', ''], correct_answer: '' },
-    ]
-  );
+  const [gaps, setGaps] = useState<Gap[]>(() => {
+    // Hỗ trợ cả `gaps` (editor) lẫn `questions` (seed/dữ liệu cũ) + gap_number→gap_id.
+    const raw = initialData?.config?.gaps ?? initialData?.config?.questions;
+    if (Array.isArray(raw) && raw.length > 0) {
+      return raw.map((g: any, idx: number) => ({
+        gap_id: g?.gap_id ?? g?.gap_number ?? idx + 1,
+        options: Array.isArray(g?.options) ? g.options : ['', '', ''],
+        correct_answer: g?.correct_answer ?? '',
+      }));
+    }
+    return [{ gap_id: 1, options: ['', '', ''], correct_answer: '' }];
+  });
   const [isSelectingBlanks, setIsSelectingBlanks] = useState(false);
   
   // Story title question (optional - for Movers/Flyers R&W Part 3)
