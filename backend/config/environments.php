@@ -63,21 +63,13 @@ return [
     |
     */
 
-    'is_local' => function() {
-        return app()->environment(['local', 'development']);
-    },
+    'is_local' => in_array(env('APP_ENV', 'local'), ['local', 'development'], true),
 
-    'is_staging' => function() {
-        return app()->environment('staging');
-    },
+    'is_staging' => env('APP_ENV') === 'staging',
 
-    'is_production' => function() {
-        return app()->environment('production');
-    },
+    'is_production' => env('APP_ENV') === 'production',
 
-    'is_testing' => function() {
-        return app()->environment('testing');
-    },
+    'is_testing' => env('APP_ENV') === 'testing',
 
     /*
     |--------------------------------------------------------------------------
