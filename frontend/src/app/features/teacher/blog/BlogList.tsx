@@ -82,11 +82,11 @@ export function BlogList() {
   };
 
   const statCards = [
-    { key: "total",    value: stats.total,    icon: FileText,     light: "bg-blue-50",    text: "text-blue-600"    },
-    { key: "draft",    value: stats.draft,    icon: PenLine,      light: "bg-slate-50",   text: "text-slate-600"   },
-    { key: "pending",  value: stats.pending,  icon: Clock,        light: "bg-amber-50",   text: "text-amber-600"   },
-    { key: "active",   value: stats.active,   icon: CheckCircle2, light: "bg-emerald-50", text: "text-emerald-600" },
-    { key: "inactive", value: stats.inactive, icon: XCircle,      light: "bg-rose-50",    text: "text-rose-600"    },
+    { key: "total",    value: stats.total,    icon: FileText     },
+    { key: "draft",    value: stats.draft,    icon: PenLine      },
+    { key: "pending",  value: stats.pending,  icon: Clock        },
+    { key: "active",   value: stats.active,   icon: CheckCircle2 },
+    { key: "inactive", value: stats.inactive, icon: XCircle      },
   ];
 
   const StatusBadge = ({ status }: { status: string }) => {
@@ -148,19 +148,19 @@ export function BlogList() {
           </div>
         </div>
 
-        {/* Stats — Bento Grid style */}
-        <div className="grid grid-cols-5 gap-4">
+        {/* Stats — compact, trung tính */}
+        <div className="grid grid-cols-5 gap-3">
           {statCards.map((c) => (
-            <div key={c.key} 
-              className="bg-white rounded-2xl p-5 hover:scale-[1.02] transition-transform duration-200 cursor-default"
-              style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-              <div className="flex items-start justify-between mb-3">
-                <div className={`w-10 h-10 rounded-xl ${c.light} flex items-center justify-center`}>
-                  <c.icon className={`${c.text}`} style={{ width: 20, height: 20 }} />
-                </div>
+            <div key={c.key}
+              className="flex items-center gap-3 bg-white rounded-xl px-4 py-3 border border-slate-100"
+              style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+              <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
+                <c.icon className="w-[18px] h-[18px] text-slate-500" />
               </div>
-              <p className="text-3xl font-bold text-slate-900 leading-none tabular-nums mb-1">{c.value}</p>
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{t(`blog.stats.${c.key}`)}</p>
+              <div className="min-w-0">
+                <p className="text-xl font-bold text-slate-900 leading-none tabular-nums">{c.value}</p>
+                <p className="text-[11px] font-medium text-slate-500 mt-1 truncate">{t(`blog.stats.${c.key}`)}</p>
+              </div>
             </div>
           ))}
         </div>
