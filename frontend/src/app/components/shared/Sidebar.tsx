@@ -45,7 +45,6 @@ const navigationData: MenuItem[] = [
     submenu: [
       { name: "manageStudents", href: "/giao-vien/students" },
       { name: "addStudent", href: "/giao-vien/students/them-moi" },
-      { name: "importStudents", href: "/giao-vien/students/import" },
     ],
   },
   {

@@ -12,7 +12,6 @@ test.describe('Teacher portal', () => {
     { path: '/giao-vien',                    name: 'teacher-dashboard' },
     { path: '/giao-vien/students',           name: 'teacher-students' },
     { path: '/giao-vien/students/them-moi',  name: 'teacher-student-add' },
-    { path: '/giao-vien/students/import',    name: 'teacher-student-import' },
     { path: '/giao-vien/khoa-hoc',           name: 'teacher-courses' },
     { path: '/giao-vien/de-thi',             name: 'teacher-exams' },
     { path: '/giao-vien/de-thi/tao-moi',     name: 'teacher-exam-create-setup' },

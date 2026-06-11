@@ -4,28 +4,36 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router";
 import {
   ArrowLeft,
-  Upload,
   Camera,
   Save,
   X,
   Eye,
   EyeOff,
   User,
-  Shield,
   Phone,
   Mail,
   MapPin,
   Calendar,
-  Baby,
-  Users,
-  GraduationCap,
   Loader2,
   CheckCircle2,
   XCircle,
+  ChevronDown,
 } from "lucide-react";
 import { useToast } from "../../../../hooks/useToast";
 import { ToastContainer } from "../../../../components/ui";
 import { StudentCredentialsModal } from "./StudentCredentialsModal";
+
+/**
+ * AddStudent — form tạo học viên mới.
+ *
+ * Thiết kế tối giản: nền trắng/slate-50, accent cam duy nhất ở CTA chính,
+ * không gradient, card border phẳng, padding gọn. Địa chỉ dùng API v2 của
+ * provinces.open-api.vn (mô hình 2 cấp Tỉnh → Phường/Xã sau sáp nhập 2025).
+ */
+
+// API địa chỉ — gọi trực tiếp từ client, không qua backend.
+const ADDRESS_API = 'https://provinces.open-api.vn/api/v2';
+type AddrItem = { code: string; name: string };
 
 export function AddStudent() {
   const { t } = useTranslation();
@@ -61,8 +69,7 @@ export function AddStudent() {
   const [phoneStatus, setPhoneStatus] = useState<PhoneStatus>('idle');
   const phoneDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const ADDRESS_API = import.meta.env.VITE_ADDRESS_API as string;
-  type AddrItem = { code: string; name: string };
+  // ── Address (Tỉnh → Phường/Xã, mô hình 2 cấp) ─────────────────────────────
   const [provinces, setProvinces] = useState<AddrItem[]>([]);
   const [communes, setCommunes] = useState<AddrItem[]>([]);
   const [addrProvince, setAddrProvince] = useState<AddrItem | null>(null);
@@ -73,9 +80,9 @@ export function AddStudent() {
 
   useEffect(() => {
     setLoadingProvinces(true);
-    fetch(`${ADDRESS_API}/provinces`)
+    fetch(`${ADDRESS_API}/p/`)
       .then(r => r.json())
-      .then(d => setProvinces((d.provinces ?? []).map((p: any) => ({ code: p.code, name: p.name }))))
+      .then((d: any[]) => setProvinces((Array.isArray(d) ? d : []).map(p => ({ code: String(p.code), name: p.name }))))
       .catch(() => {})
       .finally(() => setLoadingProvinces(false));
   }, []);
@@ -84,9 +91,9 @@ export function AddStudent() {
     if (!addrProvince) { setCommunes([]); setAddrCommune(null); return; }
     setLoadingCommunes(true);
     setAddrCommune(null);
-    fetch(`${ADDRESS_API}/provinces/${addrProvince.code}/communes`)
+    fetch(`${ADDRESS_API}/p/${addrProvince.code}?depth=2`)
       .then(r => r.json())
-      .then(d => setCommunes((d.communes ?? []).map((c: any) => ({ code: c.code, name: c.name }))))
+      .then((d: any) => setCommunes((d.wards ?? []).map((w: any) => ({ code: String(w.code), name: w.name }))))
       .catch(() => {})
       .finally(() => setLoadingCommunes(false));
   }, [addrProvince]);
@@ -94,6 +101,7 @@ export function AddStudent() {
   useEffect(() => {
     const parts = [addrStreet.trim(), addrCommune?.name, addrProvince?.name].filter(Boolean);
     handleInputChange('address', parts.join(', '));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addrStreet, addrCommune, addrProvince]);
 
   useEffect(() => {
@@ -123,37 +131,11 @@ export function AddStudent() {
     return () => { if (phoneDebounceRef.current) clearTimeout(phoneDebounceRef.current); };
   }, [formData.studentPhone]);
 
+  // Age group — config tối giản, không màu mè
   const ageGroups = [
-    {
-      value: 'kids' as const,
-      label: t('teacher.students.addStudent.ageGroups.kids.label'),
-      ageRange: t('teacher.students.addStudent.ageGroups.kids.ageRange'),
-      icon: Baby,
-      color: 'from-pink-400 to-purple-400',
-      bgColor: 'bg-pink-50',
-      borderColor: 'border-pink-300',
-      description: t('teacher.students.addStudent.ageGroups.kids.description')
-    },
-    {
-      value: 'teens' as const,
-      label: t('teacher.students.addStudent.ageGroups.teens.label'),
-      ageRange: t('teacher.students.addStudent.ageGroups.teens.ageRange'),
-      icon: Users,
-      color: 'from-orange-400 to-amber-400',
-      bgColor: 'bg-orange-50',
-      borderColor: 'border-orange-300',
-      description: t('teacher.students.addStudent.ageGroups.teens.description')
-    },
-    {
-      value: 'adults' as const,
-      label: t('teacher.students.addStudent.ageGroups.adults.label'),
-      ageRange: t('teacher.students.addStudent.ageGroups.adults.ageRange'),
-      icon: GraduationCap,
-      color: 'from-slate-400 to-gray-400',
-      bgColor: 'bg-slate-50',
-      borderColor: 'border-slate-300',
-      description: t('teacher.students.addStudent.ageGroups.adults.description')
-    },
+    { value: 'kids' as const,   label: t('teacher.students.addStudent.ageGroups.kids.label'),   ageRange: t('teacher.students.addStudent.ageGroups.kids.ageRange') },
+    { value: 'teens' as const,  label: t('teacher.students.addStudent.ageGroups.teens.label'),  ageRange: t('teacher.students.addStudent.ageGroups.teens.ageRange') },
+    { value: 'adults' as const, label: t('teacher.students.addStudent.ageGroups.adults.label'), ageRange: t('teacher.students.addStudent.ageGroups.adults.ageRange') },
   ];
 
   const handleInputChange = (field: string, value: any) => {
@@ -162,30 +144,21 @@ export function AddStudent() {
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // Validate file size (max 20MB)
-      if (file.size > 20 * 1024 * 1024) {
-        setError(t('teacher.students.addStudent.avatar.tooLarge'));
-        return;
-      }
-
-      // Validate file type - accept common image formats
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/svg+xml'];
-      if (!allowedTypes.includes(file.type)) {
-        setError(t('teacher.students.addStudent.avatar.invalidType'));
-        return;
-      }
-
-      setAvatarFile(file);
-      
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-      setError(null);
+    if (!file) return;
+    if (file.size > 20 * 1024 * 1024) {
+      setError(t('teacher.students.addStudent.avatar.tooLarge'));
+      return;
     }
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/svg+xml'];
+    if (!allowedTypes.includes(file.type)) {
+      setError(t('teacher.students.addStudent.avatar.invalidType'));
+      return;
+    }
+    setAvatarFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setAvatarPreview(reader.result as string);
+    reader.readAsDataURL(file);
+    setError(null);
   };
 
   const handleRemoveAvatar = () => {
@@ -196,82 +169,48 @@ export function AddStudent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    
-    if (phoneStatus === 'taken') {
-      setError('Số điện thoại này đã được sử dụng. Vui lòng chọn số khác.');
-      return;
-    }
-    if (phoneStatus === 'invalid') {
-      setError('Định dạng số điện thoại không hợp lệ.');
-      return;
-    }
 
-    // Validate password if not auto-generating
+    if (phoneStatus === 'taken')   { setError('Số điện thoại này đã được sử dụng.'); return; }
+    if (phoneStatus === 'invalid') { setError('Định dạng số điện thoại không hợp lệ.'); return; }
     if (!autoPassword && !formData.studentPassword) {
       setError(t('teacher.students.addStudent.validation.passwordRequired'));
       return;
     }
-    
-    setIsLoading(true);
 
+    setIsLoading(true);
     try {
       const token = getAuthToken();
-      
-      // Create FormData for multipart/form-data
-      const formDataToSend = new FormData();
-      
-      // Append all form fields
-      formDataToSend.append('studentName', formData.studentName);
-      formDataToSend.append('studentPhone', formData.studentPhone);
-      if (formData.studentEmail) formDataToSend.append('studentEmail', formData.studentEmail);
-      if (formData.studentDoB) formDataToSend.append('studentDoB', formData.studentDoB);
-      formDataToSend.append('gender', formData.gender);
-      if (formData.address) formDataToSend.append('address', formData.address);
-      formDataToSend.append('age_group', formData.age_group);
-      
-      // Handle password - auto-generate if checkbox is checked
-      const passwordToSend = autoPassword 
-        ? Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8).toUpperCase() 
-        : formData.studentPassword;
-      formDataToSend.append('studentPassword', passwordToSend);
-      
-      formDataToSend.append('status', formData.status);
-      
-      // Append avatar if selected
-      if (avatarFile) {
-        formDataToSend.append('avatar', avatarFile);
-        console.log('Avatar file attached:', avatarFile.name, avatarFile.size);
-      }
+      const fd = new FormData();
+      fd.append('studentName', formData.studentName);
+      fd.append('studentPhone', formData.studentPhone);
+      if (formData.studentEmail) fd.append('studentEmail', formData.studentEmail);
+      if (formData.studentDoB)   fd.append('studentDoB', formData.studentDoB);
+      fd.append('gender', formData.gender);
+      if (formData.address) fd.append('address', formData.address);
+      fd.append('age_group', formData.age_group);
 
-      console.log('Submitting form data...');
-      console.log('Auto password:', autoPassword);
-      console.log('Password length:', passwordToSend.length);
-      
+      const passwordToSend = autoPassword
+        ? Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8).toUpperCase()
+        : formData.studentPassword;
+      fd.append('studentPassword', passwordToSend);
+      fd.append('status', formData.status);
+      if (avatarFile) fd.append('avatar', avatarFile);
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}/teacher/student`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          // Don't set Content-Type, let browser set it with boundary for FormData
-        },
-        body: formDataToSend,
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
       });
-
       const data = await response.json();
-      console.log('Response:', data);
+      if (!response.ok) throw new Error(data.message || t('teacher.students.addStudent.error'));
 
-      if (!response.ok) {
-        throw new Error(data.message || t('teacher.students.addStudent.error'));
-      }
-
-      // Success - show credentials modal with password
       setStudentCredentials({
         name: formData.studentName,
         phone: formData.studentPhone,
-        password: data.data?.password || passwordToSend, // Get password from response or use the one we sent
+        password: data.data?.password || passwordToSend,
       });
       setShowCredentialsModal(true);
 
-      // Log activity (best-effort)
       const newStudentId = data?.data?.created_students?.[0]?.id ?? null;
       const { logTeacherActivity } = await import("../../../../services/teacherActivityLog");
       logTeacherActivity({
@@ -284,7 +223,6 @@ export function AddStudent() {
 
       success(t('teacher.students.addStudent.toast.success', { name: formData.studentName }));
     } catch (err: any) {
-      console.error('Error:', err);
       setError(err.message || t('teacher.students.addStudent.error'));
       showError(err.message || t('teacher.students.addStudent.toast.error'));
     } finally {
@@ -292,91 +230,57 @@ export function AddStudent() {
     }
   };
 
-  const steps = [
-    { id: 1, title: t('teacher.students.addStudent.steps.personalInfo'), icon: User },
-    { id: 2, title: t('teacher.students.addStudent.steps.account'), icon: Shield },
-  ];
+  // ── Reusable styles ───────────────────────────────────────────────────────
+  const inputCls = "w-full px-3.5 py-2.5 text-[14px] border border-slate-200 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300 transition-colors";
+  const labelCls = "block text-[12px] font-semibold text-slate-700 mb-1.5";
 
   return (
-    <div className="p-8 min-h-screen pb-48 bg-gradient-to-br from-[#F9FAFB] to-[#F3F4F6]">
+    <div className="px-6 py-5 pb-32 bg-slate-50 min-h-screen">
       <ToastContainer toasts={toasts} onClose={removeToast} />
-      {/* Header */}
-      <div className="mb-8">
-        <Link
-          to="/giao-vien/students"
-          className="inline-flex items-center gap-2 text-[#6B7280] hover:text-[#EA580C] mb-6 transition-colors group"
-        >
-          <div className="p-1.5 rounded-lg bg-white border border-[#E5E7EB] group-hover:border-[#EA580C] transition-colors">
+
+      {/* ── Header ────────────────────────────────────────────────────────── */}
+      <div className="mb-5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link
+            to="/giao-vien/students"
+            className="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-900 hover:border-slate-300 transition-colors"
+            aria-label="Quay lại"
+          >
             <ArrowLeft className="w-4 h-4" />
-          </div>
-          <span className="text-sm font-medium">{t('teacher.students.addStudent.backBtn')}</span>
-        </Link>
-        <div className="flex items-center justify-between">
+          </Link>
           <div>
-            <h1 className="text-3xl font-bold text-[#111827] mb-2">
+            <h1 className="text-[18px] font-bold text-slate-900 leading-tight">
               {t('teacher.students.addStudent.title')}
             </h1>
-            <p className="text-[#6B7280]">
+            <p className="text-slate-500 text-[12px] mt-0.5">
               {t('teacher.students.addStudent.subtitle')}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Progress Steps */}
-      <div className="mb-8 bg-white rounded-2xl p-6 border border-[#E5E7EB] shadow-sm">
-        <div className="flex items-center justify-between max-w-3xl mx-auto">
-          {steps.map((step, index) => {
-            const Icon = step.icon;
-            return (
-              <div key={step.id} className="flex items-center flex-1">
-                <div className="flex flex-col items-center flex-1">
-                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-[#EA580C] to-[#C2410C] text-white shadow-lg shadow-orange-500/20 mb-3">
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  <span className="text-sm font-medium text-[#111827]">
-                    {step.title}
-                  </span>
-                </div>
-                {index < steps.length - 1 && (
-                  <div className="flex-1 h-0.5 bg-gradient-to-r from-[#EA580C] to-[#FDBA74] mx-4 mb-8" />
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <form onSubmit={handleSubmit} className="max-w-4xl">
+        {/* ── Section 1: Thông tin cá nhân ─────────────────────────────── */}
+        <section className="bg-white rounded-xl border border-slate-200 p-5 mb-4">
+          <header className="flex items-center gap-2 pb-4 mb-4 border-b border-slate-100">
+            <span className="w-1 h-4 rounded-full bg-orange-500" />
+            <h2 className="text-[14px] font-bold text-slate-900">
+              {t('teacher.students.addStudent.personalSection.title')}
+            </h2>
+            <span className="text-[12px] text-slate-400 ml-auto">
+              {t('teacher.students.addStudent.personalSection.subtitle')}
+            </span>
+          </header>
 
-      <form onSubmit={handleSubmit} className="w-full">
-        {/* Section 1: Personal Information */}
-        <div className="bg-white rounded-2xl p-8 border border-[#E5E7EB] shadow-sm hover:shadow-md transition-shadow mb-6">
-          <div className="flex items-center gap-3 mb-8 pb-6 border-b border-[#F3F4F6]">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-[#FFF7ED] to-[#FFEDD5]">
-              <User className="w-6 h-6 text-[#EA580C]" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-[#111827]">
-                {t('teacher.students.addStudent.personalSection.title')}
-              </h2>
-              <p className="text-sm text-[#6B7280]">
-                {t('teacher.students.addStudent.personalSection.subtitle')}
-              </p>
-            </div>
-          </div>
-
-          {/* Avatar Upload */}
-          <div className="flex items-start gap-8 mb-8 pb-8 border-b border-[#F3F4F6]">
-            <div className="flex flex-col items-center">
-              <div className="relative group">
-                <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-[#F3F4F6] to-[#E5E7EB] border-2 border-dashed border-[#D1D5DB] flex items-center justify-center group-hover:border-[#EA580C] transition-all cursor-pointer overflow-hidden">
+          {/* Avatar + Name/Phone/Email */}
+          <div className="flex items-start gap-6 pb-5 mb-5 border-b border-slate-100">
+            <div className="flex flex-col items-center flex-shrink-0">
+              <div className="relative">
+                <div className="w-24 h-24 rounded-xl border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center overflow-hidden">
                   {avatarPreview ? (
-                    <img 
-                      src={avatarPreview} 
-                      alt="Avatar preview" 
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={avatarPreview} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <Camera className="w-10 h-10 text-[#9CA3AF] group-hover:text-[#EA580C] transition-colors" />
+                    <Camera className="w-7 h-7 text-slate-400" />
                   )}
                   <input
                     type="file"
@@ -385,31 +289,28 @@ export function AddStudent() {
                     className="absolute inset-0 opacity-0 cursor-pointer"
                   />
                 </div>
-                <div className="absolute -bottom-2 -right-2 w-10 h-10 rounded-full bg-[#EA580C] flex items-center justify-center shadow-lg">
-                  <Upload className="w-5 h-5 text-white" />
-                </div>
                 {avatarPreview && (
                   <button
                     type="button"
                     onClick={handleRemoveAvatar}
-                    className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-red-500 flex items-center justify-center shadow-lg hover:bg-red-600 transition-colors"
+                    className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full bg-white border border-slate-200 text-slate-500 hover:text-rose-600 hover:border-rose-300 transition-colors flex items-center justify-center shadow-sm"
+                    aria-label="Xóa ảnh"
                   >
-                    <X className="w-4 h-4 text-white" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
-              <p className="text-xs text-[#6B7280] mt-3 text-center font-medium">
+              <p className="text-[11px] text-slate-400 mt-2 text-center leading-snug">
                 {t('teacher.students.addStudent.avatar.upload')}
                 <br />
-                <span className="text-[#9CA3AF]">{t('teacher.students.addStudent.avatar.formats')}</span>
+                {t('teacher.students.addStudent.avatar.formats')}
               </p>
             </div>
 
-            <div className="flex-1 grid grid-cols-2 gap-6">
+            <div className="flex-1 grid grid-cols-2 gap-3.5">
               <div className="col-span-2">
-                <label className="flex items-center gap-2 text-sm font-semibold text-[#111827] mb-3">
-                  <User className="w-4 h-4 text-[#6B7280]" />
-                  {t('teacher.students.addStudent.fullName')} <span className="text-[#EF4444] ml-1">*</span>
+                <label className={labelCls}>
+                  {t('teacher.students.addStudent.fullName')} <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -417,14 +318,14 @@ export function AddStudent() {
                   value={formData.studentName}
                   onChange={(e) => handleInputChange("studentName", e.target.value)}
                   placeholder={t('teacher.students.addStudent.namePlaceholder')}
-                  className="w-full px-4 py-3.5 border border-[#E5E7EB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EA580C] focus:border-transparent transition-all text-[#111827] placeholder:text-[#9CA3AF] hover:border-[#D1D5DB]"
+                  className={inputCls}
                 />
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-sm font-semibold text-[#111827] mb-3">
-                  <Phone className="w-4 h-4 text-[#6B7280]" />
-                  {t('teacher.students.addStudent.phone')} <span className="text-[#EF4444] ml-1">*</span>
+                <label className={labelCls}>
+                  <Phone className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5 text-slate-400" />
+                  {t('teacher.students.addStudent.phone')} <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <input
@@ -433,28 +334,27 @@ export function AddStudent() {
                     value={formData.studentPhone}
                     onChange={(e) => handleInputChange("studentPhone", e.target.value)}
                     placeholder="0901 234 567"
-                    className={`w-full px-4 py-3.5 pr-11 border rounded-xl focus:outline-none focus:ring-2 focus:border-transparent transition-all text-[#111827] placeholder:text-[#9CA3AF] hover:border-[#D1D5DB] ${
-                      phoneStatus === 'taken'   ? 'border-red-400 focus:ring-red-200' :
-                      phoneStatus === 'available' ? 'border-emerald-400 focus:ring-emerald-100' :
-                      phoneStatus === 'invalid'  ? 'border-amber-400 focus:ring-amber-100' :
-                      'border-[#E5E7EB] focus:ring-[#EA580C]'
+                    className={`${inputCls} pr-9 ${
+                      phoneStatus === 'taken'     ? 'border-rose-300 focus:ring-rose-100 focus:border-rose-400' :
+                      phoneStatus === 'available' ? 'border-emerald-300 focus:ring-emerald-100 focus:border-emerald-400' :
+                      phoneStatus === 'invalid'   ? 'border-amber-300 focus:ring-amber-100 focus:border-amber-400' :
+                      ''
                     }`}
                   />
-                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none">
-                    {phoneStatus === 'checking'  && <Loader2   className="w-4 h-4 animate-spin text-slate-400" />}
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    {phoneStatus === 'checking'  && <Loader2     className="w-4 h-4 animate-spin text-slate-400" />}
                     {phoneStatus === 'available' && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
-                    {phoneStatus === 'taken'     && <XCircle   className="w-4 h-4 text-red-500" />}
-                    {phoneStatus === 'invalid'   && <XCircle   className="w-4 h-4 text-amber-500" />}
+                    {phoneStatus === 'taken'     && <XCircle      className="w-4 h-4 text-rose-500" />}
+                    {phoneStatus === 'invalid'   && <XCircle      className="w-4 h-4 text-amber-500" />}
                   </div>
                 </div>
-                {phoneStatus === 'taken'     && <p className="mt-1.5 text-xs text-red-500 flex items-center gap-1"><XCircle className="w-3 h-3" /> Số điện thoại này đã được sử dụng</p>}
-                {phoneStatus === 'available' && <p className="mt-1.5 text-xs text-emerald-600 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Số điện thoại hợp lệ</p>}
-                {phoneStatus === 'invalid'   && <p className="mt-1.5 text-xs text-amber-600 flex items-center gap-1"><XCircle className="w-3 h-3" /> Định dạng không hợp lệ (VD: 0901234567)</p>}
+                {phoneStatus === 'taken'     && <p className="mt-1 text-[11px] text-rose-600">Số điện thoại đã được sử dụng</p>}
+                {phoneStatus === 'invalid'   && <p className="mt-1 text-[11px] text-amber-600">Định dạng không hợp lệ (VD: 0901234567)</p>}
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-sm font-semibold text-[#111827] mb-3">
-                  <Mail className="w-4 h-4 text-[#6B7280]" />
+                <label className={labelCls}>
+                  <Mail className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5 text-slate-400" />
                   {t('teacher.students.addStudent.emailOptional')}
                 </label>
                 <input
@@ -462,94 +362,81 @@ export function AddStudent() {
                   value={formData.studentEmail}
                   onChange={(e) => handleInputChange("studentEmail", e.target.value)}
                   placeholder="hocsinh@email.com"
-                  className="w-full px-4 py-3.5 border border-[#E5E7EB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EA580C] focus:border-transparent transition-all text-[#111827] placeholder:text-[#9CA3AF] hover:border-[#D1D5DB]"
+                  className={inputCls}
                 />
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
+          {/* DoB / Gender / Address / Age group */}
+          <div className="grid grid-cols-2 gap-3.5">
             <div>
-              <label className="flex items-center gap-2 text-sm font-semibold text-[#111827] mb-3">
-                <Calendar className="w-4 h-4 text-[#6B7280]" />
+              <label className={labelCls}>
+                <Calendar className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5 text-slate-400" />
                 {t('teacher.students.addStudent.dateOfBirth')}
               </label>
               <input
                 type="date"
                 value={formData.studentDoB}
                 onChange={(e) => handleInputChange("studentDoB", e.target.value)}
-                className="w-full px-4 py-3.5 border border-[#E5E7EB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EA580C] focus:border-transparent transition-all text-[#111827] hover:border-[#D1D5DB]"
+                className={inputCls}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-[#111827] mb-3">
-                {t('teacher.students.addStudent.gender')}
-              </label>
-              <div className="flex items-center gap-4 h-[50px]">
+              <label className={labelCls}>{t('teacher.students.addStudent.gender')}</label>
+              <div className="flex items-center gap-4 h-[42px]">
                 {[
-                  { value: "male", label: t('teacher.students.addStudent.genderOptions.male') },
+                  { value: "male",   label: t('teacher.students.addStudent.genderOptions.male') },
                   { value: "female", label: t('teacher.students.addStudent.genderOptions.female') },
-                  { value: "other", label: t('teacher.students.addStudent.genderOptions.other') },
-                ].map((option) => (
-                  <label
-                    key={option.value}
-                    className="flex items-center gap-2.5 cursor-pointer group"
-                  >
-                    <div className="relative">
-                      <input
-                        type="radio"
-                        name="gender"
-                        value={option.value}
-                        checked={formData.gender === option.value}
-                        onChange={(e) => handleInputChange("gender", e.target.value)}
-                        className="w-5 h-5 text-[#EA580C] border-2 border-[#D1D5DB] focus:ring-2 focus:ring-[#EA580C] focus:ring-offset-2 cursor-pointer"
-                      />
-                    </div>
-                    <span className="text-sm font-medium text-[#374151] group-hover:text-[#EA580C] transition-colors">
-                      {option.label}
-                    </span>
+                  { value: "other",  label: t('teacher.students.addStudent.genderOptions.other') },
+                ].map((opt) => (
+                  <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="gender"
+                      value={opt.value}
+                      checked={formData.gender === opt.value}
+                      onChange={(e) => handleInputChange("gender", e.target.value)}
+                      className="w-4 h-4 text-orange-600 border-slate-300 focus:ring-1 focus:ring-orange-300 cursor-pointer"
+                    />
+                    <span className="text-[13px] text-slate-700">{opt.label}</span>
                   </label>
                 ))}
               </div>
             </div>
 
             <div className="col-span-2">
-              <label className="flex items-center gap-2 text-sm font-semibold text-[#111827] mb-3">
-                <MapPin className="w-4 h-4 text-[#6B7280]" />
+              <label className={labelCls}>
+                <MapPin className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5 text-slate-400" />
                 {t('teacher.students.addStudent.address')}
               </label>
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div className="relative">
                   <select
                     value={addrProvince?.code ?? ''}
-                    onChange={e => {
-                      const p = provinces.find(x => x.code === e.target.value) ?? null;
-                      setAddrProvince(p);
-                    }}
+                    onChange={e => setAddrProvince(provinces.find(x => x.code === e.target.value) ?? null)}
                     disabled={loadingProvinces}
-                    className="w-full px-4 py-3.5 border border-[#E5E7EB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EA580C] focus:border-transparent transition-all text-[#111827] bg-white appearance-none cursor-pointer hover:border-[#D1D5DB] disabled:opacity-60"
+                    className={`${inputCls} appearance-none cursor-pointer pr-9 disabled:opacity-60`}
                   >
-                    <option value="">{loadingProvinces ? 'Đang tải...' : 'Chọn Tỉnh / Thành phố'}</option>
+                    <option value="">{loadingProvinces ? 'Đang tải...' : 'Tỉnh / Thành phố'}</option>
                     {provinces.map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
                   </select>
-                  <div className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                  </div>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                 </div>
                 <div className="relative">
                   <select
                     value={addrCommune?.code ?? ''}
                     onChange={e => setAddrCommune(communes.find(x => x.code === e.target.value) ?? null)}
                     disabled={!addrProvince || loadingCommunes}
-                    className="w-full px-4 py-3.5 border border-[#E5E7EB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EA580C] focus:border-transparent transition-all text-[#111827] bg-white appearance-none cursor-pointer hover:border-[#D1D5DB] disabled:opacity-60 disabled:cursor-not-allowed"
+                    className={`${inputCls} appearance-none cursor-pointer pr-9 disabled:opacity-60 disabled:cursor-not-allowed`}
                   >
-                    <option value="">{loadingCommunes ? 'Đang tải...' : !addrProvince ? 'Chọn tỉnh trước' : 'Chọn Phường / Xã'}</option>
+                    <option value="">
+                      {loadingCommunes ? 'Đang tải...' : !addrProvince ? 'Chọn tỉnh trước' : 'Phường / Xã'}
+                    </option>
                     {communes.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
                   </select>
-                  <div className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                  </div>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                 </div>
               </div>
               <input
@@ -557,10 +444,10 @@ export function AddStudent() {
                 value={addrStreet}
                 onChange={e => setAddrStreet(e.target.value)}
                 placeholder="Số nhà, tên đường..."
-                className="w-full px-4 py-3.5 border border-[#E5E7EB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EA580C] focus:border-transparent transition-all text-[#111827] placeholder:text-[#9CA3AF] hover:border-[#D1D5DB]"
+                className={inputCls}
               />
               {formData.address && (
-                <p className="mt-2 text-xs text-slate-400 flex items-center gap-1">
+                <p className="mt-1.5 text-[11px] text-slate-400 flex items-center gap-1">
                   <MapPin className="w-3 h-3" />
                   {formData.address}
                 </p>
@@ -568,53 +455,32 @@ export function AddStudent() {
             </div>
 
             <div className="col-span-2">
-              <label className="block text-sm font-semibold text-[#111827] mb-3">
-                {t('teacher.students.addStudent.ageGroupTitle')} <span className="text-red-500">*</span>
+              <label className={labelCls}>
+                {t('teacher.students.addStudent.ageGroupTitle')} <span className="text-rose-500">*</span>
               </label>
-              <p className="text-xs text-[#6B7280] mb-3">
+              <p className="text-[11px] text-slate-400 mb-2.5">
                 {t('teacher.students.addStudent.ageGroupSubtitle')}
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {ageGroups.map((group) => {
-                  const Icon = group.icon;
-                  const isSelected = formData.age_group === group.value;
-                  
+              <div className="grid grid-cols-3 gap-2.5">
+                {ageGroups.map((g) => {
+                  const selected = formData.age_group === g.value;
                   return (
                     <button
-                      key={group.value}
+                      key={g.value}
                       type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, age_group: group.value }))}
-                      className={`
-                        relative p-4 rounded-xl border-2 transition-all
-                        ${isSelected 
-                          ? `${group.borderColor} ${group.bgColor} shadow-lg scale-105` 
-                          : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
-                        }
-                      `}
+                      onClick={() => setFormData(prev => ({ ...prev, age_group: g.value }))}
+                      className={`relative px-3.5 py-3 rounded-lg border text-left transition-all ${
+                        selected
+                          ? 'border-orange-400 bg-orange-50/60 ring-1 ring-orange-200'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
                     >
-                      <div className="flex flex-col items-center text-center space-y-2">
-                        <div className={`
-                          w-12 h-12 rounded-full bg-gradient-to-r ${group.color} 
-                          flex items-center justify-center
-                          ${isSelected ? 'scale-110' : ''}
-                          transition-transform
-                        `}>
-                          <Icon className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                          <div className="font-bold text-slate-800">{group.label}</div>
-                          <div className="text-sm text-slate-600 font-medium">{group.ageRange}</div>
-                          <div className="text-xs text-slate-500 mt-1">{group.description}</div>
-                        </div>
-                      </div>
-                      {isSelected && (
-                        <div className="absolute top-2 right-2">
-                          <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          </div>
-                        </div>
+                      <p className={`text-[13px] font-semibold ${selected ? 'text-orange-700' : 'text-slate-900'}`}>
+                        {g.label}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">{g.ageRange}</p>
+                      {selected && (
+                        <CheckCircle2 className="absolute top-2.5 right-2.5 w-4 h-4 text-orange-500" />
                       )}
                     </button>
                   );
@@ -622,52 +488,49 @@ export function AddStudent() {
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Section 2: Account */}
-        <div className="bg-white rounded-2xl p-8 border border-[#E5E7EB] shadow-sm hover:shadow-md transition-shadow mb-6">
-          <div className="flex items-center gap-3 mb-8 pb-6 border-b border-[#F3F4F6]">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-[#FEF3C7] to-[#FDE68A]">
-              <Shield className="w-6 h-6 text-[#F59E0B]" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-[#111827]">
-                {t('teacher.students.addStudent.accountSection.title')}
-              </h2>
-              <p className="text-sm text-[#6B7280]">
-                {t('teacher.students.addStudent.accountSection.subtitle')}
-              </p>
-            </div>
-          </div>
+        {/* ── Section 2: Tài khoản ─────────────────────────────────────── */}
+        <section className="bg-white rounded-xl border border-slate-200 p-5 mb-4">
+          <header className="flex items-center gap-2 pb-4 mb-4 border-b border-slate-100">
+            <span className="w-1 h-4 rounded-full bg-amber-500" />
+            <h2 className="text-[14px] font-bold text-slate-900">
+              {t('teacher.students.addStudent.accountSection.title')}
+            </h2>
+            <span className="text-[12px] text-slate-400 ml-auto">
+              {t('teacher.students.addStudent.accountSection.subtitle')}
+            </span>
+          </header>
 
-          <div className="space-y-6">
-            <label className="flex items-start gap-4 p-5 bg-gradient-to-r from-[#FFF7ED] to-[#FFEDD5] border-2 border-[#FDBA74] rounded-xl cursor-pointer hover:shadow-md transition-all group">
+          <div className="space-y-4">
+            {/* Auto password toggle */}
+            <label className="flex items-start gap-3 p-3.5 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer">
               <input
                 type="checkbox"
                 checked={autoPassword}
                 onChange={(e) => setAutoPassword(e.target.checked)}
-                className="w-5 h-5 mt-0.5 rounded border-2 border-[#EA580C] text-[#EA580C] focus:ring-2 focus:ring-[#EA580C] focus:ring-offset-2 cursor-pointer"
+                className="w-4 h-4 mt-0.5 rounded border-slate-300 text-orange-600 focus:ring-1 focus:ring-orange-300 cursor-pointer"
               />
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <p className="font-bold text-[#C2410C]">
+                <div className="flex items-center gap-2">
+                  <p className="text-[13px] font-semibold text-slate-900">
                     {t('teacher.students.addStudent.autoPassword.label')}
                   </p>
-                  <span className="px-2 py-0.5 bg-[#EA580C] text-white text-xs font-bold rounded-full">
+                  <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-semibold rounded">
                     {t('teacher.students.addStudent.autoPassword.badge')}
                   </span>
                 </div>
-                <p className="text-sm text-[#6B7280]">
+                <p className="text-[12px] text-slate-500 mt-0.5">
                   {t('teacher.students.addStudent.autoPassword.description')}
                 </p>
               </div>
             </label>
 
             {!autoPassword && (
-              <div className="grid grid-cols-2 gap-6 p-6 bg-[#F9FAFB] rounded-xl border border-[#E5E7EB]">
+              <div className="grid grid-cols-2 gap-3.5">
                 <div>
-                  <label className="block text-sm font-semibold text-[#111827] mb-3">
-                    {t('teacher.students.addStudent.passwordLabel')} <span className="text-[#EF4444]">*</span>
+                  <label className={labelCls}>
+                    {t('teacher.students.addStudent.passwordLabel')} <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <input
@@ -676,157 +539,127 @@ export function AddStudent() {
                       value={formData.studentPassword}
                       onChange={(e) => handleInputChange("studentPassword", e.target.value)}
                       placeholder={t('teacher.students.addStudent.passwordPlaceholder')}
-                      className="w-full px-4 py-3.5 pr-12 border border-[#E5E7EB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EA580C] focus:border-transparent transition-all bg-white"
+                      className={`${inputCls} pr-10`}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#EA580C] transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
                     >
-                      {showPassword ? (
-                        <EyeOff className="w-5 h-5" />
-                      ) : (
-                        <Eye className="w-5 h-5" />
-                      )}
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
-                  </div>
-                  <div className="mt-3 flex items-center gap-2">
-                    <div className="flex-1 h-2 bg-[#E5E7EB] rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-[#10B981] to-[#059669] transition-all rounded-full"
-                        style={{ width: "75%" }}
-                      />
-                    </div>
-                    <span className="text-xs text-[#10B981] font-bold px-2 py-0.5 bg-[#D1FAE5] rounded">
-                      {t('teacher.students.addStudent.passwordStrong')}
-                    </span>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-[#111827] mb-3">
-                    {t('teacher.students.addStudent.confirmPasswordLabel')} <span className="text-[#EF4444]">*</span>
+                  <label className={labelCls}>
+                    {t('teacher.students.addStudent.confirmPasswordLabel')} <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="password"
                     required={!autoPassword}
                     value={formData.confirmPassword}
-                    onChange={(e) =>
-                      handleInputChange("confirmPassword", e.target.value)
-                    }
+                    onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
                     placeholder={t('teacher.students.addStudent.confirmPasswordPlaceholder')}
-                    className="w-full px-4 py-3.5 border border-[#E5E7EB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#EA580C] focus:border-transparent transition-all bg-white"
+                    className={inputCls}
                   />
                 </div>
               </div>
             )}
 
-            <label className="flex items-center gap-3 p-4 border-2 border-[#E5E7EB] rounded-xl cursor-pointer hover:border-[#EA580C] hover:bg-[#F9FAFB] transition-all group">
+            {/* Send SMS */}
+            <label className="flex items-center gap-2.5 p-3 rounded-lg border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer">
               <input
                 type="checkbox"
                 checked={formData.sendSMS}
                 onChange={(e) => handleInputChange("sendSMS", e.target.checked)}
-                className="w-5 h-5 rounded border-2 border-[#D1D5DB] text-[#EA580C] focus:ring-2 focus:ring-[#EA580C] cursor-pointer"
+                className="w-4 h-4 rounded border-slate-300 text-orange-600 focus:ring-1 focus:ring-orange-300 cursor-pointer"
               />
-              <Phone className="w-5 h-5 text-[#6B7280] group-hover:text-[#EA580C] transition-colors" />
-              <span className="text-sm font-medium text-[#374151] group-hover:text-[#EA580C] transition-colors">
+              <Phone className="w-4 h-4 text-slate-400" />
+              <span className="text-[13px] text-slate-700">
                 {t('teacher.students.addStudent.sendSMS')}
               </span>
             </label>
 
-            <div className="p-5 bg-[#F9FAFB] rounded-xl border border-[#E5E7EB]">
-              <label className="block text-sm font-semibold text-[#111827] mb-4">
-                {t('teacher.students.addStudent.statusLabel')}
-              </label>
-              <div className="flex items-center gap-4">
+            {/* Status */}
+            <div className="flex items-center justify-between p-3.5 rounded-lg border border-slate-200">
+              <div>
+                <p className="text-[13px] font-semibold text-slate-900">
+                  {t('teacher.students.addStudent.statusLabel')}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {formData.status === "active"
+                    ? t('teacher.students.addStudent.statusActiveDesc')
+                    : t('teacher.students.addStudent.statusInactiveDesc')}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={`text-[12px] font-medium ${formData.status === "active" ? "text-emerald-600" : "text-slate-500"}`}>
+                  {formData.status === "active"
+                    ? t('teacher.students.addStudent.statusActive')
+                    : t('teacher.students.addStudent.statusInactive')}
+                </span>
                 <button
                   type="button"
                   onClick={() => handleInputChange("status", formData.status === "active" ? "inactive" : "active")}
-                  className={`relative inline-flex h-8 w-16 items-center rounded-full transition-all duration-300 ${
-                    formData.status === "active"
-                      ? "bg-gradient-to-r from-[#10B981] to-[#059669]"
-                      : "bg-[#E5E7EB]"
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    formData.status === "active" ? "bg-emerald-500" : "bg-slate-300"
                   }`}
                 >
                   <span
-                    className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-lg transition-transform duration-300 ${
-                      formData.status === "active"
-                        ? "translate-x-9"
-                        : "translate-x-1"
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                      formData.status === "active" ? "translate-x-5" : "translate-x-0.5"
                     }`}
                   />
                 </button>
-                <div className="flex items-center gap-2">
-                  <span className={`text-sm font-bold ${
-                    formData.status === "active" ? "text-[#10B981]" : "text-[#6B7280]"
-                  }`}>
-                    {formData.status === "active" ? t('teacher.students.addStudent.statusActive') : t('teacher.students.addStudent.statusInactive')}
-                  </span>
-                  {formData.status === "active" && (
-                    <div className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse" />
-                  )}
-                </div>
               </div>
-              <p className="text-xs text-[#6B7280] mt-3">
-                {formData.status === "active"
-                  ? t('teacher.students.addStudent.statusActiveDesc')
-                  : t('teacher.students.addStudent.statusInactiveDesc')}
-              </p>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Action Buttons */}
-        <div className="sticky bottom-0 bg-white/95 backdrop-blur-sm border-t-2 border-[#E5E7EB] -mx-8 px-8 py-5 flex items-center justify-between shadow-2xl rounded-t-2xl">
-          {error && (
-            <div className="flex-1 mr-4 p-3 bg-red-50 border border-red-200 rounded-xl">
-              <p className="text-red-700 text-sm flex items-center gap-2">
-                <span>⚠️</span> {error}
-              </p>
-            </div>
-          )}
+        {/* ── Sticky action bar ────────────────────────────────────────── */}
+        <div className="sticky bottom-0 -mx-6 px-6 py-3 bg-white border-t border-slate-200 flex items-center justify-between gap-3">
+          {error ? (
+            <p className="flex-1 text-[12px] text-rose-600 flex items-center gap-1.5">
+              <XCircle className="w-3.5 h-3.5 flex-shrink-0" />
+              {error}
+            </p>
+          ) : <span className="flex-1" />}
+
           <Link
             to="/giao-vien/students"
-            className="flex items-center gap-2 px-6 py-3.5 border-2 border-[#E5E7EB] text-[#374151] rounded-xl hover:bg-[#F9FAFB] hover:border-[#D1D5DB] transition-all font-semibold"
+            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 text-[13px] font-medium transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-3.5 h-3.5" />
             {t('teacher.students.addStudent.cancel')}
           </Link>
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-[#EA580C] to-[#C2410C] text-white rounded-xl hover:shadow-xl hover:shadow-orange-500/30 hover:scale-105 transition-all font-bold disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-            >
-              {isLoading ? (
-                <>
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  <span>{t('teacher.students.addStudent.submitting')}</span>
-                </>
-              ) : (
-                <>
-                  <Save className="w-5 h-5" />
-                  {t('teacher.students.addStudent.submit')}
-                </>
-              )}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-orange-600 text-white hover:bg-orange-700 text-[13px] font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                {t('teacher.students.addStudent.submitting')}
+              </>
+            ) : (
+              <>
+                <Save className="w-3.5 h-3.5" />
+                {t('teacher.students.addStudent.submit')}
+              </>
+            )}
+          </button>
         </div>
       </form>
-      
+
       {/* Student Credentials Modal */}
       {studentCredentials && (
         <StudentCredentialsModal
           isOpen={showCredentialsModal}
           onClose={() => {
             setShowCredentialsModal(false);
-            // Navigate to students list after closing modal
-            setTimeout(() => {
-              navigate('/giao-vien/students');
-            }, 300);
+            setTimeout(() => navigate('/giao-vien/students'), 300);
           }}
           studentData={studentCredentials}
         />

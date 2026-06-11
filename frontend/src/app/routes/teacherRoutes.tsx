@@ -12,7 +12,7 @@ import { Dashboard } from "../features/teacher/dashboard";
 import { CourseDetail } from "../features/teacher/courses/CourseDetail";
 // Class system deprecated — giữ import comment để dễ revert nếu cần.
 // import { ClassList, CreateClass, TransferClass, ClassStats } from "../features/teacher/classes";
-import { StudentManagement, AddStudent, ImportStudents } from "../features/teacher/students";
+import { StudentManagement, AddStudent } from "../features/teacher/students";
 import { Settings } from "../features/teacher/settings";
 import { UnderConstruction } from "../components/shared";
 
@@ -98,7 +98,6 @@ export const teacherRoutes = {
     // Học viên
     { path: "students", Component: StudentManagement },
     { path: "students/them-moi", Component: AddStudent },
-    { path: "students/import", Component: ImportStudents },
 
     // ─── Lớp học (DEPRECATED) ────────────────────────────────────────
     // Class system đã gỡ khỏi UI flow. Routes bị disable. Files
