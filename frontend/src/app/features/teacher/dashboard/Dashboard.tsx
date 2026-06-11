@@ -203,7 +203,7 @@ export function Dashboard() {
         : `+${dashboardStats?.new_students_this_month || 0} trong tháng`,
       iconBg: "bg-indigo-50",
       iconColor: "text-indigo-500",
-      href: "/giao-vien/hoc-vien",
+      href: "/giao-vien/students",
       delay: "0ms",
     },
     {

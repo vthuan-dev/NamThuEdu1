@@ -399,7 +399,7 @@ export function Header({ breadcrumb, action }: HeaderProps) {
                   <div className="px-4 py-2.5 flex items-center justify-between bg-blue-50/60">
                     <p className="text-[11px] font-bold text-blue-700 uppercase tracking-wide">Học viên mới tạo</p>
                     <Link
-                      to="/giao-vien/hoc-vien"
+                      to="/giao-vien/students"
                       onClick={() => setBellOpen(false)}
                       className="text-[10px] font-semibold text-blue-600 hover:underline flex items-center gap-1"
                     >
@@ -410,7 +410,7 @@ export function Header({ breadcrumb, action }: HeaderProps) {
                     {newStudents.map((s) => (
                       <Link
                         key={`student-${s.uId}`}
-                        to="/giao-vien/hoc-vien"
+                        to="/giao-vien/students"
                         onClick={() => setBellOpen(false)}
                         className="flex items-start gap-2.5 px-4 py-2.5 hover:bg-blue-50/40 transition-colors cursor-pointer"
                       >
