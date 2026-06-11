@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react';
-import { Navigate, RouteObject, useLocation, useParams } from 'react-router';
+import { lazy, Suspense, useEffect } from 'react';
+import { Navigate, RouteObject, useLocation, useParams, useRouteError } from 'react-router';
 import { ProtectedRoute } from '../../components/auth';
 import { StudentLayout } from '../layouts/StudentLayout';
 import { KidsLayout } from '../layouts/KidsLayout';
@@ -33,6 +33,8 @@ const TeensTestTaking = lazy(() =>
   import('../features/student/teens/TeensTestTaking').then(m => ({ default: m.TeensTestTaking })));
 const TeensTests = lazy(() =>
   import('../features/student/teens/TeensTests').then(m => ({ default: m.TeensTests })));
+const TeensHistory = lazy(() =>
+  import('../features/student/teens/TeensHistory').then(m => ({ default: m.TeensHistory })));
 const AdultsDashboard = lazy(() =>
   import('../features/student/adults/AdultsDashboard').then(m => ({ default: m.AdultsDashboard })));
 
@@ -96,6 +98,58 @@ const LoadingFallback = () => (
     />
   </div>
 );
+
+// ─── Route error boundary ──────────────────────────────────────────────────────
+// Bắt lỗi "Failed to fetch dynamically imported module" — xảy ra khi deploy mới
+// đổi hash file chunk mà trình duyệt còn giữ index.html cũ. Tự reload 1 lần để
+// nạp lại index mới; nếu vẫn lỗi thì hiện UI thân thiện thay vì màn hình trắng.
+function RouteErrorBoundary() {
+  const error = useRouteError() as any;
+  const msg = String(error?.message ?? error ?? '');
+  const isChunkError = /dynamically imported module|Importing a module script failed|Failed to fetch|ChunkLoadError|error loading dynamically/i.test(msg);
+
+  useEffect(() => {
+    if (isChunkError && !sessionStorage.getItem('chunk_reload_attempted')) {
+      sessionStorage.setItem('chunk_reload_attempted', '1');
+      window.location.reload();
+    }
+  }, [isChunkError]);
+
+  if (isChunkError) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] px-6">
+        <div className="text-center space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-teal-50 flex items-center justify-center mx-auto">
+            <div className="w-6 h-6 border-3 rounded-full animate-spin" style={{ borderColor: '#CCFBF1', borderTopColor: '#0D9488' }} />
+          </div>
+          <p className="text-base font-semibold text-slate-700">Đang cập nhật phiên bản mới…</p>
+          <button
+            onClick={() => { sessionStorage.removeItem('chunk_reload_attempted'); window.location.reload(); }}
+            className="px-5 py-2.5 rounded-xl font-bold text-white"
+            style={{ background: 'linear-gradient(135deg,#0D9488,#14B8A6)' }}
+          >
+            Tải lại trang
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-center min-h-[60vh] px-6">
+      <div className="text-center space-y-3">
+        <p className="text-base font-semibold text-slate-700">Đã có lỗi xảy ra khi tải trang.</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-5 py-2.5 rounded-xl font-bold text-white"
+          style={{ background: 'linear-gradient(135deg,#0D9488,#14B8A6)' }}
+        >
+          Tải lại trang
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function LegacyStudentRedirect() {
   const location = useLocation();
@@ -202,7 +256,7 @@ function AdaptiveTests() {
 function AdaptiveHistory() {
   return (
     <Suspense fallback={<LoadingFallback />}>
-      {isKidsUser() ? <KidsHistory /> : <TestHistory />}
+      {isKidsUser() ? <KidsHistory /> : isTeensUser() ? <TeensHistory /> : <TestHistory />}
     </Suspense>
   );
 }
@@ -264,6 +318,7 @@ function ProtectedAdultsLayout() {
 export const studentRoutes: RouteObject = {
   path: '/hoc-vien',
   element: <ProtectedStudentLayout />,
+  errorElement: <RouteErrorBoundary />,
   children: [
     {
       index: true,

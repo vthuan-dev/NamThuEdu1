@@ -10,7 +10,7 @@ import { studentApi } from '../../services/studentApi';
 import { logout } from '../../services/authApi';
 import { LogoutOverlay } from '../../components/shared/LogoutOverlay';
 import {
-  Home, BookOpen, TrendingUp, Trophy, BarChart3,
+  Home, BookOpen, TrendingUp, BarChart3,
   LogOut, Menu, X, Bell, Clock, User, ChevronDown,
 } from 'lucide-react';
 
@@ -165,7 +165,6 @@ export function TeensLayout() {
     { icon: BookOpen,   label: 'Bài tập',       path: '/hoc-vien/bai-tap' },
     { icon: Clock,      label: 'Lịch sử thi',   path: '/hoc-vien/lich-su' },
     { icon: TrendingUp, label: 'Tiến độ',        path: '/hoc-vien/tien-do' },
-    { icon: Trophy,     label: 'Thành tích',     path: '/hoc-vien/thanh-tich' },
     { icon: BarChart3,  label: 'Bảng xếp hạng', path: '/hoc-vien/bang-xep-hang' },
   ];
 

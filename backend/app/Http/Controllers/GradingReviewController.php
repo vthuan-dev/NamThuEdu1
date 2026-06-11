@@ -62,8 +62,10 @@ class GradingReviewController extends Controller
             ], 409);
         }
 
-        // Mark as ai_grading and dispatch job
-        $submission->update(['sStatus' => 'ai_grading']);
+        // Đặt trạng thái 'grading_subjective' — đây là giá trị enum hợp lệ VÀ là
+        // trạng thái mà GradeVstepSubjectiveJob::handle() yêu cầu để thực thi.
+        // (Job tự chọn IELTSGradingService khi exam.eType === 'IELTS'.)
+        $submission->update(['sStatus' => 'grading_subjective']);
         GradeVstepSubjectiveJob::dispatch($submission->sId);
 
         return response()->json([
@@ -105,9 +107,12 @@ class GradingReviewController extends Controller
         }
 
         $speaking = null;
-        $speakingResults = $raw['speaking_results'] ?? [];
+        $speakingResults = $raw['speaking_results'] ?? ($raw['ielts_speaking_results'] ?? []);
         if (!empty($speakingResults)) {
-            $scores = array_filter(array_column($speakingResults, 'score'));
+            $scores = array_filter(array_map(
+                fn($p) => $p['score'] ?? $p['band'] ?? null,
+                $speakingResults
+            ), fn($v) => $v !== null);
             $speaking = [
                 'graded_at'     => $raw['speaking_graded_at'] ?? null,
                 'model'         => 'llama-3.3-70b-versatile + whisper-large-v3-turbo',
