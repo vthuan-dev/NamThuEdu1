@@ -460,7 +460,7 @@ export function Header({ breadcrumb, action }: HeaderProps) {
                     {examsReady.slice(0, 6).map((e) => (
                       <Link
                         key={`ready-${e.id}`}
-                        to="/giao-vien/bai-tap/giao-moi"
+                        to="/giao-vien/de-thi"
                         onClick={() => setBellOpen(false)}
                         className="flex items-start gap-2.5 px-4 py-2.5 hover:bg-emerald-50/40 transition-colors cursor-pointer"
                       >
