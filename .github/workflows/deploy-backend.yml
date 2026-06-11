@@ -1,0 +1,32 @@
+name: Deploy Backend to VPS
+
+# Tự động deploy backend lên VPS mỗi khi có thay đổi push lên nhánh main.
+# Có thể chạy thủ công qua tab Actions (workflow_dispatch).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+# Không chạy chồng nhiều lần deploy cùng lúc
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: SSH Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VPS over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_PORT }}
+          command_timeout: 20m
+          script: |
+            bash /var/www/namthuedu/deploy.sh
