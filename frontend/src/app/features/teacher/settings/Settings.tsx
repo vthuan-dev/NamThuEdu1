@@ -182,25 +182,22 @@ const getInitials = (name: string) => {
     .slice(0, 2);
 };
 
-// ─── Vietnam Address API ───────────────────────────────────────────────────
-const ADDRESS_API = 'https://provinces.open-api.vn/api';
+// ─── Vietnam Address API v2 (mô hình 2 cấp sau sáp nhập: Tỉnh → Phường/Xã) ──
+// Dùng provinces.open-api.vn API v2 — dữ liệu hành chính mới, không còn cấp
+// Quận/Huyện. Gọi trực tiếp từ client.
+const ADDRESS_API = 'https://provinces.open-api.vn/api/v2';
 
-interface GeoItem { code: number; name: string; }
+interface GeoItem { code: string; name: string; }
 
 async function fetchProvinces(): Promise<GeoItem[]> {
-  const res = await fetch(`${ADDRESS_API}/?depth=1`);
+  const res = await fetch(`${ADDRESS_API}/p/`);
   const data = await res.json();
-  return data.map((p: any) => ({ code: p.code, name: p.name }));
+  return (Array.isArray(data) ? data : []).map((p: any) => ({ code: String(p.code), name: p.name }));
 }
-async function fetchDistricts(provinceCode: number): Promise<GeoItem[]> {
+async function fetchCommunes(provinceCode: string): Promise<GeoItem[]> {
   const res = await fetch(`${ADDRESS_API}/p/${provinceCode}?depth=2`);
   const data = await res.json();
-  return (data.districts || []).map((d: any) => ({ code: d.code, name: d.name }));
-}
-async function fetchWards(districtCode: number): Promise<GeoItem[]> {
-  const res = await fetch(`${ADDRESS_API}/d/${districtCode}?depth=2`);
-  const data = await res.json();
-  return (data.wards || []).map((w: any) => ({ code: w.code, name: w.name }));
+  return (data.wards || []).map((w: any) => ({ code: String(w.code), name: w.name }));
 }
 
 // ─── Shared styled select component ─────────────────────────────────────────
@@ -246,18 +243,15 @@ function ProfileTab({ userName, userEmail, userProfile, onSave, loading, toast }
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
 
-  // ── Address state ────────────────────────────────────────────────────────
+  // ── Address state (2 cấp: Tỉnh → Phường/Xã) ──────────────────────────────
   const [editingAddress, setEditingAddress] = useState(false);
   const [provinces, setProvinces] = useState<GeoItem[]>([]);
-  const [districts, setDistricts] = useState<GeoItem[]>([]);
-  const [wards, setWards] = useState<GeoItem[]>([]);
+  const [communes, setCommunes] = useState<GeoItem[]>([]);
   const [selectedProvince, setSelectedProvince] = useState('');
-  const [selectedDistrict, setSelectedDistrict] = useState('');
-  const [selectedWard, setSelectedWard] = useState('');
+  const [selectedCommune, setSelectedCommune] = useState('');
   const [streetAddress, setStreetAddress] = useState('');
   const [loadingProvinces, setLoadingProvinces] = useState(false);
-  const [loadingDistricts, setLoadingDistricts] = useState(false);
-  const [loadingWards, setLoadingWards] = useState(false);
+  const [loadingCommunes, setLoadingCommunes] = useState(false);
 
   // Load provinces lazily — only the first time user opens edit mode
   const provincesLoaded = useRef(false);
@@ -281,41 +275,23 @@ function ProfileTab({ userName, userEmail, userProfile, onSave, loading, toast }
     setFormData(prev => ({ ...prev, address: savedAddressRef.current }));
     // Reset selects
     setSelectedProvince('');
-    setSelectedDistrict('');
-    setSelectedWard('');
+    setSelectedCommune('');
     setStreetAddress(savedAddressRef.current);
-    setDistricts([]);
-    setWards([]);
+    setCommunes([]);
   }, []);
 
-  // Load districts when province changes
+  // Load communes when province changes
   const handleProvinceChange = useCallback(async (code: string) => {
     setSelectedProvince(code);
-    setSelectedDistrict('');
-    setSelectedWard('');
-    setDistricts([]);
-    setWards([]);
+    setSelectedCommune('');
+    setCommunes([]);
     if (!code) return;
-    setLoadingDistricts(true);
+    setLoadingCommunes(true);
     try {
-      const data = await fetchDistricts(Number(code));
-      setDistricts(data);
-    } catch { toast.error('Không thể tải danh sách quận/huyện'); }
-    finally { setLoadingDistricts(false); }
-  }, [toast]);
-
-  // Load wards when district changes
-  const handleDistrictChange = useCallback(async (code: string) => {
-    setSelectedDistrict(code);
-    setSelectedWard('');
-    setWards([]);
-    if (!code) return;
-    setLoadingWards(true);
-    try {
-      const data = await fetchWards(Number(code));
-      setWards(data);
+      const data = await fetchCommunes(code);
+      setCommunes(data);
     } catch { toast.error('Không thể tải danh sách phường/xã'); }
-    finally { setLoadingWards(false); }
+    finally { setLoadingCommunes(false); }
   }, [toast]);
 
   // Build full address string ONLY while in edit mode
@@ -323,20 +299,16 @@ function ProfileTab({ userName, userEmail, userProfile, onSave, loading, toast }
     if (!editingAddress) return;
     const parts: string[] = [];
     if (streetAddress.trim()) parts.push(streetAddress.trim());
-    if (selectedWard) {
-      const w = wards.find(w => String(w.code) === selectedWard);
-      if (w) parts.push(w.name);
-    }
-    if (selectedDistrict) {
-      const d = districts.find(d => String(d.code) === selectedDistrict);
-      if (d) parts.push(d.name);
+    if (selectedCommune) {
+      const c = communes.find(c => String(c.code) === selectedCommune);
+      if (c) parts.push(c.name);
     }
     if (selectedProvince) {
       const p = provinces.find(p => String(p.code) === selectedProvince);
       if (p) parts.push(p.name);
     }
     setFormData(prev => ({ ...prev, address: parts.join(', ') }));
-  }, [editingAddress, streetAddress, selectedWard, selectedDistrict, selectedProvince, wards, districts, provinces]);
+  }, [editingAddress, streetAddress, selectedCommune, selectedProvince, communes, provinces]);
 
   useEffect(() => {
     if (userProfile) {
@@ -643,7 +615,7 @@ function ProfileTab({ userName, userEmail, userProfile, onSave, loading, toast }
         <div className="px-6 py-4 border-b border-[#F3F4F6] flex items-center gap-2">
           <div className="w-1 h-5 rounded-full bg-gradient-to-b from-[#10B981] to-[#059669]" />
           <h3 className="text-[#111827] font-bold" style={{ fontSize: '16px' }}>Địa chỉ</h3>
-          <span className="text-[11px] text-[#9CA3AF] bg-[#F3F4F6] px-2 py-0.5 rounded-full">provinces.open-api.vn</span>
+          <span className="text-[11px] text-[#9CA3AF] bg-[#F3F4F6] px-2 py-0.5 rounded-full">Đơn vị hành chính mới (2 cấp)</span>
           <div className="ml-auto">
             {editingAddress ? (
               <button
@@ -695,7 +667,7 @@ function ProfileTab({ userName, userEmail, userProfile, onSave, loading, toast }
         {/* Edit form — animated slide down */}
         {editingAddress && (
           <div className="p-6 space-y-4">
-            {/* Row 1: Province + District */}
+            {/* Row 1: Province + Commune (mô hình 2 cấp, không còn Quận/Huyện) */}
             <div className="grid grid-cols-2 gap-4">
               <GeoSelect
                 label="Tỉnh / Thành phố"
@@ -706,26 +678,17 @@ function ProfileTab({ userName, userEmail, userProfile, onSave, loading, toast }
                 placeholder="Chọn tỉnh/thành phố"
               />
               <GeoSelect
-                label="Quận / Huyện"
-                value={selectedDistrict}
-                onChange={handleDistrictChange}
-                options={districts}
-                loading={loadingDistricts}
+                label="Phường / Xã"
+                value={selectedCommune}
+                onChange={setSelectedCommune}
+                options={communes}
+                loading={loadingCommunes}
                 disabled={!selectedProvince}
-                placeholder={selectedProvince ? 'Chọn quận/huyện' : 'Chọn tỉnh trước'}
+                placeholder={selectedProvince ? 'Chọn phường/xã' : 'Chọn tỉnh trước'}
               />
             </div>
-            {/* Row 2: Ward + Street */}
+            {/* Row 2: Street */}
             <div className="grid grid-cols-2 gap-4">
-              <GeoSelect
-                label="Phường / Xã"
-                value={selectedWard}
-                onChange={setSelectedWard}
-                options={wards}
-                loading={loadingWards}
-                disabled={!selectedDistrict}
-                placeholder={selectedDistrict ? 'Chọn phường/xã' : 'Chọn quận trước'}
-              />
               <div>
                 <label className="block text-xs font-semibold text-[#6B7280] uppercase tracking-wide mb-1.5">Số nhà / Đường</label>
                 <div className="relative">

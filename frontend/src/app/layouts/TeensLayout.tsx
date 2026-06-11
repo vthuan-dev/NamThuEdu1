@@ -8,6 +8,7 @@ import { PwaInstallBanner } from '../../components/PwaInstallBanner';
 import { ResultDetail } from '../features/student/test-taking/ResultDetail';
 import { studentApi } from '../../services/studentApi';
 import { logout } from '../../services/authApi';
+import { LogoutOverlay } from '../../components/shared/LogoutOverlay';
 import {
   Home, BookOpen, TrendingUp, Trophy, BarChart3,
   LogOut, Menu, X, Bell, Clock, User, ChevronDown,
@@ -82,9 +83,9 @@ export function TeensLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const profileRef = useRef<HTMLDivElement>(null);
+  const [profileOpen, setProfileOpen] = useState(false);  const profileRef = useRef<HTMLDivElement>(null);
   const [activeSubmissionId, setActiveSubmissionId] = useState<number | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   // Basic user info from localStorage (for name, role — always available synchronously)
   const localUserStr = localStorage.getItem('user');
@@ -148,8 +149,15 @@ export function TeensLayout() {
   }, [activeSubmissionId]);
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/dang-nhap', { replace: true });
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setMenuOpen(false);
+    setProfileOpen(false);
+    try {
+      await logout();
+    } finally {
+      setTimeout(() => navigate('/dang-nhap', { replace: true }), 900);
+    }
   };
 
   const navItems: NavItem[] = [
@@ -175,6 +183,7 @@ export function TeensLayout() {
       className="min-h-screen flex flex-col"
       style={{ background: 'linear-gradient(160deg, #F0FDFA 0%, #ECFEFF 40%, #F8FAFC 100%)' }}
     >
+      <LogoutOverlay show={loggingOut} />
       <NotificationPermissionBanner push={push} />
       <PwaInstallBanner pwa={pwa} />
 
