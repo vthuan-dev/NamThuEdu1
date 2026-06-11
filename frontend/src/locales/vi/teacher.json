@@ -1116,12 +1116,12 @@
         "dob": "Ngày sinh",
         "ageGroup": "Nhóm lớp",
         "ageGroupOptions": {
-          "kids": "👶 Trẻ em (6-12)",
-          "teens": "🎓 Thiếu niên (13-17)",
-          "adults": "👔 Người lớn (18+)"
+          "kids": "Trẻ em (6-12)",
+          "teens": "Thiếu niên (13-17)",
+          "adults": "Người lớn (18+)"
         },
         "statusLabel": "Trạng thái",
-        "statusOptions": { "active": "✅ Đang học", "inactive": "⏸️ Tạm nghỉ" },
+        "statusOptions": { "active": "Đang học", "inactive": "Tạm nghỉ" },
         "viewPassword": "Xem mật khẩu",
         "password": {
           "hidden": "Mật khẩu đã được ẩn",

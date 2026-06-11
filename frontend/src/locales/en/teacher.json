@@ -932,12 +932,12 @@
         "dob": "Date of Birth",
         "ageGroup": "Age Group",
         "ageGroupOptions": {
-          "kids": "👶 Kids (6-12)",
-          "teens": "🎓 Teens (13-17)",
-          "adults": "👔 Adults (18+)"
+          "kids": "Kids (6-12)",
+          "teens": "Teens (13-17)",
+          "adults": "Adults (18+)"
         },
         "statusLabel": "Status",
-        "statusOptions": { "active": "✅ Active", "inactive": "⏸️ Suspended" },
+        "statusOptions": { "active": "Active", "inactive": "Suspended" },
         "viewPassword": "View Password",
         "password": {
           "hidden": "Password is hidden",

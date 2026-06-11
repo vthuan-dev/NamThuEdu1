@@ -1,10 +1,116 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getAuthToken } from '../../../../utils/authStorage';
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
-import { X, Loader2 } from "lucide-react";
+import {
+  X,
+  Loader2,
+  ChevronDown,
+  Check,
+  Baby,
+  GraduationCap,
+  Briefcase,
+  CircleDot,
+  CircleSlash,
+} from "lucide-react";
 import { getApiUrl, getAssetUrl } from "../../../../utils/apiConfig";
 import { useToast } from "../../../../hooks/useToast";
+
+// ─── Custom Select (listbox) — tinh tế hơn native, dùng lucide icon ─────────
+type SelectOption = {
+  value: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+};
+
+function FieldSelect({
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: SelectOption[];
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const selected = options.find((o) => o.value === value);
+  const SelectedIcon = selected?.icon;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`w-full flex items-center gap-2 px-3.5 py-2.5 text-[14px] border rounded-lg bg-white text-left transition-colors ${
+          open
+            ? 'border-orange-300 ring-2 ring-orange-200 outline-none'
+            : 'border-slate-200 hover:border-slate-300'
+        }`}
+      >
+        {SelectedIcon && <SelectedIcon className="w-4 h-4 text-slate-500 flex-shrink-0" />}
+        <span className="flex-1 truncate text-slate-900">
+          {selected?.label ?? <span className="text-slate-400">{placeholder ?? 'Chọn...'}</span>}
+        </span>
+        <ChevronDown
+          className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.ul
+            role="listbox"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.12 }}
+            className="absolute z-20 mt-1.5 w-full bg-white rounded-lg border border-slate-200 shadow-lg shadow-slate-200/60 overflow-hidden py-1"
+          >
+            {options.map((o) => {
+              const Icon = o.icon;
+              const isActive = o.value === value;
+              return (
+                <li
+                  key={o.value}
+                  role="option"
+                  aria-selected={isActive}
+                  onClick={() => { onChange(o.value); setOpen(false); }}
+                  className={`flex items-center gap-2.5 px-3 py-2 text-[13px] cursor-pointer transition-colors ${
+                    isActive
+                      ? 'bg-orange-50 text-orange-700'
+                      : 'text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-orange-500' : 'text-slate-400'}`} />
+                  <span className="flex-1">{o.label}</span>
+                  {isActive && <Check className="w-3.5 h-3.5 text-orange-500" />}
+                </li>
+              );
+            })}
+          </motion.ul>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 interface EditStudentModalProps {
   isOpen: boolean;
@@ -336,34 +442,32 @@ export function EditStudentModal({ isOpen, onClose, student, onSave, toast: toas
                 {/* Age Group & Status */}
                 <div className="grid grid-cols-2 gap-3.5">
                   <div>
-                    <label htmlFor="ageGroup" className={labelCls}>
+                    <label className={labelCls}>
                       {t('teacher.students.editStudent.ageGroup')}
                     </label>
-                    <select
-                      id="ageGroup"
+                    <FieldSelect
                       value={formData.ageGroup}
-                      onChange={(e) => setFormData({ ...formData, ageGroup: e.target.value })}
-                      className={`${inputCls} cursor-pointer`}
-                    >
-                      <option value="kids">{t('teacher.students.editStudent.ageGroupOptions.kids')}</option>
-                      <option value="teens">{t('teacher.students.editStudent.ageGroupOptions.teens')}</option>
-                      <option value="adults">{t('teacher.students.editStudent.ageGroupOptions.adults')}</option>
-                    </select>
+                      onChange={(v) => setFormData({ ...formData, ageGroup: v })}
+                      options={[
+                        { value: 'kids',   label: t('teacher.students.editStudent.ageGroupOptions.kids'),   icon: Baby },
+                        { value: 'teens',  label: t('teacher.students.editStudent.ageGroupOptions.teens'),  icon: GraduationCap },
+                        { value: 'adults', label: t('teacher.students.editStudent.ageGroupOptions.adults'), icon: Briefcase },
+                      ]}
+                    />
                   </div>
 
                   <div>
-                    <label htmlFor="status" className={labelCls}>
+                    <label className={labelCls}>
                       {t('teacher.students.editStudent.statusLabel')}
                     </label>
-                    <select
-                      id="status"
+                    <FieldSelect
                       value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                      className={`${inputCls} cursor-pointer`}
-                    >
-                      <option value="active">{t('teacher.students.editStudent.statusOptions.active')}</option>
-                      <option value="inactive">{t('teacher.students.editStudent.statusOptions.inactive')}</option>
-                    </select>
+                      onChange={(v) => setFormData({ ...formData, status: v })}
+                      options={[
+                        { value: 'active',   label: t('teacher.students.editStudent.statusOptions.active'),   icon: CircleDot },
+                        { value: 'inactive', label: t('teacher.students.editStudent.statusOptions.inactive'), icon: CircleSlash },
+                      ]}
+                    />
                   </div>
                 </div>
               </div>
