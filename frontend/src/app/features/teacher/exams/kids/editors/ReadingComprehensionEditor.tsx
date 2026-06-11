@@ -28,11 +28,17 @@ const ReadingComprehensionEditor: React.FC<ReadingComprehensionEditorProps> = ({
   const [title, setTitle] = useState(initialData?.title || 'Đọc Hiểu Và Trả Lời Câu Hỏi');
   const [passage, setPassage] = useState(initialData?.config?.passage || '');
   const [questions, setQuestions] = useState<Question[]>(
-    initialData?.config?.questions || [
-      { id: '1', question: '', answer: '' },
-      { id: '2', question: '', answer: '' },
-      { id: '3', question: '', answer: '' },
-    ]
+    (initialData?.config?.questions && initialData.config.questions.length > 0
+      ? initialData.config.questions.map((q: any, idx: number) => ({
+          id: q?.id ?? `q-${idx + 1}`,
+          question: q?.question ?? q?.text ?? '',
+          answer: q?.answer ?? q?.correct_answer ?? '',
+        }))
+      : [
+          { id: '1', question: '', answer: '' },
+          { id: '2', question: '', answer: '' },
+          { id: '3', question: '', answer: '' },
+        ])
   );
 
   const addQuestion = () => {

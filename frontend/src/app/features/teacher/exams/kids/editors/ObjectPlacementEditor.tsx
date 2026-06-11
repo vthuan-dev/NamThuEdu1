@@ -37,7 +37,7 @@ const ObjectPlacementEditor: React.FC<ObjectPlacementEditorProps> = ({
   const [items, setItems] = useState<PlacementItem[]>(
     (initialData?.config?.items || []).map((it: any, idx: number) => ({
       id: it?.id ?? `item-${idx + 1}`,
-      name: it?.name ?? it?.label ?? '',
+      name: it?.name ?? it?.label ?? it?.object ?? '',
       cardImageUrl: it?.cardImageUrl ?? it?.card_image_url ?? it?.image_url ?? it?.imageUrl ?? '',
       correctX: it?.correctX ?? it?.correct_position?.x ?? 50,
       correctY: it?.correctY ?? it?.correct_position?.y ?? 50,
