@@ -35,15 +35,15 @@ export function LookAndRead({
     const answerValue = answer[idx];
 
     return (
-      <div key={idx} className="p-5 bg-white rounded-xl border-3 border-purple-200 shadow-md hover:shadow-lg transition-shadow">
+      <div key={idx} className="p-5 bg-white rounded-2xl border-2 border-purple-200 shadow-md hover:shadow-lg transition-shadow">
         <div className="flex items-start gap-4">
           <span className="flex-shrink-0 w-8 h-8 bg-purple-500 text-white rounded-full flex items-center justify-center font-bold">
             {idx + 1}
           </span>
-          <div className="flex-1 space-y-3">
+          <div className="flex-1 space-y-3 min-w-0">
             {/* Item Image (if exists) */}
             {itemImageUrl && (
-              <div className="border-3 border-purple-200 rounded-lg overflow-hidden bg-gray-50">
+              <div className="border-2 border-purple-200 rounded-lg overflow-hidden bg-gray-50">
                 <img
                   src={getFullMediaUrl(itemImageUrl)}
                   alt={`Question ${idx + 1}`}
@@ -56,9 +56,9 @@ export function LookAndRead({
             <p className="font-medium text-lg text-gray-800">{questionText}</p>
 
             {/* Tick/Cross or Yes/No buttons */}
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-3">
               <button
-                className={`flex-1 px-6 py-3 rounded-lg border-2 font-bold text-lg transition-all ${
+                className={`flex-1 min-w-[120px] px-5 py-3 rounded-xl border-2 font-bold text-lg whitespace-nowrap transition-all ${
                   isInteractive ? 'hover:scale-105 cursor-pointer' : 'cursor-not-allowed'
                 } ${
                   answerValue === true
@@ -71,7 +71,7 @@ export function LookAndRead({
                 {trueLabel}
               </button>
               <button
-                className={`flex-1 px-6 py-3 rounded-lg border-2 font-bold text-lg transition-all ${
+                className={`flex-1 min-w-[120px] px-5 py-3 rounded-xl border-2 font-bold text-lg whitespace-nowrap transition-all ${
                   isInteractive ? 'hover:scale-105 cursor-pointer' : 'cursor-not-allowed'
                 } ${
                   answerValue === false
@@ -101,10 +101,10 @@ export function LookAndRead({
 
       {/* STICKY IMAGE LAYOUT: shared image left (sticky) + questions right (scrollable) */}
       {imageUrl && readingQuestions.length > 0 ? (
-        <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] gap-6 items-start">
           {/* Sticky Image Column (LEFT) */}
-          <div className="sticky top-4 h-fit">
-            <div className="border-4 border-purple-300 rounded-xl overflow-hidden bg-white shadow-lg">
+          <div className="lg:sticky lg:top-4 h-fit min-w-0">
+            <div className="border-4 border-purple-300 rounded-2xl overflow-hidden bg-white shadow-lg">
               <img
                 src={getFullMediaUrl(imageUrl)}
                 alt="Nhìn tranh và đánh dấu đúng/sai"
@@ -115,7 +115,7 @@ export function LookAndRead({
           </div>
 
           {/* Scrollable Questions Column (RIGHT) */}
-          <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+          <div className="space-y-4 min-w-0 lg:max-h-[600px] lg:overflow-y-auto lg:pr-2">
             {readingQuestions.map((q: any, idx: number) => renderQuestionCard(q, idx))}
           </div>
         </div>

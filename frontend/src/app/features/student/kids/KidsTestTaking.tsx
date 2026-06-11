@@ -266,12 +266,14 @@ export function KidsTestTaking() {
   const progress = total > 0 ? Math.round(((current + 1) / total) * 100) : 0;
   const selected = answers[qid] ?? '';
   const isLast = current >= total - 1;
+  // Kids task (ảnh + cột câu hỏi) cần khung rộng hơn để không bị cắt/scroll ngang.
+  const wrap = isKidsTask ? 'max-w-6xl' : 'max-w-3xl';
 
   return (
     <div className="min-h-screen pb-28" style={{ background: 'linear-gradient(160deg, #FFF1F2 0%, #FFF7ED 50%, #F0FDF4 100%)' }}>
       {/* Top bar */}
       <header className="sticky top-0 z-30" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(14px)', borderBottom: '1.5px solid #FFE4E6' }}>
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-4">
+        <div className={`${wrap} mx-auto px-4 sm:px-6 h-16 flex items-center gap-4`}>
           <span className="text-sm font-extrabold flex-shrink-0" style={{ color: '#9F1239' }}>
             Câu {current + 1}/{total}
           </span>
@@ -286,7 +288,7 @@ export function KidsTestTaking() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 pt-6">
+      <main className={`${wrap} mx-auto px-4 sm:px-6 pt-6`}>
         <section className="rounded-3xl p-6 sm:p-8"
           style={{ background: 'rgba(255,255,255,0.9)', boxShadow: '0 8px 32px rgba(251,113,133,0.12)', border: '2px solid rgba(255,255,255,0.9)' }}>
 
@@ -363,7 +365,7 @@ export function KidsTestTaking() {
 
       {/* Bottom nav */}
       <div className="fixed bottom-0 left-0 right-0 z-30" style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(14px)', borderTop: '1.5px solid #FFE4E6' }}>
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
+        <div className={`${wrap} mx-auto px-4 sm:px-6 py-3 flex items-center gap-3`}>
           <button onClick={() => setCurrent(c => Math.max(0, c - 1))} disabled={current === 0}
             className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors disabled:opacity-40">
             <ArrowLeft className="w-4 h-4" /> Trước
