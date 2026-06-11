@@ -56,10 +56,10 @@ export function LandingPage() {
     "@graph": [
       {
         "@type": "EducationalOrganization",
-        "@id": "https://namthuedu.com/#organization",
+        "@id": "https://namthuedu.vn/#organization",
         "name": "NamThuEdu",
-        "url": "https://namthuedu.com",
-        "logo": "https://namthuedu.com/favicon.png",
+        "url": "https://namthuedu.vn",
+        "logo": "https://namthuedu.vn/favicon.png",
         "description": "Nền tảng học tiếng Anh chuẩn VSTEP, IELTS và Cambridge tại Cần Thơ, Việt Nam.",
         "address": {
           "@type": "PostalAddress",
@@ -78,14 +78,14 @@ export function LandingPage() {
       },
       {
         "@type": "WebSite",
-        "@id": "https://namthuedu.com/#website",
-        "url": "https://namthuedu.com",
+        "@id": "https://namthuedu.vn/#website",
+        "url": "https://namthuedu.vn",
         "name": "NamThuEdu",
         "inLanguage": "vi",
-        "publisher": { "@id": "https://namthuedu.com/#organization" },
+        "publisher": { "@id": "https://namthuedu.vn/#organization" },
         "potentialAction": {
           "@type": "SearchAction",
-          "target": "https://namthuedu.com/blog?q={search_term_string}",
+          "target": "https://namthuedu.vn/bai-viet?q={search_term_string}",
           "query-input": "required name=search_term_string"
         }
       }
@@ -97,8 +97,8 @@ export function LandingPage() {
       <Helmet>
         <title>NamThuEdu — Học tiếng Anh thông minh hơn | VSTEP, IELTS, Cambridge</title>
         <meta name="description" content="NamThuEdu - Nền tảng học tiếng Anh chuẩn VSTEP, IELTS và Cambridge tại Cần Thơ. Luyện thi thông minh với AI chấm bài tự động." />
-        <link rel="canonical" href="https://namthuedu.com/" />
-        <meta property="og:url" content="https://namthuedu.com/" />
+        <link rel="canonical" href="https://namthuedu.vn/" />
+        <meta property="og:url" content="https://namthuedu.vn/" />
         <meta property="og:title" content="NamThuEdu — Học tiếng Anh thông minh hơn" />
         <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
       </Helmet>

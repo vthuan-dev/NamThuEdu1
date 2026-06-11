@@ -1,7 +1,7 @@
 import { Helmet } from "react-helmet-async";
 
 const SITE_NAME = "NamThuEdu";
-const SITE_URL = "https://namthuedu.com";
+const SITE_URL = "https://namthuedu.vn";
 const DEFAULT_IMAGE = "/images/banner.png";
 const DEFAULT_DESCRIPTION =
   "Tổng hợp bài viết học tiếng Anh, ngữ pháp, từ vựng, mẹo thi VSTEP và IELTS từ đội ngũ giáo viên NamThuEdu tại Cần Thơ.";

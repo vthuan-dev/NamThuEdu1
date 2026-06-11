@@ -18,7 +18,7 @@
     <title>NamThuEdu — Học tiếng Anh thông minh hơn</title>
 
     <!-- Canonical (fallback — overridden per-page by react-helmet-async) -->
-    <link rel="canonical" href="https://namthuedu.com" />
+    <link rel="canonical" href="https://namthuedu.vn" />
 
     <!-- Open Graph -->
     <meta property="og:site_name" content="NamThuEdu" />
@@ -26,17 +26,17 @@
     <meta property="og:type" content="website" />
     <meta property="og:title" content="NamThuEdu — Học tiếng Anh thông minh hơn" />
     <meta property="og:description" content="Nền tảng học tiếng Anh chuẩn VSTEP, IELTS và Cambridge tại Cần Thơ." />
-    <meta property="og:image" content="https://namthuedu.com/images/banner.png" />
+    <meta property="og:image" content="https://namthuedu.vn/images/banner.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:url" content="https://namthuedu.com" />
+    <meta property="og:url" content="https://namthuedu.vn" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@namthuedu" />
     <meta name="twitter:title" content="NamThuEdu — Học tiếng Anh thông minh hơn" />
     <meta name="twitter:description" content="Nền tảng học tiếng Anh chuẩn VSTEP, IELTS và Cambridge tại Cần Thơ." />
-    <meta name="twitter:image" content="https://namthuedu.com/images/banner.png" />
+    <meta name="twitter:image" content="https://namthuedu.vn/images/banner.png" />
 
     <!-- Preload LCP hero image -->
     <link rel="preload" as="image" href="/images/banner.png" fetchpriority="high" />
@@ -45,6 +45,43 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Comic+Neue:wght@300;400;700&family=Quicksand:wght@400;500;600;700&family=Baloo+2:wght@400;500;600;700;800&family=Roboto:wght@300;400;500;700&family=Playpen+Sans:wght@400;700;800&family=Montserrat:wght@500;600;700&family=Poppins:wght@600;700;800&family=Playfair+Display:ital,wght@0,700;1,400;1,700&subset=vietnamese&display=swap" rel="stylesheet" />
+
+    <!-- Structured Data: EducationalOrganization (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "EducationalOrganization",
+      "name": "NamThuEdu",
+      "alternateName": "Nam Thư Education",
+      "url": "https://namthuedu.vn",
+      "logo": "https://namthuedu.vn/favicon.png",
+      "image": "https://namthuedu.vn/images/banner.png",
+      "description": "Nền tảng học tiếng Anh trực tuyến chuẩn VSTEP, IELTS và Cambridge tại Cần Thơ, Việt Nam. Tích hợp AI chấm bài Writing và Speaking cho học viên từ 6 đến 18 tuổi và người đi làm.",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Cần Thơ",
+        "addressCountry": "VN"
+      },
+      "areaServed": "VN",
+      "knowsLanguage": ["vi", "en"],
+      "sameAs": []
+    }
+    </script>
+
+    <!-- Structured Data: WebSite + SearchAction (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "NamThuEdu",
+      "url": "https://namthuedu.vn",
+      "inLanguage": "vi-VN",
+      "publisher": {
+        "@type": "EducationalOrganization",
+        "name": "NamThuEdu"
+      }
+    }
+    </script>
   </head>
 
   <body>
