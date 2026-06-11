@@ -69,7 +69,7 @@ export function OddOneOut(props: OddOneOutProps) {
 
       {/* Image grid */}
       {images.length > 0 ? (
-        <div className="grid grid-cols-2 gap-4 sm:gap-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {images.map((img: any, idx: number) => {
             const k = keyOf(img, idx);
             const isSelected = selected != null && String(selected) === String(k);
@@ -103,7 +103,7 @@ export function OddOneOut(props: OddOneOutProps) {
                   </span>
                 )}
 
-                <div className="aspect-square w-full bg-slate-50 flex items-center justify-center overflow-hidden">
+                <div className="h-32 sm:h-36 w-full bg-slate-50 flex items-center justify-center overflow-hidden">
                   <img
                     src={getFullMediaUrl(img?.url || img)}
                     alt={`Hình ${idx + 1}`}

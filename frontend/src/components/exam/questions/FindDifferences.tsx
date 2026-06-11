@@ -62,7 +62,7 @@ export function FindDifferences(props: Props) {
         <div className="grid grid-cols-2 gap-4">
           {images.map((img: any, idx: number) => (
             <div key={idx} className="rounded-2xl border-4 border-purple-200 overflow-hidden bg-white">
-              <img src={getFullMediaUrl(img.url || img)} alt={`Tranh ${idx + 1}`} className="w-full h-auto object-contain" />
+              <img src={getFullMediaUrl(img.url || img)} alt={`Tranh ${idx + 1}`} className="w-full object-contain" style={{ maxHeight: 240 }} />
               <div className="p-2 text-center font-bold text-slate-600 bg-slate-50">
                 {img.label || `Tranh ${idx + 1}`}
               </div>
