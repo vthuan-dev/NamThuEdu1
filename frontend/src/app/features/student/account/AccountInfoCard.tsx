@@ -4,6 +4,11 @@ import { User, Save, Camera, ChevronDown, Loader2, MapPin, X } from 'lucide-reac
 import { studentApi } from '../../../../services/studentApi';
 import { useToastContext } from '../../../../contexts/ToastContext';
 
+// ─── Vietnam Address API v2 (mô hình 2 cấp sau sáp nhập 2025: Tỉnh → Phường/Xã) ──
+// Dùng provinces.open-api.vn API v2 — dữ liệu hành chính mới, không còn cấp
+// Quận/Huyện. Gọi trực tiếp từ client (giống các trang giáo viên).
+const ADDRESS_API = 'https://provinces.open-api.vn/api/v2';
+
 type Form = {
   uName: string;
   uGender: 0 | 1;
@@ -32,7 +37,7 @@ type Province = {
 type Commune = {
   code: string;
   name: string;
-  administrativeLevel: string;
+  administrativeLevel?: string;
 };
 
 const inputBase =
@@ -110,10 +115,15 @@ export function AccountInfoCard({ defaultExpanded = true }: Props = {}) {
     const fetchProvinces = async () => {
       setIsLoadingProvinces(true);
       try {
-        const res = await fetch('/address-kit-api/latest/provinces');
+        const res = await fetch(`${ADDRESS_API}/p/`);
         if (!res.ok) throw new Error('Failed to fetch provinces');
         const data = await res.json();
-        setProvinces(data.provinces || []);
+        setProvinces(
+          (Array.isArray(data) ? data : []).map((p: any) => ({
+            code: String(p.code),
+            name: p.name,
+          }))
+        );
       } catch (err) {
         console.error(err);
         toast.error('Không thể tải danh sách Tỉnh/Thành phố');
@@ -163,10 +173,13 @@ export function AccountInfoCard({ defaultExpanded = true }: Props = {}) {
     const fetchCommunes = async () => {
       setIsLoadingCommunes(true);
       try {
-        const res = await fetch(`/address-kit-api/latest/provinces/${selectedProvinceCode}/communes`);
+        const res = await fetch(`${ADDRESS_API}/p/${selectedProvinceCode}?depth=2`);
         if (!res.ok) throw new Error('Failed to fetch communes');
         const data = await res.json();
-        const fetchedCommunes = data.communes || [];
+        const fetchedCommunes: Commune[] = (data.wards || []).map((w: any) => ({
+          code: String(w.code),
+          name: w.name,
+        }));
         setCommunes(fetchedCommunes);
         
         // Auto-select commune if we're parsing existing address
