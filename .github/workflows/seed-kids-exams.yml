@@ -1,0 +1,25 @@
+name: Seed Kids Sample Exams (VPS)
+
+# Chạy TAY (workflow_dispatch) để seed 10 đề mẫu Kids lên DB prod.
+# Seeder idempotent (bỏ qua đề trùng tiêu đề) → chạy lại nhiều lần an toàn,
+# chỉ thêm đề mới, không xoá/đụng dữ liệu hiện có.
+on:
+  workflow_dispatch:
+
+jobs:
+  seed:
+    name: SSH Seed
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run seeder on VPS over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_PORT }}
+          command_timeout: 10m
+          script: |
+            cd /var/www/namthuedu/backend
+            git -C /var/www/namthuedu pull origin main || true
+            php artisan db:seed --class=KidsSampleExamsSeeder --force
