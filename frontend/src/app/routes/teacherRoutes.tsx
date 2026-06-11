@@ -44,6 +44,7 @@ import { CreateVstepSpeaking } from "../features/teacher/exams/vstep/CreateVstep
 import { CreateVstepFull } from "../features/teacher/exams/vstep/CreateVstepFull";
 import CreateIeltsExam from "../features/teacher/exams/ielts/CreateIeltsExam";
 import { CreateIeltsFullExam } from "../features/teacher/exams/ielts/CreateIeltsFullExam";
+import { GeneralExamPreview } from "../features/teacher/exams/GeneralExamPreview";
 import { CreateThptExam } from "../features/teacher/exams/thpt/CreateThptExam";
 import { IeltsPreviewPage } from "../features/teacher/exams/ielts/IeltsPreviewPage";
 import { IeltsTestPreviewPage } from "../features/teacher/exams/ielts/IeltsTestPreviewPage";
@@ -171,6 +172,7 @@ export const teacherRoutes = {
     { path: "de-thi/:examId", Component: ExamDetail },
     { path: "de-thi/:examId/vstep", Component: VstepExamPreview }, // VSTEP exam preview
     { path: "de-thi/:examId/xem", Component: ExamPreview },
+    { path: "de-thi/:examId/xem-de", Component: GeneralExamPreview }, // GENERAL/objective preview
     { path: "de-thi/:examId/xem-moi", Component: ExamPreviewNew }, // NEW: Test shared component
     { path: "de-thi/:examId/chinh-sua", Component: EditExam },
     { path: "test-exam/:examId", Component: TestExamPlayer }, // TEST: Drag & drop testing

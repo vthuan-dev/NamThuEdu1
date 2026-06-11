@@ -581,7 +581,8 @@ export function AllExams() {
       return `/giao-vien/de-thi/thpt/${exam.eId}/sua`;
     }
 
-    return `/giao-vien/de-thi/${exam.eId}/xem`;
+    // GENERAL / đề trắc nghiệm tổng hợp (teens luyện tập…) → preview danh sách câu hỏi.
+    return `/giao-vien/de-thi/${exam.eId}/xem-de`;
   };
 
   return (
