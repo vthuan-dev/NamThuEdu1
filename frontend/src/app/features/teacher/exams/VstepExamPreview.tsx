@@ -25,6 +25,7 @@ import {
   loadVstepWritingExam,
   loadVstepSpeakingExam,
 } from "../../../../services/vstepApi";
+import { api } from "../../../../services/api";
 
 /* ============================================================
  *  TYPES
@@ -179,6 +180,28 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
     const id = setInterval(() => setTimeLeft((t) => Math.max(0, t - 1)), 1000);
     return () => clearInterval(id);
   }, [timeLeft > 0, current.skill]);
+
+  // Guard: đề kids bị route nhầm sang preview VSTEP → chuyển về đúng trang kids.
+  useEffect(() => {
+    if (!examId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res: any = await api.get(`/teacher/exams/${examId}`);
+        const ex = res?.data?.data ?? res?.data;
+        const ageGroup = String(ex?.age_group ?? '').toLowerCase();
+        const eType = String(ex?.eType ?? '').toUpperCase();
+        const isKids = ageGroup === 'kids' || eType === 'KIDS' || ex?.kids_exam_config != null;
+        if (!cancelled && isKids) {
+          navigate(
+            admin ? `/admin/de-thi/xem/kids/${examId}` : `/giao-vien/de-thi/${examId}/xem-moi`,
+            { replace: true }
+          );
+        }
+      } catch { /* bỏ qua — để luồng VSTEP tự xử lý */ }
+    })();
+    return () => { cancelled = true; };
+  }, [examId, admin, navigate]);
 
   /* ── Load all 4 skills song song ──────────────────────────── */
   useEffect(() => {

@@ -42,8 +42,16 @@ const LookReadEditor: React.FC<LookReadEditorProps> = ({
     if (initialData) {
       setTitle(initialData.title || '');
       setAnswerFormat(initialData.config?.answerFormat || initialData.config?.answer_format || 'tick_cross');
-      setSharedImageUrl(initialData.config?.sharedImageUrl || '');
-      setStatements(initialData.config?.items || []);
+      setSharedImageUrl(initialData.config?.sharedImageUrl || initialData.config?.shared_image_url || '');
+      // Chuẩn hóa items: đảm bảo mỗi câu có id (tránh key trùng/undefined) + map field cũ.
+      const rawItems: any[] = initialData.config?.items || [];
+      setStatements(rawItems.map((it: any, idx: number) => ({
+        id: it?.id ?? `stmt-${idx + 1}`,
+        imageUrl: it?.imageUrl ?? it?.image_url ?? '',
+        statement: it?.statement ?? it?.text ?? '',
+        correctAnswer: (it?.correctAnswer ?? it?.correct_answer ?? 'tick') as 'tick' | 'cross',
+        isExample: it?.isExample ?? it?.is_example ?? false,
+      })));
     }
   }, [initialData]);
 
@@ -446,7 +454,7 @@ const LookReadEditor: React.FC<LookReadEditorProps> = ({
           <div className="space-y-4">
             {statements.map((stmt, index) => (
               <div
-                key={stmt.id}
+                key={stmt.id ?? index}
                 className={`rounded-xl border p-4 transition-all ${
                   stmt.isExample
                     ? 'border-amber-300 bg-amber-50'

@@ -31,7 +31,12 @@ const PictureQuestionsEditor: React.FC<PictureQuestionsEditorProps> = ({
 }) => {
   const [title, setTitle] = useState(initialData?.title || '');
   const [questions, setQuestions] = useState<QuestionItem[]>(
-    initialData?.config?.questions || []
+    (initialData?.config?.questions || []).map((q: any, idx: number) => ({
+      id: q?.id ?? `q-${idx + 1}`,
+      imageUrl: q?.imageUrl ?? q?.image_url ?? initialData?.config?.imageUrl ?? initialData?.config?.image_url ?? '',
+      question: q?.question ?? q?.text ?? '',
+      sampleAnswer: q?.sampleAnswer ?? q?.sample_answer ?? q?.answer ?? '',
+    }))
   );
 
   const addQuestion = () =>
@@ -94,7 +99,7 @@ const PictureQuestionsEditor: React.FC<PictureQuestionsEditorProps> = ({
           <FieldLabel hint={`${questions.length} câu`}>Danh sách câu hỏi</FieldLabel>
           <div className="space-y-2">
             {questions.map((q, index) => (
-              <ItemCard key={q.id} index={index} onRemove={() => removeQuestion(q.id)}>
+              <ItemCard key={q.id ?? index} index={index} onRemove={() => removeQuestion(q.id)}>
                 <div className="flex gap-3">
                   <ImageUpload
                     value={q.imageUrl}

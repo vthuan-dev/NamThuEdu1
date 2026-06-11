@@ -30,7 +30,14 @@ const PictureCardQuestionsEditor: React.FC<PictureCardQuestionsEditorProps> = ({
   examId,
 }) => {
   const [title, setTitle] = useState(initialData?.title || '');
-  const [cards, setCards] = useState<CardItem[]>(initialData?.config?.cards || []);
+  const [cards, setCards] = useState<CardItem[]>(
+    (initialData?.config?.cards || []).map((c: any, idx: number) => ({
+      id: c?.id ?? `card-${idx + 1}`,
+      imageUrl: c?.imageUrl ?? c?.image_url ?? '',
+      question: c?.question ?? c?.text ?? '',
+      sampleAnswer: c?.sampleAnswer ?? c?.sample_answer ?? '',
+    }))
+  );
 
   const addCard = () =>
     setCards([
@@ -91,7 +98,7 @@ const PictureCardQuestionsEditor: React.FC<PictureCardQuestionsEditorProps> = ({
           <FieldLabel hint={`${cards.length} thẻ`}>Danh sách thẻ hình</FieldLabel>
           <div className="space-y-2">
             {cards.map((card, index) => (
-              <ItemCard key={card.id} index={index} onRemove={() => removeCard(card.id)}>
+              <ItemCard key={card.id ?? index} index={index} onRemove={() => removeCard(card.id)}>
                 <div className="flex gap-3">
                   <ImageUpload
                     value={card.imageUrl}

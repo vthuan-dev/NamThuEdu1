@@ -22,7 +22,16 @@ const OpenClozeEditor: React.FC<OpenClozeEditorProps> = ({ onSave, onCancel, ini
     initialData?.config?.text || 'I __1__ to school every day. My school __2__ very big.'
   );
   const [gaps, setGaps] = useState<Gap[]>(
-    initialData?.config?.gaps || [{ gap_id: 1, correct_answers: [''] }]
+    (initialData?.config?.gaps && initialData.config.gaps.length > 0
+      ? initialData.config.gaps.map((g: any, idx: number) => ({
+          gap_id: g?.gap_id ?? g?.gap_number ?? idx + 1,
+          correct_answers: Array.isArray(g?.correct_answers)
+            ? g.correct_answers
+            : g?.correct_answer != null
+              ? [String(g.correct_answer)]
+              : [''],
+        }))
+      : [{ gap_id: 1, correct_answers: [''] }])
   );
 
   const addGap = () => {
