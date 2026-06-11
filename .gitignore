@@ -23,7 +23,6 @@ backend/test*.php
 backend/check*.php
 backend/verify*.php
 backend/analyze*.php
-frontend/src/app/features/test/
 .tmp-verify/
 *.ps1
 test-*.js
