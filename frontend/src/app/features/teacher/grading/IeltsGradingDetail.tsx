@@ -170,6 +170,20 @@ export function IeltsGradingDetail() {
         setBandOverrides(initOverrides);
         setOverallFeedback(d.sTeacher_feedback ?? "");
 
+        // Map đáp án đúng theo qId từ exam.questions (objective L/R hiển thị "Đáp án: ...")
+        const correctByQid: Record<number, string> = {};
+        (d.exam?.questions ?? []).forEach((q: any) => {
+          const opts = q.answers ?? [];
+          const corrects = opts
+            .filter((a: any) => a.aIs_correct === true || a.aIs_correct === 1)
+            .map((a: any) => String(a.aContent ?? "").trim())
+            .filter(Boolean);
+          // Fallback: một số dạng điền từ lưu đáp án ở qData.correct_answer
+          const fromData = q.qData?.correct_answer ?? q.qData?.answer ?? null;
+          if (corrects.length) correctByQid[q.qId] = corrects.join(" / ");
+          else if (fromData) correctByQid[q.qId] = String(fromData);
+        });
+
         // Map answers → questions
         const qs: Question[] = (d.answers ?? []).map((sa: any, idx: number): Question => {
           const q = sa.question ?? {};
@@ -185,7 +199,7 @@ export function IeltsGradingDetail() {
             skill,
             text: q.qContent ?? "",
             studentAnswer: sa.saAnswer_text ?? "",
-            correctAnswer: q.correctAnswer ?? "",
+            correctAnswer: q.correctAnswer ?? correctByQid[q.qId] ?? "",
             points: sa.saPoints_awarded ?? (isSubjective ? (sa.saAi_score ?? 0) : 0),
             maxPoints: isSubjective ? 9 : (q.qPoints ?? 1),
             isCorrect: sa.saIs_correct,
