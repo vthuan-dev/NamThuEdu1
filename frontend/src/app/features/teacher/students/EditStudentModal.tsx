@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { getAuthToken } from '../../../../utils/authStorage';
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
-import { X, Upload, User, Loader2 } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { getApiUrl, getAssetUrl } from "../../../../utils/apiConfig";
 import { useToast } from "../../../../hooks/useToast";
 
@@ -237,8 +237,14 @@ export function EditStudentModal({ isOpen, onClose, student, onSave, toast: toas
                           className="w-16 h-16 rounded-full object-cover ring-1 ring-slate-200"
                         />
                       ) : (
-                        <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center ring-1 ring-slate-200">
-                          <User className="w-7 h-7 text-slate-400" />
+                        <div
+                          className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center ring-1 ring-slate-200 text-slate-500 font-semibold"
+                          style={{ fontSize: 22, letterSpacing: '-0.02em' }}
+                        >
+                          {(formData.name || student?.name || '?')
+                            .trim()
+                            .charAt(0)
+                            .toUpperCase() || '?'}
                         </div>
                       )}
                     </div>
@@ -246,9 +252,8 @@ export function EditStudentModal({ isOpen, onClose, student, onSave, toast: toas
                     <div className="flex-1 min-w-0">
                       <label
                         htmlFor="avatar-upload"
-                        className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-slate-200 bg-white text-[12px] font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors cursor-pointer"
+                        className="inline-flex items-center h-8 px-3 rounded-md border border-slate-200 bg-white text-[12px] font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors cursor-pointer"
                       >
-                        <Upload className="w-3.5 h-3.5" />
                         {t('teacher.students.editStudent.chooseNewPhoto')}
                       </label>
                       <input
