@@ -180,6 +180,150 @@ class GeminiPdfController extends Controller
     }
 
     /**
+     * Parse TEXT đề VSTEP (đã trích xuất sẵn ở client từ PDF thuần hoặc file Word)
+     * → JSON theo schema import. Không upload file lên Gemini — chỉ gửi text,
+     * nhanh & rẻ hơn nhiều so với parseVstepPdf (vốn dùng cho PDF scan/ảnh).
+     *
+     * Route: POST /api/teacher/vstep/parse-text
+     * Body (json): { text: string }
+     * Return: { success, data: { listening?, reading?, writing? } }
+     */
+    public function parseVstepText(Request $request)
+    {
+        @set_time_limit(180);
+        @ini_set('max_execution_time', '180');
+
+        $request->validate([
+            'text' => 'required|string|min:30|max:120000',
+        ]);
+
+        if (empty($this->apiKeys)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'GEMINI_API_KEY chưa được cấu hình trong .env backend.',
+            ], 500);
+        }
+
+        $text   = (string) $request->input('text');
+        $prompt = $this->buildVstepPrompt()
+            . "\n\nHere is the raw exam text extracted from the document. Parse it faithfully:\n\"\"\"\n"
+            . $text
+            . "\n\"\"\"";
+
+        $lastError = '';
+        $totalKeys = count($this->apiKeys);
+
+        foreach ($this->apiKeys as $idx => $apiKey) {
+            try {
+                $result = $this->generateContentFromText($prompt, $apiKey);
+                $result = $this->postProcessVstep($result);
+
+                return response()->json([
+                    'success' => true,
+                    'data'    => $result,
+                ]);
+            } catch (\Exception $e) {
+                $lastError = $e->getMessage();
+                $keyNo = $idx + 1;
+                if ($this->shouldRotateKey($lastError) && $keyNo < $totalKeys) {
+                    Log::warning("Gemini key #{$keyNo} lỗi ({$lastError}) — xoay sang key #" . ($keyNo + 1));
+                    continue;
+                }
+                Log::error('Gemini VSTEP parse-text error: ' . $lastError);
+                break;
+            }
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => $lastError ?: 'Gemini parse text VSTEP thất bại.',
+        ], 500);
+    }
+
+    /**
+     * Gọi Gemini generateContent với prompt text-only (không file), có xoay vòng
+     * model fallback + retry backoff như generateContent. Nhận apiKey để dùng
+     * chung cơ chế xoay vòng key của parseVstepText.
+     */
+    private function generateContentFromText(string $prompt, string $apiKey): array
+    {
+        $verifySsl = app()->environment('production');
+
+        $payload = [
+            'contents' => [[
+                'parts' => [['text' => $prompt]],
+            ]],
+            'generationConfig' => [
+                'temperature'      => 0.1,
+                'responseMimeType' => 'application/json',
+            ],
+        ];
+
+        $response  = null;
+        $lastError = '';
+
+        foreach ($this->modelFallbacks as $model) {
+            $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key=" . $apiKey;
+
+            for ($attempt = 1; $attempt <= 3; $attempt++) {
+                try {
+                    $response = Http::withOptions(['verify' => $verifySsl])
+                        ->timeout(90)
+                        ->post($url, $payload);
+                } catch (\Throwable $e) {
+                    $lastError = $e->getMessage();
+                    sleep($attempt);
+                    continue;
+                }
+
+                if ($response->successful()) {
+                    break 2;
+                }
+
+                $status    = $response->status();
+                $lastError = $response->body();
+
+                if ($status === 503 || $status === 429) {
+                    sleep($attempt);
+                    continue;
+                }
+
+                $isModelGone = $status === 404 || ($status === 400 && stripos($lastError, 'model') !== false);
+                if ($isModelGone) {
+                    Log::warning("Gemini model '{$model}' unavailable (status {$status}), trying next fallback");
+                    break;
+                }
+
+                break 2;
+            }
+        }
+
+        if (!$response || !$response->successful()) {
+            $isOverloaded = $response && in_array($response->status(), [503, 429]);
+            $msg = $isOverloaded
+                ? 'Hệ thống AI đang quá tải. Vui lòng thử lại sau ít phút.'
+                : 'Lỗi Gemini generateContent (text): ' . $lastError;
+            throw new \Exception($msg);
+        }
+
+        $body = $response->json();
+        $text = $body['candidates'][0]['content']['parts'][0]['text'] ?? null;
+        if (!$text) {
+            throw new \Exception('Gemini không trả về kết quả');
+        }
+
+        $text = preg_replace('/^```json\s*/i', '', trim($text));
+        $text = preg_replace('/\s*```$/i', '', $text);
+
+        $parsed = json_decode($text, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \Exception('Gemini trả về JSON không hợp lệ: ' . json_last_error_msg());
+        }
+
+        return $parsed;
+    }
+
+    /**
      * Chuẩn hoá kết quả VSTEP từ Gemini về đúng schema mà VstepImportModal cần.
      * - options luôn là object {A,B,C,D}
      * - đảm bảo các mảng tồn tại

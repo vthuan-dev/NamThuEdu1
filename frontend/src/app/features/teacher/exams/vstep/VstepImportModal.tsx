@@ -4,6 +4,7 @@ import {
   saveVstepListeningSection,
   saveVstepPart,
   saveVstepWritingTask,
+  parseVstepTextWithAi,
 } from '../../../../../services/vstepApi';
 import { parseVstepExamSmart } from './vstepParser';
 import { PdfPageSelector } from '../ielts/components/PdfPageSelector';
@@ -131,6 +132,8 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
   const [parseMethod, setParseMethod] = useState<'local' | 'ai' | 'json' | null>(null);
   const [pdfProgress, setPdfProgress] = useState({ label: '', done: 0, total: 0 });
   const [scannedText, setScannedText] = useState('');
+  const [isScanned, setIsScanned] = useState(false);
+  const [sourceKind, setSourceKind] = useState<'pdf' | 'docx' | 'json' | null>(null);
   const [showJson, setShowJson] = useState(false);
   const [jsonCopied, setJsonCopied] = useState(false);
   const [progress, setProgress]   = useState({ current: 0, total: 0, label: '' });
@@ -146,12 +149,22 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
     setFileName(f.name);
 
     const isPdf  = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+    const isDocx = /\.docx$/i.test(f.name)
+      || f.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     const isJson = f.type === 'application/json' || /\.json$/i.test(f.name);
 
     if (isPdf) {
       // PDF → hiện bước chọn/cắt trang trước khi trích xuất.
+      setSourceKind('pdf');
       setPendingFile(f);
       setPdfStage('trim');
+      return;
+    }
+
+    if (isDocx) {
+      // Word → trích xuất text trực tiếp (không cần AI), rồi gửi text lên AI lấy JSON.
+      setSourceKind('docx');
+      await extractDocxText(f);
       return;
     }
 
@@ -162,6 +175,7 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
         if (!parsed.listening && !parsed.reading && !parsed.writing) {
           throw new Error('JSON phải có ít nhất 1 trong 3 key: listening, reading, writing');
         }
+        setSourceKind('json');
         setParseMethod('json');
         setPayload(parsed);
       } catch (e: any) {
@@ -170,7 +184,33 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
       return;
     }
 
-    setError('Chỉ hỗ trợ file .json hoặc .pdf');
+    setError('Chỉ hỗ trợ file .pdf, .docx hoặc .json');
+  };
+
+  /** Trích xuất text từ file Word (.docx) bằng mammoth → dùng cho AI text→JSON. */
+  const extractDocxText = async (f: File) => {
+    setError('');
+    setPayload(null);
+    setFileName(f.name);
+    setPendingFile(null);
+    pdfFileRef.current = null; // không có file PDF cho path vision
+    try {
+      setPdfStage('extract');
+      setPdfProgress({ label: 'Đang đọc file Word...', done: 0, total: 0 });
+      const mammoth = await import('mammoth');
+      const buf = await f.arrayBuffer();
+      const { value } = await mammoth.extractRawText({ arrayBuffer: buf });
+      const text = (value || '').trim();
+      if (text.length < 30) {
+        throw new Error('File Word không có nội dung văn bản để trích xuất.');
+      }
+      setScannedText(text);
+      setIsScanned(false); // Word luôn là text thuần → dùng AI text→JSON
+      setPdfStage('scanned');
+    } catch (e: any) {
+      setError(e.message || 'Lỗi đọc file Word');
+      setPdfStage('idle');
+    }
   };
 
   /** Trích xuất text từ PDF (đã cắt trang nếu cần) để dùng cho parser local. */
@@ -179,7 +219,7 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
     setPayload(null);
     setFileName(f.name);
     setPendingFile(null);
-    pdfFileRef.current = f; // giữ file (đã cắt) để gửi Gemini
+    pdfFileRef.current = f; // giữ file (đã cắt) để gửi Gemini (path vision cho PDF scan)
 
     try {
       setPdfStage('extract');
@@ -203,7 +243,14 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
         }
         fullText += `\n=== Page ${i} ===\n${pageText.trim()}\n`;
       }
+
+      // Phát hiện PDF scan: text trích ra quá ít so với số trang ⇒ PDF là ảnh/scan,
+      // pdf.js không lấy được chữ → buộc phải dùng AI vision (OCR) để đọc.
+      const meaningful = fullText.replace(/=== Page \d+ ===/g, '').replace(/\s+/g, '').length;
+      const scanned = meaningful < Math.max(120, pdf.numPages * 40);
+
       setScannedText(fullText);
+      setIsScanned(scanned);
       setPdfStage('scanned');
     } catch (e: any) {
       setError(e.message || 'Lỗi đọc PDF');
@@ -245,6 +292,45 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
     } finally {
       setAiParsing(false);
     }
+  };
+
+  /** Gửi TEXT đã trích xuất (PDF thuần / Word) lên AI → JSON đề VSTEP. */
+  const handleTextAiParse = async () => {
+    if (!scannedText.trim()) { setError('Không có nội dung text để phân tích.'); return; }
+    setError('');
+    setAiParsing(true);
+    setPdfStage('ai');
+    setPdfProgress({ label: 'AI đang phân tích nội dung...', done: 0, total: 0 });
+    try {
+      const json = await parseVstepTextWithAi(scannedText);
+      if (!json.success) {
+        throw new Error(json.message || 'AI phân tích thất bại.');
+      }
+      const data = json.data as ImportPayload;
+      if (!data?.listening && !data?.reading && !data?.writing) {
+        throw new Error('AI không nhận dạng được nội dung VSTEP trong file này.');
+      }
+      setParseMethod('ai');
+      setPayload(data);
+      setPdfStage('idle');
+    } catch (e: any) {
+      const apiMsg = e?.response?.data?.message;
+      setError(apiMsg || e.message || 'Lỗi phân tích bằng AI');
+      setPdfStage('scanned');
+    } finally {
+      setAiParsing(false);
+    }
+  };
+
+  /**
+   * Dispatcher AI: PDF scan (không trích được text) → đọc PDF bằng AI vision;
+   * còn lại (PDF thuần / Word) → gửi text đã trích lên AI để chuyển JSON.
+   */
+  const handleAiSmart = () => {
+    if (isScanned && pdfFileRef.current) {
+      return handleGeminiParse();
+    }
+    return handleTextAiParse();
   };
 
   const downloadSample = () => {
@@ -374,6 +460,7 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
     setProgress({ current: 0, total: 0, label: '' });
     setStatus({ listening: 'idle', reading: 'idle', writing: 'idle' });
     setScannedText(''); setPdfStage('idle');
+    setIsScanned(false); setSourceKind(null);
     setPendingFile(null); pdfFileRef.current = null;
     setAiParsing(false); setParseMethod(null);
   };
@@ -464,7 +551,9 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
               </div>
               <div className="text-center">
                 <p className="font-bold text-orange-900">
-                  {pdfStage === 'extract' ? 'Đang đọc PDF...' : 'Đang AI phân tích...'}
+                  {pdfStage === 'extract'
+                    ? (sourceKind === 'docx' ? 'Đang đọc file Word...' : 'Đang đọc PDF...')
+                    : 'Đang AI phân tích...'}
                 </p>
                 <p className="text-xs text-orange-700 mt-1">{pdfProgress.label}</p>
               </div>
@@ -479,29 +568,48 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
             </div>
           )}
 
-          {/* PDF scanned: text preview + AI trigger */}
-          {pdfStage === 'scanned' && scannedText && (
+          {/* PDF/Word scanned: text preview + AI trigger */}
+          {pdfStage === 'scanned' && (
             <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
-                <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-emerald-900 truncate">{fileName}</p>
-                  <p className="text-xs text-emerald-700">Đọc xong — {scannedText.length.toLocaleString()} ký tự</p>
+              {isScanned ? (
+                <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                  <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-amber-900 truncate">{fileName}</p>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      PDF dạng scan/ảnh — không trích được text trực tiếp. Cần dùng AI đọc (OCR) để chuyển sang JSON.
+                    </p>
+                  </div>
+                  <button onClick={resetState} className="p-1.5 rounded-lg hover:bg-white text-amber-700">
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
-                <button onClick={resetState} className="p-1.5 rounded-lg hover:bg-white text-emerald-700">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-gray-400" />
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Nội dung trích xuất</span>
+              ) : (
+                <div className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-emerald-900 truncate">{fileName}</p>
+                    <p className="text-xs text-emerald-700">
+                      {sourceKind === 'docx' ? 'Đọc Word xong' : 'Đọc PDF xong'} — {scannedText.length.toLocaleString()} ký tự
+                    </p>
+                  </div>
+                  <button onClick={resetState} className="p-1.5 rounded-lg hover:bg-white text-emerald-700">
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
-                <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed p-5 overflow-y-auto"
-                  style={{ maxHeight: '460px', fontFamily: '"Times New Roman", Times, serif' }}>
-                  {scannedText}
-                </pre>
-              </div>
+              )}
+              {!isScanned && scannedText && (
+                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                  <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-gray-400" />
+                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Nội dung trích xuất</span>
+                  </div>
+                  <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed p-5 overflow-y-auto"
+                    style={{ maxHeight: '460px', fontFamily: '"Times New Roman", Times, serif' }}>
+                    {scannedText}
+                  </pre>
+                </div>
+              )}
             </div>
           )}
 
@@ -509,7 +617,7 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
           {pdfStage === 'idle' && !payload ? (
             <label className="block border-2 border-dashed border-gray-300 hover:border-orange-400 hover:bg-orange-50/50 rounded-xl p-8 cursor-pointer transition-all">
               <input
-                type="file" accept="application/json,.json,application/pdf,.pdf" className="hidden"
+                type="file" accept="application/json,.json,application/pdf,.pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }}
               />
               <div className="flex flex-col items-center gap-3 text-center">
@@ -518,7 +626,7 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
                 </div>
                 <div>
                   <p className="font-semibold text-gray-900">Click hoặc kéo thả file</p>
-                  <p className="text-xs text-gray-500 mt-1">Hỗ trợ: <span className="font-bold text-orange-600">.pdf</span> (cắt trang + AI Gemini phân tích) hoặc <span className="font-bold text-blue-600">.json</span></p>
+                  <p className="text-xs text-gray-500 mt-1">Hỗ trợ: <span className="font-bold text-orange-600">.pdf</span> · <span className="font-bold text-sky-600">.docx</span> (AI chuyển sang JSON) hoặc <span className="font-bold text-blue-600">.json</span></p>
                 </div>
               </div>
             </label>
@@ -633,22 +741,28 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
           )}
           {pdfStage === 'scanned' ? (
             <>
+              {!isScanned && (
+                <button
+                  onClick={handleAiParse}
+                  disabled={aiParsing}
+                  className="h-10 px-5 bg-white border border-orange-300 text-orange-700 rounded-lg text-sm font-semibold hover:bg-orange-50 transition-all flex items-center gap-2 disabled:opacity-40"
+                  title="Phân tích nhanh bằng thư viện (miễn phí, không cần mạng AI)"
+                >
+                  <Sparkles className="w-4 h-4" /> Phân tích nhanh
+                </button>
+              )}
               <button
-                onClick={handleAiParse}
-                disabled={aiParsing}
-                className="h-10 px-5 bg-white border border-orange-300 text-orange-700 rounded-lg text-sm font-semibold hover:bg-orange-50 transition-all flex items-center gap-2 disabled:opacity-40"
-                title="Phân tích nhanh bằng thư viện (miễn phí, không cần mạng AI)"
-              >
-                <Sparkles className="w-4 h-4" /> Phân tích nhanh
-              </button>
-              <button
-                onClick={handleGeminiParse}
+                onClick={handleAiSmart}
                 disabled={aiParsing}
                 className="h-10 px-6 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-lg text-sm font-semibold hover:from-violet-600 hover:to-fuchsia-600 transition-all flex items-center gap-2 shadow-md disabled:opacity-50"
-                title="Dùng AI Gemini đọc PDF (chính xác hơn, kể cả PDF scan)"
+                title={isScanned
+                  ? 'PDF scan — AI Gemini đọc ảnh (OCR) rồi chuyển sang JSON'
+                  : 'Gửi nội dung đã trích xuất lên AI để chuyển sang JSON chuẩn'}
               >
                 {aiParsing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
-                {aiParsing ? 'Đang phân tích...' : 'Phân tích bằng AI Gemini'}
+                {aiParsing
+                  ? 'Đang phân tích...'
+                  : isScanned ? 'Phân tích bằng AI (OCR)' : 'Phân tích bằng AI'}
               </button>
             </>
           ) : pdfStage === 'trim' || pdfStage === 'extract' || pdfStage === 'ai' ? null : (

@@ -343,3 +343,21 @@ export const loadVstepSpeakingExam = async (examId: string, admin = false) => {
   const response = await api.get(url);
   return response.data;
 };
+
+/* ========================================
+ * VSTEP IMPORT — AI PARSE (PDF / Word / text)
+ * ======================================== */
+
+/**
+ * Gửi TEXT (đã trích xuất ở client từ PDF thuần hoặc file Word) lên backend để
+ * Gemini chuyển thành JSON đề VSTEP (Listening/Reading/Writing).
+ * Nhẹ & nhanh hơn parseVstepPdf vì không upload file.
+ */
+export const parseVstepTextWithAi = async (text: string) => {
+  const response = await api.post('/teacher/vstep/parse-text', { text });
+  return response.data as {
+    success: boolean;
+    message?: string;
+    data?: unknown;
+  };
+};
