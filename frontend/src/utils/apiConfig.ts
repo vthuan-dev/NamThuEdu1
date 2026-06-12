@@ -6,8 +6,11 @@
 // API Base URL from environment
 export const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
 
-// Backend URL (without /api suffix) for asset URLs
-export const BACKEND_URL = API_BASE_URL.replace('/api', '');
+// Backend URL (without /api suffix) for asset URLs.
+// LƯU Ý: phải dùng regex neo cuối chuỗi (\/api\/?$), KHÔNG dùng .replace('/api','')
+// vì chuỗi "https://api.namthuedu.vn/api" có "/api" xuất hiện sớm trong "//api..."
+// → .replace('/api','') sẽ cắt nhầm thành "https:/.namthuedu.vn/api" làm hỏng URL ảnh.
+export const BACKEND_URL = (API_BASE_URL || '').replace(/\/api\/?$/, '');
 
 // API Timeout
 export const API_TIMEOUT = Number(import.meta.env.VITE_API_TIMEOUT) || 30000;
