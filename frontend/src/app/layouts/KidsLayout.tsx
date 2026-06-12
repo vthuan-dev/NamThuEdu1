@@ -122,7 +122,7 @@ export function KidsLayout() {
                 style={{ background: 'linear-gradient(135deg, #FB7185 0%, #F97316 100%)', boxShadow: '0 4px 12px rgba(251,113,133,0.35)' }}
               >
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt={user?.uName || 'Avatar'} className="w-full h-full object-cover" />
+                  <img src={avatarUrl} alt={user?.uName || 'Avatar'} className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
                 ) : (
                   initial
                 )}

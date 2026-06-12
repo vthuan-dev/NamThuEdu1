@@ -265,7 +265,7 @@ export function TeensLayout() {
                   aria-expanded={profileOpen}
                 >
                   {avatarUrl ? (
-                    <img src={avatarUrl} alt={user?.uName || 'Avatar'} className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-200" />
+                    <img src={avatarUrl} alt={user?.uName || 'Avatar'} className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-200" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
                   ) : (
                     <div
                       className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold ring-1 ring-slate-200"
@@ -294,7 +294,7 @@ export function TeensLayout() {
                     {/* User info header */}
                     <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
                       {avatarUrl ? (
-                        <img src={avatarUrl} alt={user?.uName || 'Avatar'} className="w-10 h-10 rounded-full object-cover ring-1 ring-slate-200" />
+                        <img src={avatarUrl} alt={user?.uName || 'Avatar'} className="w-10 h-10 rounded-full object-cover ring-1 ring-slate-200" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
                       ) : (
                         <div
                           className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold ring-1 ring-slate-200"
