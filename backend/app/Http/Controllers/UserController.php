@@ -2438,7 +2438,7 @@ class UserController extends Controller
                 'teacher:uId,uName,uPhone,uStatus',
                 'course:cId,cName,cStatus',
             ])
-            ->withCount('enrollments')
+            ->withCount('students')
             ->orderBy('cCreated_at', 'desc');
 
         if ($request->filled('status')) {
@@ -2481,7 +2481,7 @@ class UserController extends Controller
                         'name' => $course->cName,
                         'status' => $course->cStatus ?? null,
                     ] : null,
-                    'student_count' => (int) ($class->enrollments_count ?? 0),
+                    'student_count' => (int) ($class->students_count ?? 0),
                     'created_at' => $class->cCreated_at,
                 ];
             })->values();
@@ -2516,7 +2516,7 @@ class UserController extends Controller
                     'name' => $course->cName,
                     'status' => $course->cStatus ?? null,
                 ] : null,
-                'student_count' => (int) ($class->enrollments_count ?? 0),
+                'student_count' => (int) ($class->students_count ?? 0),
                 'created_at' => $class->cCreated_at,
             ];
         })->values();

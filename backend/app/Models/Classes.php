@@ -50,6 +50,14 @@ class Classes extends Model
         return $this->hasMany(User::class, 'class_id', 'cId')->where('uRole', 'student');
     }
 
+    /**
+     * Bản ghi ghi danh (class_enrollments). Dùng cho withCount('enrollments').
+     */
+    public function enrollments()
+    {
+        return $this->hasMany(ClassEnrollment::class, 'class_id', 'cId');
+    }
+
     public function transfersFrom()
     {
         return $this->hasMany(ClassTransfer::class, 'from_class_id', 'cId');
