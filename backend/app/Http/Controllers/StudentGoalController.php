@@ -60,7 +60,24 @@ class StudentGoalController extends Controller
         }
 
         $goal = StudentGoal::where('student_id', $id)->first();
-        return response()->json(['status' => 'success', 'data' => $goal]);
+
+        $history = \App\Models\StudentGoalAnalysis::where('student_id', $id)
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get()
+            ->map(function ($a) {
+                $an = $a->analysis ?? [];
+                return [
+                    'id' => $a->id,
+                    'date' => optional($a->created_at)->toIso8601String(),
+                    'progress_percent' => $a->overall_progress_percent,
+                    'current_level' => $a->current_level_estimate,
+                    'on_track' => $a->on_track,
+                    'summary' => $an['gap_summary'] ?? ($an['summary'] ?? null),
+                ];
+            });
+
+        return response()->json(['status' => 'success', 'data' => ['goal' => $goal, 'history' => $history]]);
     }
 
     /**

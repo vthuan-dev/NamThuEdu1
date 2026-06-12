@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Loader2, Sparkles, Target, TrendingUp, AlertTriangle, CheckCircle2,
-  ListChecks, Trash2, Clock,
+  ListChecks, Trash2, Clock, History,
 } from "lucide-react";
 import {
   teacherStudentGoalApi, StudentGoalData, GoalAnalysis,
@@ -37,6 +37,7 @@ export function StudentGoalModal({
 
   const [analysis, setAnalysis] = useState<GoalAnalysis | null>(null);
   const [analyzedAt, setAnalyzedAt] = useState<string | null>(null);
+  const [history, setHistory] = useState<any[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -44,7 +45,8 @@ export function StudentGoalModal({
     setAnalysis(null);
     teacherStudentGoalApi.get(studentId)
       .then((res: any) => {
-        const g: StudentGoalData | null = res?.data || null;
+        const g: StudentGoalData | null = res?.data?.goal || null;
+        setHistory(res?.data?.history || []);
         if (g) {
           setExists(true);
           setTargetLevel(g.target_level || "");
@@ -83,10 +85,23 @@ export function StudentGoalModal({
     setAnalyzing(true);
     try {
       const res = await teacherStudentGoalApi.analyze(studentId);
-      setAnalysis(res?.data?.analysis || null);
-      setAnalyzedAt(res?.data?.analyzed_at || new Date().toISOString());
-      if (res?.data?.analysis?.error) toast.warning("AI tạm thời bận, thử lại sau.");
-      else toast.success("Đã phân tích bằng AI.");
+      const a = res?.data?.analysis || null;
+      const at = res?.data?.analyzed_at || new Date().toISOString();
+      setAnalysis(a);
+      setAnalyzedAt(at);
+      if (a && !a.error) {
+        setHistory((prev) => [{
+          id: Date.now(),
+          date: at,
+          progress_percent: a.overall_progress_percent ?? null,
+          current_level: a.current_level_estimate ?? null,
+          on_track: a.on_track ?? null,
+          summary: a.gap_summary || a.summary || null,
+        }, ...prev]);
+        toast.success("Đã phân tích bằng AI.");
+      } else {
+        toast.warning("AI tạm thời bận, thử lại sau.");
+      }
     } catch (e: any) {
       toast.error(e?.response?.data?.message || "Phân tích thất bại.");
     } finally { setAnalyzing(false); }
@@ -172,6 +187,32 @@ export function StudentGoalModal({
 
           {/* Kết quả phân tích */}
           {analysis && <AnalysisView analysis={analysis} analyzedAt={analyzedAt} targetLevel={targetLevel} />}
+
+          {/* Lịch sử phân tích (AI dùng để so sánh tiến bộ) */}
+          {history.length > 0 && (
+            <div>
+              <p className="text-sm font-semibold text-[#111827] mb-2 inline-flex items-center gap-1.5">
+                <History className="w-4 h-4 text-gray-400" /> Lịch sử phân tích ({history.length})
+              </p>
+              <div className="space-y-2">
+                {history.slice(0, 8).map((h) => (
+                  <div key={h.id} className="flex items-start gap-3 rounded-xl bg-gray-50 ring-1 ring-gray-100 px-3.5 py-2.5">
+                    <div className="text-center shrink-0 w-12">
+                      <p className="text-base font-bold text-[#111827] tabular-nums leading-none">{h.progress_percent ?? "–"}<span className="text-[10px] font-normal">%</span></p>
+                      {h.current_level && <p className="text-[10px] text-gray-500 mt-0.5">{h.current_level}</p>}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      {h.summary && <p className="text-xs text-[#374151] line-clamp-2">{h.summary}</p>}
+                      <p className="text-[10px] text-gray-400 mt-0.5">{h.date ? new Date(h.date).toLocaleString("vi-VN") : ""}</p>
+                    </div>
+                    {h.on_track !== null && h.on_track !== undefined && (
+                      <span className={`shrink-0 mt-0.5 w-2 h-2 rounded-full ${h.on_track ? "bg-teal-500" : "bg-amber-500"}`} title={h.on_track ? "Đúng lộ trình" : "Cần tăng tốc"} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Modal>

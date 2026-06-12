@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Submission;
 use App\Models\StudentGoal;
+use App\Models\StudentGoalAnalysis;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -90,6 +91,30 @@ class StudentGoalAnalysisService
     }
 
     /**
+     * Lấy tóm tắt các lần phân tích trước (mới nhất trước) để AI hiểu quá khứ.
+     */
+    public function recentAnalyses(int $studentId, int $limit = 3): array
+    {
+        return StudentGoalAnalysis::where('student_id', $studentId)
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get()
+            ->map(function ($a) {
+                $an = $a->analysis ?? [];
+                return [
+                    'date'                  => optional($a->created_at)->toDateString(),
+                    'progress_percent'      => $a->overall_progress_percent,
+                    'current_level'         => $a->current_level_estimate,
+                    'on_track'              => $a->on_track,
+                    'top_weaknesses'        => array_slice($an['weaknesses'] ?? [], 0, 3),
+                    'recommended_actions'   => array_slice($an['priority_actions'] ?? [], 0, 3),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
      * Phân tích mục tiêu bằng AI; trả mảng kết quả (đã cache vào goal).
      */
     public function analyze(StudentGoal $goal): array
@@ -127,6 +152,7 @@ class StudentGoalAnalysisService
                 'teacher_note'  => $goal->note,
             ],
             'performance' => $perf,
+            'previous_analyses' => $this->recentAnalyses($goal->student_id, 3),
         ];
 
         $system = $this->buildSystemPrompt();
@@ -153,6 +179,23 @@ class StudentGoalAnalysisService
         $goal->ai_analyzed_at = now();
         $goal->save();
 
+        // Lưu lịch sử phân tích để truy xuất + nạp lại cho AI lần sau.
+        try {
+            StudentGoalAnalysis::create([
+                'student_id'               => $goal->student_id,
+                'goal_id'                  => $goal->id,
+                'target_level'             => $goal->target_level,
+                'overall_progress_percent' => is_numeric($result['overall_progress_percent'] ?? null)
+                    ? max(0, min(100, (int) round($result['overall_progress_percent']))) : null,
+                'current_level_estimate'   => $result['current_level_estimate'] ?? null,
+                'on_track'                 => array_key_exists('on_track', $result) ? $result['on_track'] : null,
+                'analysis'                 => $result,
+                'performance_snapshot'     => $perf,
+            ]);
+        } catch (\Exception $e) {
+            Log::warning('StudentGoalAnalysis history save failed: ' . $e->getMessage());
+        }
+
         return $result;
     }
 
@@ -167,6 +210,7 @@ NGUYÊN TẮC:
 - Đối chiếu trình độ hiện tại với mục tiêu: nêu RÕ còn thiếu bao nhiêu, thiếu kỹ năng nào, cần làm gì để đạt.
 - Văn phong tiếng Việt, ngắn gọn, thực dụng, dành cho giáo viên. Mỗi gạch đầu dòng là một ý hành động cụ thể (không chung chung).
 - Tham chiếu mốc CEFR ↔ điểm để ước lượng: ví dụ thang /10: A2≈4–5, B1≈5.5–6.5, B2≈7–8, C1≈8.5–9.5 (điều chỉnh theo loại đề nếu cần).
+- Nếu có trường "previous_analyses" (các lần phân tích trước, mới nhất trước): hãy SO SÁNH theo thời gian — ghi nhận đã tiến bộ/chững lại ở đâu so với lần trước, kiểm tra các "recommended_actions" trước đó đã có kết quả chưa, và NÂNG CẤP lời khuyên (không lặp lại y hệt). Nếu tiến bộ rõ, hãy động viên cụ thể; nếu giậm chân, đề xuất hướng khác.
 
 CHỈ TRẢ VỀ MỘT JSON HỢP LỆ (không markdown, không giải thích ngoài JSON) theo schema:
 {
