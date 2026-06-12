@@ -25,18 +25,6 @@ const toNum = (v: any) => Number(v ?? 0);
 type ResultFilter = 'all' | 'pass' | 'fail';
 type SortMode = 'newest' | 'oldest' | 'highest' | 'lowest';
 
-function statusChip(status: string) {
-  switch (status) {
-    case 'graded':             return { label: 'Đã chấm',      color: '#059669', bg: '#D1FAE5' };
-    case 'grading_subjective': return { label: 'Đang chấm…',   color: '#D97706', bg: '#FEF3C7' };
-    case 'submitted':          return { label: 'Đã nộp',       color: '#0D9488', bg: '#CCFBF1' };
-    case 'partially_graded':   return { label: 'Chấm một phần',color: '#7C3AED', bg: '#EDE9FE' };
-    case 'auto_submitted':     return { label: 'Tự nộp',       color: '#0891B2', bg: '#CFFAFE' };
-    case 'in_progress':        return { label: 'Đang làm',     color: '#6B7280', bg: '#F3F4F6' };
-    default:                   return { label: status ?? '—',  color: '#6B7280', bg: '#F3F4F6' };
-  }
-}
-
 function timeTaken(start?: string, end?: string): string | null {
   if (!start || !end) return null;
   const diff = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 1000);
@@ -252,8 +240,8 @@ export function TeensHistory() {
                     const score = toNum(s.sScore);
                     const max = toNum(s.exam?.eMax_score ?? 100);
                     const pct = max > 0 ? Math.round((score / max) * 100) : 0;
-                    const status = statusChip(s.sStatus);
                     const isVstep = String(s.exam?.eType ?? '').toUpperCase() === 'VSTEP';
+                    const isThpt = String(s.exam?.eType ?? '').toUpperCase() === 'THPT';
                     const isPending = s.sStatus === 'grading_subjective';
                     const isInProg = s.sStatus === 'in_progress';
                     const isPass = !isInProg && !isPending && max > 0 && score / max >= PASS_THRESHOLD;
@@ -261,65 +249,71 @@ export function TeensHistory() {
 
                     const onClick = () => {
                       if (isInProg) {
-                        navigate(isVstep
-                          ? `${BASE}/lam-bai-vstep/${s.exam?.eId}?submissionId=${s.sId}`
-                          : `${BASE}/lam-bai/${s.exam?.eId}?autostart=1&submissionId=${s.sId}`);
+                        navigate(
+                          isThpt
+                            ? `${BASE}/lam-bai-thpt/${s.exam?.eId}`
+                            : isVstep
+                            ? `${BASE}/lam-bai-vstep/${s.exam?.eId}?submissionId=${s.sId}`
+                            : `${BASE}/lam-bai/${s.exam?.eId}?autostart=1&submissionId=${s.sId}`
+                        );
                         return;
                       }
-                      navigate(isVstep ? `${BASE}/ket-qua-vstep/${s.sId}` : `${BASE}/ket-qua/${s.sId}`);
+                      navigate(
+                        isThpt
+                          ? `${BASE}/ket-qua-thpt/${s.sId}`
+                          : isVstep
+                          ? `${BASE}/ket-qua-vstep/${s.sId}`
+                          : `${BASE}/ket-qua/${s.sId}`
+                      );
                     };
 
                     const badgeBg = isInProg ? '#F1F5F9'
                       : isPending ? '#FEF3C7'
                       : isPass ? 'linear-gradient(135deg,#0D9488,#14B8A6)'
-                      : 'linear-gradient(135deg,#F43F5E,#FB7185)';
+                      : '#F8FAFC';
+                    const dotColor = isInProg ? '#94A3B8' : isPending ? '#F59E0B' : isPass ? '#10B981' : '#94A3B8';
 
                     return (
                       <button key={s.sId} onClick={onClick}
-                        className="w-full text-left rounded-2xl bg-white overflow-hidden border border-slate-200 hover:border-teal-300 hover:shadow-[0_4px_16px_rgba(13,148,136,0.10)] transition-all">
-                        {isInProg && <div className="h-0.5" style={{ background: `linear-gradient(90deg,${TEAL},${TEAL_MID})` }} />}
-                        <div className="flex items-center gap-3 p-3.5">
+                        className="group w-full text-left rounded-2xl bg-white overflow-hidden border border-slate-200 hover:border-teal-300 hover:shadow-[0_4px_16px_rgba(13,148,136,0.10)] transition-all">
+                        <div className="flex items-center gap-3.5 p-3.5">
                           {/* Score badge */}
-                          <div className="w-[56px] h-[56px] rounded-xl flex-shrink-0 flex flex-col items-center justify-center"
+                          <div className="w-[54px] h-[54px] rounded-xl flex-shrink-0 flex flex-col items-center justify-center ring-1 ring-slate-100"
                             style={{ background: badgeBg }}>
                             {isPending ? (
                               <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#D97706' }} />
                             ) : isInProg ? (
-                              <>
-                                <PenLine className="w-4 h-4 text-slate-400" />
-                                <span className="text-[7px] font-extrabold text-slate-400 mt-0.5 tracking-wide">LÀM DỞ</span>
-                              </>
-                            ) : (
+                              <PenLine className="w-5 h-5 text-slate-400" />
+                            ) : isPass ? (
                               <>
                                 <span className="text-[17px] font-extrabold text-white leading-none">{score.toFixed(0)}</span>
                                 <span className="text-[8px] font-bold text-white/85 mt-0.5">{pct}%</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-[17px] font-extrabold text-slate-700 leading-none">{score.toFixed(0)}</span>
+                                <span className="text-[8px] font-bold text-slate-400 mt-0.5">{pct}%</span>
                               </>
                             )}
                           </div>
 
                           {/* Info */}
                           <div className="flex-1 min-w-0">
-                            <p className="font-bold truncate text-[14px] text-slate-800 leading-tight">
+                            <p className="font-bold truncate text-[14px] text-slate-900 leading-tight">
                               {s.exam?.eTitle ?? 'Bài thi'}
                             </p>
-                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold"
-                                style={{ background: status.bg, color: status.color }}>
-                                {status.label}
+                            <div className="flex items-center gap-x-3 gap-y-1 mt-1.5 flex-wrap text-[12px] text-slate-400">
+                              <span className="inline-flex items-center gap-1.5 font-medium text-slate-500">
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: dotColor }} />
+                                {isInProg ? 'Đang làm' : isPending ? 'Đang chấm…' : isPass ? 'Đạt' : 'Chưa đạt'}
                               </span>
-                              {!isInProg && !isPending && (
-                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold"
-                                  style={{ background: isPass ? '#D1FAE5' : '#FFE4E6', color: isPass ? '#059669' : '#E11D48' }}>
-                                  {isPass ? 'Đạt' : 'Chưa đạt'}
-                                </span>
-                              )}
                               {took && (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-400">
+                                <span className="inline-flex items-center gap-1">
                                   <Clock className="w-3 h-3" />{took}
                                 </span>
                               )}
                               {(s.sSubmit_time || s.sStart_time) && (
-                                <span className="text-[10px] text-slate-400">{formatDate(s.sSubmit_time ?? s.sStart_time)}</span>
+                                <span>{formatDate(s.sSubmit_time ?? s.sStart_time)}</span>
                               )}
                             </div>
 
@@ -327,12 +321,12 @@ export function TeensHistory() {
                             {!isInProg && !isPending && max > 0 && (
                               <div className="mt-2 h-1.5 rounded-full overflow-hidden bg-slate-100">
                                 <div className="h-full rounded-full transition-all duration-700"
-                                  style={{ width: `${pct}%`, background: isPass ? `linear-gradient(90deg,${TEAL},${TEAL_MID})` : 'linear-gradient(90deg,#F43F5E,#FB7185)' }} />
+                                  style={{ width: `${pct}%`, background: isPass ? `linear-gradient(90deg,${TEAL},${TEAL_MID})` : '#CBD5E1' }} />
                               </div>
                             )}
                           </div>
 
-                          <ChevronRight className="w-5 h-5 text-slate-300 flex-shrink-0" />
+                          <ChevronRight className="w-5 h-5 text-slate-300 flex-shrink-0 group-hover:text-teal-500 transition-colors" />
                         </div>
                       </button>
                     );
