@@ -42,6 +42,44 @@ export function getRememberedPhone(role: 'student' | 'teacher'): string {
   return localStorage.getItem('remember_phone') ?? '';
 }
 
+/**
+ * Đồng bộ user từ SERVER (nguồn thật) → ghi đè cache trong storage đang giữ token.
+ *
+ * Lý do: localStorage/sessionStorage chỉ là cache, có thể cũ/sai (vd: giáo viên
+ * đổi age_group, hoặc dữ liệu lưu từ phiên cũ). Các quyết định quan trọng
+ * (age_group, role) nên lấy từ DB qua /user/profile thay vì tin cache.
+ *
+ * An toàn: nếu gọi lỗi/không có token → giữ nguyên cache hiện tại, không xoá.
+ */
+export async function refreshAuthUserFromServer(): Promise<Record<string, unknown> | null> {
+  const token = getAuthToken();
+  if (!token) return null;
+  try {
+    const { API_BASE_URL } = await import('./apiConfig');
+    const res = await fetch(`${API_BASE_URL}/user/profile`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    });
+    if (!res.ok) return getAuthUser();
+    const json = await res.json();
+    const data = json?.data;
+    if (!data || typeof data !== 'object') return getAuthUser();
+
+    const current = getAuthUser() ?? {};
+    const merged = { ...current, ...data };
+
+    // Ghi lại vào đúng storage đang giữ token (local nếu "ghi nhớ", còn lại session).
+    const store = localStorage.getItem('auth_token') ? localStorage : sessionStorage;
+    store.setItem('user', JSON.stringify(merged));
+    if ((data as any).role) store.setItem('auth_role', String((data as any).role));
+
+    // Báo cho các component đang lắng nghe (vd avatar/age_group) cập nhật.
+    window.dispatchEvent(new Event('user-profile-updated'));
+    return merged;
+  } catch {
+    return getAuthUser();
+  }
+}
+
 export function clearAuthData(): void {
   ['auth_token', 'auth_role', 'user'].forEach((k) => {
     localStorage.removeItem(k);

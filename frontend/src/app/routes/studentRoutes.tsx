@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Navigate, RouteObject, useLocation, useParams, useRouteError } from 'react-router';
 import { ProtectedRoute } from '../../components/auth';
 import { StudentLayout } from '../layouts/StudentLayout';
@@ -6,6 +6,7 @@ import { KidsLayout } from '../layouts/KidsLayout';
 import { TeensLayout } from '../layouts/TeensLayout';
 import { UnderConstruction } from '../components/shared';
 import { StudentProtectedRoute } from './StudentProtectedRoute';
+import { refreshAuthUserFromServer } from '../../utils/authStorage';
 import { WaitingForClass } from '../features/student/WaitingForClass';
 
 // ─── Age Group Dashboards ─────────────────────────────────────────────────────
@@ -286,10 +287,16 @@ function KidsRedirect() {
   return <Navigate to={newPath + location.search} replace />;
 }
 
-// Auto-detect layout from age_group in auth session (localStorage or sessionStorage)
+// Auto-detect layout from age_group — ưu tiên dữ liệu THẬT từ server.
+// Khi vào khu vực học viên, gọi /user/profile để đồng bộ age_group/role mới nhất
+// từ DB rồi mới render (localStorage chỉ là cache tạm tránh nhấp nháy).
 function AdaptiveStudentLayout() {
-  const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
-  const ageGroup = raw ? (JSON.parse(raw) as { age_group?: string }).age_group : undefined;
+  const [, bump] = useState(0);
+  useEffect(() => {
+    refreshAuthUserFromServer().then((u) => { if (u) bump((v) => v + 1); });
+  }, []);
+
+  const ageGroup = getSessionAgeGroup();
   if (ageGroup === 'kids') return <KidsLayout />;
   if (ageGroup === 'teens') return <TeensLayout />;
   return <StudentLayout />;
