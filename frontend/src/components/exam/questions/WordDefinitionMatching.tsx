@@ -15,9 +15,23 @@ export function WordDefinitionMatching({
 }: WordDefinitionMatchingProps) {
   const realTaskData = taskData.task_data || taskData;
   const config = taskData.config || realTaskData.config || {};
-  
-  const questions = realTaskData?.questions || config?.questions || [];
-  const wordBank = realTaskData?.word_bank || config?.word_bank || realTaskData?.wordBank || config?.wordBank || [];
+
+  // Format chuẩn: questions[] + word_bank[]
+  let questions = realTaskData?.questions || config?.questions || [];
+  let wordBank = realTaskData?.word_bank || config?.word_bank || realTaskData?.wordBank || config?.wordBank || [];
+
+  // Tương thích format editor: words = [{ word, definition }]
+  const words = realTaskData?.words || config?.words || [];
+  if (questions.length === 0 && Array.isArray(words) && words.length > 0) {
+    questions = words.map((w: any) => ({
+      definition: w.definition ?? w.text ?? '',
+      answer: w.word,
+    }));
+    if (wordBank.length === 0) {
+      wordBank = words.map((w: any) => w.word).filter(Boolean);
+    }
+  }
+
   const instructions = realTaskData?.instructions || config?.instructions;
   
   return (
