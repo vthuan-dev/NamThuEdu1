@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, Link } from "react-router";
-import { Bell, Plus, ChevronRight, User, Settings, LogOut, ChevronDown, BookOpen, ExternalLink, Send, Volume2, VolumeX } from "lucide-react";
+import { Bell, Plus, ChevronRight, User, Settings, LogOut, ChevronDown, BookOpen, ExternalLink, Send, Volume2, VolumeX, UserCog, Check, X, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../ui/button";
 import { logout } from "../../../services/authApi";
 import { api } from "../../../services/api";
 import { getAuthUser } from "../../../utils/authStorage";
 import { useNotificationSound } from "../../../hooks/useNotificationSound";
+import { classMgmtApi, CoTeacherInvitation } from "../../../services/classMgmtApi";
 
 interface HeaderProps {
   breadcrumb: string | string[];
@@ -68,9 +70,50 @@ export function Header({ breadcrumb, action }: HeaderProps) {
   const [newStudents, setNewStudents] = useState<any[]>([]);
   const seenStudentIdsRef = useRef<Set<number> | null>(null);
 
+  // Co-teacher invitations (lời mời cùng quản lý lớp)
+  const [coInvites, setCoInvites] = useState<CoTeacherInvitation[]>([]);
+  const [activeInvite, setActiveInvite] = useState<CoTeacherInvitation | null>(null);
+  const [respondingAction, setRespondingAction] = useState<null | "accept" | "decline">(null);
+
   const handleToggleSound = () => {
     const next = toggleSound();
     setSoundOn(next);
+  };
+
+  // Lấy danh sách lời mời cùng quản lý lớp (chỉ giáo viên), cập nhật định kỳ.
+  useEffect(() => {
+    const u = getAuthUser();
+    const role = (u?.role as string) || (u?.uRole as string) || "";
+    if (role !== "teacher") return;
+
+    let alive = true;
+    const fetchInvites = () => {
+      classMgmtApi.myCoTeacherInvitations()
+        .then((res: any) => { if (alive) setCoInvites(res?.data || []); })
+        .catch(() => {});
+    };
+    fetchInvites();
+    const timer = setInterval(fetchInvites, 30000);
+    return () => { alive = false; clearInterval(timer); };
+  }, []);
+
+  const respondInvite = async (action: "accept" | "decline") => {
+    if (!activeInvite) return;
+    setRespondingAction(action);
+    try {
+      await classMgmtApi.respondCoTeacherInvitation(activeInvite.id, action);
+      const accepted = action === "accept";
+      const classId = activeInvite.class?.cId;
+      setCoInvites((prev) => prev.filter((i) => i.id !== activeInvite.id));
+      setActiveInvite(null);
+      if (accepted && classId) {
+        navigate(`/giao-vien/lop-hoc/${classId}`);
+      }
+    } catch (e) {
+      // Lỗi: giữ modal để người dùng thử lại.
+    } finally {
+      setRespondingAction(null);
+    }
   };
 
   const user     = getAuthUser();
@@ -371,16 +414,16 @@ export function Header({ breadcrumb, action }: HeaderProps) {
           <button
             onClick={handleBellClick}
             className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all relative ${
-              unread > 0
+              (unread + coInvites.length) > 0
                 ? "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
                 : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
             }`}
             aria-label={t("header.notifications")}
           >
-            <Bell className={`w-[15px] h-[15px] ${unread > 0 ? "animate-pulse" : ""}`} />
-            {unread > 0 && (
+            <Bell className={`w-[15px] h-[15px] ${(unread + coInvites.length) > 0 ? "animate-pulse" : ""}`} />
+            {(unread + coInvites.length) > 0 && (
               <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1 border border-white">
-                {unread > 9 ? "9+" : unread}
+                {(unread + coInvites.length) > 9 ? "9+" : (unread + coInvites.length)}
               </span>
             )}
           </button>
@@ -393,6 +436,38 @@ export function Header({ breadcrumb, action }: HeaderProps) {
             }`}
           >
             <div className="w-80 bg-white rounded-xl border border-slate-200 shadow-lg shadow-slate-200/60 overflow-hidden">
+              {/* Section: Lời mời cùng quản lý lớp */}
+              {coInvites.length > 0 && (
+                <div className="border-b border-slate-100">
+                  <div className="px-4 py-2.5 bg-teal-50/70">
+                    <p className="text-[11px] font-bold text-teal-700 uppercase tracking-wide">Lời mời cộng tác</p>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-50">
+                    {coInvites.map((inv) => (
+                      <button
+                        key={`co-${inv.id}`}
+                        onClick={() => { setActiveInvite(inv); setBellOpen(false); }}
+                        className="w-full text-left flex items-start gap-2.5 px-4 py-2.5 hover:bg-teal-50/50 transition-colors cursor-pointer"
+                      >
+                        <div className="w-7 h-7 bg-gradient-to-tr from-teal-500 to-emerald-500 rounded-full flex items-center justify-center text-white flex-shrink-0 mt-0.5">
+                          <UserCog className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-slate-700 leading-snug">
+                            <span className="font-semibold text-slate-900">{inv.invited_by || "Một giáo viên"}</span>
+                            <span className="text-slate-500"> mời bạn cùng quản lý </span>
+                            <span className="font-medium text-slate-800 truncate block mt-0.5">{inv.class?.cName}</span>
+                          </p>
+                          <span className="inline-block mt-1 text-[10px] font-semibold text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded">
+                            Bấm để phản hồi
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Section: Học viên mới */}
               {newStudents.length > 0 && (
                 <div className="border-b border-slate-100">
@@ -618,6 +693,68 @@ export function Header({ breadcrumb, action }: HeaderProps) {
           )}
         </div>
       </div>
+
+      {/* Modal phản hồi lời mời cùng quản lý lớp */}
+      {activeInvite && createPortal(
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+          onMouseDown={() => respondingAction === null && setActiveInvite(null)}
+        >
+          <div
+            className="bg-white rounded-2xl w-full max-w-md shadow-2xl ring-1 ring-black/5"
+            onMouseDown={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+              <h2 className="text-lg font-bold text-[#111827]">Lời mời cùng quản lý lớp</h2>
+              <button
+                onClick={() => respondingAction === null && setActiveInvite(null)}
+                aria-label="Đóng"
+                className="p-1.5 -mr-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <div className="text-center mb-5">
+                <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-50 to-white ring-1 ring-teal-100 flex items-center justify-center mb-3">
+                  <UserCog className="w-7 h-7 text-[#0D9488]" />
+                </div>
+                <p className="text-sm text-[#374151] leading-relaxed">
+                  <span className="font-semibold text-[#111827]">{activeInvite.invited_by || "Một giáo viên"}</span> mời bạn cùng quản lý lớp{" "}
+                  <span className="font-semibold text-[#111827]">{activeInvite.class?.cName}</span>.
+                </p>
+                <p className="text-xs text-[#6B7280] mt-2 leading-relaxed">
+                  Khi chấp nhận, bạn sẽ cùng quản lý học viên, thông báo và mục tiêu của lớp này.
+                </p>
+              </div>
+              {activeInvite.message && (
+                <div className="mb-4 px-3.5 py-3 rounded-xl bg-gray-50 ring-1 ring-gray-100 text-sm text-[#374151] italic">
+                  "{activeInvite.message}"
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+              <button
+                onClick={() => respondInvite("decline")}
+                disabled={respondingAction !== null}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-[#E5E7EB] text-[#374151] rounded-xl font-semibold hover:bg-gray-50 active:scale-[0.98] disabled:opacity-60 transition-all"
+              >
+                {respondingAction === "decline" ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />} Từ chối
+              </button>
+              <button
+                onClick={() => respondInvite("accept")}
+                disabled={respondingAction !== null}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0D9488] text-white rounded-xl font-semibold hover:bg-[#0F766E] active:scale-[0.98] disabled:opacity-60 transition-all"
+              >
+                {respondingAction === "accept" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Chấp nhận
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
