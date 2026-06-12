@@ -7,7 +7,7 @@
  *  • Part 2 — Long Turn (Cue Card): 1-min prep + 1-2 min monologue
  *  • Part 3 — Discussion: follow-up Qs related to Part 2 topic
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Mic, ArrowRight, CheckCircle2 } from "lucide-react";
 import type { IeltsSpeakingPayload, IeltsSpeakingPart } from "../types";
 import { IeltsSpeakingRecorder } from "../components/IeltsSpeakingRecorder";
@@ -20,6 +20,23 @@ interface IeltsSpeakingViewProps {
   onSubmit: () => void;
 }
 
+/**
+ * Thông báo giọng nói NGẮN GỌN khi vào mỗi part: chỉ báo Part mấy + thời gian.
+ * KHÔNG đọc lại câu hỏi / cue card (đã hiển thị trên màn hình) để tiết kiệm thời gian.
+ */
+function buildIeltsSpeakingAnnounce(part: IeltsSpeakingPart): string {
+  const name = part.partName?.trim() || `Part ${part.partNumber}`;
+  if (part.partNumber === 2) {
+    const prep = part.prepSeconds ?? 60;
+    const speak = part.speakSeconds ?? 120;
+    const prepText = prep >= 60 ? `${Math.round(prep / 60)} minute` : `${prep} seconds`;
+    const speakMin = Math.max(1, Math.round(speak / 60));
+    return `${name}. You have ${prepText} to prepare and up to ${speakMin} minute${speakMin > 1 ? "s" : ""} to speak. Please read the cue card on the screen, then start speaking.`;
+  }
+  const mins = part.recommendedMinutes;
+  return `${name}.${mins ? ` You have about ${mins} minutes.` : ""} Please read the question on the screen, then start speaking.`;
+}
+
 export function IeltsSpeakingView({ payload, submissionId, onSubmit }: IeltsSpeakingViewProps) {
   const parts = payload.parts ?? [];
   const [activePartIdx, setActivePartIdx] = useState(0);
@@ -28,6 +45,21 @@ export function IeltsSpeakingView({ payload, submissionId, onSubmit }: IeltsSpea
   const [uploadingPart, setUploadingPart] = useState<number | null>(null);
 
   const currentPart: IeltsSpeakingPart | undefined = parts[activePartIdx];
+
+  // Phát thông báo giọng nói ngắn (Part + thời gian) mỗi khi chuyển part.
+  useEffect(() => {
+    if (!currentPart) return;
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const text = buildIeltsSpeakingAnnounce(currentPart);
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = "en-US";
+    utt.rate = 0.95;
+    window.speechSynthesis.speak(utt);
+    return () => window.speechSynthesis.cancel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePartIdx]);
+
   if (!currentPart) {
     return <div className="p-8 text-center text-gray-500">No speaking parts available.</div>;
   }
