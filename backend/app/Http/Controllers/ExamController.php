@@ -1228,7 +1228,7 @@ class ExamController extends Controller
             'questions.*.options.B' => 'required|string',
             'questions.*.options.C' => 'required|string',
             'questions.*.options.D' => 'required|string',
-            'questions.*.correctAnswer' => 'required|in:A,B,C,D',
+            'questions.*.correctAnswer' => 'nullable|in:A,B,C,D',
         ]);
 
         if ($validator->fails()) {
@@ -1292,6 +1292,7 @@ class ExamController extends Controller
 
             // Create questions
             foreach ($request->questions as $questionData) {
+                $correct = !empty($questionData['correctAnswer']) ? $questionData['correctAnswer'] : 'A';
                 $question = Question::create([
                     'exam_id' => $exam->eId,
                     'content_block_id' => $contentBlock->id,
@@ -1307,7 +1308,7 @@ class ExamController extends Controller
                         'part_name' => $request->partName,
                         'question_number' => $questionData['questionNumber'],
                         'options' => $questionData['options'],
-                        'correct_answer' => $questionData['correctAnswer'],
+                        'correct_answer' => $correct,
                     ],
                 ]);
 
@@ -1316,7 +1317,7 @@ class ExamController extends Controller
                     Answer::create([
                         'question_id' => $question->qId,
                         'aContent' => $questionData['options'][$option],
-                        'aIs_correct' => $questionData['correctAnswer'] === $option,
+                        'aIs_correct' => $correct === $option,
                         'aOrder' => ord($option) - ord('A'),
                     ]);
                 }
@@ -2256,7 +2257,7 @@ class ExamController extends Controller
             'questions.*.options.B' => 'required|string',
             'questions.*.options.C' => 'required|string',
             'questions.*.options.D' => 'required|string',
-            'questions.*.correctAnswer' => 'required|in:A,B,C,D',
+            'questions.*.correctAnswer' => 'nullable|in:A,B,C,D',
         ]);
         if ($validator->fails()) {
             return response()->json(['status' => 'error', 'message' => 'Dữ liệu không hợp lệ.', 'errors' => $validator->errors()], 400);
@@ -2335,6 +2336,8 @@ class ExamController extends Controller
 
             // 3. Tạo questions mới
             foreach ($request->questions as $qData) {
+                // Chưa chọn đáp án → mặc định "A" (giáo viên sửa lại sau).
+                $correct = !empty($qData['correctAnswer']) ? $qData['correctAnswer'] : 'A';
                 $question = Question::create([
                     'exam_id' => $exam->eId,
                     'content_block_id' => $contentBlock->id,
@@ -2350,7 +2353,7 @@ class ExamController extends Controller
                         'section_number' => $sectionNumber,
                         'question_number' => $qData['questionNumber'],
                         'options' => $qData['options'],
-                        'correct_answer' => $qData['correctAnswer'],
+                        'correct_answer' => $correct,
                     ],
                 ]);
 
@@ -2358,7 +2361,7 @@ class ExamController extends Controller
                     Answer::create([
                         'question_id' => $question->qId,
                         'aContent' => $qData['options'][$opt],
-                        'aIs_correct' => $qData['correctAnswer'] === $opt,
+                        'aIs_correct' => $correct === $opt,
                         'aOrder' => ord($opt) - ord('A'),
                     ]);
                 }
@@ -2509,7 +2512,7 @@ class ExamController extends Controller
             'questions.*.options.B' => 'required|string',
             'questions.*.options.C' => 'required|string',
             'questions.*.options.D' => 'required|string',
-            'questions.*.correctAnswer' => 'required|in:A,B,C,D',
+            'questions.*.correctAnswer' => 'nullable|in:A,B,C,D',
         ]);
 
         if ($validator->fails()) {
@@ -2563,6 +2566,7 @@ class ExamController extends Controller
 
             // Create questions
             foreach ($request->questions as $questionData) {
+                $correct = !empty($questionData['correctAnswer']) ? $questionData['correctAnswer'] : 'A';
                 $question = Question::create([
                     'exam_id' => $exam->eId,
                     'content_block_id' => $contentBlock->id,
@@ -2578,7 +2582,7 @@ class ExamController extends Controller
                         'part_name' => $request->partName,
                         'question_number' => $questionData['questionNumber'],
                         'options' => $questionData['options'],
-                        'correct_answer' => $questionData['correctAnswer'],
+                        'correct_answer' => $correct,
                     ],
                 ]);
 
@@ -2587,7 +2591,7 @@ class ExamController extends Controller
                     Answer::create([
                         'question_id' => $question->qId,
                         'aContent' => $questionData['options'][$option],
-                        'aIs_correct' => $questionData['correctAnswer'] === $option,
+                        'aIs_correct' => $correct === $option,
                         'aOrder' => ord($option) - ord('A'),
                     ]);
                 }
