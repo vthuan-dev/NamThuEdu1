@@ -683,6 +683,10 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         Route::get('/classes/assignments', [UserController::class, 'adminClassAssignments']);
         Route::get('/classes/assignment-teachers', [UserController::class, 'adminAssignmentTeachers']);
         Route::put('/classes/{id}/assign-teacher', [UserController::class, 'adminAssignTeacherToClass']);
+        // Quản lý lớp (admin xem chi tiết, gỡ học viên, xóa lớp)
+        Route::get('/classes/{id}/detail', [UserController::class, 'adminClassDetail']);
+        Route::delete('/classes/{id}', [UserController::class, 'adminDeleteClass']);
+        Route::delete('/classes/{id}/students/{studentId}', [UserController::class, 'adminRemoveStudentFromClass']);
 
         // Bàn giao lớp (admin xử lý yêu cầu)
         Route::get('/handover-requests', [AdminHandoverController::class, 'index']);

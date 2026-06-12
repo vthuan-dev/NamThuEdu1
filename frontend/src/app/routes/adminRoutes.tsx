@@ -23,6 +23,7 @@ const AdminRevenueReportPage       = lazy(() => import("../features/admin/report
 const AdminTeachersReportPage      = lazy(() => import("../features/admin/reports/AdminTeachersReportPage").then(m => ({ default: m.AdminTeachersReportPage })));
 const AdminSettingsPage            = lazy(() => import("../features/admin/settings/AdminSettingsPage").then(m => ({ default: m.AdminSettingsPage })));
 const AdminHandoverPage            = lazy(() => import("../features/admin/handover/AdminHandoverPage").then(m => ({ default: m.AdminHandoverPage })));
+const AdminClassManagementPage     = lazy(() => import("../features/admin/classes/AdminClassManagementPage").then(m => ({ default: m.AdminClassManagementPage })));
 
 function ProtectedAdminLayout() {
   return (
@@ -49,6 +50,9 @@ export const adminRoutes = {
 
     // Bàn giao lớp
     { path: "ban-giao-lop", Component: AdminHandoverPage },
+
+    // Quản lý lớp (tổng hợp: danh sách lớp + yêu cầu bàn giao/xóa)
+    { path: "quan-ly-lop", Component: AdminClassManagementPage },
 
     // Nội dung
     { path: "content/posts", Component: AdminPostsPage },

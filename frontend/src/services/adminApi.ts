@@ -151,6 +151,39 @@ export interface AdminStudentRegistrationItem {
   last_login?: string | null;
 }
 
+export interface AdminClassMember {
+  id: number;
+  name: string;
+  phone: string;
+  status: "active" | "inactive";
+  avatar_url?: string | null;
+  age_group?: string | null;
+  joined_at?: string | null;
+}
+
+export interface AdminClassCoTeacher {
+  id: number;
+  teacher: { id: number; name: string; phone: string; avatar_url?: string | null } | null;
+  invited_by?: string | null;
+  status: "accepted" | "pending" | string;
+  responded_at?: string | null;
+}
+
+export interface AdminClassDetail {
+  class_id: number;
+  class_name: string;
+  description?: string | null;
+  status: "active" | "inactive" | string;
+  age_group?: string | null;
+  created_at?: string;
+  teacher: { id: number; name: string; phone: string; status: string; avatar_url?: string | null } | null;
+  course: { id: number; name: string; status?: string | null } | null;
+  co_teachers: AdminClassCoTeacher[];
+  students: AdminClassMember[];
+  student_count: number;
+  pending_request?: { id: number; type: string; reason?: string | null; created_at?: string } | null;
+}
+
 export interface AdminCreateCoursePayload {
   course_name: string;
   teacher_id: number;
@@ -411,6 +444,22 @@ export const adminApi = {
     const response = await api.put<ApiResponse<unknown>>(`/admin/classes/${classId}/assign-teacher`, {
       teacher_id: teacherId,
     });
+    return response.data;
+  },
+
+  // ── Quản lý lớp (chi tiết, gỡ học viên, xóa lớp) ──
+  async getClassDetail(classId: number) {
+    const response = await api.get<ApiResponse<AdminClassDetail>>(`/admin/classes/${classId}/detail`);
+    return unwrap(response.data);
+  },
+
+  async deleteClass(classId: number) {
+    const response = await api.delete<ApiResponse<unknown>>(`/admin/classes/${classId}`);
+    return response.data;
+  },
+
+  async removeStudentFromClass(classId: number, studentId: number) {
+    const response = await api.delete<ApiResponse<unknown>>(`/admin/classes/${classId}/students/${studentId}`);
     return response.data;
   },
 

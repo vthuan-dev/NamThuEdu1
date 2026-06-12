@@ -54,7 +54,7 @@ const adminNav: NavItem[] = [
     ],
   },
   { label: "Bài viết", href: "/admin/content/posts", icon: FileEdit },
-  { label: "Bàn giao lớp", href: "/admin/ban-giao-lop", icon: Users },
+  { label: "Quản lý lớp", href: "/admin/quan-ly-lop", icon: GraduationCap },
   {
     label: "Báo cáo",
     icon: BarChart3,
@@ -388,6 +388,8 @@ export function AdminLayout() {
                location.pathname.startsWith("/admin/courses/new") ? "Khóa học" :
                location.pathname.startsWith("/admin/courses/categories") ? "Khóa học" :
                location.pathname.startsWith("/admin/content/posts") ? "Bài viết" :
+               location.pathname.startsWith("/admin/quan-ly-lop") ? "Quản lý lớp" :
+               location.pathname.startsWith("/admin/ban-giao-lop") ? "Bàn giao lớp" :
                location.pathname.startsWith("/admin/reports") ? "Báo cáo" :
                location.pathname.startsWith("/admin/settings") ? "Cài đặt" :
                location.pathname.startsWith("/admin/profile") ? "Hồ sơ" : "Admin"}

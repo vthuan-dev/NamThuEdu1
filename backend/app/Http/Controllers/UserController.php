@@ -2666,6 +2666,164 @@ class UserController extends Controller
     }
 
     /**
+     * GET /api/admin/classes/{id}/detail
+     * Chi tiết một lớp cho admin: chủ lớp, đồng quản lý (co-teachers),
+     * danh sách học viên, khóa học, yêu cầu đang chờ.
+     */
+    public function adminClassDetail(Request $request, $id)
+    {
+        $user = $request->user();
+        if (!$user || $user->uRole !== 'admin') {
+            return response()->json(['status' => 'error', 'message' => 'Chỉ quản trị viên mới có quyền truy cập.'], 403);
+        }
+
+        $class = Classes::with(['teacher:uId,uName,uPhone,uStatus,avatar_url', 'course:cId,cName,cStatus'])
+            ->find($id);
+        if (!$class) {
+            return response()->json(['status' => 'error', 'message' => 'Không tìm thấy lớp học.'], 404);
+        }
+
+        // Học viên trong lớp (nguồn membership chính: users.class_id)
+        $students = User::where('class_id', $class->cId)
+            ->where('uRole', 'student')
+            ->whereNull('uDeleted_at')
+            ->orderBy('uName')
+            ->get(['uId', 'uName', 'uPhone', 'uStatus', 'avatar_url', 'age_group', 'uCreated_at'])
+            ->map(fn ($s) => [
+                'id' => $s->uId,
+                'name' => $s->uName,
+                'phone' => $s->uPhone,
+                'status' => $s->uStatus,
+                'avatar_url' => $s->avatar_url,
+                'age_group' => $s->age_group,
+                'joined_at' => $s->uCreated_at,
+            ])->values();
+
+        // Đồng quản lý (co-teachers): accepted + pending
+        $coTeachers = \App\Models\ClassCoTeacher::with(['teacher:uId,uName,uPhone,avatar_url', 'inviter:uId,uName'])
+            ->where('class_id', $class->cId)
+            ->whereIn('status', ['accepted', 'pending'])
+            ->get()
+            ->map(fn ($c) => [
+                'id' => $c->id,
+                'teacher' => $c->teacher ? [
+                    'id' => $c->teacher->uId,
+                    'name' => $c->teacher->uName,
+                    'phone' => $c->teacher->uPhone,
+                    'avatar_url' => $c->teacher->avatar_url,
+                ] : null,
+                'invited_by' => $c->inviter->uName ?? null,
+                'status' => $c->status,
+                'responded_at' => $c->responded_at,
+            ])->values();
+
+        // Yêu cầu đang chờ (bàn giao / xóa lớp)
+        $pendingRequest = \App\Models\ClassHandoverRequest::where('class_id', $class->cId)
+            ->where('status', 'pending')
+            ->first();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'class_id' => $class->cId,
+                'class_name' => $class->cName,
+                'description' => $class->cDescription,
+                'status' => $class->cStatus,
+                'age_group' => $class->age_group,
+                'created_at' => $class->cCreated_at,
+                'teacher' => $class->teacher ? [
+                    'id' => $class->teacher->uId,
+                    'name' => $class->teacher->uName,
+                    'phone' => $class->teacher->uPhone,
+                    'status' => $class->teacher->uStatus,
+                    'avatar_url' => $class->teacher->avatar_url,
+                ] : null,
+                'course' => $class->course ? [
+                    'id' => $class->course->cId,
+                    'name' => $class->course->cName,
+                    'status' => $class->course->cStatus ?? null,
+                ] : null,
+                'co_teachers' => $coTeachers,
+                'students' => $students,
+                'student_count' => $students->count(),
+                'pending_request' => $pendingRequest ? [
+                    'id' => $pendingRequest->id,
+                    'type' => $pendingRequest->request_type ?? 'handover',
+                    'reason' => $pendingRequest->reason,
+                    'created_at' => $pendingRequest->created_at,
+                ] : null,
+            ],
+        ]);
+    }
+
+    /**
+     * DELETE /api/admin/classes/{id}
+     * Admin xóa lớp: gỡ toàn bộ học viên, xóa enrollment + co-teacher + yêu cầu
+     * liên quan, rồi xóa lớp. Thao tác không thể hoàn tác.
+     */
+    public function adminDeleteClass(Request $request, $id)
+    {
+        $user = $request->user();
+        if (!$user || $user->uRole !== 'admin') {
+            return response()->json(['status' => 'error', 'message' => 'Chỉ quản trị viên mới có quyền thực hiện thao tác này.'], 403);
+        }
+
+        $class = Classes::find($id);
+        if (!$class) {
+            return response()->json(['status' => 'error', 'message' => 'Không tìm thấy lớp học.'], 404);
+        }
+
+        $className = $class->cName;
+
+        \DB::transaction(function () use ($class) {
+            // Gỡ học viên khỏi lớp (giữ lại tài khoản học viên)
+            User::where('class_id', $class->cId)->where('uRole', 'student')->update(['class_id' => null]);
+            ClassEnrollment::where('class_id', $class->cId)->delete();
+            \App\Models\ClassCoTeacher::where('class_id', $class->cId)->delete();
+            \App\Models\ClassHandoverRequest::where('class_id', $class->cId)->delete();
+            $class->delete();
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'message' => "Đã xóa lớp \"{$className}\" và gỡ toàn bộ học viên khỏi lớp.",
+        ]);
+    }
+
+    /**
+     * DELETE /api/admin/classes/{id}/students/{studentId}
+     * Admin gỡ một học viên khỏi lớp (không xóa tài khoản).
+     */
+    public function adminRemoveStudentFromClass(Request $request, $id, $studentId)
+    {
+        $user = $request->user();
+        if (!$user || $user->uRole !== 'admin') {
+            return response()->json(['status' => 'error', 'message' => 'Chỉ quản trị viên mới có quyền thực hiện thao tác này.'], 403);
+        }
+
+        $class = Classes::find($id);
+        if (!$class) {
+            return response()->json(['status' => 'error', 'message' => 'Không tìm thấy lớp học.'], 404);
+        }
+
+        $student = User::where('uId', $studentId)->where('uRole', 'student')->first();
+        if (!$student || (int) $student->class_id !== (int) $class->cId) {
+            return response()->json(['status' => 'error', 'message' => 'Học viên không thuộc lớp này.'], 400);
+        }
+
+        \DB::transaction(function () use ($student, $class) {
+            $student->class_id = null;
+            $student->save();
+            ClassEnrollment::where('class_id', $class->cId)->where('student_id', $student->uId)->delete();
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'message' => "Đã gỡ học viên {$student->uName} khỏi lớp.",
+        ]);
+    }
+
+    /**
      * GET /api/admin/students/new-registrations
      * Danh sách học viên đăng ký mới
      */
