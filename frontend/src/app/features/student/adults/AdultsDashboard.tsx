@@ -720,8 +720,8 @@ export function AdultsDashboard() {
           })}
         </section>
 
-        {/* ─── Bài tập được giao (card grid) ─────── */}
-        {pendingAssignments.length > 0 && (() => {
+        {/* ─── Tổng quan: bài tập + nhắc nhở + streak ─────── */}
+        {(() => {
           const SKILL_MAP: Record<string, { label: string; color: string; bg: string; border: string; icon: any }> = {
             listening: { label: 'Listening', color: '#1D4ED8', bg: '#EFF6FF', border: '#BFDBFE', icon: Headphones },
             reading:   { label: 'Reading',   color: '#047857', bg: '#ECFDF5', border: '#A7F3D0', icon: BookOpenCheck },
@@ -737,17 +737,21 @@ export function AdultsDashboard() {
                   <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: '#FFF7ED' }}>
                     <ClipboardList className="w-4 h-4" style={{ color: '#EA580C' }} />
                   </div>
-                  <h2 className="text-sm font-extrabold text-slate-900 tracking-tight">Bài tập được giao</h2>
-                  <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-orange-500 text-white text-[10px] font-bold tabular-nums">
-                    {pendingAssignments.length}
-                  </span>
+                  <h2 className="text-sm font-extrabold text-slate-900 tracking-tight">Tổng quan</h2>
+                  {pendingAssignments.length > 0 && (
+                    <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-orange-500 text-white text-[10px] font-bold tabular-nums">
+                      {pendingAssignments.length}
+                    </span>
+                  )}
                 </div>
-                <Link to="/hoc-vien/bai-tap" className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1">
-                  Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
-                </Link>
+                {pendingAssignments.length > 0 && (
+                  <Link to="/hoc-vien/bai-tap" className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1">
+                    Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
                 {visible.map((a) => {
                   const skill = SKILL_MAP[a.exam_skill?.toLowerCase()] ?? SKILL_MAP['mixed'];
                   const SkillIcon = skill.icon;
@@ -811,6 +815,135 @@ export function AdultsDashboard() {
                     </div>
                   );
                 })}
+
+                {/* Reminders — moved into overview grid */}
+                {visibleReminders.length > 0 && (
+                  <section
+                    className="rounded-3xl overflow-hidden"
+                    style={{
+                      background: '#fff',
+                      border: '1.5px solid #F0F0F8',
+                      boxShadow: `0 4px 24px rgba(124,58,237,0.10)`,
+                    }}
+                  >
+                    {/* Purple gradient header */}
+                    <div
+                      className="relative flex items-center justify-between px-5 py-3.5 overflow-hidden"
+                      style={{ background: `linear-gradient(135deg, #1E0B4B 0%, ${PURPLE} 100%)` }}
+                    >
+                      <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full opacity-25 pointer-events-none"
+                        style={{ background: `radial-gradient(circle, #A78BFA, transparent)` }} />
+                      <div className="relative z-10 flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ background: 'rgba(167,139,250,0.25)' }}>
+                          <Bell className="w-3.5 h-3.5 text-purple-200" strokeWidth={2.5} />
+                        </div>
+                        <span className="text-sm font-semibold text-white leading-tight">
+                          {teacherItems.length > 0 ? 'Giáo viên nhắc nhở' : 'Bài tập sắp đến hạn'}
+                        </span>
+                        <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold tabular-nums"
+                          style={{ background: 'rgba(255,255,255,0.22)', color: '#fff' }}>
+                          {totalReminders}
+                        </span>
+                      </div>
+                      <Link
+                        to="/hoc-vien/bai-tap"
+                        className="relative z-10 text-[11px] font-medium text-purple-200 hover:text-white transition-colors flex items-center gap-0.5"
+                      >
+                        Tất cả <ChevronRight className="w-3 h-3" />
+                      </Link>
+                    </div>
+
+                    {/* Items */}
+                    <div className="py-0.5">
+                      {visibleReminders.map((item, idx) => {
+                        const isUrgent = item.isUrgent || item.daysUntil <= 1;
+                        const isWarn   = !isUrgent && item.daysUntil <= 3;
+                        const isDismissing = dismissingId === item.reminderId;
+                        const accentColor = isUrgent ? '#EF4444' : isWarn ? '#F97316' : PURPLE_MID;
+                        const ctaBg       = isUrgent ? '#EF4444' : `linear-gradient(135deg, ${PURPLE}, ${PURPLE_MID})`;
+                        return (
+                          <div
+                            key={item.key}
+                            className="group relative flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors duration-150"
+                            style={{ borderBottom: idx < visibleReminders.length - 1 ? '1px solid #F8FAFC' : 'none' }}
+                          >
+                            <div
+                              className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full"
+                              style={{ background: accentColor, opacity: isUrgent || isWarn ? 1 : 0.35 }}
+                            />
+                            <div className="flex-1 min-w-0 pl-1">
+                              <p className="text-[13px] font-semibold text-slate-800 truncate leading-snug">
+                                {item.title}
+                              </p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                {item.type && <span className="text-[11px] text-slate-400">{item.type}</span>}
+                                {item.duration ? <span className="text-[11px] text-slate-300">· {item.duration}ph</span> : null}
+                                <span className="text-[11px] font-semibold ml-1" style={{ color: accentColor }}>
+                                  {formatDeadline(item.deadline, item.daysUntil)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <Link
+                                to={`/hoc-vien/phong-cho/${item.assignmentId}`}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 active:scale-95"
+                                style={{ background: ctaBg }}
+                              >
+                                Làm bài <ArrowRight className="w-3 h-3" />
+                              </Link>
+                              {item.fromTeacher && item.reminderId && (
+                                <button
+                                  onClick={() => handleDismiss(item)}
+                                  disabled={isDismissing}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 flex items-center justify-center text-slate-300 hover:text-slate-500 disabled:opacity-30 rounded-md hover:bg-slate-100"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
+
+                {/* Streak — moved into overview grid */}
+                <section
+                  className="rounded-3xl overflow-hidden hover:-translate-y-0.5 transition-all duration-300"
+                  style={{ border: '1.5px solid #F0F0F8', boxShadow: '0 2px 12px rgba(124,58,237,0.07)' }}
+                >
+                  <div
+                    className="relative px-4 py-3.5 overflow-hidden"
+                    style={{ background: `linear-gradient(135deg, ${PURPLE}18 0%, #1D4ED810 100%)` }}
+                  >
+                    <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full opacity-20 pointer-events-none"
+                      style={{ background: `radial-gradient(circle, #FBBF24, transparent)` }} />
+                    <div className="relative z-10 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                          style={{ background: 'linear-gradient(135deg, #F59E0B, #FBBF24)' }}>
+                          <Flame className="w-3.5 h-3.5 text-white" strokeWidth={2.2} />
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-bold tracking-widest uppercase" style={{ color: PURPLE_MID }}>Hoạt động</p>
+                          <h2 className="text-xs font-extrabold leading-tight" style={{ color: '#1A1040' }}>Đều đặn</h2>
+                        </div>
+                      </div>
+                      {streak > 0 && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#FEF3C7', color: '#92400E' }}>
+                          🔥{streak}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="bg-white px-4 py-1.5 divide-y divide-slate-100">
+                    <KeyValue label="Hiện tại" value={`${streak} ngày`} highlight={streak > 0} />
+                    <KeyValue label="Dài nhất" value={`${gam?.streak.longest || 0} ngày`} />
+                    <KeyValue label="Tổng ngày" value={gam?.streak.total_active_days || 0} />
+                  </div>
+                </section>
               </div>
 
               {pendingAssignments.length > 4 && (
@@ -826,10 +959,8 @@ export function AdultsDashboard() {
           );
         })()}
 
-        {/* ─── Main grid: 3+2 ──────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-          <div className="space-y-5">
+        {/* ─── Bài thi tiếp theo (full width) ──────────────────── */}
+        <div className="space-y-5">
 
             {/* Next test card */}
             {nextAction ? (
@@ -1006,149 +1137,6 @@ export function AdultsDashboard() {
             )}
 
             {/* Progress section removed per request */}
-          </div>
-
-          {/* RIGHT: Reminders + Performance + Streak */}
-          <div className="space-y-5">
-
-            {/* Reminders — premium sidebar card */}
-            {visibleReminders.length > 0 && (
-              <section
-                className="rounded-3xl overflow-hidden"
-                style={{
-                  background: '#fff',
-                  border: '1.5px solid #F0F0F8',
-                  boxShadow: `0 4px 24px rgba(124,58,237,0.10)`,
-                }}
-              >
-                {/* Purple gradient header */}
-                <div
-                  className="relative flex items-center justify-between px-5 py-3.5 overflow-hidden"
-                  style={{ background: `linear-gradient(135deg, #1E0B4B 0%, ${PURPLE} 100%)` }}
-                >
-                  {/* Orb */}
-                  <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full opacity-25 pointer-events-none"
-                    style={{ background: `radial-gradient(circle, #A78BFA, transparent)` }} />
-                  <div className="relative z-10 flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ background: 'rgba(167,139,250,0.25)' }}>
-                      <Bell className="w-3.5 h-3.5 text-purple-200" strokeWidth={2.5} />
-                    </div>
-                    <span className="text-sm font-semibold text-white leading-tight">
-                      {teacherItems.length > 0 ? 'Giáo viên nhắc nhở' : 'Bài tập sắp đến hạn'}
-                    </span>
-                    <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold tabular-nums"
-                      style={{ background: 'rgba(255,255,255,0.22)', color: '#fff' }}>
-                      {totalReminders}
-                    </span>
-                  </div>
-                  <Link
-                    to="/hoc-vien/bai-tap"
-                    className="relative z-10 text-[11px] font-medium text-purple-200 hover:text-white transition-colors flex items-center gap-0.5"
-                  >
-                    Tất cả <ChevronRight className="w-3 h-3" />
-                  </Link>
-                </div>
-
-                {/* Items */}
-                <div className="py-0.5">
-                  {visibleReminders.map((item, idx) => {
-                    const isUrgent = item.isUrgent || item.daysUntil <= 1;
-                    const isWarn   = !isUrgent && item.daysUntil <= 3;
-                    const isDismissing = dismissingId === item.reminderId;
-                    const accentColor = isUrgent ? '#EF4444' : isWarn ? '#F97316' : PURPLE_MID;
-                    const ctaBg       = isUrgent ? '#EF4444' : `linear-gradient(135deg, ${PURPLE}, ${PURPLE_MID})`;
-                    return (
-                      <div
-                        key={item.key}
-                        className="group relative flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors duration-150"
-                        style={{ borderBottom: idx < visibleReminders.length - 1 ? '1px solid #F8FAFC' : 'none' }}
-                      >
-                        {/* Always-visible left accent */}
-                        <div
-                          className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full"
-                          style={{ background: accentColor, opacity: isUrgent || isWarn ? 1 : 0.35 }}
-                        />
-
-                        {/* Content */}
-                        <div className="flex-1 min-w-0 pl-1">
-                          <p className="text-[13px] font-semibold text-slate-800 truncate leading-snug">
-                            {item.title}
-                          </p>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            {item.type && <span className="text-[11px] text-slate-400">{item.type}</span>}
-                            {item.duration ? <span className="text-[11px] text-slate-300">· {item.duration}ph</span> : null}
-                            <span className="text-[11px] font-semibold ml-1" style={{ color: accentColor }}>
-                              {formatDeadline(item.deadline, item.daysUntil)}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* CTA */}
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <Link
-                            to={`/hoc-vien/phong-cho/${item.assignmentId}`}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 active:scale-95"
-                            style={{ background: ctaBg }}
-                          >
-                            Làm bài <ArrowRight className="w-3 h-3" />
-                          </Link>
-                          {item.fromTeacher && item.reminderId && (
-                            <button
-                              onClick={() => handleDismiss(item)}
-                              disabled={isDismissing}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 flex items-center justify-center text-slate-300 hover:text-slate-500 disabled:opacity-30 rounded-md hover:bg-slate-100"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-
-            {/* Performance + Streak stacked */}
-            <div className="space-y-4">
-              <section
-                className="rounded-3xl overflow-hidden hover:-translate-y-0.5 transition-all duration-300"
-                style={{ border: '1.5px solid #F0F0F8', boxShadow: '0 2px 12px rgba(124,58,237,0.07)' }}
-              >
-                <div
-                  className="relative px-4 py-3.5 overflow-hidden"
-                  style={{ background: `linear-gradient(135deg, ${PURPLE}18 0%, #1D4ED810 100%)` }}
-                >
-                  <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full opacity-20 pointer-events-none"
-                    style={{ background: `radial-gradient(circle, #FBBF24, transparent)` }} />
-                  <div className="relative z-10 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-                        style={{ background: 'linear-gradient(135deg, #F59E0B, #FBBF24)' }}>
-                        <Flame className="w-3.5 h-3.5 text-white" strokeWidth={2.2} />
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-bold tracking-widest uppercase" style={{ color: PURPLE_MID }}>Hoạt động</p>
-                        <h2 className="text-xs font-extrabold leading-tight" style={{ color: '#1A1040' }}>Đều đặn</h2>
-                      </div>
-                    </div>
-                    {streak > 0 && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: '#FEF3C7', color: '#92400E' }}>
-                        🔥{streak}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="bg-white px-4 py-1.5 divide-y divide-slate-100">
-                  <KeyValue label="Hiện tại" value={`${streak} ngày`} highlight={streak > 0} />
-                  <KeyValue label="Dài nhất" value={`${gam?.streak.longest || 0} ngày`} />
-                  <KeyValue label="Tổng ngày" value={gam?.streak.total_active_days || 0} />
-                </div>
-              </section>
-            </div>
-
-          </div>
         </div>
 
       </div>
