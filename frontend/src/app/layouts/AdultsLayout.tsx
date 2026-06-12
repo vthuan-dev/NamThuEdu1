@@ -21,6 +21,7 @@ import { getAuthUser } from '../../utils/authStorage';
 import { getFullMediaUrl } from '../../utils/mediaUtils';
 import { LogoutOverlay } from '../../components/shared/LogoutOverlay';
 import { ExamReminderPopup } from '../../components/student/ExamReminderPopup';
+import { DailyMotivationPopup } from '../../components/student/DailyMotivationPopup';
 import {
   Home,
   BookOpen,
@@ -269,6 +270,7 @@ export function AdultsLayout() {
         </main>
       </div>
       <ExamReminderPopup />
+      <DailyMotivationPopup accent="#7C3AED" accentMid="#8B5CF6" accentSoft="#F5F3FF" />
     </div>
   );
 }

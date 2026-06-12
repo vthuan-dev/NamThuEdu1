@@ -11,6 +11,7 @@ import { logout } from '../../services/authApi';
 import { getFullMediaUrl } from '../../utils/mediaUtils';
 import { LogoutOverlay } from '../../components/shared/LogoutOverlay';
 import { ExamReminderPopup } from '../../components/student/ExamReminderPopup';
+import { DailyMotivationPopup } from '../../components/student/DailyMotivationPopup';
 import {
   Home, BookOpen, TrendingUp,
   LogOut, Menu, X, Bell, Clock, User, ChevronDown,
@@ -401,6 +402,7 @@ export function TeensLayout() {
         </div>
       </main>
       <ExamReminderPopup />
+      <DailyMotivationPopup accent="#0D9488" accentMid="#14B8A6" accentSoft="#F0FDFA" />
 
       {/* Result Detail Modal */}
       {activeSubmissionId !== null && (

@@ -27,6 +27,7 @@ import { LogoutOverlay } from '../../components/shared/LogoutOverlay';
 import { logout } from '../../services/authApi';
 import { getAuthUser } from '../../utils/authStorage';
 import { getFullMediaUrl } from '../../utils/mediaUtils';
+import { DailyMotivationPopup } from '../../components/student/DailyMotivationPopup';
 
 type NavItem = { icon: any; label: string; path: string };
 
@@ -222,6 +223,7 @@ export function KidsLayout() {
       <main className="min-w-0">
         <Outlet />
       </main>
+      <DailyMotivationPopup accent="#FB7185" accentMid="#F97316" accentSoft="#FFF1F2" />
     </div>
   );
 }
