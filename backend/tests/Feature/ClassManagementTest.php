@@ -112,22 +112,24 @@ class ClassManagementTest extends TestCase
     }
 
     /** @test */
-    public function xoa_lop_con_hoc_vien_chan_tru_khi_force(): void
+    public function xoa_lop_tao_yeu_cau_cho_admin_duyet(): void
     {
         $class = $this->makeClass($this->teacher, ['age_group' => 'teens']);
         $student = User::factory()->create([
             'uRole' => 'student', 'age_group' => 'teens', 'class_id' => $class->cId,
         ]);
 
-        // Không force → 409
+        // Giáo viên xóa lớp → tạo yêu cầu xóa (201), lớp CHƯA bị xóa.
         $this->actingAs($this->teacher, 'sanctum')
             ->deleteJson("/api/teacher/classes/{$class->cId}")
-            ->assertStatus(409);
+            ->assertStatus(201);
 
-        // force=true → xóa, học viên được gỡ class_id
-        $this->actingAs($this->teacher, 'sanctum')
-            ->deleteJson("/api/teacher/classes/{$class->cId}?force=true")
-            ->assertStatus(200);
-        $this->assertNull($student->fresh()->class_id);
+        $this->assertDatabaseHas('class_handover_requests', [
+            'class_id' => $class->cId,
+            'request_type' => 'deletion',
+            'status' => 'pending',
+        ]);
+        // Lớp vẫn còn, học viên vẫn trong lớp.
+        $this->assertEquals($class->cId, $student->fresh()->class_id);
     }
 }

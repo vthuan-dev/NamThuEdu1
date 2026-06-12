@@ -11,6 +11,7 @@ use App\Models\ClassTransfer;
 use App\Models\ClassAnnouncement;
 use App\Models\ClassGoal;
 use App\Models\ClassHandoverRequest;
+use App\Models\ClassCoTeacher;
 use App\Models\TestAssignment;
 use App\Models\Course;
 use App\Models\User;
