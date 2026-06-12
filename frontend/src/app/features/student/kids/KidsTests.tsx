@@ -252,7 +252,44 @@ export function KidsTests() {
           </div>
         ) : visible.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-3xl border-2 border-rose-100">
-            <div className="text-6xl mb-3">{search ? '🔍' : tab === 'assigned' ? '�' : '📚'}</div>
+            <div className="mx-auto mb-4 flex items-center justify-center" style={{ animation: 'kidsEmptyFloat 3s ease-in-out infinite' }}>
+              <style>{`@keyframes kidsEmptyFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}`}</style>
+              <svg width="160" height="150" viewBox="0 0 160 150" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Chưa có bài thi">
+                {/* nền tròn mềm */}
+                <circle cx="80" cy="78" r="60" fill="#FFF1F2" />
+                <circle cx="80" cy="78" r="60" fill="url(#kidsGlow)" fillOpacity="0.5" />
+                {/* tia nắng */}
+                <g stroke="#FCD34D" strokeWidth="4" strokeLinecap="round">
+                  <line x1="80" y1="6" x2="80" y2="16" />
+                  <line x1="132" y1="20" x2="125" y2="28" />
+                  <line x1="28" y1="20" x2="35" y2="28" />
+                </g>
+                {/* ngôi sao */}
+                <path d="M34 96l3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z" fill="#FB7185" />
+                <path d="M128 60l2.5 5 5.5.8-4 4 .9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-4 5.5-.8z" fill="#34D399" />
+                {/* thùng sách (thân nhân vật) */}
+                <rect x="46" y="62" width="68" height="50" rx="14" fill="url(#kidsBox)" />
+                <rect x="46" y="62" width="68" height="50" rx="14" stroke="#fff" strokeWidth="3" />
+                {/* nắp mở */}
+                <path d="M44 64c0-7 6-12 13-12h46c7 0 13 5 13 12l-6 4H50z" fill="#FDBA74" />
+                {/* mắt + má + miệng cười */}
+                <circle cx="68" cy="86" r="4.5" fill="#7C2D12" />
+                <circle cx="92" cy="86" r="4.5" fill="#7C2D12" />
+                <circle cx="60" cy="94" r="3.5" fill="#FDA4AF" fillOpacity="0.8" />
+                <circle cx="100" cy="94" r="3.5" fill="#FDA4AF" fillOpacity="0.8" />
+                <path d="M72 96c3 4 13 4 16 0" stroke="#7C2D12" strokeWidth="3" strokeLinecap="round" fill="none" />
+                <defs>
+                  <linearGradient id="kidsBox" x1="46" y1="62" x2="114" y2="112" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#FB923C" />
+                    <stop offset="1" stopColor="#F97316" />
+                  </linearGradient>
+                  <radialGradient id="kidsGlow" cx="0" cy="0" r="1" gradientTransform="translate(80 78) rotate(90) scale(60)" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#FED7AA" />
+                    <stop offset="1" stopColor="#FED7AA" stopOpacity="0" />
+                  </radialGradient>
+                </defs>
+              </svg>
+            </div>
             <h3 className="text-lg font-extrabold text-slate-800">
               {search ? 'Không tìm thấy bài nào' : tab === 'assigned' ? 'Chưa có bài cô giao' : 'Chưa có bài thi nào'}
             </h3>
