@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -148,6 +148,14 @@ export function TestList() {
   };
 
   const hasActiveFilters = type !== 'all' || format !== 'all' || search !== '';
+
+  // ─── Phân trang: 12 bài / trang ───────────────────────────────────────────
+  const PAGE_SIZE = 12;
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [status, type, format, search]);
+  const totalPages = Math.max(1, Math.ceil(filteredTests.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const pagedTests = filteredTests.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
   return (
     <div className="min-h-screen" style={{ background: "#F8F7FF" }}>
@@ -342,7 +350,7 @@ export function TestList() {
         </div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
-           {filteredTests.map((test) => {
+           {pagedTests.map((test) => {
               const formatMeta = getFormatMeta(test.exam_format);
               const Icon = formatMeta.icon;
               const color = formatMeta.color;
@@ -445,7 +453,7 @@ export function TestList() {
       ) : (
         /* List View */
         <div className="space-y-4">
-           {filteredTests.map((test) => {
+           {pagedTests.map((test) => {
               const formatMeta = getFormatMeta(test.exam_format);
               const Icon = formatMeta.icon;
               const color = formatMeta.color;
@@ -557,6 +565,37 @@ export function TestList() {
                 </div>
               );
            })}
+        </div>
+      )}
+
+      {/* ══ Pager ═══════════════════════════════════════════════════════════ */}
+      {!isLoading && filteredTests.length > PAGE_SIZE && (
+        <div className="flex items-center justify-center gap-1.5 mt-8">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={pageSafe <= 1}
+            className="px-3.5 py-2 rounded-lg text-sm font-bold bg-white border disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            style={{ borderColor: "#DDD6FE", color: "#6B7280" }}>
+            ← Trước
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPage(p)}
+              className="min-w-[38px] h-[38px] rounded-lg text-sm font-bold border transition-colors"
+              style={p === pageSafe
+                ? { background: PRIMARY, color: "#fff", borderColor: PRIMARY }
+                : { background: "#fff", borderColor: "#DDD6FE", color: "#475569" }}>
+              {p}
+            </button>
+          ))}
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={pageSafe >= totalPages}
+            className="px-3.5 py-2 rounded-lg text-sm font-bold bg-white border disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            style={{ borderColor: "#DDD6FE", color: "#6B7280" }}>
+            Sau →
+          </button>
         </div>
       )}
       </div>

@@ -8,7 +8,7 @@
  *
  * Style: tươi sáng, bo tròn lớn, emoji, 1 điểm nhấn rose/cam — đúng tinh thần kids.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Clock, ListChecks, Search, CheckCircle2, Play, RotateCcw, Sparkles, Gift, BookOpenCheck } from 'lucide-react';
@@ -172,6 +172,17 @@ export function KidsTests() {
     return source.filter((t: any) => String(t.title ?? '').toLowerCase().includes(q));
   }, [source, search]);
 
+  // ─── Phân trang: 12 bài / trang ───────────────────────────────────────────
+  const PAGE_SIZE = 12;
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [tab, search]);
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const paged = useMemo(
+    () => visible.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE),
+    [visible, pageSafe]
+  );
+
   const assignedCount = allExams.filter((e: any) => e.isAssigned).length;
 
   return (
@@ -253,7 +264,7 @@ export function KidsTests() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {visible.map((t: any) => (
+            {paged.map((t: any) => (
               <ExamCard
                 key={t.key}
                 title={t.title}
@@ -268,6 +279,35 @@ export function KidsTests() {
                 showAssignedBadge={tab === 'all'}
               />
             ))}
+          </div>
+        )}
+
+        {/* ─── Phân trang ──────────────────────────────────────── */}
+        {!isLoading && visible.length > PAGE_SIZE && (
+          <div className="flex items-center justify-center gap-2 pt-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={pageSafe <= 1}
+              className="px-4 py-2.5 rounded-full text-sm font-extrabold text-slate-600 bg-white border-2 border-rose-100 hover:border-rose-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              ← Trước
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPage(p)}
+                className="min-w-[42px] h-[42px] rounded-full text-sm font-extrabold transition-transform active:scale-95"
+                style={p === pageSafe
+                  ? { background: 'linear-gradient(135deg, #FB7185, #F97316)', color: '#fff', boxShadow: '0 4px 12px rgba(251,113,133,0.35)' }
+                  : { background: '#fff', border: '2px solid #FFE4E6', color: '#475569' }}>
+                {p}
+              </button>
+            ))}
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={pageSafe >= totalPages}
+              className="px-4 py-2.5 rounded-full text-sm font-extrabold text-slate-600 bg-white border-2 border-rose-100 hover:border-rose-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              Sau →
+            </button>
           </div>
         )}
       </div>

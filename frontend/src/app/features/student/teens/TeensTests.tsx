@@ -9,7 +9,7 @@
  *
  * Style: teal/slate chuyên nghiệp — đồng bộ TeensLayout/TeensDashboard.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -79,7 +79,7 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
         {showAssignedBadge && item.isAssigned && (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold"
             style={{ background: '#EEF2FF', color: '#4F46E5' }}>
-            <Gift className="w-3.5 h-3.5" /> Cô giao
+            <Gift className="w-3.5 h-3.5" /> Giảng viên giao
           </span>
         )}
       </div>
@@ -193,6 +193,17 @@ export function TeensTests() {
     const q = search.toLowerCase();
     return source.filter((t) => String(t.title ?? '').toLowerCase().includes(q));
   }, [source, search]);
+
+  // ─── Phân trang: 12 bài / trang ───────────────────────────────────────────
+  const PAGE_SIZE = 12;
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [tab, search]);
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const paged = useMemo(
+    () => visible.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE),
+    [visible, pageSafe]
+  );
 
   const assignedCount = allExams.filter((e) => e.isAssigned).length;
   const stats = {
@@ -309,9 +320,38 @@ export function TeensTests() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
-            {visible.map((t) => (
+            {paged.map((t) => (
               <ExamCard key={t.key} item={t} showAssignedBadge={tab === 'all'} />
             ))}
+          </div>
+        )}
+
+        {/* ══ Pager ════════════════════════════════════════════════════════════ */}
+        {!isLoading && visible.length > PAGE_SIZE && (
+          <div className="flex items-center justify-center gap-1.5 mt-6">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={pageSafe <= 1}
+              className="px-3 py-2 rounded-lg text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              ← Trước
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPage(p)}
+                className="min-w-[38px] h-[38px] rounded-lg text-sm font-bold transition-colors"
+                style={p === pageSafe
+                  ? { background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})`, color: '#fff' }
+                  : { background: '#fff', border: '1px solid #E2E8F0', color: '#475569' }}>
+                {p}
+              </button>
+            ))}
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={pageSafe >= totalPages}
+              className="px-3 py-2 rounded-lg text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              Sau →
+            </button>
           </div>
         )}
       </div>
