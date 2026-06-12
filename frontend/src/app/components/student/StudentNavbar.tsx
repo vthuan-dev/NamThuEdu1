@@ -152,7 +152,6 @@ export function StudentNavbar() {
     { path: studentPath(), label: t("student.nav.dashboard"), exact: true },
     { path: studentPath("/bai-tap"), label: t("student.nav.tests"), exact: false },
     { path: studentPath("/de-thi"), label: "\u0110\u1ec1 thi", exact: false },
-    { path: studentPath("/tien-do"), label: t("student.nav.progress"), exact: false },
     { path: studentPath("/lich-su"), label: t("student.nav.history"), exact: false },
   ];
 
@@ -161,7 +160,6 @@ export function StudentNavbar() {
     { path: studentPath(), label: t("student.nav.dashboard"), icon: Home, exact: true },
     { path: studentPath("/bai-tap"), label: t("student.nav.tests"), icon: ClipboardList, exact: false },
     { path: studentPath("/de-thi"), label: "Đề thi", icon: BookOpen, exact: false },
-    { path: studentPath("/tien-do"), label: t("student.nav.progress"), icon: BarChart2, exact: false },
   ];
 
   const isActive = (path: string, exact = false) => {
@@ -175,7 +173,6 @@ export function StudentNavbar() {
     { path: studentPath(),                 label: t("student.nav.dashboard"),         icon: Home,          exact: true },
     { path: studentPath("/bai-tap"),       label: t("student.nav.tests"),              icon: ClipboardList, exact: false },
     { path: studentPath("/de-thi"),        label: "Đề thi",                            icon: BookOpen,      exact: false },
-    { path: studentPath("/tien-do"),       label: t("student.nav.progress"),           icon: TrendingUp,    exact: false },
     { path: studentPath("/lich-su"),       label: t("student.nav.history"),            icon: History,       exact: false },
     { path: studentPath("/bang-xep-hang"),label: "Bảng xếp hạng",                    icon: Trophy,        exact: false },
     { path: studentPath("/ho-so"),         label: t("student.nav.profile.myProfile"),  icon: User,          exact: false },
