@@ -43,7 +43,8 @@ export type SectionType =
   | 'tf_group'
   | 'reading_mixed'
   | 'matching'
-  | 'listening';
+  | 'listening'
+  | 'speaking';
 
 interface BaseSection {
   /** id ổn định để React key + reorder */
@@ -231,6 +232,18 @@ export interface ListeningSection extends BaseSection {
   items: McQuestionItem[];
 }
 
+// ── 13. Speaking (đề nói — ghi âm, AI chấm) ───────────────────────────────
+export interface SpeakingItem {
+  question_number: number;
+  prompt: string;
+  prep_seconds?: number;
+  speak_seconds?: number;
+}
+export interface SpeakingSection extends BaseSection {
+  type: 'speaking';
+  items: SpeakingItem[];
+}
+
 // ── Union ───────────────────────────────────────────────────────────────────
 export type ThptSection =
   | PhoneticsSection
@@ -244,7 +257,8 @@ export type ThptSection =
   | TfGroupSection
   | ReadingMixedSection
   | MatchingSection
-  | ListeningSection;
+  | ListeningSection
+  | SpeakingSection;
 
 // ── Full config ──────────────────────────────────────────────────────────
 export interface ThptConfig {

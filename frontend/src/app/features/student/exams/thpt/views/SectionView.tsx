@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import type { ThptAnswers, ThptSection, ViewMode } from '../types';
+import { ThptSpeakingRecorder } from '../components/ThptSpeakingRecorder';
 
 const THEME = {
   primary: '#2563EB',
@@ -15,9 +16,10 @@ interface Props {
   correctAnswers?: ThptAnswers;
   onAnswerChange: (key: string, value: boolean | string) => void;
   mode: ViewMode;
+  submissionId?: number | null;
 }
 
-export function SectionView({ section, answers, correctAnswers, onAnswerChange, mode }: Props) {
+export function SectionView({ section, answers, correctAnswers, onAnswerChange, mode, submissionId }: Props) {
   return (
     <section className="space-y-5">
       <header className="rounded-2xl bg-white border border-slate-200 p-5">
@@ -26,12 +28,12 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
           <p className="text-sm text-slate-600 mt-1 leading-relaxed">{section.instructions}</p>
         )}
       </header>
-      <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} />
+      <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} />
     </section>
   );
 }
 
-function Body({ section, answers, correctAnswers, onAnswerChange, mode }: Props) {
+function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissionId }: Props) {
   const isReview = mode === 'review';
 
   switch (section.type) {
@@ -164,6 +166,30 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode }: Props)
                   ))}
                 </div>
               </QCard>
+            );
+          })}
+        </>
+      );
+    }
+
+    case 'speaking': {
+      const sec = section as any;
+      return (
+        <>
+          {sec.items.map((item: any) => {
+            const key = `q${item.question_number}`;
+            const recorded = String(answers[key] ?? '').trim() !== '';
+            return (
+              <ThptSpeakingRecorder
+                key={key}
+                submissionId={submissionId ?? null}
+                questionNumber={item.question_number}
+                prompt={item.prompt}
+                prepSeconds={Number(item.prep_seconds ?? 30)}
+                speakSeconds={Number(item.speak_seconds ?? 120)}
+                recorded={recorded || isReview}
+                onRecorded={() => onAnswerChange(key, '[recorded]')}
+              />
             );
           })}
         </>

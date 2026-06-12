@@ -13,7 +13,7 @@ const GROUP_LABELS: Record<string, string> = {
   language: 'Ngôn ngữ (Use of English)',
   reading: 'Đọc hiểu',
   writing: 'Viết',
-  audio: 'Nghe (Listening)',
+  audio: 'Nghe & Nói (Listening & Speaking)',
 };
 
 export function AddSectionModal({ open, onClose, onPick }: Props) {

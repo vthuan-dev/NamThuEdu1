@@ -181,6 +181,7 @@ export function StudentThptExamPage() {
               section={activeSection}
               answers={answers}
               onAnswerChange={onAnswerChange}
+              submissionId={submissionId}
               mode="taking"
             />
           )}

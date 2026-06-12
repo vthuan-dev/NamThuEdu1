@@ -216,6 +216,32 @@ class VstepGradingService
     //  UPDATE SUBMISSION  (merge new scores, recompute overall, update status)
     // ═══════════════════════════════════════════════════════════════════════
 
+    /**
+     * Chấm MỘT bài nói độc lập (dùng cho đề THPT/tổng hợp có phần Nói).
+     * Trả: ['score','pronunciation_score','content_score','transcript','feedback','criteria','suggestions'].
+     */
+    public function gradeSpeakingAudio(string $audioUrl, string $context = '', int $partNum = 1): array
+    {
+        $whisper = $this->transcribeWithGroqWhisperVerbose($audioUrl);
+        if (!$whisper || empty($whisper['text'])) {
+            return [
+                'score' => 0.0, 'pronunciation_score' => 0.0, 'content_score' => 0.0,
+                'transcript' => '', 'feedback' => 'Không nhận diện được giọng nói trong bản ghi.',
+                'criteria' => [], 'suggestions' => [],
+            ];
+        }
+        $pronunciation = $this->computePronunciationScore($whisper);
+        $content       = $this->gradeSpeakingTranscript($partNum, $whisper['text'], $context);
+        $contentScore  = $content['score'] ?? 5.0;
+        $combined      = round(0.35 * $pronunciation + 0.65 * $contentScore, 2);
+        return array_merge($content, [
+            'score'               => $combined,
+            'pronunciation_score' => $pronunciation,
+            'content_score'       => $contentScore,
+            'transcript'          => $whisper['text'],
+        ]);
+    }
+
     public function updateSubmission(Submission $submission, ?float $writingScore, ?float $speakingScore): void
     {
         $raw         = $this->decodeGeminiField($submission);

@@ -122,28 +122,6 @@ export const AGE_GROUP_CATALOG: AgeGroupCatalog[] = [
         needsSkill: false,
         badge: 'Mới',
       },
-      {
-        value: 'teens-audio',
-        examType: 'TeensAudio',
-        name: 'Nghe & Nói',
-        description: 'Đề Listening (audio + trắc nghiệm) hoặc Speaking (chấm bằng AI)',
-        tagline: 'Luyện Nghe và Nói cho teen — Speaking ghi âm và chấm tự động bằng AI',
-        duration: '15 - 30 phút',
-        iconName: 'Headphones',
-        iconColor: '#0D9488',
-        themeColor: '#0D9488',
-        highlights: [
-          { iconName: 'Headphones', label: 'Listening', value: 'Audio + trắc nghiệm tự chấm' },
-          { iconName: 'Mic', label: 'Speaking', value: 'Ghi âm · AI chấm điểm' },
-          { iconName: 'Users', label: 'Đối tượng', value: 'Lớp 6 → 12' },
-        ],
-        needsSkill: true,
-        badge: 'Mới',
-        skills: [
-          { value: 'listening', label: 'Listening', description: 'Audio + câu hỏi trắc nghiệm' },
-          { value: 'speaking', label: 'Speaking', description: 'Đề nói — AI chấm điểm' },
-        ],
-      },
     ],
   },
   {

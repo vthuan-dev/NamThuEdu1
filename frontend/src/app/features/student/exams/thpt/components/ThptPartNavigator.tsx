@@ -20,6 +20,7 @@ function sectionQuestions(s: ThptSection, answers: ThptAnswers): QItem[] {
     case 'phonetics':
     case 'mc_questions':
     case 'listening':
+    case 'speaking':
     case 'error_identification':
       return s.items.map((it: any) => ({ qn: it.question_number, answered: has(`q${it.question_number}`) }));
     case 'word_form':

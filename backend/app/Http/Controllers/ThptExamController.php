@@ -567,6 +567,16 @@ class ThptExamController extends Controller
 
             $payload['result'] = $result;
             $submission->submission_payload = $payload;
+
+            // Nếu đề có phần Nói + học viên đã ghi âm → AI chấm Nói chạy nền.
+            // Điểm khách quan vẫn hiển thị ngay; job sẽ blend điểm Nói vào sau.
+            $hasSpeakingSection = collect($configForGrading['sections'] ?? [])
+                ->contains(fn($s) => ($s['type'] ?? '') === 'speaking');
+            $rawFeedback = json_decode($submission->sGemini_feedback ?? '{}', true) ?: [];
+            $hasSpeakingAudio = !empty($rawFeedback['speaking_audio'] ?? []);
+            if ($hasSpeakingSection && $hasSpeakingAudio) {
+                \App\Jobs\GradeThptSpeakingJob::dispatch((int) $submission->sId);
+            }
         }
         $submission->save();
 
@@ -684,6 +694,9 @@ class ThptExamController extends Controller
                 case 'listening':
                     if (empty($s['audio_url'])) $errors[] = "{$label}: chưa có audio.";
                     if (empty($s['items'])) $errors[] = "{$label}: chưa có câu hỏi nào.";
+                    break;
+                case 'speaking':
+                    if (empty($s['items'])) $errors[] = "{$label}: chưa có đề nói nào.";
                     break;
                 case 'tf_group':
                     if (empty($s['items'])) {

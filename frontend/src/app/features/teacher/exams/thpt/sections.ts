@@ -126,6 +126,14 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
     group: 'audio',
     autoGrade: true,
   },
+  {
+    type: 'speaking',
+    label: 'Nói (Speaking)',
+    description: 'Đề nói — học viên ghi âm, AI chấm điểm',
+    icon: 'Mic',
+    group: 'audio',
+    autoGrade: false,
+  },
 ];
 
 export function sectionMeta(type: SectionType): SectionTypeMeta {
@@ -161,6 +169,7 @@ export function collectQuestionNumbers(s: ThptSection): number[] {
     case 'matching':
     case 'reading_mixed':
     case 'listening':
+    case 'speaking':
       return (s as any).items.map((i: any) => i.question_number);
     case 'mc_cloze':
     case 'open_cloze':
@@ -310,6 +319,14 @@ export function createSection(type: SectionType, startNum: number): ThptSection 
         audio_url: '',
         items: [makeMcItem(startNum)],
       };
+    case 'speaking':
+      return {
+        ...base,
+        type: 'speaking',
+        title: 'Nói',
+        instructions: 'Nghe đề, chuẩn bị rồi ghi âm câu trả lời của bạn.',
+        items: [makeSpeakingItem(startNum)],
+      };
   }
 }
 
@@ -379,6 +396,15 @@ export function makeTransformItem(qn: number) {
     lead_in: '',
     prompt_word: '',
     accepted_answers: [''],
+  };
+}
+
+export function makeSpeakingItem(qn: number) {
+  return {
+    question_number: qn,
+    prompt: '',
+    prep_seconds: 30,
+    speak_seconds: 120,
   };
 }
 

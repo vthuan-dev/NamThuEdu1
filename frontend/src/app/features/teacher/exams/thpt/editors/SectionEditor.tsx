@@ -10,6 +10,7 @@ import {
   makeTfItem,
   makeMatchingItem,
   makeTransformItem,
+  makeSpeakingItem,
   nextQuestionNumber,
 } from '../sections';
 import { SectionHeader, QuestionBadge, DeleteBtn, AddButton, OptionRow } from './shared';
@@ -59,6 +60,8 @@ export function SectionEditor({ section, allSections, onChange }: Props) {
       return <>{common}<TransformationEditor section={section} all={allSections} onChange={onChange} /></>;
     case 'listening':
       return <>{common}<ListeningEditor section={section} all={allSections} onChange={onChange} /></>;
+    case 'speaking':
+      return <>{common}<SpeakingEditor section={section} all={allSections} onChange={onChange} /></>;
     default:
       return common;
   }
@@ -366,6 +369,63 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
         </ItemCard>
       ))}
       <AddButton label="Thêm câu" onClick={() => update([...section.items, makeMcItem(nextQuestionNumber(all))])} />
+    </div>
+  );
+}
+// ════════════════════════════════════════════════════════════════════════════
+// 2c. SPEAKING (đề nói — ghi âm, AI chấm)
+// ════════════════════════════════════════════════════════════════════════════
+function SpeakingEditor({ section, all, onChange }: { section: Extract<ThptSection, { type: 'speaking' }>; all: ThptSection[]; onChange: (s: ThptSection) => void }) {
+  const update = (items: typeof section.items) => onChange({ ...section, items });
+  return (
+    <div className="space-y-4">
+      <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+        <span>🎙️ Học viên sẽ ghi âm trả lời. Phần Nói được <b>AI chấm tự động</b> (phát âm + nội dung) sau khi nộp; giáo viên có thể xem lại và điều chỉnh.</span>
+      </div>
+      {section.items.map((item, idx) => (
+        <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
+          <textarea
+            value={item.prompt}
+            onChange={(e) => {
+              const items = [...section.items];
+              items[idx] = { ...item, prompt: e.target.value };
+              update(items);
+            }}
+            rows={3}
+            placeholder="Đề nói (VD: Describe your favourite hobby. You should say what it is, when you do it, and why you enjoy it.)"
+            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-200"
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-xs font-semibold text-slate-500">
+              Chuẩn bị (giây)
+              <input
+                type="number" min={0} max={600}
+                value={item.prep_seconds ?? 30}
+                onChange={(e) => {
+                  const items = [...section.items];
+                  items[idx] = { ...item, prep_seconds: Math.max(0, Number(e.target.value) || 0) };
+                  update(items);
+                }}
+                className="mt-1 w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+            </label>
+            <label className="text-xs font-semibold text-slate-500">
+              Thời gian nói (giây)
+              <input
+                type="number" min={10} max={1200}
+                value={item.speak_seconds ?? 120}
+                onChange={(e) => {
+                  const items = [...section.items];
+                  items[idx] = { ...item, speak_seconds: Math.max(10, Number(e.target.value) || 10) };
+                  update(items);
+                }}
+                className="mt-1 w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+            </label>
+          </div>
+        </ItemCard>
+      ))}
+      <AddButton label="Thêm đề nói" onClick={() => update([...section.items, makeSpeakingItem(nextQuestionNumber(all))])} />
     </div>
   );
 }
