@@ -223,11 +223,19 @@ class VstepGradingService
     public function gradeSpeakingAudio(string $audioUrl, string $context = '', int $partNum = 1): array
     {
         $whisper = $this->transcribeWithGroqWhisperVerbose($audioUrl);
-        if (!$whisper || empty($whisper['text'])) {
+        $rawText = trim((string) ($whisper['text'] ?? ''));
+        // Đếm số "từ" thực (chữ cái/số) — loại dấu câu, khoảng trắng. "." hay "..." → 0 từ.
+        $wordCount = $rawText === '' ? 0 : (int) preg_match_all('/[\p{L}\p{N}]+/u', $rawText);
+        if (!$whisper || $wordCount < 2) {
             return [
                 'score' => 0.0, 'pronunciation_score' => 0.0, 'content_score' => 0.0,
-                'transcript' => '', 'feedback' => 'Không nhận diện được giọng nói trong bản ghi.',
-                'criteria' => [], 'suggestions' => [],
+                'transcript' => $rawText,
+                'feedback' => 'Không nhận diện được giọng nói trong bản ghi — có thể bạn chưa nói, nói quá nhỏ, hoặc micro không thu được âm. Hãy ghi âm lại và nói to, rõ ràng nhé.',
+                'criteria' => [],
+                'suggestions' => [
+                    'Kiểm tra micro và môi trường yên tĩnh trước khi ghi âm.',
+                    'Bắt đầu nói ngay khi bắt đầu ghi âm và trả lời đầy đủ câu hỏi.',
+                ],
             ];
         }
         $pronunciation = $this->computePronunciationScore($whisper);
