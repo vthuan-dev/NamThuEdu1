@@ -252,6 +252,10 @@ class ThptExamController extends Controller
         // Config sẽ go-live: nếu có draft đang sửa thì lấy draft, không thì dùng config hiện tại
         $configToPublish = $hasDraft ? $exam->thpt_draft_config : $exam->thpt_config;
 
+        // Tự điền đáp án mặc định (đáp án đầu / "A") cho câu trắc nghiệm CHƯA chọn,
+        // để giáo viên publish được ngay và sửa lại sau. Mỗi câu luôn có 1 đáp án.
+        $configToPublish = $this->fillDefaultThptAnswers($configToPublish);
+
         $errors = $this->validateThptConfig($configToPublish);
         if (!empty($errors)) {
             return $this->error('Đề chưa đủ nội dung để publish.', 422, $errors);
@@ -286,9 +290,10 @@ class ThptExamController extends Controller
             $updates['eDuration_minutes'] = $configToPublish['total_duration_minutes']
                 ?? $exam->eDuration_minutes;
         } elseif (!$isPublished) {
-            // Lần đầu publish
+            // Lần đầu publish — ghi config đã auto-fill đáp án mặc định vào thpt_config.
             $updates['thpt_version'] = max(1, (int) ($exam->thpt_version ?? 0));
-            // Đã ghi qua updateDraft rồi nên thpt_config đã đúng
+            $updates['thpt_config'] = $configToPublish;
+            $updates['thpt_draft_config'] = null;
         }
 
         $exam->update($updates);
@@ -669,6 +674,92 @@ class ThptExamController extends Controller
     /**
      * Validate config trước khi publish (section-based v2).
      */
+    /**
+     * Tự điền đáp án mặc định (đáp án đầu / "A") cho câu trắc nghiệm chưa chọn,
+     * và placeholder "A" cho đáp án dạng nhập (để publish được, giáo viên sửa sau).
+     */
+    private function fillDefaultThptAnswers(?array $config): array
+    {
+        if (!is_array($config)) return $config ?? [];
+        $firstOptId = function ($options) {
+            if (is_array($options) && !empty($options)) {
+                $first = $options[0];
+                return is_array($first) ? ($first['id'] ?? 'A') : 'A';
+            }
+            return 'A';
+        };
+        $blank = fn($v) => $v === null || trim((string) $v) === '';
+        $emptyAccepted = function ($arr): bool {
+            if (!is_array($arr)) return true;
+            foreach ($arr as $a) { if (trim((string) $a) !== '') return false; }
+            return true;
+        };
+
+        foreach (($config['sections'] ?? []) as $si => $s) {
+            $type = $s['type'] ?? null;
+            switch ($type) {
+                case 'phonetics':
+                    foreach (($s['items'] ?? []) as $ii => $it) {
+                        if ($blank($it['correct_id'] ?? null)) {
+                            $config['sections'][$si]['items'][$ii]['correct_id'] = $firstOptId($it['words'] ?? []);
+                        }
+                    }
+                    break;
+                case 'mc_questions':
+                case 'listening':
+                    foreach (($s['items'] ?? []) as $ii => $it) {
+                        if ($blank($it['correct_id'] ?? null)) {
+                            $config['sections'][$si]['items'][$ii]['correct_id'] = $firstOptId($it['options'] ?? []);
+                        }
+                    }
+                    break;
+                case 'error_identification':
+                    foreach (($s['items'] ?? []) as $ii => $it) {
+                        if ($blank($it['correct_id'] ?? null)) {
+                            $config['sections'][$si]['items'][$ii]['correct_id'] = $firstOptId($it['segments'] ?? []);
+                        }
+                    }
+                    break;
+                case 'word_form':
+                case 'sentence_transformation':
+                    // Dạng NHẬP TAY — không tự điền; validate sẽ chặn nếu thiếu.
+                    break;
+                case 'matching':
+                    foreach (($s['items'] ?? []) as $ii => $it) {
+                        $ans = is_array($it['answers'] ?? null) ? $it['answers'] : [];
+                        foreach (['1', '2', '3', '4'] as $k) {
+                            if ($blank($ans[$k] ?? null)) $ans[$k] = 'A';
+                        }
+                        $config['sections'][$si]['items'][$ii]['answers'] = $ans;
+                    }
+                    break;
+                case 'mc_cloze':
+                    foreach (($s['blanks'] ?? []) as $bi => $b) {
+                        if ($blank($b['correct_id'] ?? null)) {
+                            $config['sections'][$si]['blanks'][$bi]['correct_id'] = $firstOptId($b['options'] ?? []);
+                        }
+                    }
+                    break;
+                case 'word_bank_cloze':
+                case 'open_cloze':
+                    // Dạng NHẬP TAY (điền từ) — không tự điền; validate sẽ chặn nếu thiếu.
+                    break;
+                case 'reading_mixed':
+                    foreach (($s['items'] ?? []) as $ii => $it) {
+                        $kind = $it['kind'] ?? 'mc';
+                        if ($kind === 'mc' && $blank($it['correct_id'] ?? null)) {
+                            $config['sections'][$si]['items'][$ii]['correct_id'] = $firstOptId($it['options'] ?? []);
+                        } elseif ($kind === 'sentence_insertion' && $blank($it['correct'] ?? null) && $blank($it['correct_id'] ?? null)) {
+                            $config['sections'][$si]['items'][$ii]['correct'] = 'A';
+                        }
+                    }
+                    break;
+                // tf_group: statements đã có 'correct' bool mặc định; speaking: AI chấm — bỏ qua.
+            }
+        }
+        return $config;
+    }
+
     private function validateThptConfig(?array $config): array
     {
         $errors = [];

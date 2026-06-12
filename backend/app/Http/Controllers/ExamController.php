@@ -157,7 +157,7 @@ class ExamController extends Controller
 
         if ($request->has('eSkill')) {
             $request->merge([
-                'eSkill' => strtolower($request->eSkill)
+                'eSkill' => strtolower($request->eSkill) 
             ]);
         }
 
@@ -1125,9 +1125,10 @@ class ExamController extends Controller
             $validationErrors[] = 'Đề thi phải có thời gian làm bài hợp lệ.';
         }
 
-        // BẮT BUỘC ĐÁP ÁN: mọi câu khách quan phải có đáp án đúng mới được xuất bản.
-        // Câu tự luận/nói (essay/writing/speaking) do chấm tay/AI nên bỏ qua.
+        // Câu CÓ LỰA CHỌN (≥2 phương án) chưa chọn → tự đặt phương án đầu làm đáp án.
+        // Câu NHẬP TAY (điền từ/short answer) thiếu đáp án → CHẶN xuất bản.
         $subjectiveTypes = ['essay', 'writing', 'speaking', 'short_writing', 'speaking_task'];
+        $fillTypes = ['fill_blank', 'fill_in_blank', 'short_answer', 'text', 'open_cloze', 'word_form'];
         $exam->loadMissing('questions.answers');
         $noAnswerKey = [];
         foreach ($exam->questions as $q) {
@@ -1145,14 +1146,31 @@ class ExamController extends Controller
                 foreach (['correct_answer', 'answer'] as $k) {
                     if (isset($d[$k]) && trim((string) $d[$k]) !== '') { $hasKey = true; break; }
                 }
-                if (!$hasKey && !empty($d['correct_answers'])) $hasKey = true;
-                if (!$hasKey && !empty($d['accepted_answers'])) $hasKey = true;
+                if (!$hasKey && (!empty($d['correct_answers']) || !empty($d['accepted_answers']))) $hasKey = true;
             }
-            if (!$hasKey) $noAnswerKey[] = $q->qSection_order ?? $q->qId;
+            if ($hasKey) continue;
+
+            $answers = $q->relationLoaded('answers')
+                ? $q->answers->sortBy(fn($a) => $a->aOrder ?? $a->aId)->values()
+                : $q->answers()->orderBy('aOrder')->get();
+            $isChoice = $answers->count() >= 2 && !in_array($type, $fillTypes, true);
+            if ($isChoice) {
+                // Chọn đại phương án đầu làm đáp án đúng (placeholder, sửa sau).
+                $first = $answers->first();
+                $first->aIs_correct = true;
+                $first->save();
+                $d = is_array($q->qData) ? $q->qData : [];
+                $d['correct_answer'] = $d['correct_answer'] ?? 'A';
+                $q->qData = $d;
+                $q->save();
+            } else {
+                // Dạng nhập tay / không có phương án để chọn → chặn.
+                $noAnswerKey[] = $q->qSection_order ?? $q->qId;
+            }
         }
         if (!empty($noAnswerKey)) {
             $shown = implode(', ', array_slice($noAnswerKey, 0, 20)) . (count($noAnswerKey) > 20 ? '…' : '');
-            $validationErrors[] = "Còn câu chưa có đáp án đúng (câu {$shown}). Phải nhập đáp án cho TẤT CẢ câu khách quan mới xuất bản được.";
+            $validationErrors[] = "Câu {$shown} dạng tự nhập chưa có đáp án. Vui lòng nhập đáp án cho các câu này trước khi xuất bản.";
         }
 
         if (!empty($validationErrors)) {

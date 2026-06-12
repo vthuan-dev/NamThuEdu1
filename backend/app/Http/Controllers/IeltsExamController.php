@@ -239,14 +239,14 @@ class IeltsExamController extends Controller
             );
         }
 
-        // BẮT BUỘC ĐÁP ÁN: Listening & Reading toàn câu khách quan → mọi câu phải có
-        // đáp án đúng mới được xuất bản. Writing/Speaking do chấm tay/AI nên bỏ qua.
+        // Câu CÓ LỰA CHỌN (trắc nghiệm/TFNG/matching…) chưa chọn → tự điền "A".
+        // Câu NHẬP TAY (điền từ/hoàn thành câu) thiếu đáp án → CHẶN xuất bản.
         if (in_array($skill, ['listening', 'reading'], true)) {
-            $missing = $this->ieltsMissingAnswers($data);
+            [$data, $missing] = $this->fillIeltsChoiceAndFindMissing($data);
             if (!empty($missing)) {
                 $shown = implode(', ', array_slice($missing, 0, 20)) . (count($missing) > 20 ? '…' : '');
                 return $this->errorResponse(
-                    "Không thể xuất bản: còn {$shown} câu chưa có đáp án đúng. Vui lòng nhập đáp án cho TẤT CẢ câu hỏi trước khi xuất bản.",
+                    "Không thể xuất bản: câu {$shown} dạng tự nhập (điền từ / hoàn thành câu) chưa có đáp án. Vui lòng nhập đáp án cho các câu này trước khi xuất bản.",
                     422
                 );
             }
@@ -580,29 +580,42 @@ class IeltsExamController extends Controller
     }
 
     /**
-     * Quét đệ quy mọi mảng "questions" trong dữ liệu IELTS và trả về danh sách
-     * số câu (questionNumber) CHƯA có đáp án đúng (correctAnswer rỗng).
-     * Dùng cho Listening/Reading khi xuất bản — đề không có đáp án thì không cho publish.
+     * Với câu Listening/Reading chưa có đáp án:
+     *  - Dạng CÓ LỰA CHỌN (multiple choice, TFNG, yes/no, matching, heading…) → tự điền "A".
+     *  - Dạng NHẬP TAY (completion, short answer, labelling…) → gom vào danh sách thiếu để CHẶN.
+     * Trả về [data đã điền, danh sách số câu còn thiếu đáp án nhập tay].
      */
-    private function ieltsMissingAnswers(array $data): array
+    private function fillIeltsChoiceAndFindMissing(array $data): array
     {
+        $isChoice = function ($qtype): bool {
+            $t = strtolower(str_replace([' ', '-'], '_', (string) $qtype));
+            foreach (['multiple_choice', 'choice', 'true_false', 'tfng', 'identifying_information', 'yes_no', 'matching', 'heading'] as $kw) {
+                if (strpos($t, $kw) !== false) return true;
+            }
+            return false;
+        };
         $missing = [];
-        $walk = function ($node) use (&$walk, &$missing) {
+        $walk = function (&$node) use (&$walk, &$missing, $isChoice) {
             if (!is_array($node)) return;
-            foreach ($node as $key => $val) {
+            foreach ($node as $key => &$val) {
                 if ($key === 'questions' && is_array($val)) {
-                    foreach ($val as $i => $q) {
+                    foreach ($val as &$q) {
                         if (!is_array($q)) continue;
-                        $qn = $q['questionNumber'] ?? ($i + 1);
-                        $ca = trim((string) ($q['correctAnswer'] ?? ''));
-                        if ($ca === '') $missing[] = $qn;
+                        if (trim((string) ($q['correctAnswer'] ?? '')) !== '') continue;
+                        if ($isChoice($q['questionType'] ?? '')) {
+                            $q['correctAnswer'] = 'A'; // chọn đại đáp án đầu
+                        } else {
+                            $missing[] = $q['questionNumber'] ?? '?';
+                        }
                     }
+                    unset($q);
                 }
                 if (is_array($val)) $walk($val);
             }
+            unset($val);
         };
         $walk($data);
-        return $missing;
+        return [$data, $missing];
     }
 
     /**

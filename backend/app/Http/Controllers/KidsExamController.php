@@ -248,35 +248,13 @@ class KidsExamController extends Controller
         if ($request->has('eDuration')) $updateData['eDuration'] = $request->eDuration;
         if ($request->has('eStatus')) $updateData['eStatus'] = $request->eStatus;
 
-        // BẮT BUỘC ĐÁP ÁN khi xuất bản đề kids: phải có câu hỏi và mỗi task (trừ
-        // kỹ năng Nói/Speaking) phải có đáp án trong task_data.
+        // Khi xuất bản đề kids: chỉ yêu cầu có câu hỏi (cấu trúc). Đáp án theo từng
+        // task được nhập ở editor; không auto-fill "A" vì task_data mỗi dạng mỗi khác.
         if (($updateData['eStatus'] ?? null) === 'published') {
-            $questions = Question::where('exam_id', $exam->eId)->get();
-            if ($questions->isEmpty()) {
+            $questionCount = Question::where('exam_id', $exam->eId)->count();
+            if ($questionCount === 0) {
                 return response()->json([
                     'message' => 'Không thể xuất bản: đề chưa có câu hỏi nào.',
-                ], 422);
-            }
-            $missing = [];
-            foreach ($questions as $idx => $q) {
-                $cfg = $q->kids_task_config ?? [];
-                $skill = strtolower((string) ($cfg['skill'] ?? ''));
-                $taskData = $cfg['task_data'] ?? null;
-                // Bỏ qua kỹ năng Nói (không có đáp án cố định).
-                if ($skill === 'speaking') continue;
-                if (empty($taskData)) { $missing[] = $idx + 1; continue; }
-                // Có đáp án nếu task_data chứa marker correct/answer/is_correct khác rỗng.
-                $flat = json_encode($taskData, JSON_UNESCAPED_UNICODE);
-                $hasAnswer = is_string($flat) && preg_match(
-                    '/"(correct[A-Za-z_]*|answer[A-Za-z_]*|is_correct|isCorrect)"\s*:\s*(true|"[^"]+"|\[[^\]]*[^\s\]][^\]]*\]|\d)/i',
-                    $flat
-                );
-                if (!$hasAnswer) $missing[] = $idx + 1;
-            }
-            if (!empty($missing)) {
-                $shown = implode(', ', array_slice($missing, 0, 20)) . (count($missing) > 20 ? '…' : '');
-                return response()->json([
-                    'message' => "Không thể xuất bản: câu {$shown} chưa có đáp án đúng. Vui lòng nhập đáp án cho mọi câu (trừ phần Nói) trước khi xuất bản.",
                 ], 422);
             }
         }
