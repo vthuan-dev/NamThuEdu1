@@ -545,10 +545,17 @@ function SpeakingResultCard({ n, prompt, result, audioUrl }: { n: number; prompt
       </div>
 
       {!graded ? (
-        <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-          <Loader2 className="w-4 h-4 animate-spin text-amber-600 flex-shrink-0" />
-          <p className="text-sm font-medium text-amber-800">AI đang chấm phần Nói — quay lại sau ít phút để xem điểm &amp; nhận xét nhé.</p>
-        </div>
+        !audioUrl ? (
+          <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <XCircle className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            <p className="text-sm font-medium text-slate-500">Bạn chưa ghi âm câu này.</p>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <Loader2 className="w-4 h-4 animate-spin text-amber-600 flex-shrink-0" />
+            <p className="text-sm font-medium text-amber-800">AI đang chấm phần Nói — quay lại sau ít phút để xem điểm &amp; nhận xét nhé.</p>
+          </div>
+        )
       ) : (
         <div className="rounded-xl border border-slate-200 overflow-hidden">
           <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-teal-50/60 to-white border-b border-slate-100">
