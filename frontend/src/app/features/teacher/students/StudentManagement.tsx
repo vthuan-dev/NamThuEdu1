@@ -1261,7 +1261,7 @@ export function StudentManagement() {
                               />
                             ) : (
                               <div className="w-10 h-10 rounded-full bg-[#9CA3AF] text-white flex items-center justify-center font-semibold text-sm">
-                                {student.uName?.split(' ').slice(-2).map((n: string) => n[0]).join('').toUpperCase() || 'NA'}
+                                {student.uName?.trim().charAt(0).toUpperCase() || 'N'}
                               </div>
                             )}
                             <span className="font-medium text-[#6B7280]">
