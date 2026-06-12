@@ -855,6 +855,21 @@ class StudentTestController extends Controller
 
             $finalStatus = ($isVstepTx && $hasSubjectiveContent) ? 'grading_subjective' : 'graded';
 
+            // Teens (non-VSTEP/IELTS) Speaking exams cũng cần chấm AI: nếu có audio
+            // speaking đã upload thì đưa về grading_subjective + dispatch job.
+            $teensSpeakingNeedsAi = false;
+            if (!$isVstepTx) {
+                $rawFeedbackTeens = json_decode($submission->sGemini_feedback ?? '{}', true) ?? [];
+                $hasSpeakingAudioTeens = !empty($rawFeedbackTeens['speaking_audio'] ?? []);
+                $hasSpeakingQuestion = $submission->exam->questions->contains(function ($q) {
+                    return strtolower($q->qSkill ?? $q->qSection ?? '') === 'speaking';
+                });
+                if ($hasSpeakingAudioTeens && $hasSpeakingQuestion) {
+                    $teensSpeakingNeedsAi = true;
+                    $finalStatus = 'grading_subjective';
+                }
+            }
+
             $updateData = [
                 'sSubmit_time'           => now(),
                 'submit_idempotency_key' => $idempotencyKey,

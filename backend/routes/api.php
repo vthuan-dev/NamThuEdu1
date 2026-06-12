@@ -311,6 +311,9 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         Route::post('/exams/{examId}/thpt/publish',       [\App\Http\Controllers\ThptExamController::class, 'publish']);
         Route::delete('/exams/{examId}/thpt/draft',       [\App\Http\Controllers\ThptExamController::class, 'discardDraft']);
         Route::get('/exams/{examId}/thpt/versions',       [\App\Http\Controllers\ThptExamController::class, 'listVersions']);
+
+        // ── Teens Listening / Speaking exam (relational, AI-graded speaking) ────
+        Route::post('/exams/teens',                        [\App\Http\Controllers\TeensExamController::class, 'store']);
         
         // Listening
         Route::post('/exams/{examId}/vstep/listening/parts/{partNumber}', [ExamController::class, 'saveVstepListeningPart']);

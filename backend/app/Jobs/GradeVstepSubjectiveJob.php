@@ -54,12 +54,17 @@ class GradeVstepSubjectiveJob implements ShouldQueue
 
         try {
             // Skip AI for short/empty writing answers — auto-grade as 0
+            $hasWritingSection = $submission->exam->questions->contains(function ($q) {
+                return strtolower($q->qSkill ?? $q->qSection ?? '') === 'writing';
+            });
             $hasRealWriting = $submission->answers->contains(function ($a) {
                 $sec = strtolower($a->question->qSkill ?? $a->question->qSection ?? '');
                 if ($sec !== 'writing') return false;
                 return strlen(trim($a->saAnswer_text ?? '')) >= 30;
             });
-            $writingScore  = $hasRealWriting ? $service->gradeWriting($submission) : 0;
+            // null khi đề KHÔNG có phần writing (vd: đề Speaking-only của teens) để
+            // không kéo điểm trung bình xuống; 0 khi có phần writing nhưng bỏ trống.
+            $writingScore  = $hasWritingSection ? ($hasRealWriting ? $service->gradeWriting($submission) : 0) : null;
             $speakingScore = $service->gradeSpeaking($submission);
             $service->updateSubmission($submission, $writingScore, $speakingScore);
 
