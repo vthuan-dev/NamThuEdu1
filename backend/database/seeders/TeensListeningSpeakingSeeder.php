@@ -139,13 +139,13 @@ class TeensListeningSpeakingSeeder extends Seeder
                 [
                     'question_number' => 5,
                     'prompt' => 'Talk about your favourite hobby. You should say what it is, when you do it, and why you enjoy it.',
-                    'prep_seconds' => 30,
+                    'prep_seconds' => 5,
                     'speak_seconds' => 90,
                 ],
                 [
                     'question_number' => 6,
                     'prompt' => 'Describe a place you would like to visit. Explain where it is, what you can do there, and why you want to go.',
-                    'prep_seconds' => 30,
+                    'prep_seconds' => 5,
                     'speak_seconds' => 90,
                 ],
             ],

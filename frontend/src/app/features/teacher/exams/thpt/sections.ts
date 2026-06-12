@@ -403,7 +403,7 @@ export function makeSpeakingItem(qn: number) {
   return {
     question_number: qn,
     prompt: '',
-    prep_seconds: 30,
+    prep_seconds: 5,
     speak_seconds: 120,
   };
 }

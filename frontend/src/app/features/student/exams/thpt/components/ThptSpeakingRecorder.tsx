@@ -18,9 +18,13 @@ interface Props {
   speakSeconds: number;
   recorded: boolean;
   onRecorded: () => void;
+  /** Khoá khi đề khác đang được ghi âm — mỗi lần chỉ làm 1 đề. */
+  disabled?: boolean;
+  /** Báo cho cha biết đề này đang bận (prep/recording/uploading) hay không. */
+  onActiveChange?: (busy: boolean) => void;
 }
 
-export function ThptSpeakingRecorder({ submissionId, questionNumber, prompt, prepSeconds, speakSeconds, recorded, onRecorded }: Props) {
+export function ThptSpeakingRecorder({ submissionId, questionNumber, prompt, prepSeconds, speakSeconds, recorded, onRecorded, disabled, onActiveChange }: Props) {
   type Phase = 'idle' | 'prep' | 'recording' | 'uploading' | 'done';
   const [phase, setPhase] = useState<Phase>(recorded ? 'done' : 'idle');
   const [left, setLeft] = useState(prepSeconds || speakSeconds);
@@ -30,17 +34,34 @@ export function ThptSpeakingRecorder({ submissionId, questionNumber, prompt, pre
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<number | null>(null);
 
+  // Báo trạng thái bận cho phần cha (để khoá các đề còn lại — 1 lần làm 1 đề).
+  useEffect(() => {
+    onActiveChange?.(phase === 'prep' || phase === 'recording' || phase === 'uploading');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
   useEffect(() => () => {
     if (timerRef.current) window.clearInterval(timerRef.current);
     streamRef.current?.getTracks().forEach((t) => t.stop());
     if (mrRef.current?.state === 'recording') mrRef.current.stop();
   }, []);
 
+  // Đếm ngược an toàn: KHÔNG gọi done() bên trong updater của setLeft (tránh
+  // race khiến thời gian nói bị nhảy về 0 → ghi âm dừng ngay khi vừa bắt đầu).
   const countdown = (secs: number, done: () => void) => {
-    setLeft(secs);
     if (timerRef.current) window.clearInterval(timerRef.current);
+    let remaining = Math.max(1, Math.round(secs));
+    setLeft(remaining);
     timerRef.current = window.setInterval(() => {
-      setLeft((s) => { if (s <= 1) { if (timerRef.current) window.clearInterval(timerRef.current); done(); return 0; } return s - 1; });
+      remaining -= 1;
+      if (remaining <= 0) {
+        if (timerRef.current) window.clearInterval(timerRef.current);
+        timerRef.current = null;
+        setLeft(0);
+        done();
+      } else {
+        setLeft(remaining);
+      }
     }, 1000);
   };
 
@@ -98,12 +119,19 @@ export function ThptSpeakingRecorder({ submissionId, questionNumber, prompt, pre
             </div>
           )}
           {phase === 'idle' && !denied && (
-            <button onClick={start}
-              className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl text-white font-semibold text-sm transition-colors active:scale-[0.99]"
-              style={{ background: TEAL }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = TEAL_DARK)}
-              onMouseLeave={(e) => (e.currentTarget.style.background = TEAL)}>
-              <Mic className="w-4 h-4" /> {prepSeconds > 0 ? `Chuẩn bị ${prepSeconds}s rồi ghi âm` : 'Bắt đầu ghi âm'}
+            <button onClick={start} disabled={disabled}
+              className={`w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-colors ${
+                disabled
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  : 'text-white active:scale-[0.99] cursor-pointer'
+              }`}
+              style={disabled ? undefined : { background: TEAL }}
+              onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = TEAL_DARK; }}
+              onMouseLeave={(e) => { if (!disabled) e.currentTarget.style.background = TEAL; }}>
+              <Mic className="w-4 h-4" />
+              {disabled
+                ? 'Hoàn thành đề đang làm trước đã'
+                : prepSeconds > 0 ? `Chuẩn bị ${prepSeconds}s rồi ghi âm` : 'Bắt đầu ghi âm'}
             </button>
           )}
           {(phase === 'prep' || phase === 'recording') && (

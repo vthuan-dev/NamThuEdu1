@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { CheckCircle2, XCircle, Headphones } from 'lucide-react';
 import type { ThptAnswers, ThptSection, ViewMode } from '../types';
 import { ThptSpeakingRecorder } from '../components/ThptSpeakingRecorder';
@@ -57,6 +57,8 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
 
 function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissionId }: Props) {
   const isReview = mode === 'review';
+  // Đề Nói: mỗi lần chỉ cho ghi âm 1 đề. activeSpeakingQ = số câu đang ghi (hoặc null).
+  const [activeSpeakingQ, setActiveSpeakingQ] = useState<number | null>(null);
 
   switch (section.type) {
     case 'phonetics':
@@ -210,15 +212,18 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
           {sec.items.map((item: any) => {
             const key = `q${item.question_number}`;
             const recorded = String(answers[key] ?? '').trim() !== '';
+            const lockedByOther = activeSpeakingQ !== null && activeSpeakingQ !== item.question_number;
             return (
               <ThptSpeakingRecorder
                 key={key}
                 submissionId={submissionId ?? null}
                 questionNumber={item.question_number}
                 prompt={item.prompt}
-                prepSeconds={Number(item.prep_seconds ?? 30)}
+                prepSeconds={Number(item.prep_seconds ?? 5)}
                 speakSeconds={Number(item.speak_seconds ?? 120)}
                 recorded={recorded || isReview}
+                disabled={lockedByOther}
+                onActiveChange={(busy) => setActiveSpeakingQ(busy ? item.question_number : null)}
                 onRecorded={() => onAnswerChange(key, '[recorded]')}
               />
             );

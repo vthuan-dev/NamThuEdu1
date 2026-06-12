@@ -400,7 +400,7 @@ function SpeakingEditor({ section, all, onChange }: { section: Extract<ThptSecti
               Chuẩn bị (giây)
               <input
                 type="number" min={0} max={600}
-                value={item.prep_seconds ?? 30}
+                value={item.prep_seconds ?? 5}
                 onChange={(e) => {
                   const items = [...section.items];
                   items[idx] = { ...item, prep_seconds: Math.max(0, Number(e.target.value) || 0) };
