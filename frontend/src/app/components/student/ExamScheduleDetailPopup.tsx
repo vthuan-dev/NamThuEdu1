@@ -4,7 +4,7 @@
  * Dùng lại được cho luồng "GV vừa thêm lịch -> hiện popup" sau này.
  */
 import { createPortal } from 'react-dom';
-import { X, CalendarClock, MapPin, Clock, StickyNote, User2, Sparkles } from 'lucide-react';
+import { X, CalendarClock, MapPin, Clock, StickyNote, User2, Sparkles, GraduationCap } from 'lucide-react';
 import type { ExamSchedule } from '../../../services/studentApi';
 
 interface Props {
@@ -13,6 +13,19 @@ interface Props {
   accent?: string;
   accentMid?: string;
   accentSoft?: string;
+}
+
+const EXAM_TYPE_LABELS: Record<string, string> = {
+  vstep: 'VSTEP',
+  ielts: 'IELTS',
+  thpt: 'THPT Quốc gia',
+  cambridge: 'Cambridge',
+  other: 'Khác',
+};
+
+function examTypeLabel(t?: string | null) {
+  if (!t) return null;
+  return EXAM_TYPE_LABELS[t] ?? t.toUpperCase();
 }
 
 function fmtDate(d?: string | null) {
@@ -37,6 +50,7 @@ export function ExamScheduleDetailPopup({
   const urgent = days != null && days >= 0 && days <= 3;
 
   const rows = [
+    examTypeLabel(schedule.exam_type) ? { icon: GraduationCap, label: 'Kỳ thi', value: examTypeLabel(schedule.exam_type)! } : null,
     { icon: CalendarClock, label: 'Ngày thi', value: fmtDate(schedule.exam_date) },
     schedule.exam_time ? { icon: Clock, label: 'Giờ thi', value: schedule.exam_time.slice(0, 5) } : null,
     schedule.location ? { icon: MapPin, label: 'Địa điểm', value: schedule.location } : null,
