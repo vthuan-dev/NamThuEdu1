@@ -344,63 +344,53 @@ export function AllExams() {
     return "all";
   };
 
-  // Filter exams - dùng getAgeGroup() để áp dụng mapping mới (VSTEP/IELTS → adults)
-  const filteredExams = exams.filter(exam => {
-    const matchesSearch = exam.eTitle.toLowerCase().includes(searchQuery.toLowerCase());
+  // ── Predicates tách riêng để badge nhóm tuổi KHỚP CHÍNH XÁC với danh sách ──
+  const matchesSearchFn = (exam: KidsExam) =>
+    exam.eTitle.toLowerCase().includes(searchQuery.toLowerCase());
 
-    // Type filter: check cả kids_exam_config, eType, và _group
-    let matchesType = filterType === "all";
-    if (!matchesType) {
-      const kidsType = exam.kids_exam_config?.exam_type;
-      const eType = (exam.eType || "").toLowerCase();
-      const group = exam._group;
-      const filterLower = filterType.toLowerCase();
+  const matchesTypeFn = (exam: KidsExam & { _group?: string }) => {
+    if (filterType === "all") return true;
+    const kidsType = exam.kids_exam_config?.exam_type;
+    const eType = (exam.eType || "").toLowerCase();
+    const group = exam._group;
+    const filterLower = filterType.toLowerCase();
+    if (kidsType && kidsType.toLowerCase() === filterLower) return true;
+    if (eType === filterLower) return true;
+    if (
+      (filterLower === "vstep" && (group === "vstep" || eType === "vstep")) ||
+      (filterLower === "ielts" && (group === "ielts" || eType === "ielts"))
+    ) return true;
+    return false;
+  };
 
-      if (kidsType && kidsType.toLowerCase() === filterLower) {
-        matchesType = true;
-      } else if (eType === filterLower) {
-        matchesType = true;
-      } else if (
-        // VSTEP/IELTS mapping
-        (filterLower === "vstep" && (group === "vstep" || eType === "vstep")) ||
-        (filterLower === "ielts" && (group === "ielts" || eType === "ielts"))
-      ) {
-        matchesType = true;
-      }
-    }
+  const matchesAgeFn = (exam: KidsExam & { _group?: string }) => {
+    if (filterAgeGroup === "all") return true;
+    const examAgeGroup = getAgeGroup(exam);
+    if (examAgeGroup === "all") return true; // chưa phân loại → match mọi filter
+    return examAgeGroup === filterAgeGroup;
+  };
 
-    // Age group filter - dùng getAgeGroup để nhất quán với stats
-    let matchesAgeGroup = filterAgeGroup === "all";
-    if (!matchesAgeGroup) {
-      const examAgeGroup = getAgeGroup(exam);
-      // Nếu age_group="all" (chưa phân loại) → match mọi filter
-      if (examAgeGroup === "all") {
-        matchesAgeGroup = true;
-      } else {
-        matchesAgeGroup = examAgeGroup === filterAgeGroup;
-      }
-    }
+  const matchesOwnerFn = (exam: KidsExam) => {
+    if (filterOwner === "mine") return exam._is_owner === true;
+    if (filterOwner === "others") return exam._is_owner === false;
+    return true;
+  };
 
-    // Owner filter: của tôi / từ giáo viên khác / tất cả
-    let matchesOwner = true;
-    if (filterOwner === "mine") {
-      matchesOwner = exam._is_owner === true;
-    } else if (filterOwner === "others") {
-      matchesOwner = exam._is_owner === false;
-    }
-
-    // Status filter: nháp / đã xuất bản (luôn 1 trong 2, không còn "all")
+  const matchesStatusFn = (exam: KidsExam) => {
     // eStatus có thể là 'draft', 'published', 'active', 'inactive', 'archived'
     const status = (exam.eStatus || "").toLowerCase();
-    let matchesStatus: boolean;
-    if (filterStatus === "draft") {
-      matchesStatus = status === "draft";
-    } else {
-      matchesStatus = status === "published" || status === "active";
-    }
+    if (filterStatus === "draft") return status === "draft";
+    return status === "published" || status === "active";
+  };
 
-    return matchesSearch && matchesType && matchesAgeGroup && matchesOwner && matchesStatus;
-  });
+  // Base cho badge nhóm tuổi: áp MỌI filter trừ nhóm tuổi → bấm "Người lớn" hiện đúng số trên badge
+  const ageStatsBase = exams.filter(e =>
+    matchesSearchFn(e) && matchesTypeFn(e) && matchesOwnerFn(e) && matchesStatusFn(e)
+  );
+
+  const filteredExams = exams.filter(e =>
+    matchesSearchFn(e) && matchesTypeFn(e) && matchesAgeFn(e) && matchesOwnerFn(e) && matchesStatusFn(e)
+  );
 
   // Sort filtered exams theo lựa chọn của user.
   // updated_desc = vừa chỉnh sửa gần nhất (mặc định, dùng updated_at fallback created_at)
@@ -422,9 +412,10 @@ export function AllExams() {
 
   const stats = {
     total: exams.length,
-    kids: exams.filter(e => getAgeGroup(e) === "kids").length,
-    teens: exams.filter(e => getAgeGroup(e) === "teens").length,
-    adults: exams.filter(e => getAgeGroup(e) === "adults").length,
+    ageTotal: ageStatsBase.length,
+    kids: ageStatsBase.filter(e => getAgeGroup(e) === "kids").length,
+    teens: ageStatsBase.filter(e => getAgeGroup(e) === "teens").length,
+    adults: ageStatsBase.filter(e => getAgeGroup(e) === "adults").length,
     mine: exams.filter(e => e._is_owner === true).length,
     others: exams.filter(e => e._is_owner === false).length,
     draft: exams.filter(e => (e.eStatus || "").toLowerCase() === "draft").length,
@@ -640,7 +631,7 @@ export function AllExams() {
         {/* Stats & Age Group Filter - Clean grid layout */}
         {!loading && !error && (() => {
           const groups = [
-            { key: "all" as const, label: "Tất cả", icon: Layers, count: stats.total, hint: "Toàn bộ đề thi" },
+            { key: "all" as const, label: "Tất cả", icon: Layers, count: stats.ageTotal, hint: "Toàn bộ đề thi" },
             { key: "kids" as const, label: "Trẻ em", icon: Baby, count: stats.kids, hint: "6-12 tuổi" },
             { key: "teens" as const, label: "Học sinh", icon: BookOpen, count: stats.teens, hint: "13-17 tuổi" },
             { key: "adults" as const, label: "Người lớn", icon: GraduationCap, count: stats.adults, hint: "18+ tuổi" },
