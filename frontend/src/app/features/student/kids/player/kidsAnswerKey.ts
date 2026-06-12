@@ -276,4 +276,5 @@ export const MANUAL_REVIEW_TYPES = new Set([
   'picture_sentence_writing',
   'picture_story_writing',
   'listen_colour_write',
+  'listen_colour',
 ]);
