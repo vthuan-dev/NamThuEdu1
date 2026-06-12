@@ -1,6 +1,7 @@
 import { Fragment, useState, useMemo, useEffect, useRef, useLayoutEffect, lazy, Suspense } from "react";
 import { api } from "../../../../services/api";
 import { gradingApi } from "../../../../services/gradingApi";
+import { KidsAnswerReview } from "./KidsAnswerReview";
 import { useTranslation } from "react-i18next";
 import { Link, useParams, useNavigate } from "react-router";
 import { useToastContext } from "../../../../contexts/ToastContext";
@@ -61,6 +62,7 @@ interface Question {
   originalOptions?: { id: string; letter: string; content: string; isCorrect: boolean }[];
   isOverrideKey?: boolean;
   audioUrl?: string;
+  kidsTaskConfig?: any;   // cấu hình kids task (task_type, task_data...) để hiển thị bài làm rõ ràng
 }
 
 // ─── Skill config ─────────────────────────────────────────────────────────────
@@ -211,9 +213,11 @@ function VstepGradingDetailInternal() {
 
         // Build correct-answer lookup: qId → correct answer content
         const correctMap: Record<number, string> = {};
+        const kidsConfigMap: Record<number, any> = {};
         for (const eq of (d.exam?.questions ?? [])) {
           const correct = (eq.answers ?? []).find((a: any) => a.aIs_correct);
           if (correct) correctMap[eq.qId] = correct.aContent;
+          if (eq.kids_task_config) kidsConfigMap[eq.qId] = eq.kids_task_config;
         }
 
         let geminiFeedback: any = {};
@@ -285,6 +289,7 @@ function VstepGradingDetailInternal() {
             originalOptions: [...options],
             isOverrideKey:  false,
             audioUrl,
+            kidsTaskConfig: kidsConfigMap[q.qId] ?? q.kids_task_config ?? undefined,
           } satisfies Question;
         });
         setQuestions(qs);
@@ -597,7 +602,15 @@ function VstepGradingDetailInternal() {
         <div className="px-5 py-4 space-y-3">
           <p className="text-sm font-semibold text-slate-800 leading-relaxed">{question.text}</p>
 
-          {question.options && question.options.length > 0 ? (
+          {question.kidsTaskConfig ? (
+            <KidsAnswerReview
+              taskType={question.kidsTaskConfig.task_type}
+              taskName={question.kidsTaskConfig.task_name}
+              taskData={question.kidsTaskConfig.task_data}
+              instructions={question.kidsTaskConfig.instructions}
+              studentAnswerRaw={question.studentAnswer}
+            />
+          ) : question.options && question.options.length > 0 ? (
             <div className="space-y-2 mt-2">
               <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Các đáp án lựa chọn</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
