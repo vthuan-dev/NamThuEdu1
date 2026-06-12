@@ -4,7 +4,7 @@ import {
   Plus, Users, School, AlertCircle, Trash2, Pencil, ArrowRightLeft,
   Loader2, GraduationCap, Layers, UserCog, Check, X,
 } from "lucide-react";
-import { classMgmtApi, ClassItem, CoTeacherInvitation } from "../../../../services/classMgmtApi";
+import { classMgmtApi, ClassItem, CoTeacherInvitation, ClassRequest } from "../../../../services/classMgmtApi";
 import { useToastContext } from "../../../../contexts/ToastContext";
 import {
   ageMeta, CapacityBar, Modal, Field, CardSkeleton,
@@ -31,21 +31,36 @@ export function ClassManage() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [invites, setInvites] = useState<CoTeacherInvitation[]>([]);
+  const [requests, setRequests] = useState<ClassRequest[]>([]);
 
   const load = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [res, invRes] = await Promise.all([
+      const [res, invRes, reqRes] = await Promise.all([
         classMgmtApi.list(),
         classMgmtApi.myCoTeacherInvitations().catch(() => ({ data: [] })),
+        classMgmtApi.myRequests("pending").catch(() => ({ data: [] })),
       ]);
       setClasses(res.data || []);
       setInvites(invRes?.data || []);
+      setRequests(reqRes?.data || []);
     } catch {
       setError("Không thể tải danh sách lớp. Vui lòng thử lại.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const cancelRequest = async (r: ClassRequest) => {
+    const label = r.request_type === "deletion" ? "yêu cầu xóa lớp" : "yêu cầu bàn giao";
+    if (!window.confirm(`Hủy ${label} cho lớp "${r.class.cName}"?`)) return;
+    try {
+      await classMgmtApi.cancelRequest(r.id);
+      toast.success("Đã hủy yêu cầu.");
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Không hủy được yêu cầu.");
     }
   };
 
@@ -176,6 +191,37 @@ export function ClassManage() {
         </div>
       )}
 
+      {/* Yêu cầu đang chờ admin xử lý — xem lại & hủy */}
+      {requests.length > 0 && (
+        <div className="mb-6 bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden cm-rise">
+          <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/60">
+            <p className="text-sm font-bold text-[#111827]">Yêu cầu của tôi đang chờ admin duyệt</p>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {requests.map((r) => {
+              const isDel = r.request_type === "deletion";
+              return (
+                <div key={r.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${isDel ? "bg-red-50 text-red-600 ring-1 ring-red-200" : "bg-amber-50 text-amber-700 ring-1 ring-amber-200"}`}>
+                      {isDel ? <Trash2 className="w-3.5 h-3.5" /> : <ArrowRightLeft className="w-3.5 h-3.5" />}
+                      {isDel ? "Xóa lớp" : "Bàn giao"}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-[#111827] truncate">{r.class.cName}</p>
+                      <p className="text-xs text-[#9CA3AF]">{r.created_at ? new Date(r.created_at).toLocaleString("vi-VN") : ""}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => cancelRequest(r)} className={`${btnGhost} px-3 py-2 shrink-0`}>
+                    <X className="w-4 h-4" /> Hủy yêu cầu
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {classes.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-2xl border border-gray-200 cm-rise">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-teal-50 rounded-full mb-4 ring-1 ring-teal-100">
@@ -195,7 +241,7 @@ export function ClassManage() {
             <StatTile icon={GraduationCap} label="Tổng học viên" value={totalStudents} />
             <StatTile
               icon={ArrowRightLeft}
-              label="Chờ bàn giao"
+              label="Chờ admin duyệt"
               value={pendingHandover}
               accent={pendingHandover > 0 ? "amber" : "neutral"}
             />
@@ -218,8 +264,9 @@ export function ClassManage() {
                   </div>
 
                   {c.has_pending_handover && (
-                    <span className="inline-flex items-center gap-1.5 mb-3 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 ring-1 ring-amber-200">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 cm-dot-pulse" /> Chờ bàn giao
+                    <span className={`inline-flex items-center gap-1.5 mb-3 px-2.5 py-1 rounded-full text-xs font-semibold ring-1 ${c.pending_request_type === "deletion" ? "bg-red-50 text-red-600 ring-red-200" : "bg-amber-50 text-amber-700 ring-amber-200"}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full cm-dot-pulse ${c.pending_request_type === "deletion" ? "bg-red-500" : "bg-amber-500"}`} />
+                      {c.pending_request_type === "deletion" ? "Chờ xóa lớp" : "Chờ bàn giao"}
                     </span>
                   )}
                   {c.is_owner === false && (

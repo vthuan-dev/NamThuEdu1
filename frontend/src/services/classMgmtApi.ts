@@ -15,8 +15,21 @@ export interface ClassItem {
   current_student_count: number;
   is_full: boolean;
   has_pending_handover?: boolean;
+  pending_request_type?: 'handover' | 'deletion' | null;
+  pending_request_id?: number | null;
   is_owner?: boolean;
   cCreated_at?: string;
+}
+
+export interface ClassRequest {
+  id: number;
+  request_type: 'handover' | 'deletion';
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  reason?: string | null;
+  admin_note?: string | null;
+  class: { cId: number; cName: string | null; age_group?: string | null };
+  created_at?: string;
+  resolved_at?: string | null;
 }
 
 export interface CoTeacher {
@@ -136,6 +149,12 @@ export const classMgmtApi = {
     api.post(`/teacher/classes/${id}/handover-request`, { reason }).then(r => r.data),
   cancelHandover: (id: number) =>
     api.delete(`/teacher/classes/${id}/handover-request`).then(r => r.data),
+
+  // ── Xem lại & hủy yêu cầu (bàn giao + xóa lớp) ────────────
+  myRequests: (status?: string) =>
+    api.get('/teacher/class-requests', { params: status ? { status } : {} }).then(r => r.data),
+  cancelRequest: (id: number) =>
+    api.post(`/teacher/class-requests/${id}/cancel`).then(r => r.data),
 
   // ── Co-teaching: mời GV khác cùng quản lý lớp ─────────────
   colleagues: () => api.get('/teacher/colleagues').then(r => r.data),

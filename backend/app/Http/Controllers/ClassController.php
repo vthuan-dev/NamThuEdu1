@@ -105,15 +105,16 @@ class ClassController extends Controller
                          ->orderBy('cCreated_at', 'desc')
                          ->get();
 
-        // Lấy danh sách lớp đang có yêu cầu bàn giao chờ xử lý.
-        $pendingClassIds = ClassHandoverRequest::where('status', 'pending')
+        // Lấy yêu cầu đang chờ xử lý theo lớp (kèm loại: bàn giao / xóa).
+        $pendingByClass = ClassHandoverRequest::where('status', 'pending')
             ->whereIn('class_id', $classes->pluck('cId'))
-            ->pluck('class_id')
-            ->flip();
+            ->get()
+            ->keyBy('class_id');
 
         // Add stats for each class
-        $classesWithStats = $classes->map(function($class) use ($pendingClassIds, $user) {
+        $classesWithStats = $classes->map(function($class) use ($pendingByClass, $user) {
             $count = $this->liveStudentCount($class->cId);
+            $pending = $pendingByClass->get($class->cId);
             return [
                 'cId' => $class->cId,
                 'cName' => $class->cName,
@@ -123,7 +124,9 @@ class ClassController extends Controller
                 'max_students' => $class->max_students,
                 'current_student_count' => $count,
                 'is_full' => $class->max_students ? $count >= $class->max_students : false,
-                'has_pending_handover' => $pendingClassIds->has($class->cId),
+                'has_pending_handover' => $pending ? true : false,
+                'pending_request_type' => $pending ? ($pending->request_type ?? 'handover') : null,
+                'pending_request_id' => $pending->id ?? null,
                 'is_owner' => (int) $class->cTeacher_id === (int) $user->uId,
                 'cCreated_at' => $class->cCreated_at,
             ];
@@ -1287,6 +1290,73 @@ class ClassController extends Controller
     }
 
     // ─── Co-teaching: mời giáo viên khác cùng quản lý lớp ──────────────
+
+    /**
+     * GET /api/teacher/class-requests?status=
+     * Danh sách yêu cầu (bàn giao + xóa lớp) do chính giáo viên này gửi.
+     */
+    public function myRequests(Request $request)
+    {
+        $user = $request->user();
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
+        }
+
+        $query = ClassHandoverRequest::with('class:cId,cName,age_group')
+            ->where('from_teacher_id', $user->uId);
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $rows = $query->orderByRaw("FIELD(status,'pending','approved','rejected','cancelled')")
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get()
+            ->map(function ($r) {
+                return [
+                    'id' => $r->id,
+                    'request_type' => $r->request_type ?? 'handover',
+                    'status' => $r->status,
+                    'reason' => $r->reason,
+                    'admin_note' => $r->admin_note,
+                    'class' => [
+                        'cId' => $r->class->cId ?? $r->class_id,
+                        'cName' => $r->class->cName ?? ('Lớp #' . $r->class_id),
+                        'age_group' => $r->class->age_group ?? null,
+                    ],
+                    'created_at' => $r->created_at,
+                    'resolved_at' => $r->resolved_at,
+                ];
+            });
+
+        return response()->json(['status' => 'success', 'data' => $rows]);
+    }
+
+    /**
+     * POST /api/teacher/class-requests/{id}/cancel
+     * Giáo viên hủy yêu cầu (bàn giao/xóa) đang chờ của chính mình.
+     */
+    public function cancelRequest(Request $request, $id)
+    {
+        $user = $request->user();
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
+        }
+
+        $req = ClassHandoverRequest::where('id', $id)
+            ->where('from_teacher_id', $user->uId)
+            ->where('status', 'pending')
+            ->first();
+        if (!$req) {
+            return response()->json(['status' => 'error', 'message' => 'Không tìm thấy yêu cầu đang chờ.'], 404);
+        }
+
+        $req->status = 'cancelled';
+        $req->resolved_at = now();
+        $req->save();
+
+        return response()->json(['status' => 'success', 'message' => 'Đã hủy yêu cầu.']);
+    }
 
     /**
      * GET /api/teacher/colleagues
