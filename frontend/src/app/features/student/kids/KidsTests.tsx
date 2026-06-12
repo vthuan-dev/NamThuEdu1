@@ -45,6 +45,9 @@ function ExamCard({
     ? `${BASE}/phong-cho/${assignmentId}`
     : `${BASE}/lam-bai/${examId}?autostart=1&direct=1`;
 
+  // "Làm lại": luôn đi đường direct để tạo lượt làm mới (không vướng giới hạn assignment)
+  const redoTo = `${BASE}/lam-bai/${examId}?autostart=1&direct=1`;
+
   return (
     <div className="flex flex-col bg-white rounded-3xl border-2 border-rose-100 p-5 transition-all hover:shadow-lg hover:-translate-y-0.5 hover:border-rose-200">
       {/* Status + skill */}
@@ -87,10 +90,17 @@ function ExamCard({
       {/* Action */}
       <div className="mt-auto">
         {isCompleted && submissionId ? (
-          <Link to={`${BASE}/ket-qua/${submissionId}`}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-sm font-extrabold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors">
-            <CheckCircle2 className="w-4 h-4" /> Xem kết quả 🌟
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to={`${BASE}/ket-qua/${submissionId}`}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3 rounded-2xl text-sm font-extrabold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors">
+              <CheckCircle2 className="w-4 h-4" /> Kết quả 🌟
+            </Link>
+            <Link to={redoTo}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3 rounded-2xl text-sm font-extrabold text-white transition-transform hover:scale-[1.02] active:scale-95"
+              style={{ background: 'linear-gradient(135deg, #FB7185 0%, #F97316 100%)' }}>
+              <RotateCcw className="w-4 h-4" /> Làm lại 🔄
+            </Link>
+          </div>
         ) : (
           <Link to={startTo}
             className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-sm font-extrabold text-white transition-transform hover:scale-[1.02] active:scale-95"
