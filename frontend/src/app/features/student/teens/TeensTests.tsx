@@ -15,6 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Clock, ListChecks, Search, CheckCircle2, Play, RotateCcw,
   Sparkles, Gift, ClipboardList, BookOpen, AlertTriangle,
+  Headphones, Mic, PenLine, FileText, ArrowRight,
 } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
 import { usePageTitle, PAGE_TITLES } from '../../../../hooks/usePageTitle';
@@ -26,12 +27,6 @@ const TEAL_MID = '#14B8A6';
 type Tab = 'all' | 'assigned';
 type Status = 'pending' | 'in_progress' | 'completed';
 
-const STATUS_META: Record<Status, { label: string; c: string; soft: string }> = {
-  pending:     { label: 'Chưa làm',   c: '#0F766E', soft: '#CCFBF1' },
-  in_progress: { label: 'Đang làm',   c: '#B45309', soft: '#FEF3C7' },
-  completed:   { label: 'Hoàn thành', c: '#059669', soft: '#D1FAE5' },
-};
-
 const SKILL_LABELS: Record<string, string> = {
   mixed: 'Tổng hợp', grammar: 'Ngữ pháp', vocabulary: 'Từ vựng',
   reading: 'Đọc hiểu', listening: 'Nghe', writing: 'Viết', speaking: 'Nói',
@@ -39,6 +34,17 @@ const SKILL_LABELS: Record<string, string> = {
 function skillLabel(s?: string) {
   const k = String(s ?? '').toLowerCase();
   return SKILL_LABELS[k] ?? (s ? s[0].toUpperCase() + s.slice(1) : '');
+}
+
+// Icon theo kỹ năng — dùng cho ô icon nhã nhặn trên thẻ.
+function skillIcon(s?: string) {
+  switch (String(s ?? '').toLowerCase()) {
+    case 'listening': return Headphones;
+    case 'speaking':  return Mic;
+    case 'writing':   return PenLine;
+    case 'reading':   return BookOpen;
+    default:          return FileText;
+  }
 }
 
 interface TeensExamItem {
@@ -57,54 +63,52 @@ interface TeensExamItem {
 
 // ─── Card ──────────────────────────────────────────────────────────────────────
 function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssignedBadge: boolean }) {
-  const meta = STATUS_META[item.status] ?? STATUS_META.pending;
   const isCompleted = item.status === 'completed';
   const inProgress = item.status === 'in_progress';
+  const SkillIcon = skillIcon(item.skill);
 
-  // Đề được giao → vào "phòng chờ" qua assignmentId (teens tự skip vào làm bài).
-  // Đề tự do     → làm trực tiếp bằng examId (direct=1).
+  const dot = isCompleted ? '#10B981' : inProgress ? '#F59E0B' : '#94A3B8';
+  const statusText = isCompleted ? 'Hoàn thành' : inProgress ? 'Đang làm' : 'Chưa làm';
+
   const startTo = item.isAssigned && item.assignmentId
     ? `${BASE}/phong-cho/${item.assignmentId}`
     : `${BASE}/lam-bai/${item.examId}?autostart=1&direct=1`;
 
   return (
-    <div className="flex flex-col bg-white rounded-2xl border border-slate-200 p-5 transition-all hover:shadow-md hover:-translate-y-0.5 hover:border-teal-200">
-      {/* Status + assigned badge */}
-      <div className="flex items-center justify-between mb-3">
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold"
-          style={{ background: meta.soft, color: meta.c }}>
-          {isCompleted ? <CheckCircle2 className="w-3.5 h-3.5" /> : inProgress ? <RotateCcw className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
-          {meta.label}
-        </span>
-        {showAssignedBadge && item.isAssigned && (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold"
-            style={{ background: '#EEF2FF', color: '#4F46E5' }}>
-            <Gift className="w-3.5 h-3.5" /> Giảng viên giao
+    <div className="group flex flex-col bg-white rounded-2xl border border-slate-200 p-5 transition-all duration-200 hover:border-teal-300 hover:shadow-[0_6px_20px_-8px_rgba(13,148,136,0.25)]">
+      {/* Icon kỹ năng + trạng thái */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-teal-50 text-teal-700 ring-1 ring-teal-100">
+          <SkillIcon className="w-5 h-5" />
+        </div>
+        <div className="flex items-center gap-2.5">
+          {showAssignedBadge && item.isAssigned && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-700">
+              <Gift className="w-3.5 h-3.5" /> GV giao
+            </span>
+          )}
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: dot }} />
+            {statusText}
           </span>
-        )}
+        </div>
       </div>
 
       {/* Title */}
-      <h3 className="text-base font-bold text-slate-900 leading-snug line-clamp-2 min-h-[44px]">
+      <h3 className="text-[15px] font-bold text-slate-900 leading-snug line-clamp-2 min-h-[42px]">
         {item.title}
       </h3>
 
       {/* Meta */}
-      <div className="flex items-center flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500 mt-2 mb-4">
+      <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-[13px] text-slate-400 mt-2 mb-4">
         {!!item.duration && item.duration > 0 && (
-          <span className="inline-flex items-center gap-1.5">
-            <Clock className="w-4 h-4 text-slate-400" /> {item.duration} phút
-          </span>
+          <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {item.duration} phút</span>
         )}
         {!!item.questions && item.questions > 0 && (
-          <span className="inline-flex items-center gap-1.5">
-            <ListChecks className="w-4 h-4 text-slate-400" /> {item.questions} câu
-          </span>
+          <span className="inline-flex items-center gap-1.5"><ListChecks className="w-3.5 h-3.5" /> {item.questions} câu</span>
         )}
         {item.skill && (
-          <span className="inline-flex items-center gap-1.5 font-semibold text-slate-400">
-            <BookOpen className="w-4 h-4" /> {skillLabel(item.skill)}
-          </span>
+          <span className="font-medium text-slate-500">{skillLabel(item.skill)}</span>
         )}
       </div>
 
@@ -112,14 +116,18 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
       <div className="mt-auto">
         {isCompleted && item.submissionId ? (
           <Link to={`${BASE}/ket-qua/${item.submissionId}`}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors">
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors">
             <CheckCircle2 className="w-4 h-4" /> Xem kết quả
           </Link>
         ) : (
           <Link to={startTo}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold text-white transition-transform hover:scale-[1.01] active:scale-95"
-            style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
-            <Play className="w-4 h-4 fill-white" /> {inProgress ? 'Làm tiếp' : 'Bắt đầu'}
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
+            style={{ background: TEAL }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#0B7E74')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = TEAL)}>
+            {inProgress ? <RotateCcw className="w-4 h-4" /> : <Play className="w-4 h-4 fill-white" />}
+            {inProgress ? 'Làm tiếp' : 'Bắt đầu'}
+            <ArrowRight className="w-4 h-4 opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
           </Link>
         )}
       </div>
@@ -231,16 +239,16 @@ export function TeensTests() {
               <ClipboardList className="w-6 h-6 text-white" />
             </div>
             <div>
-              <p className="text-teal-200 text-xs font-bold tracking-widest uppercase mb-1">Bài tập</p>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight">Bài tập của tôi</h1>
-              <p className="text-teal-100 text-sm mt-1">Đề thầy cô đăng và giao cho bạn — chọn một bài để bắt đầu nhé!</p>
+              <p className="text-teal-200 text-xs font-bold tracking-widest uppercase mb-1">Đề luyện</p>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight">Đề luyện của tôi</h1>
+              <p className="text-teal-100 text-sm mt-1">Đề thầy cô đăng để bạn luyện tập — chọn một đề để bắt đầu nhé!</p>
             </div>
           </div>
 
           {/* Stats */}
           <div className="flex items-center gap-3 flex-wrap">
             {[
-              { label: 'Tổng bài tập', value: stats.total,      color: '#99F6E4' },
+              { label: 'Tổng số đề',   value: stats.total,      color: '#99F6E4' },
               { label: 'Chưa làm',     value: stats.pending,    color: '#FCD34D' },
               { label: 'Đang làm',     value: stats.inProgress, color: '#FDBA74' },
               { label: 'Hoàn thành',   value: stats.completed,  color: '#86EFAC' },
@@ -267,7 +275,7 @@ export function TeensTests() {
               style={tab === 'all'
                 ? { background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})`, color: '#fff', boxShadow: `0 4px 14px ${TEAL}40` }
                 : { background: 'transparent', color: '#64748B' }}>
-              <Sparkles className="w-4 h-4" /> Tất cả bài tập
+              <Sparkles className="w-4 h-4" /> Tất cả đề luyện
             </button>
             <button onClick={() => setTab('assigned')}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all"
@@ -287,7 +295,7 @@ export function TeensTests() {
           {/* Search */}
           <div className="relative flex-1 sm:max-w-xs sm:ml-auto">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input type="text" placeholder="Tìm bài tập…"
+            <input type="text" placeholder="Tìm đề…"
               value={search} onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm font-medium outline-none focus:border-teal-300 transition-colors"
               style={{ background: '#fff', border: '1px solid #E2E8F0', color: '#0F172A' }} />
