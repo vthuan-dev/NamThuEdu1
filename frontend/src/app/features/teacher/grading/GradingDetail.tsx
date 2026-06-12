@@ -232,6 +232,10 @@ function VstepGradingDetailInternal() {
         }
 
         // Map student answers → Question[]
+        const examTypeUpper = String(d.exam?.eType ?? "").toUpperCase();
+        // VSTEP/IELTS: objective tính 1 điểm/câu (điểm kỹ năng quy đổi riêng).
+        // Các đề khác (Kids/Teens/General): dùng điểm thực của câu hỏi (qPoints/qScore).
+        const useRealPoints = !(examTypeUpper.includes("VSTEP") || examTypeUpper.includes("IELTS"));
         const qs: Question[] = (d.answers ?? []).map((sa: any, idx: number) => {
           const q = sa.question ?? {};
           const skill = (q.qSkill ?? "").toLowerCase() as VstepSkill;
@@ -281,7 +285,7 @@ function VstepGradingDetailInternal() {
                              : undefined,
             points:        Number(sa.saPoints_awarded ?? 0),
             pointsAwarded: sa.saPoints_awarded !== null && sa.saPoints_awarded !== undefined ? Number(sa.saPoints_awarded) : null,
-            maxPoints:     isSubjective ? 10 : 1,
+            maxPoints:     isSubjective ? 10 : (useRealPoints ? Number(q.qPoints ?? q.qScore ?? 1) : 1),
             isCorrect:     isCorrect as boolean | undefined,
             feedback:      sa.saTeacher_feedback ?? "",
             autoGraded:    !isSubjective,
