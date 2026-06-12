@@ -3,6 +3,40 @@ import { useNavigate, useLocation } from "react-router";
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
 import { GraduationCap, Phone, Mail, MapPin, Menu, X, ChevronDown, BookOpen, Zap, FileText, Info, HelpCircle, MessageCircle } from "lucide-react";
 
+// Danh mục khóa học đầy đủ theo 3 nhóm học viên (người lớn / thiếu niên / trẻ em).
+// Dùng chung cho dropdown desktop và submenu mobile.
+const COURSE_GROUPS: {
+  group: string;
+  age: string;
+  items: { label: string; desc: string }[];
+}[] = [
+  {
+    group: "Người lớn",
+    age: "18+ tuổi",
+    items: [
+      { label: "VSTEP", desc: "Chứng chỉ tiếng Anh quốc gia (B1–C1)" },
+      { label: "IELTS", desc: "Chứng chỉ tiếng Anh quốc tế (Academic & General)" },
+    ],
+  },
+  {
+    group: "Thiếu niên",
+    age: "13–17 tuổi",
+    items: [
+      { label: "Luyện thi THPT", desc: "Tiếng Anh thi Tốt nghiệp & xét tuyển ĐH" },
+      { label: "IELTS Foundation", desc: "Nền tảng IELTS cho học sinh cấp 2–3" },
+    ],
+  },
+  {
+    group: "Trẻ em",
+    age: "6–12 tuổi",
+    items: [
+      { label: "Cambridge Starters", desc: "Pre A1 — Khởi đầu (6–8 tuổi)" },
+      { label: "Cambridge Movers", desc: "A1 — Tiến bộ (8–10 tuổi)" },
+      { label: "Cambridge Flyers", desc: "A2 — Thành thạo (10–12 tuổi)" },
+    ],
+  },
+];
+
 export function Header() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -129,25 +163,31 @@ export function Header() {
                 <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${coursesDropdownOpen ? 'rotate-180' : ''}`} />
               </a>
 
-              {/* Dropdown Menu */}
+              {/* Dropdown Menu — đầy đủ khóa học theo 3 nhóm học viên */}
               {coursesDropdownOpen && (
-                <div className="absolute left-0 top-full pt-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="w-56 rounded-lg bg-white shadow-lg ring-1 ring-black/5 overflow-hidden">
-                    <div className="py-2">
-                      {[
-                        { label: "VSTEP", desc: "Chứng chỉ tiếng Anh quốc gia" },
-                        { label: "IELTS", desc: "Chứng chỉ tiếng Anh quốc tế" },
-                        { label: "Tiếng Anh cho thiếu niên", desc: "Dành cho học sinh 6-18 tuổi" },
-                      ].map((item) => (
-                        <a
-                          key={item.label}
-                          href="#khoa-hoc"
-                          onClick={scrollToCourses}
-                          className="block px-4 py-2.5 text-sm text-slate-700 transition-all duration-200 hover:bg-orange-50 hover:text-orange-600 hover:pl-5"
-                        >
-                          <div className="font-semibold">{item.label}</div>
-                          <div className="text-xs text-slate-500">{item.desc}</div>
-                        </a>
+                <div className="absolute left-1/2 -translate-x-1/2 top-full pt-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="w-[720px] max-w-[92vw] rounded-2xl bg-white shadow-xl ring-1 ring-black/5 overflow-hidden">
+                    <div className="grid grid-cols-3 divide-x divide-slate-100">
+                      {COURSE_GROUPS.map((grp) => (
+                        <div key={grp.group} className="p-4">
+                          <div className="mb-2 flex items-baseline justify-between px-1">
+                            <span className="text-sm font-bold text-slate-800">{grp.group}</span>
+                            <span className="text-[11px] font-medium text-orange-500">{grp.age}</span>
+                          </div>
+                          <div className="space-y-0.5">
+                            {grp.items.map((item) => (
+                              <a
+                                key={item.label}
+                                href="#khoa-hoc"
+                                onClick={scrollToCourses}
+                                className="block rounded-lg px-3 py-2 transition-all duration-200 hover:bg-orange-50"
+                              >
+                                <div className="text-sm font-semibold text-slate-700">{item.label}</div>
+                                <div className="text-xs text-slate-500 leading-snug">{item.desc}</div>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -278,33 +318,28 @@ export function Header() {
                   <ChevronDown className={`h-4 w-4 text-indigo-400 transition-transform duration-300 ${mobileCoursesOpen ? "rotate-180" : ""}`} />
                 </button>
 
-                {/* Submenu */}
+                {/* Submenu — đầy đủ khóa học theo nhóm học viên */}
                 {mobileCoursesOpen && (
-                  <div className="ml-10 mt-0.5 space-y-0.5 animate-in slide-in-from-top-2 duration-200">
-                    <a
-                      href="#vstep"
-                      onClick={() => closeMobileMenu()}
-                      className="block cursor-pointer rounded-lg px-3 py-2 text-sm transition-all duration-200 hover:bg-indigo-100 border-l-2 border-orange-400"
-                    >
-                      <div className="font-semibold text-indigo-800">VSTEP</div>
-                      <div className="text-xs text-indigo-500">Chứng chỉ tiếng Anh quốc gia</div>
-                    </a>
-                    <a
-                      href="#ielts"
-                      onClick={() => closeMobileMenu()}
-                      className="block cursor-pointer rounded-lg px-3 py-2 text-sm transition-all duration-200 hover:bg-indigo-100 border-l-2 border-orange-400"
-                    >
-                      <div className="font-semibold text-indigo-800">IELTS</div>
-                      <div className="text-xs text-indigo-500">Chứng chỉ tiếng Anh quốc tế</div>
-                    </a>
-                    <a
-                      href="#kids"
-                      onClick={() => closeMobileMenu()}
-                      className="block cursor-pointer rounded-lg px-3 py-2 text-sm transition-all duration-200 hover:bg-indigo-100 border-l-2 border-orange-400"
-                    >
-                      <div className="font-semibold text-indigo-800">Tiếng Anh thiếu niên</div>
-                      <div className="text-xs text-indigo-500">Dành cho học sinh 6–18 tuổi</div>
-                    </a>
+                  <div className="ml-10 mt-0.5 space-y-2 animate-in slide-in-from-top-2 duration-200">
+                    {COURSE_GROUPS.map((grp) => (
+                      <div key={grp.group}>
+                        <div className="flex items-baseline gap-2 px-3 pt-1.5 pb-0.5">
+                          <span className="text-[11px] font-bold uppercase tracking-wide text-indigo-900">{grp.group}</span>
+                          <span className="text-[10px] font-medium text-orange-500">{grp.age}</span>
+                        </div>
+                        {grp.items.map((item) => (
+                          <a
+                            key={item.label}
+                            href="#khoa-hoc"
+                            onClick={() => closeMobileMenu()}
+                            className="block cursor-pointer rounded-lg px-3 py-2 text-sm transition-all duration-200 hover:bg-indigo-100 border-l-2 border-orange-400"
+                          >
+                            <div className="font-semibold text-indigo-800">{item.label}</div>
+                            <div className="text-xs text-indigo-500 leading-snug">{item.desc}</div>
+                          </a>
+                        ))}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
