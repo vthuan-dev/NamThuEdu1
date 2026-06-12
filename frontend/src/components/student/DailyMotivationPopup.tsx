@@ -8,9 +8,11 @@
  * - Màu nhấn theo role (teal/teens, cam/kids, tím/adults) qua prop accent.
  */
 import { useEffect, useState } from 'react';
-import { X, Sparkles, CalendarClock, Flame, ArrowRight } from 'lucide-react';
+import { X, Sparkles, Flame, ArrowRight } from 'lucide-react';
 import { getAuthUser } from '../../utils/authStorage';
 import { studentApi } from '../../services/studentApi';
+import type { ExamSchedule } from '../../services/studentApi';
+import { ExamScheduleDetailPopup } from '../../app/components/student/ExamScheduleDetailPopup';
 
 const QUOTES = [
   'Mỗi ngày học một chút, tương lai khác một nhiều. Cố lên nhé!',
@@ -40,7 +42,7 @@ export function DailyMotivationPopup({
 }: Props) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('bạn');
-  const [nextExam, setNextExam] = useState<{ title: string; date: string | null; daysUntil: number | null } | null>(null);
+  const [schedule, setSchedule] = useState<ExamSchedule | null>(null);
 
   useEffect(() => {
     let user: any = null;
@@ -62,14 +64,13 @@ export function DailyMotivationPopup({
       setOpen(true);
     };
 
-    // Lấy lịch thi gần nhất (nếu có) để nhắc — best-effort, rồi mới hiện popup
+    // Lấy lịch thi gần nhất (nếu có) — ưu tiên hiện popup lịch thi, rồi mới hiện popup
     const p = studentApi.getExamSchedules?.();
     if (p && typeof p.then === 'function') {
       p.then((res: any) => {
-        const list = res?.data?.data?.schedules ?? [];
+        const list: ExamSchedule[] = res?.data?.data?.schedules ?? [];
         if (!cancelled && Array.isArray(list) && list.length > 0) {
-          const s = list[0];
-          setNextExam({ title: s.title, date: s.exam_date ?? null, daysUntil: s.days_until ?? null });
+          setSchedule(list[0]);
         }
       })
         .catch(() => {})
@@ -83,14 +84,22 @@ export function DailyMotivationPopup({
 
   if (!open) return null;
 
+  // Có lịch thi sắp tới → hiện popup lịch thi (đẹp, chi tiết) làm popup đầu ngày
+  if (schedule) {
+    return (
+      <ExamScheduleDetailPopup
+        schedule={schedule}
+        onClose={() => setOpen(false)}
+        accent={accent}
+        accentMid={accentMid}
+        accentSoft={accentSoft}
+      />
+    );
+  }
+
   const hour = new Date().getHours();
   const greeting = hour < 11 ? 'Chào buổi sáng' : hour < 14 ? 'Chào buổi trưa' : hour < 18 ? 'Chào buổi chiều' : 'Chào buổi tối';
   const quote = QUOTES[new Date().getDate() % QUOTES.length];
-
-  const daysText = nextExam?.daysUntil == null ? null
-    : nextExam.daysUntil <= 0 ? 'hôm nay'
-    : nextExam.daysUntil === 1 ? 'ngày mai'
-    : `còn ${nextExam.daysUntil} ngày`;
 
   return (
     <div
@@ -135,25 +144,6 @@ export function DailyMotivationPopup({
               <p className="text-[14px] font-medium text-slate-700 leading-relaxed">{quote}</p>
             </div>
           </div>
-
-          {/* Nhắc lịch thi sắp tới */}
-          {nextExam && (
-            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 p-3.5 mb-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: accentSoft, color: accent }}>
-                <CalendarClock className="w-5 h-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Lịch thi sắp tới</p>
-                <p className="text-sm font-bold text-slate-800 truncate">{nextExam.title}</p>
-                {daysText && (
-                  <p className="text-xs mt-0.5 font-semibold" style={{ color: accent }}>
-                    {daysText}{nextExam.date ? ` · ${new Date(nextExam.date).toLocaleDateString('vi-VN')}` : ''}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
 
           <button
             onClick={() => setOpen(false)}
