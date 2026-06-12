@@ -314,6 +314,22 @@ function RosterTab({ classId, students, max, onChanged, toast }: any) {
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm học viên..."
             className={`${inputClass} pl-9`} />
         </div>
+        {!loadingAvail && filtered.length > 0 && (() => {
+          const filteredIds = filtered.map((s) => s.uId);
+          const allPicked = filteredIds.every((id) => picked.includes(id));
+          const toggleAll = () =>
+            setPicked(allPicked
+              ? picked.filter((id) => !filteredIds.includes(id))
+              : Array.from(new Set([...picked, ...filteredIds])));
+          return (
+            <div className="flex items-center justify-between mb-2 px-1">
+              <span className="text-xs text-[#6B7280]">{filtered.length} học viên{search ? " (đã lọc)" : ""}</span>
+              <button onClick={toggleAll} className="text-sm font-semibold text-[#0D9488] hover:text-[#0F766E] transition-colors">
+                {allPicked ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+              </button>
+            </div>
+          );
+        })()}
         <div className="border border-[#E5E7EB] rounded-xl overflow-hidden max-h-[46vh] overflow-y-auto">
           {loadingAvail ? (
             <div className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-[#0D9488]" /></div>
