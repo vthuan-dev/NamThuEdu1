@@ -189,8 +189,14 @@ export function AllExams() {
       }
 
       // Xác định endpoint dựa trên age_group hoặc kids_exam_config
+      // QUAN TRỌNG: backend trả kids_exam_config = null cho đề non-kids, nên
+      // KHÔNG dùng `!== undefined` (null !== undefined = true → route nhầm sang
+      // endpoint kids → xóa thất bại 404 → đề "sống lại"). Phải dùng Boolean()
+      // + _group tag để nhận diện kids chính xác.
       const isKidsExam =
-        (exam as any).age_group === "kids" || exam.kids_exam_config !== undefined;
+        (exam as any)._group === "kids" ||
+        (exam as any).age_group === "kids" ||
+        Boolean(exam.kids_exam_config);
 
       if (isKidsExam) {
         await deleteKidsExam(examId);
@@ -247,7 +253,9 @@ export function AllExams() {
 
     for (const exam of targetExams) {
       const isKidsExam =
-        (exam as any).age_group === "kids" || exam.kids_exam_config !== undefined;
+        (exam as any)._group === "kids" ||
+        (exam as any).age_group === "kids" ||
+        Boolean(exam.kids_exam_config);
       try {
         if (isKidsExam) {
           await deleteKidsExam(exam.eId);
