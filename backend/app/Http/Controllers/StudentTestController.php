@@ -2164,6 +2164,33 @@ class StudentTestController extends Controller
             }
         }
 
+        // ── Lịch thi do giáo viên đặt (sắp tới, từ hôm nay trở đi) ──
+        $examSchedules = \App\Models\StudentExamSchedule::where('student_id', $studentId)
+            ->whereDate('exam_date', '>=', now()->toDateString())
+            ->orderBy('exam_date')
+            ->take(10)
+            ->get();
+
+        foreach ($examSchedules as $sch) {
+            $examDate = \Carbon\Carbon::parse($sch->exam_date);
+            $daysLeft = (int) \Carbon\Carbon::today()->diffInDays($examDate->copy()->startOfDay(), false);
+            $whenText = $daysLeft === 0 ? 'hôm nay' : ($daysLeft === 1 ? 'ngày mai' : "còn {$daysLeft} ngày");
+            $timeText = $sch->exam_time ? (' lúc ' . substr($sch->exam_time, 0, 5)) : '';
+            $isUrgent = $daysLeft >= 0 && $daysLeft <= 3;
+            $notifications[] = [
+                'id'           => 'exam_schedule_' . $sch->id,
+                'title'        => '📅 Lịch thi: ' . $sch->title,
+                'message'      => 'Ngày thi ' . $examDate->format('d/m/Y') . $timeText . ' (' . $whenText . ')'
+                    . ($sch->location ? ' · Tại: ' . $sch->location : ''),
+                'type'         => 'reminder',
+                'color'        => $isUrgent ? '#EF4444' : '#0EA5E9',
+                'is_read'      => false,
+                'created_at'   => $sch->created_at,
+                'action_url'   => '/',
+                'action_label' => 'Xem lịch thi',
+            ];
+        }
+
         // Sort newest first
         usort($notifications, function ($a, $b) {
             return strtotime((string)$b['created_at']) - strtotime((string)$a['created_at']);

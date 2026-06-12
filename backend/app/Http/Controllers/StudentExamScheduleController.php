@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\StudentExamSchedule;
 use App\Models\User;
+use App\Services\PushNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -85,6 +86,21 @@ class StudentExamScheduleController extends Controller
             'location'   => $request->location,
             'note'       => $request->note,
         ]);
+
+        // Push tới học viên để hiện ngay (nếu đang online); chuông cũng tự cập nhật
+        // qua /student/notifications (block lịch thi) khi học viên login / poll.
+        try {
+            $dateText = \Carbon\Carbon::parse($request->exam_date)->format('d/m/Y')
+                . ($request->exam_time ? ' lúc ' . substr($request->exam_time, 0, 5) : '');
+            (new PushNotificationService())->sendToUser(
+                (int) $studentId,
+                '📅 Bạn có lịch thi mới',
+                $request->title . ' — ngày thi ' . $dateText,
+                ['url' => '/hoc-vien']
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Exam schedule push failed: ' . $e->getMessage());
+        }
 
         return response()->json([
             'status'  => 'success',
