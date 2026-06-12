@@ -243,6 +243,12 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         Route::get('/co-teacher-invitations', [ClassController::class, 'myCoTeacherInvitations']);
         Route::post('/co-teacher-invitations/{coId}/respond', [ClassController::class, 'respondCoTeacherInvitation']);
 
+        // Mục tiêu học viên + phân tích tiến độ bằng AI (Groq)
+        Route::get('/students/{id}/goal', [\App\Http\Controllers\StudentGoalController::class, 'show']);
+        Route::put('/students/{id}/goal', [\App\Http\Controllers\StudentGoalController::class, 'upsert']);
+        Route::delete('/students/{id}/goal', [\App\Http\Controllers\StudentGoalController::class, 'destroy']);
+        Route::post('/students/{id}/goal/analyze', [\App\Http\Controllers\StudentGoalController::class, 'analyze']);
+
         
         // Practice Sessions Routes
         Route::prefix('practice-sessions')->group(function () {

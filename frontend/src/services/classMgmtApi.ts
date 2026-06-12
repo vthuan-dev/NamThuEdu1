@@ -165,3 +165,52 @@ export const adminHandoverApi = {
 export const studentGoalApi = {
   next: () => api.get('/student/class-goals/next').then(r => r.data),
 };
+
+// ── Teacher: mục tiêu từng học viên + phân tích AI ────────────
+export interface GoalSkillAnalysis {
+  skill: string;
+  current_score?: number | null;
+  current_level?: string | null;
+  target_hint?: string;
+  status?: 'achieved' | 'on_track' | 'behind' | 'no_data' | string;
+  gap_note?: string;
+}
+
+export interface GoalAnalysis {
+  has_data?: boolean;
+  error?: boolean;
+  summary?: string;
+  gap_summary?: string;
+  current_level_estimate?: string | null;
+  overall_progress_percent?: number;
+  on_track?: boolean | null;
+  skills?: GoalSkillAnalysis[];
+  weaknesses?: string[];
+  priority_actions?: string[];
+  estimated_sessions_to_goal?: number | null;
+  encouragement?: string;
+}
+
+export interface StudentGoalData {
+  id?: number;
+  student_id?: number;
+  target_level: string;
+  target_skill?: string | null;
+  exam_type?: string | null;
+  target_date?: string | null;
+  note?: string | null;
+  status?: 'active' | 'achieved' | 'cancelled';
+  ai_analysis?: GoalAnalysis | null;
+  ai_analyzed_at?: string | null;
+}
+
+export const teacherStudentGoalApi = {
+  get: (studentId: number) =>
+    api.get(`/teacher/students/${studentId}/goal`).then(r => r.data),
+  upsert: (studentId: number, data: Partial<StudentGoalData>) =>
+    api.put(`/teacher/students/${studentId}/goal`, data).then(r => r.data),
+  remove: (studentId: number) =>
+    api.delete(`/teacher/students/${studentId}/goal`).then(r => r.data),
+  analyze: (studentId: number) =>
+    api.post(`/teacher/students/${studentId}/goal/analyze`).then(r => r.data),
+};

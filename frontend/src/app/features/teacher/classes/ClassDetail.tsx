@@ -12,6 +12,7 @@ import { useToastContext } from "../../../../contexts/ToastContext";
 import {
   ageMeta, Avatar, Modal, Field, inputClass, btnPrimary, btnGhost,
 } from "./classMgmtUi";
+import { StudentGoalModal } from "./StudentGoalModal";
 
 type TabKey = "roster" | "assignments" | "announcements" | "goals" | "coteachers";
 
@@ -253,6 +254,7 @@ function RosterTab({ classId, students, max, ageGroup, onChanged, toast }: any) 
   const [picked, setPicked] = useState<number[]>([]);
   const [loadingAvail, setLoadingAvail] = useState(false);
   const [search, setSearch] = useState("");
+  const [goalStudent, setGoalStudent] = useState<{ id: number; name: string } | null>(null);
   const classMeta = ageMeta(ageGroup);
 
   const openEnroll = async () => {
@@ -323,12 +325,30 @@ function RosterTab({ classId, students, max, ageGroup, onChanged, toast }: any) 
                   <p className="text-sm text-[#6B7280]">{s.uPhone || "—"}</p>
                 </div>
               </div>
-              <button onClick={() => removeStudent(s)} aria-label="Xóa khỏi lớp" className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0">
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => setGoalStudent({ id: s.uId, name: s.uName })}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-violet-700 bg-violet-50 hover:bg-violet-100 ring-1 ring-violet-100 transition-colors"
+                  title="Đặt mục tiêu & phân tích AI"
+                >
+                  <Target className="w-3.5 h-3.5" /> Mục tiêu
+                </button>
+                <button onClick={() => removeStudent(s)} aria-label="Xóa khỏi lớp" className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           ))}
         </div>
+      )}
+
+      {goalStudent && (
+        <StudentGoalModal
+          studentId={goalStudent.id}
+          studentName={goalStudent.name}
+          open={!!goalStudent}
+          onClose={() => setGoalStudent(null)}
+        />
       )}
 
       <Modal
