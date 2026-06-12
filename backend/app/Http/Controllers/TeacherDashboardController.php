@@ -140,12 +140,12 @@ class TeacherDashboardController extends Controller
         // Get counts
         $totalCourses = \App\Models\Course::where('cTeacher', $user->uId)->count();
         $totalClasses = \App\Models\Classes::where('cTeacher_id', $user->uId)->count();
-        $totalExams = \App\Models\Exam::where('teacher_id', $user->uId)->count();
+        $totalExams = \App\Models\Exam::where('eTeacher_id', $user->uId)->count();
         
         // Get total students - đếm số học viên distinct đã từng dùng exam của
         // teacher này (có submission >= 60s). Không phụ thuộc class vì hệ
         // thống mới student không thuộc class cố định, chỉ thuộc age_group.
-        $teacherExamIdsForCount = \App\Models\Exam::where('teacher_id', $user->uId)->pluck('eId');
+        $teacherExamIdsForCount = \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId');
         $totalStudents = Submission::whereIn('exam_id', $teacherExamIdsForCount)
             ->whereNotNull('sStart_time')
             ->where(function ($q) {
@@ -172,20 +172,20 @@ class TeacherDashboardController extends Controller
             ->whereMonth('uCreated_at', now()->month)
             ->count();
             
-        $newExamsThisMonth = \App\Models\Exam::where('teacher_id', $user->uId)
+        $newExamsThisMonth = \App\Models\Exam::where('eTeacher_id', $user->uId)
             ->whereMonth('eCreated_at', now()->month)
             ->count();
 
         // Get today's classes (assignments with deadline today)
         $classesToday = \App\Models\TestAssignment::whereIn('exam_id',
-            \App\Models\Exam::where('teacher_id', $user->uId)->pluck('eId')
+            \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId')
         )
             ->whereDate('taDeadline', today())
             ->count();
 
         // Get pending grading
         $pendingGrading = Submission::whereIn('exam_id',
-            \App\Models\Exam::where('teacher_id', $user->uId)->pluck('eId')
+            \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId')
         )
             ->where('sStatus', 'submitted')
             ->whereNull('sGraded_time')
@@ -193,14 +193,14 @@ class TeacherDashboardController extends Controller
 
         // Get deadlines this week
         $deadlinesThisWeek = \App\Models\TestAssignment::whereIn('exam_id',
-            \App\Models\Exam::where('teacher_id', $user->uId)->pluck('eId')
+            \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId')
         )
             ->whereBetween('taDeadline', [now()->startOfWeek(), now()->endOfWeek()])
             ->count();
 
         // Calculate average score
         $avgScore = Submission::whereIn('exam_id',
-            \App\Models\Exam::where('teacher_id', $user->uId)->pluck('eId')
+            \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId')
         )
             ->where('sStatus', 'graded')
             ->whereNotNull('sScore')
@@ -208,14 +208,14 @@ class TeacherDashboardController extends Controller
 
         // Calculate score improvement (compare last 2 weeks)
         $lastWeekAvg = Submission::whereIn('exam_id',
-            \App\Models\Exam::where('teacher_id', $user->uId)->pluck('eId')
+            \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId')
         )
             ->where('sStatus', 'graded')
             ->whereBetween('sSubmit_time', [now()->subWeeks(2), now()->subWeek()])
             ->avg('sScore');
             
         $thisWeekAvg = Submission::whereIn('exam_id',
-            \App\Models\Exam::where('teacher_id', $user->uId)->pluck('eId')
+            \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId')
         )
             ->where('sStatus', 'graded')
             ->whereBetween('sSubmit_time', [now()->subWeek(), now()])
@@ -225,7 +225,7 @@ class TeacherDashboardController extends Controller
 
         // ── Assignment & submission stats ──────────────────────────────────
         // Lấy id các đề của giáo viên này
-        $teacherExamIds = \App\Models\Exam::where('teacher_id', $user->uId)->pluck('eId');
+        $teacherExamIds = \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId');
 
         // Tổng số bài đã giao (TestAssignment của các đề thuộc teacher)
         $totalAssignments = \App\Models\TestAssignment::whereIn('exam_id', $teacherExamIds)->count();
@@ -321,7 +321,7 @@ class TeacherDashboardController extends Controller
             ], 401);
         }
 
-        $examIds = \App\Models\Exam::where('teacher_id', $user->uId)->pluck('eId');
+        $examIds = \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId');
         
         $performanceData = [];
         
@@ -375,7 +375,7 @@ class TeacherDashboardController extends Controller
         $activities = [];
 
         // Recent exams created
-        $recentExams = \App\Models\Exam::where('teacher_id', $user->uId)
+        $recentExams = \App\Models\Exam::where('eTeacher_id', $user->uId)
             ->orderBy('eCreated_at', 'desc')
             ->limit(2)
             ->get();
@@ -395,7 +395,7 @@ class TeacherDashboardController extends Controller
 
         // Recent assignments
         $recentAssignments = \App\Models\TestAssignment::whereIn('exam_id',
-            \App\Models\Exam::where('teacher_id', $user->uId)->pluck('eId')
+            \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId')
         )
             ->orderBy('taCreated_at', 'desc')
             ->limit(2)
@@ -419,7 +419,7 @@ class TeacherDashboardController extends Controller
 
         // Recent grading
         $recentGrading = Submission::whereIn('exam_id',
-            \App\Models\Exam::where('teacher_id', $user->uId)->pluck('eId')
+            \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId')
         )
             ->where('sStatus', 'graded')
             ->whereNotNull('sGraded_time')
@@ -470,7 +470,7 @@ class TeacherDashboardController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
         }
 
-        $teacherExamIds = \App\Models\Exam::where('teacher_id', $user->uId)->pluck('eId');
+        $teacherExamIds = \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId');
         if ($teacherExamIds->isEmpty()) {
             return response()->json(['status' => 'success', 'data' => []]);
         }
@@ -548,7 +548,7 @@ class TeacherDashboardController extends Controller
         // CHỈ tính bài thi VSTEP full skill (mixed) — đề thi chính thức tổng hợp
         // 4 kỹ năng. Loại bỏ các đề lẻ (listening/reading/writing/speaking riêng)
         // và các đề loại khác (IELTS, Kids, Practice).
-        $teacherExamIds = \App\Models\Exam::where('teacher_id', $user->uId)
+        $teacherExamIds = \App\Models\Exam::where('eTeacher_id', $user->uId)
             ->where('eType', 'VSTEP')
             ->where('eSkill', 'mixed')
             ->pluck('eId');
@@ -747,7 +747,7 @@ class TeacherDashboardController extends Controller
         // Get active submissions for teacher's exams
         $activeSessions = Submission::with(['user', 'exam', 'assignment'])
             ->whereHas('exam', function($query) use ($user) {
-                $query->where('teacher_id', $user->uId);
+                $query->where('eTeacher_id', $user->uId);
             })
             ->where('sStatus', 'in_progress')
             ->get()
@@ -821,7 +821,7 @@ class TeacherDashboardController extends Controller
         $submission = Submission::with(['exam', 'user'])
             ->where('sId', $request->submission_id)
             ->whereHas('exam', function($query) use ($user) {
-                $query->where('teacher_id', $user->uId);
+                $query->where('eTeacher_id', $user->uId);
             })
             ->first();
 
@@ -880,7 +880,7 @@ class TeacherDashboardController extends Controller
         $submission = Submission::with(['exam', 'user'])
             ->where('sId', $submissionId)
             ->whereHas('exam', function($query) use ($user) {
-                $query->where('teacher_id', $user->uId);
+                $query->where('eTeacher_id', $user->uId);
             })
             ->first();
 
