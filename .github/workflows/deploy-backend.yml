@@ -30,3 +30,13 @@ jobs:
           command_timeout: 20m
           script: |
             bash /var/www/namthuedu/deploy.sh
+            # ── Dọn sạch cache sau khi deploy để user thấy thay đổi ngay ──
+            cd /var/www/namthuedu/backend
+            php artisan optimize:clear || true
+            php artisan config:clear || true
+            php artisan cache:clear || true
+            php artisan route:clear || true
+            php artisan view:clear || true
+            # Nạp lại config cache cho hiệu năng (tùy chọn, an toàn nếu lỗi)
+            php artisan config:cache || true
+            echo "✅ Cleared backend caches after deploy"
