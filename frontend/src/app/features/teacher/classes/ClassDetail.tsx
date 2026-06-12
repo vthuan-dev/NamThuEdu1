@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router";
 import {
   ArrowLeft, Users, FileText, Megaphone, Target, ArrowRightLeft,
-  Loader2, AlertCircle, Trash2, Plus, UserPlus, Search, Calendar, CheckCircle2,
+  Loader2, AlertCircle, Trash2, Plus, UserPlus, Search, Calendar, CheckCircle2, Info,
 } from "lucide-react";
 import {
   classMgmtApi, ClassItem, ClassStudent, ClassAnnouncement, ClassGoal, ClassAssignmentRow,
@@ -96,10 +96,14 @@ export function ClassDetail() {
       </button>
 
       {/* Class header card */}
-      <div className="bg-white rounded-2xl border border-[#E5E7EB] p-5 sm:p-6 mb-6 cm-rise">
+      <div className="relative bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 sm:p-6 mb-6 cm-rise overflow-hidden">
+        <div className="absolute inset-x-0 top-0 h-1" style={{ background: `linear-gradient(90deg, ${meta.bar}, ${meta.bar}00)` }} />
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start gap-4">
-            <div className={`hidden sm:flex w-12 h-12 rounded-xl items-center justify-center ${meta.soft}`}>
+            <div
+              className="hidden sm:flex w-12 h-12 rounded-2xl items-center justify-center shadow-sm ring-1 ring-black/5"
+              style={{ background: `linear-gradient(135deg, ${meta.bar}1f, ${meta.bar}3d)` }}
+            >
               <Users className="w-6 h-6" style={{ color: meta.bar }} />
             </div>
             <div>
@@ -146,7 +150,7 @@ export function ClassDetail() {
 
       {/* Tab content (re-mounts per tab for a gentle fade-up) */}
       <div key={tab} className="cm-tab-in">
-        {tab === "roster" && <RosterTab classId={classId} students={students} max={cls.max_students} onChanged={load} toast={toast} />}
+        {tab === "roster" && <RosterTab classId={classId} students={students} max={cls.max_students} ageGroup={cls.age_group} onChanged={load} toast={toast} />}
         {tab === "assignments" && <AssignmentsTab assignments={assignments} />}
         {tab === "announcements" && <AnnouncementsTab classId={classId} items={announcements} onChanged={load} toast={toast} />}
         {tab === "goals" && <GoalsTab classId={classId} items={goals} onChanged={load} toast={toast} />}
@@ -219,12 +223,13 @@ function HandoverButton({ classId, pending, onChanged }: { classId: number; pend
 }
 
 // ─── Roster tab ───────────────────────────────────────────────
-function RosterTab({ classId, students, max, onChanged, toast }: any) {
+function RosterTab({ classId, students, max, ageGroup, onChanged, toast }: any) {
   const [enrollOpen, setEnrollOpen] = useState(false);
   const [available, setAvailable] = useState<any[]>([]);
   const [picked, setPicked] = useState<number[]>([]);
   const [loadingAvail, setLoadingAvail] = useState(false);
   const [search, setSearch] = useState("");
+  const classMeta = ageMeta(ageGroup);
 
   const openEnroll = async () => {
     setEnrollOpen(true); setPicked([]); setSearch(""); setLoadingAvail(true);
@@ -232,7 +237,12 @@ function RosterTab({ classId, students, max, onChanged, toast }: any) {
       const res = await classMgmtApi.availableStudents();
       const list = res?.data?.data || res?.data || [];
       const enrolledIds = new Set(students.map((s: ClassStudent) => s.uId));
-      setAvailable((Array.isArray(list) ? list : []).filter((s: any) => !enrolledIds.has(s.uId)));
+      // Một lớp chỉ gồm học viên cùng độ tuổi với lớp — không trộn 2 nhóm role.
+      setAvailable(
+        (Array.isArray(list) ? list : []).filter(
+          (s: any) => !enrolledIds.has(s.uId) && (!ageGroup || s.age_group === ageGroup)
+        )
+      );
     } catch {
       toast.error("Không tải được danh sách học viên.");
     } finally { setLoadingAvail(false); }
@@ -309,6 +319,13 @@ function RosterTab({ classId, students, max, onChanged, toast }: any) {
           </>
         }
       >
+        <div className="flex items-start gap-2.5 mb-4 px-3.5 py-3 rounded-xl bg-gradient-to-br from-teal-50 to-white ring-1 ring-teal-100">
+          <Info className="w-4 h-4 text-[#0D9488] mt-0.5 shrink-0" />
+          <p className="text-sm text-[#374151] leading-relaxed">
+            Lớp dành cho học viên <span className={`font-semibold px-1.5 py-0.5 rounded ${classMeta.pill}`}>{classMeta.label}</span>.
+            Danh sách chỉ hiển thị học viên cùng độ tuổi — mỗi lớp không trộn nhiều nhóm.
+          </p>
+        </div>
         <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm học viên..."
@@ -334,7 +351,13 @@ function RosterTab({ classId, students, max, onChanged, toast }: any) {
           {loadingAvail ? (
             <div className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-[#0D9488]" /></div>
           ) : filtered.length === 0 ? (
-            <p className="p-8 text-center text-sm text-[#6B7280]">Không có học viên phù hợp.</p>
+            <div className="p-8 text-center">
+              <p className="text-sm text-[#6B7280]">
+                {search
+                  ? "Không tìm thấy học viên phù hợp."
+                  : `Không còn học viên ${classMeta.label} nào để thêm.`}
+              </p>
+            </div>
           ) : filtered.map((s, i) => {
             const checked = picked.includes(s.uId);
             return (
@@ -343,8 +366,8 @@ function RosterTab({ classId, students, max, onChanged, toast }: any) {
                   onChange={(e) => setPicked(e.target.checked ? [...picked, s.uId] : picked.filter((x) => x !== s.uId))}
                   className="w-4 h-4 rounded accent-[#0D9488]" />
                 <Avatar name={s.uName} size={32} />
-                <span className="flex-1 text-sm text-[#111827]">{s.uName}</span>
-                <span className="text-xs text-[#9CA3AF]">{s.age_group}</span>
+                <span className="flex-1 text-sm font-medium text-[#111827]">{s.uName}</span>
+                {s.uPhone && <span className="text-xs text-[#9CA3AF] tabular-nums">{s.uPhone}</span>}
               </label>
             );
           })}
