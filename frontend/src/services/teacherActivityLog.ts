@@ -37,6 +37,7 @@ export type TeacherActivityAction =
   | 'student.delete'
   | 'student.restore'
   | 'student.import'
+  | 'student.exam_schedule.create'
   // Blog
   | 'blog.create'
   | 'blog.update'

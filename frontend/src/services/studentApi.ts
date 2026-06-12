@@ -53,6 +53,21 @@ export interface TeacherReminder {
   read_at: string | null;
 }
 
+export interface ExamSchedule {
+  id: number;
+  student_id: number;
+  title: string;
+  exam_type: string | null;
+  exam_date: string;       // YYYY-MM-DD
+  exam_time: string | null; // HH:mm
+  location: string | null;
+  note: string | null;
+  days_until: number | null;
+  is_urgent: boolean;
+  teacher_name: string | null;
+  created_at: string;
+}
+
 export interface UpcomingTest {
   id: number;
   assignment_id: number;
@@ -272,6 +287,12 @@ export const studentApi = {
 
   dismissReminder: (id: number) =>
     api.delete(`/student/reminders/${id}`),
+
+  // Lịch thi sắp tới do giáo viên đặt (popup nhắc nhở trên dashboard)
+  getExamSchedules: () =>
+    api.get<{ status: string; data: { schedules: ExamSchedule[]; count: number } }>(
+      '/student/exam-schedules'
+    ),
 
   // Dashboard specific APIs
   getInProgressTests: () =>

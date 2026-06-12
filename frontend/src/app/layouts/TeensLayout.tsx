@@ -10,6 +10,7 @@ import { studentApi } from '../../services/studentApi';
 import { logout } from '../../services/authApi';
 import { getFullMediaUrl } from '../../utils/mediaUtils';
 import { LogoutOverlay } from '../../components/shared/LogoutOverlay';
+import { ExamReminderPopup } from '../../components/student/ExamReminderPopup';
 import {
   Home, BookOpen, TrendingUp,
   LogOut, Menu, X, Bell, Clock, User, ChevronDown,
@@ -399,6 +400,7 @@ export function TeensLayout() {
           <Outlet />
         </div>
       </main>
+      <ExamReminderPopup />
 
       {/* Result Detail Modal */}
       {activeSubmissionId !== null && (

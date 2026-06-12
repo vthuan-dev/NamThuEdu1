@@ -19,6 +19,7 @@ import {
   UserCheck,
   UserX,
   Calendar,
+  CalendarClock,
   Check,
   AlertTriangle,
   X,
@@ -29,6 +30,7 @@ import { usePageHeader } from "../../../../contexts/TeacherHeaderContext";
 import { ToastContainer } from "../../../../components/ui";
 import { useNavigate } from "react-router";
 import { EditStudentModal } from "./EditStudentModal";
+import { ExamScheduleModal } from "./ExamScheduleModal";
 import { getApiUrl, getAssetUrl } from "../../../../utils/apiConfig";
 
 type TabType = "list" | "deleted";
@@ -80,6 +82,8 @@ export function StudentManagement() {
   ]);
   const [editingStudent, setEditingStudent] = useState<any>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [scheduleStudent, setScheduleStudent] = useState<any>(null);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
   // Filter students by course (frontend only, since backend doesn't have course field)
   const filteredStudents = useMemo(() => {
@@ -519,6 +523,11 @@ export function StudentManagement() {
   const handleEditClick = (student: typeof students[0]) => {
     setEditingStudent(student);
     setIsEditModalOpen(true);
+  };
+
+  const handleScheduleClick = (student: typeof students[0]) => {
+    setScheduleStudent(student);
+    setIsScheduleModalOpen(true);
   };
 
   const handleSaveEdit = async (updatedStudent: any) => {
@@ -1131,6 +1140,13 @@ export function StudentManagement() {
                             <Edit className="w-4 h-4 text-[#6B7280]" />
                           </button>
                           <button 
+                            onClick={(e) => { e.stopPropagation(); handleScheduleClick(student); }}
+                            className="p-2 hover:bg-[#FFF7ED] rounded-lg transition-colors"
+                            title="Lịch thi / nhắc nhở ôn luyện"
+                          >
+                            <CalendarClock className="w-4 h-4 text-[#EA580C]" />
+                          </button>
+                          <button 
                             onClick={(e) => { e.stopPropagation(); handleDeleteClick(student); }}
                             className="p-2 hover:bg-[#FEE2E2] rounded-lg transition-colors"
                             title={t('teacher.students.management.actions.delete')}
@@ -1331,6 +1347,17 @@ export function StudentManagement() {
         }}
         student={editingStudent}
         onSave={handleSaveEdit}
+        toast={toast}
+      />
+
+      {/* Exam Schedule Modal */}
+      <ExamScheduleModal
+        isOpen={isScheduleModalOpen}
+        onClose={() => {
+          setIsScheduleModalOpen(false);
+          setScheduleStudent(null);
+        }}
+        student={scheduleStudent}
         toast={toast}
       />
 

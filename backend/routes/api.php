@@ -36,6 +36,7 @@ use App\Http\Controllers\ExamHighlightController;
 use App\Http\Controllers\ClassAnnouncementController;
 use App\Http\Controllers\ClassGoalController;
 use App\Http\Controllers\AdminHandoverController;
+use App\Http\Controllers\StudentExamScheduleController;
 
 /*
 |--------------------------------------------------------------------------
@@ -183,6 +184,12 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         Route::post('/student/{id}', [UserController::class, 'update']); // _method=PUT spoofing for file uploads
         Route::delete('/student/{id}', [UserController::class, 'destroyStudent']); // Soft delete
         Route::post('/student/{id}/restore', [UserController::class, 'restoreStudent']); // Restore deleted
+
+        // Lịch thi / lịch trình ôn luyện của học viên
+        Route::get('/students/{id}/exam-schedules', [StudentExamScheduleController::class, 'index']);
+        Route::post('/students/{id}/exam-schedules', [StudentExamScheduleController::class, 'store']);
+        Route::put('/exam-schedules/{id}', [StudentExamScheduleController::class, 'update']);
+        Route::delete('/exam-schedules/{id}', [StudentExamScheduleController::class, 'destroy']);
         Route::post('/student/{id}/reset-password', [UserController::class, 'resetStudentPassword']); // Reset password
         Route::delete('/student/{id}/permanent', [UserController::class, 'permanentDeleteStudent']); // Permanent delete
         Route::get('/students/statistics', [UserController::class, 'studentStatistics']);
@@ -544,6 +551,9 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
 
         // Mục tiêu lớp gần nhất (countdown trên dashboard)
         Route::get('/class-goals/next', [StudentTestController::class, 'nextClassGoal']);
+
+        // Lịch thi sắp tới do giáo viên đặt (dùng cho popup nhắc nhở)
+        Route::get('/exam-schedules', [StudentExamScheduleController::class, 'myUpcoming']);
 
         
         // WebSocket Real-time Features

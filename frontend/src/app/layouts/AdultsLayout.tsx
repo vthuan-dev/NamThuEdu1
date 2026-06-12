@@ -20,6 +20,7 @@ import { logout } from '../../services/authApi';
 import { getAuthUser } from '../../utils/authStorage';
 import { getFullMediaUrl } from '../../utils/mediaUtils';
 import { LogoutOverlay } from '../../components/shared/LogoutOverlay';
+import { ExamReminderPopup } from '../../components/student/ExamReminderPopup';
 import {
   Home,
   BookOpen,
@@ -267,6 +268,7 @@ export function AdultsLayout() {
           <Outlet />
         </main>
       </div>
+      <ExamReminderPopup />
     </div>
   );
 }
