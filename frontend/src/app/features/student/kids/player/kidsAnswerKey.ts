@@ -166,6 +166,27 @@ export function buildReviewRows(
         };
       });
     }
+    case 'listen_and_draw_lines': {
+      // Nối tên (label) vào đúng người/vật (hotspot) trên tranh.
+      // Đáp án lưu { [labelIndex]: hotspotIndex }. Đúng khi tên i nối vào hotspot i.
+      // Giữ index gốc để khớp với map đáp án (chỉ bỏ HIỂN THỊ item ví dụ).
+      const allItems: any[] = taskData?.items ?? [];
+      const rows: ReviewRow[] = [];
+      allItems.forEach((it: any, i: number) => {
+        if (it?.isExample || it?.is_example) return; // ví dụ — không chấm
+        const raw = get(String(i));
+        const matchedIdx = raw === '' ? -1 : parseInt(raw, 10);
+        const matchedName =
+          matchedIdx >= 0 && allItems[matchedIdx] ? String(allItems[matchedIdx].name ?? '') : '';
+        rows.push({
+          label: String(it?.name ?? `Mục ${i + 1}`),
+          student: matchedName || '—',
+          correct: String(it?.name ?? ''),
+          isCorrect: matchedIdx === i,
+        });
+      });
+      return rows;
+    }
     default:
       return [];
   }

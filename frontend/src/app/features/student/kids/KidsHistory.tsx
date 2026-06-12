@@ -78,7 +78,11 @@ export function KidsHistory() {
   });
 
   const subs = useMemo(() => {
-    const list = (data as any)?.data?.data?.submissions as Submission[] | undefined;
+    // Backend trả về Laravel paginator → mảng nằm ở data.data.data (không phải .submissions)
+    const rawData = (data as any)?.data?.data;
+    const list: Submission[] = Array.isArray(rawData)
+      ? rawData
+      : (rawData?.data ?? rawData?.submissions ?? []);
     return (list ?? []).filter(s => !isAdultExam(s));
   }, [data]);
 

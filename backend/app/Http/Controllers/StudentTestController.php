@@ -2555,6 +2555,20 @@ class StudentTestController extends Controller
                 }
                 return ['manual' => false, 'ratio' => $correct / $n];
             }
+            case 'listen_and_draw_lines': {
+                // Nối tên (label) vào đúng hotspot trên tranh.
+                // Player lưu { [labelIndex]: hotspotIndex }. Đúng khi label i nối vào hotspot i.
+                $items = $data['items'] ?? [];
+                $gradable = 0; $correct = 0;
+                foreach ($items as $i => $it) {
+                    if (!empty($it['isExample']) || !empty($it['is_example'])) continue; // ví dụ
+                    $gradable++;
+                    $got = $map[(string) $i] ?? '';
+                    if ($got !== '' && (int) $got === (int) $i) $correct++;
+                }
+                if ($gradable === 0) return ['manual' => false, 'ratio' => 0.0];
+                return ['manual' => false, 'ratio' => $correct / $gradable];
+            }
             default:
                 // Nói / viết tự do / dạng chưa hỗ trợ → giáo viên chấm tay
                 return ['manual' => true, 'ratio' => 0.0];
