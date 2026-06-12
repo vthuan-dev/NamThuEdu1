@@ -815,6 +815,14 @@ export function StudentExamBrowser() {
   const vstepCount = exams.filter((e) => e.type === "VSTEP").length;
   const ieltsCount = exams.filter((e) => e.type === "IELTS").length;
 
+  // ─── Phân trang: 12 đề / trang ───────────────────────────────────────────
+  const PAGE_SIZE = 12;
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [activeTab, debouncedSearch, sortBy, durationFilter]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageSafe = Math.min(page, totalPages);
+  const paged = filtered.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
+
   const tabs: { key: TabType; label: string; count: number; color: string; bg: string }[] = [
     { key: "ALL",   label: "Tất cả", count: exams.length, color: PURPLE,      bg: PURPLE_LIGHT },
     { key: "VSTEP", label: "VSTEP",  count: vstepCount,   color: VSTEP_COLOR, bg: VSTEP_BG },
@@ -1117,15 +1125,44 @@ export function StudentExamBrowser() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {filtered.map((exam, idx) => (
+            {paged.map((exam, idx) => (
               <ExamCard
                 key={exam.id}
                 exam={exam}
-                idx={idx}
+                idx={(pageSafe - 1) * PAGE_SIZE + idx}
                 highlight={debouncedSearch}
                 recentAttemptTime={recentAttemptsMap.get(exam.id)}
               />
             ))}
+          </div>
+        )}
+
+        {/* ── Phân trang ── */}
+        {!isLoading && !isError && filtered.length > PAGE_SIZE && (
+          <div className="flex items-center justify-center gap-1.5 mt-8">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={pageSafe <= 1}
+              className="px-3 py-2 rounded-lg text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              ← Trước
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPage(p)}
+                className="min-w-[38px] h-[38px] rounded-lg text-sm font-bold transition-colors"
+                style={p === pageSafe
+                  ? { background: `linear-gradient(135deg, ${PURPLE}, ${PURPLE_MID})`, color: "#fff" }
+                  : { background: "#fff", border: "1px solid #E2E8F0", color: "#475569" }}>
+                {p}
+              </button>
+            ))}
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={pageSafe >= totalPages}
+              className="px-3 py-2 rounded-lg text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              Sau →
+            </button>
           </div>
         )}
       </div>
