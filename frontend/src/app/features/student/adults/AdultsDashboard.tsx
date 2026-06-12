@@ -668,7 +668,7 @@ export function AdultsDashboard() {
       </div>
 
       {/* Main content */}
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-5">
 
         {/* Error banner */}
         {error && (
@@ -721,9 +721,9 @@ export function AdultsDashboard() {
         </section>
 
         {/* ─── Main grid: 3+2 ──────────────────────────────────── */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-          <div className="lg:col-span-3 space-y-6">
+          <div className="space-y-5">
 
             {/* Next test card */}
             {nextAction ? (
@@ -903,7 +903,7 @@ export function AdultsDashboard() {
           </div>
 
           {/* RIGHT: Reminders + Performance + Streak */}
-          <div className="lg:col-span-2 space-y-5">
+          <div className="space-y-5">
 
             {/* Reminders — premium sidebar card */}
             {visibleReminders.length > 0 && (
