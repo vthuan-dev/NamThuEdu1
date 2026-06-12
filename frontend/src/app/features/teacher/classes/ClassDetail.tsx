@@ -95,30 +95,31 @@ export function ClassDetail() {
         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" /> Danh sách lớp
       </button>
 
-      {/* Class header card */}
-      <div className="relative bg-white rounded-2xl border border-[#E5E7EB] shadow-sm p-5 sm:p-6 mb-6 cm-rise overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-1" style={{ background: `linear-gradient(90deg, ${meta.bar}, ${meta.bar}00)` }} />
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-start gap-4">
+      {/* Class header card — compact */}
+      <div className="relative bg-white rounded-2xl border border-[#E5E7EB] shadow-sm pl-5 pr-4 py-3.5 mb-6 cm-rise overflow-hidden">
+        <div className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: meta.bar }} />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div
-              className="hidden sm:flex w-12 h-12 rounded-2xl items-center justify-center shadow-sm ring-1 ring-black/5"
+              className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center ring-1 ring-black/5 shrink-0"
               style={{ background: `linear-gradient(135deg, ${meta.bar}1f, ${meta.bar}3d)` }}
             >
-              <Users className="w-6 h-6" style={{ color: meta.bar }} />
+              <Users className="w-5 h-5" style={{ color: meta.bar }} />
             </div>
-            <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-bold text-[#111827] tracking-tight">{cls.cName}</h1>
-                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${meta.pill}`}>{meta.label}</span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg sm:text-xl font-bold text-[#111827] tracking-tight truncate">{cls.cName}</h1>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${meta.pill}`}>{meta.label}</span>
+                {pendingHandover && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 ring-1 ring-amber-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 cm-dot-pulse" /> Chờ bàn giao
+                  </span>
+                )}
               </div>
-              <p className="text-sm text-[#6B7280] mt-1.5">
-                <span className="font-semibold text-[#374151]">{students.length}</span>/{cls.max_students} học viên
+              <p className="text-xs sm:text-sm text-[#6B7280] mt-0.5 inline-flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-gray-400" />
+                <span><span className="font-semibold text-[#374151] tabular-nums">{students.length}</span>/{cls.max_students} học viên</span>
               </p>
-              {pendingHandover && (
-                <span className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 ring-1 ring-amber-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 cm-dot-pulse" /> Đang chờ admin bàn giao
-                </span>
-              )}
             </div>
           </div>
           <HandoverButton classId={classId} pending={!!pendingHandover} onChanged={load} />
