@@ -2,12 +2,15 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router";
 import {
   ArrowLeft, Users, FileText, Megaphone, Target, ArrowRightLeft,
-  Loader2, AlertCircle, Trash2, Plus, X, UserPlus,
+  Loader2, AlertCircle, Trash2, Plus, UserPlus, Search, Calendar, CheckCircle2,
 } from "lucide-react";
 import {
   classMgmtApi, ClassItem, ClassStudent, ClassAnnouncement, ClassGoal, ClassAssignmentRow,
 } from "../../../../services/classMgmtApi";
 import { useToastContext } from "../../../../contexts/ToastContext";
+import {
+  ageMeta, Avatar, Modal, Field, inputClass, btnPrimary, btnGhost,
+} from "./classMgmtUi";
 
 type TabKey = "roster" | "assignments" | "announcements" | "goals";
 
@@ -56,43 +59,70 @@ export function ClassDetail() {
   useEffect(() => { load(); }, [load]);
 
   if (loading) {
-    return <div className="p-8 min-h-screen flex items-center justify-center bg-[#F9FAFB]"><Loader2 className="w-10 h-10 text-[#0D9488] animate-spin" /></div>;
+    return (
+      <div className="p-8 min-h-screen flex items-center justify-center bg-[#F9FAFB]">
+        <div className="text-center">
+          <Loader2 className="w-9 h-9 text-[#0D9488] animate-spin mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Đang tải lớp học...</p>
+        </div>
+      </div>
+    );
   }
   if (error || !cls) {
     return (
       <div className="p-8 min-h-screen flex items-center justify-center bg-[#F9FAFB]">
-        <div className="text-center bg-white rounded-2xl p-8 border border-red-200">
-          <AlertCircle className="w-10 h-10 text-red-600 mx-auto mb-3" />
+        <div className="text-center bg-white rounded-2xl p-8 border border-red-100 shadow-sm cm-rise">
+          <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
           <p className="text-red-600 font-semibold mb-4">{error}</p>
-          <button onClick={() => navigate("/giao-vien/lop-hoc")} className="px-6 py-2 bg-[#0D9488] text-white rounded-xl">Về danh sách lớp</button>
+          <button onClick={() => navigate("/giao-vien/lop-hoc")} className={`${btnPrimary} mx-auto`}>Về danh sách lớp</button>
         </div>
       </div>
     );
   }
 
+  const meta = ageMeta(cls.age_group);
+
+  const counts: Record<TabKey, number> = {
+    roster: students.length,
+    assignments: assignments.length,
+    announcements: announcements.length,
+    goals: goals.filter((g) => g.status === "active").length,
+  };
+
   return (
-    <div className="p-8 min-h-screen bg-[#F9FAFB]">
-      <button onClick={() => navigate("/giao-vien/lop-hoc")} className="flex items-center gap-2 text-[#6B7280] hover:text-[#111827] mb-4">
-        <ArrowLeft className="w-4 h-4" /> Danh sách lớp
+    <div className="p-6 sm:p-8 min-h-screen bg-[#F9FAFB]">
+      <button onClick={() => navigate("/giao-vien/lop-hoc")} className="inline-flex items-center gap-1.5 text-sm text-[#6B7280] hover:text-[#111827] mb-4 transition-colors group">
+        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" /> Danh sách lớp
       </button>
 
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-[#111827]">{cls.cName}</h1>
-          <p className="text-sm text-[#6B7280] mt-1">
-            {students.length} học viên · Độ tuổi {cls.age_group}
-          </p>
-          {pendingHandover && (
-            <span className="inline-flex items-center gap-1 mt-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-              <ArrowRightLeft className="w-3 h-3" /> Đang chờ admin bàn giao
-            </span>
-          )}
+      {/* Class header card */}
+      <div className="bg-white rounded-2xl border border-[#E5E7EB] p-5 sm:p-6 mb-6 cm-rise">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className={`hidden sm:flex w-12 h-12 rounded-xl items-center justify-center ${meta.soft}`}>
+              <Users className="w-6 h-6" style={{ color: meta.bar }} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-bold text-[#111827] tracking-tight">{cls.cName}</h1>
+                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${meta.pill}`}>{meta.label}</span>
+              </div>
+              <p className="text-sm text-[#6B7280] mt-1.5">
+                <span className="font-semibold text-[#374151]">{students.length}</span>/{cls.max_students} học viên
+              </p>
+              {pendingHandover && (
+                <span className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 ring-1 ring-amber-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 cm-dot-pulse" /> Đang chờ admin bàn giao
+                </span>
+              )}
+            </div>
+          </div>
+          <HandoverButton classId={classId} pending={!!pendingHandover} onChanged={load} />
         </div>
-        <HandoverButton classId={classId} pending={!!pendingHandover} onChanged={load} />
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-[#E5E7EB] mb-6">
+      <div className="flex gap-1 border-b border-[#E5E7EB] mb-6 overflow-x-auto">
         {TABS.map((t) => {
           const Icon = t.icon;
           const active = tab === t.key;
@@ -100,18 +130,27 @@ export function ClassDetail() {
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-all focus:outline-none focus:ring-2 focus:ring-[#0D9488] rounded-t ${active ? "border-[#0D9488] text-[#0D9488]" : "border-transparent text-[#6B7280] hover:text-[#111827]"}`}
+              className={`relative flex items-center gap-2 px-4 py-3 text-sm font-semibold whitespace-nowrap transition-colors focus:outline-none ${active ? "text-[#0D9488]" : "text-[#6B7280] hover:text-[#111827]"}`}
             >
               <Icon className="w-4 h-4" /> {t.label}
+              {counts[t.key] > 0 && (
+                <span className={`ml-0.5 min-w-[20px] px-1.5 py-0.5 rounded-full text-[11px] font-bold tabular-nums ${active ? "bg-teal-50 text-[#0D9488]" : "bg-gray-100 text-gray-500"}`}>
+                  {counts[t.key]}
+                </span>
+              )}
+              <span className={`absolute left-2 right-2 -bottom-px h-0.5 rounded-full bg-[#0D9488] transition-all duration-300 ${active ? "opacity-100 scale-x-100" : "opacity-0 scale-x-0"}`} />
             </button>
           );
         })}
       </div>
 
-      {tab === "roster" && <RosterTab classId={classId} students={students} onChanged={load} toast={toast} />}
-      {tab === "assignments" && <AssignmentsTab assignments={assignments} />}
-      {tab === "announcements" && <AnnouncementsTab classId={classId} items={announcements} onChanged={load} toast={toast} />}
-      {tab === "goals" && <GoalsTab classId={classId} items={goals} onChanged={load} toast={toast} />}
+      {/* Tab content (re-mounts per tab for a gentle fade-up) */}
+      <div key={tab} className="cm-tab-in">
+        {tab === "roster" && <RosterTab classId={classId} students={students} max={cls.max_students} onChanged={load} toast={toast} />}
+        {tab === "assignments" && <AssignmentsTab assignments={assignments} />}
+        {tab === "announcements" && <AnnouncementsTab classId={classId} items={announcements} onChanged={load} toast={toast} />}
+        {tab === "goals" && <GoalsTab classId={classId} items={goals} onChanged={load} toast={toast} />}
+      </div>
     </div>
   );
 }
@@ -146,39 +185,41 @@ function HandoverButton({ classId, pending, onChanged }: { classId: number; pend
   };
 
   if (pending) {
-    return <button onClick={cancel} className="px-4 py-2.5 border border-amber-300 text-amber-700 rounded-xl font-semibold hover:bg-amber-50">Hủy yêu cầu bàn giao</button>;
+    return (
+      <button onClick={cancel} className="shrink-0 inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-amber-300 text-amber-700 rounded-xl font-semibold hover:bg-amber-50 active:scale-[0.98] transition-all">
+        Hủy yêu cầu bàn giao
+      </button>
+    );
   }
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="flex items-center gap-2 px-4 py-2.5 border border-[#E5E7EB] text-[#374151] rounded-xl font-semibold hover:bg-gray-50">
+      <button onClick={() => setOpen(true)} className={`${btnGhost} shrink-0`}>
         <ArrowRightLeft className="w-4 h-4" /> Xin bàn giao lớp
       </button>
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">Xin bàn giao lớp</h2>
-              <button onClick={() => setOpen(false)} aria-label="Đóng"><X className="w-5 h-5" /></button>
-            </div>
-            <p className="text-sm text-[#6B7280] mb-3">Yêu cầu sẽ được gửi tới admin để chỉ định giáo viên tiếp nhận.</p>
-            <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="Lý do (không bắt buộc)"
-              className="w-full px-3 py-2.5 border border-[#E5E7EB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0D9488]" />
-            <div className="flex gap-3 mt-5">
-              <button onClick={() => setOpen(false)} className="flex-1 px-4 py-2.5 border border-[#E5E7EB] rounded-xl font-semibold hover:bg-gray-50">Hủy</button>
-              <button onClick={submit} disabled={busy} className="flex-1 px-4 py-2.5 bg-[#0D9488] text-white rounded-xl font-semibold hover:bg-[#0F766E] disabled:opacity-60 flex items-center justify-center gap-2">
-                {busy && <Loader2 className="w-4 h-4 animate-spin" />} Gửi yêu cầu
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Xin bàn giao lớp"
+        footer={
+          <>
+            <button onClick={() => setOpen(false)} className={`${btnGhost} flex-1`}>Hủy</button>
+            <button onClick={submit} disabled={busy} className={`${btnPrimary} flex-1`}>
+              {busy && <Loader2 className="w-4 h-4 animate-spin" />} Gửi yêu cầu
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-[#6B7280] mb-3">Yêu cầu sẽ được gửi tới admin để chỉ định giáo viên tiếp nhận lớp.</p>
+        <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="Lý do (không bắt buộc)"
+          className={`${inputClass} resize-none`} />
+      </Modal>
     </>
   );
 }
 
 // ─── Roster tab ───────────────────────────────────────────────
-function RosterTab({ classId, students, onChanged, toast }: any) {
+function RosterTab({ classId, students, max, onChanged, toast }: any) {
   const [enrollOpen, setEnrollOpen] = useState(false);
   const [available, setAvailable] = useState<any[]>([]);
   const [picked, setPicked] = useState<number[]>([]);
@@ -186,7 +227,7 @@ function RosterTab({ classId, students, onChanged, toast }: any) {
   const [search, setSearch] = useState("");
 
   const openEnroll = async () => {
-    setEnrollOpen(true); setPicked([]); setLoadingAvail(true);
+    setEnrollOpen(true); setPicked([]); setSearch(""); setLoadingAvail(true);
     try {
       const res = await classMgmtApi.availableStudents();
       const list = res?.data?.data || res?.data || [];
@@ -222,79 +263,103 @@ function RosterTab({ classId, students, onChanged, toast }: any) {
   };
 
   const filtered = available.filter((s) => (s.uName || "").toLowerCase().includes(search.toLowerCase()));
+  const isFull = students.length >= max;
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
-        <button onClick={openEnroll} className="flex items-center gap-2 px-4 py-2.5 bg-[#0D9488] text-white rounded-xl font-semibold hover:bg-[#0F766E]">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <p className="text-sm text-[#6B7280]">
+          {students.length > 0 ? `${students.length} học viên trong lớp` : ""}
+        </p>
+        <button onClick={openEnroll} disabled={isFull} className={`${btnPrimary} ${isFull ? "" : ""}`} title={isFull ? "Lớp đã đầy" : ""}>
           <UserPlus className="w-4 h-4" /> Thêm học viên
         </button>
       </div>
+
       {students.length === 0 ? (
-        <EmptyState icon={Users} text="Lớp chưa có học viên nào." />
+        <EmptyState icon={Users} title="Lớp chưa có học viên" text="Thêm học viên để bắt đầu giao đề và theo dõi tiến độ." />
       ) : (
-        <div className="bg-white rounded-2xl border border-[#E5E7EB] divide-y">
-          {students.map((s: ClassStudent) => (
-            <div key={s.uId} className="flex items-center justify-between px-5 py-3">
-              <div>
-                <p className="font-semibold text-[#111827]">{s.uName}</p>
-                <p className="text-sm text-[#6B7280]">{s.uPhone}</p>
+        <div className="bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden">
+          {students.map((s: ClassStudent, i: number) => (
+            <div key={s.uId} className={`flex items-center justify-between px-4 sm:px-5 py-3 hover:bg-gray-50/70 transition-colors ${i > 0 ? "border-t border-gray-100" : ""}`}>
+              <div className="flex items-center gap-3 min-w-0">
+                <Avatar name={s.uName} />
+                <div className="min-w-0">
+                  <p className="font-semibold text-[#111827] truncate">{s.uName}</p>
+                  <p className="text-sm text-[#6B7280]">{s.uPhone || "—"}</p>
+                </div>
               </div>
-              <button onClick={() => removeStudent(s)} aria-label="Xóa khỏi lớp" className="p-2 hover:bg-red-50 rounded-lg">
-                <Trash2 className="w-4 h-4 text-red-500" />
+              <button onClick={() => removeStudent(s)} aria-label="Xóa khỏi lớp" className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0">
+                <Trash2 className="w-4 h-4" />
               </button>
             </div>
           ))}
         </div>
       )}
 
-      {enrollOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">Thêm học viên vào lớp</h2>
-              <button onClick={() => setEnrollOpen(false)} aria-label="Đóng"><X className="w-5 h-5" /></button>
-            </div>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm học viên..."
-              className="w-full px-3 py-2.5 border border-[#E5E7EB] rounded-xl mb-3 focus:outline-none focus:ring-2 focus:ring-[#0D9488]" />
-            <div className="flex-1 overflow-y-auto border border-[#E5E7EB] rounded-xl divide-y">
-              {loadingAvail ? (
-                <div className="p-6 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-[#0D9488]" /></div>
-              ) : filtered.length === 0 ? (
-                <p className="p-6 text-center text-sm text-[#6B7280]">Không có học viên phù hợp.</p>
-              ) : filtered.map((s) => (
-                <label key={s.uId} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50">
-                  <input type="checkbox" checked={picked.includes(s.uId)}
-                    onChange={(e) => setPicked(e.target.checked ? [...picked, s.uId] : picked.filter((x) => x !== s.uId))}
-                    className="w-4 h-4 text-[#0D9488]" />
-                  <span className="flex-1">{s.uName} <span className="text-xs text-[#9CA3AF]">({s.age_group})</span></span>
-                </label>
-              ))}
-            </div>
-            <div className="flex gap-3 mt-4">
-              <button onClick={() => setEnrollOpen(false)} className="flex-1 px-4 py-2.5 border border-[#E5E7EB] rounded-xl font-semibold hover:bg-gray-50">Hủy</button>
-              <button onClick={doEnroll} className="flex-1 px-4 py-2.5 bg-[#0D9488] text-white rounded-xl font-semibold hover:bg-[#0F766E]">Thêm ({picked.length})</button>
-            </div>
-          </div>
+      <Modal
+        open={enrollOpen}
+        onClose={() => setEnrollOpen(false)}
+        title="Thêm học viên vào lớp"
+        maxWidth="max-w-lg"
+        footer={
+          <>
+            <button onClick={() => setEnrollOpen(false)} className={`${btnGhost} flex-1`}>Hủy</button>
+            <button onClick={doEnroll} disabled={picked.length === 0} className={`${btnPrimary} flex-1`}>Thêm ({picked.length})</button>
+          </>
+        }
+      >
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm học viên..."
+            className={`${inputClass} pl-9`} />
         </div>
-      )}
+        <div className="border border-[#E5E7EB] rounded-xl overflow-hidden max-h-[46vh] overflow-y-auto">
+          {loadingAvail ? (
+            <div className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-[#0D9488]" /></div>
+          ) : filtered.length === 0 ? (
+            <p className="p-8 text-center text-sm text-[#6B7280]">Không có học viên phù hợp.</p>
+          ) : filtered.map((s, i) => {
+            const checked = picked.includes(s.uId);
+            return (
+              <label key={s.uId} className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${checked ? "bg-teal-50/60" : "hover:bg-gray-50"} ${i > 0 ? "border-t border-gray-100" : ""}`}>
+                <input type="checkbox" checked={checked}
+                  onChange={(e) => setPicked(e.target.checked ? [...picked, s.uId] : picked.filter((x) => x !== s.uId))}
+                  className="w-4 h-4 rounded accent-[#0D9488]" />
+                <Avatar name={s.uName} size={32} />
+                <span className="flex-1 text-sm text-[#111827]">{s.uName}</span>
+                <span className="text-xs text-[#9CA3AF]">{s.age_group}</span>
+              </label>
+            );
+          })}
+        </div>
+      </Modal>
     </div>
   );
 }
 
 // ─── Assignments tab ──────────────────────────────────────────
 function AssignmentsTab({ assignments }: { assignments: ClassAssignmentRow[] }) {
-  if (assignments.length === 0) return <EmptyState icon={FileText} text="Lớp chưa được giao đề nào. Giao đề từ Ngân hàng đề." />;
+  if (assignments.length === 0) return <EmptyState icon={FileText} title="Chưa giao đề nào" text="Giao đề cho lớp từ Ngân hàng đề để học viên bắt đầu làm bài." />;
   return (
-    <div className="bg-white rounded-2xl border border-[#E5E7EB] divide-y">
-      {assignments.map((a) => (
-        <div key={a.taId} className="flex items-center justify-between px-5 py-3">
-          <div>
-            <p className="font-semibold text-[#111827]">{a.exam_title || `Đề #${a.exam_id}`}</p>
-            <p className="text-sm text-[#6B7280]">
-              {a.taDeadline ? `Hạn: ${new Date(a.taDeadline).toLocaleDateString("vi-VN")}` : "Không hạn"} · {a.submission_count} bài nộp
-            </p>
+    <div className="bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden">
+      {assignments.map((a, i) => (
+        <div key={a.taId} className={`flex items-center justify-between gap-3 px-5 py-4 hover:bg-gray-50/70 transition-colors ${i > 0 ? "border-t border-gray-100" : ""}`}>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-lg bg-teal-50 flex items-center justify-center shrink-0">
+              <FileText className="w-4 h-4 text-[#0D9488]" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-[#111827] truncate">{a.exam_title || `Đề #${a.exam_id}`}</p>
+              <p className="text-sm text-[#6B7280] inline-flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5" />
+                {a.taDeadline ? `Hạn: ${new Date(a.taDeadline).toLocaleDateString("vi-VN")}` : "Không hạn"}
+              </p>
+            </div>
           </div>
+          <span className="shrink-0 px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 tabular-nums">
+            {a.submission_count} bài nộp
+          </span>
         </div>
       ))}
     </div>
@@ -327,63 +392,73 @@ function AnnouncementsTab({ classId, items, onChanged, toast }: any) {
     catch (e: any) { toast.error(e?.response?.data?.message || "Không xóa được."); }
   };
 
-  const badge = (p: string) => p === "urgent" ? "bg-red-100 text-red-700" : p === "important" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600";
+  const meta = (p: string) =>
+    p === "urgent" ? { dot: "bg-red-500", label: "Khẩn", chip: "bg-red-50 text-red-600 ring-red-200" }
+    : p === "important" ? { dot: "bg-amber-500", label: "Quan trọng", chip: "bg-amber-50 text-amber-700 ring-amber-200" }
+    : { dot: "bg-gray-300", label: "Thường", chip: "bg-gray-100 text-gray-500 ring-gray-200" };
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
-        <button onClick={() => setOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-[#0D9488] text-white rounded-xl font-semibold hover:bg-[#0F766E]">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <p className="text-sm text-[#6B7280]">{items.length > 0 ? `${items.length} thông báo` : ""}</p>
+        <button onClick={() => setOpen(true)} className={btnPrimary}>
           <Plus className="w-4 h-4" /> Đăng thông báo
         </button>
       </div>
+
       {items.length === 0 ? (
-        <EmptyState icon={Megaphone} text="Chưa có thông báo nào." />
+        <EmptyState icon={Megaphone} title="Chưa có thông báo" text="Đăng thông báo để gửi thông tin tới toàn bộ học viên trong lớp." />
       ) : (
         <div className="space-y-3">
-          {items.map((a: ClassAnnouncement) => (
-            <div key={a.id} className="bg-white rounded-2xl border border-[#E5E7EB] p-5">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="font-bold text-[#111827]">{a.title}</h3>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${badge(a.priority)}`}>{a.priority}</span>
+          {items.map((a: ClassAnnouncement, i: number) => {
+            const m = meta(a.priority);
+            return (
+              <div key={a.id} className="bg-white rounded-2xl border border-[#E5E7EB] p-5 hover:shadow-sm transition-shadow cm-rise" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`w-2 h-2 rounded-full ${m.dot}`} />
+                    <h3 className="font-bold text-[#111827]">{a.title}</h3>
+                    {a.priority !== "normal" && (
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ring-1 ${m.chip}`}>{m.label}</span>
+                    )}
+                  </div>
+                  <button onClick={() => remove(a)} aria-label="Xóa thông báo" className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-                <button onClick={() => remove(a)} aria-label="Xóa thông báo" className="p-1.5 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4 text-red-500" /></button>
+                <p className="text-sm text-[#374151] whitespace-pre-wrap mt-2 leading-relaxed">{a.content}</p>
+                <p className="text-xs text-[#9CA3AF] mt-3">{new Date(a.created_at).toLocaleString("vi-VN")}</p>
               </div>
-              <p className="text-sm text-[#374151] whitespace-pre-wrap">{a.content}</p>
-              <p className="text-xs text-[#9CA3AF] mt-2">{new Date(a.created_at).toLocaleString("vi-VN")}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">Đăng thông báo</h2>
-              <button onClick={() => setOpen(false)} aria-label="Đóng"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="space-y-3">
-              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tiêu đề"
-                className="w-full px-3 py-2.5 border border-[#E5E7EB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0D9488]" />
-              <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={4} placeholder="Nội dung"
-                className="w-full px-3 py-2.5 border border-[#E5E7EB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0D9488]" />
-              <select value={priority} onChange={(e) => setPriority(e.target.value)}
-                className="w-full px-3 py-2.5 border border-[#E5E7EB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0D9488]">
-                <option value="normal">Thường (không đẩy thông báo)</option>
-                <option value="important">Quan trọng (đẩy thông báo)</option>
-                <option value="urgent">Khẩn (đẩy thông báo)</option>
-              </select>
-            </div>
-            <div className="flex gap-3 mt-5">
-              <button onClick={() => setOpen(false)} className="flex-1 px-4 py-2.5 border border-[#E5E7EB] rounded-xl font-semibold hover:bg-gray-50">Hủy</button>
-              <button onClick={create} disabled={busy} className="flex-1 px-4 py-2.5 bg-[#0D9488] text-white rounded-xl font-semibold hover:bg-[#0F766E] disabled:opacity-60 flex items-center justify-center gap-2">
-                {busy && <Loader2 className="w-4 h-4 animate-spin" />} Đăng
-              </button>
-            </div>
-          </div>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Đăng thông báo"
+        footer={
+          <>
+            <button onClick={() => setOpen(false)} className={`${btnGhost} flex-1`}>Hủy</button>
+            <button onClick={create} disabled={busy} className={`${btnPrimary} flex-1`}>
+              {busy && <Loader2 className="w-4 h-4 animate-spin" />} Đăng
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tiêu đề" className={inputClass} />
+          <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={4} placeholder="Nội dung thông báo..." className={`${inputClass} resize-none`} />
+          <Field label="Mức độ ưu tiên" hint="Quan trọng / Khẩn sẽ gửi thông báo đẩy tới học viên.">
+            <select value={priority} onChange={(e) => setPriority(e.target.value)} className={inputClass}>
+              <option value="normal">Thường — không đẩy thông báo</option>
+              <option value="important">Quan trọng — đẩy thông báo</option>
+              <option value="urgent">Khẩn — đẩy thông báo</option>
+            </select>
+          </Field>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }
@@ -416,75 +491,95 @@ function GoalsTab({ classId, items, onChanged, toast }: any) {
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
-        <button onClick={() => setOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-[#0D9488] text-white rounded-xl font-semibold hover:bg-[#0F766E]">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <p className="text-sm text-[#6B7280]">{items.length > 0 ? `${items.length} mục tiêu` : ""}</p>
+        <button onClick={() => setOpen(true)} className={btnPrimary}>
           <Plus className="w-4 h-4" /> Tạo mục tiêu
         </button>
       </div>
+
       {items.length === 0 ? (
-        <EmptyState icon={Target} text="Chưa có mục tiêu nào. Đặt mục tiêu để nhắc động lực học viên mỗi ngày." />
+        <EmptyState icon={Target} title="Chưa có mục tiêu" text="Đặt mục tiêu để hệ thống nhắc động lực học viên mỗi ngày lúc 07:00." />
       ) : (
         <div className="space-y-3">
-          {items.map((g: ClassGoal) => {
+          {items.map((g: ClassGoal, i: number) => {
             const days = Math.ceil((new Date(g.target_date).getTime() - Date.now()) / 86400000);
+            const active = g.status === "active";
+            const urgent = active && days >= 0 && days <= 7;
             return (
-              <div key={g.id} className="bg-white rounded-2xl border border-[#E5E7EB] p-5 flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-[#111827]">{g.goal_title}</h3>
-                    {g.target_level && <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-teal-100 text-teal-700">{g.target_level}</span>}
-                    {g.status !== "active" && <span className="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500">{g.status}</span>}
+              <div key={g.id} className="bg-white rounded-2xl border border-[#E5E7EB] p-5 flex items-center justify-between gap-3 hover:shadow-sm transition-shadow cm-rise" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${active ? "bg-teal-50" : "bg-gray-100"}`}>
+                    {active ? <Target className="w-5 h-5 text-[#0D9488]" /> : <CheckCircle2 className="w-5 h-5 text-gray-400" />}
                   </div>
-                  <p className="text-sm text-[#6B7280] mt-1">
-                    Ngày mục tiêu: {new Date(g.target_date).toLocaleDateString("vi-VN")}
-                    {g.status === "active" && days >= 0 && <span className="text-[#0D9488] font-semibold"> · còn {days} ngày</span>}
-                  </p>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-bold text-[#111827] truncate">{g.goal_title}</h3>
+                      {g.target_level && <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-teal-50 text-teal-700 ring-1 ring-teal-200">{g.target_level}</span>}
+                      {!active && <span className="px-2 py-0.5 rounded-full text-[11px] bg-gray-100 text-gray-500">{g.status === "completed" ? "Hoàn thành" : "Đã hủy"}</span>}
+                    </div>
+                    <p className="text-sm text-[#6B7280] mt-1 inline-flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5" />
+                      {new Date(g.target_date).toLocaleDateString("vi-VN")}
+                    </p>
+                  </div>
                 </div>
-                <button onClick={() => remove(g)} aria-label="Xóa mục tiêu" className="p-2 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4 text-red-500" /></button>
+                <div className="flex items-center gap-2 shrink-0">
+                  {active && days >= 0 && (
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold tabular-nums ${urgent ? "bg-amber-50 text-amber-700 ring-1 ring-amber-200" : "bg-teal-50 text-[#0D9488] ring-1 ring-teal-200"}`}>
+                      còn {days} ngày
+                    </span>
+                  )}
+                  {active && days < 0 && (
+                    <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600 ring-1 ring-red-200">Quá hạn</span>
+                  )}
+                  <button onClick={() => remove(g)} aria-label="Xóa mục tiêu" className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             );
           })}
         </div>
       )}
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold">Tạo mục tiêu lớp</h2>
-              <button onClick={() => setOpen(false)} aria-label="Đóng"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="space-y-3">
-              <input value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} placeholder="VD: Thi VSTEP B2"
-                className="w-full px-3 py-2.5 border border-[#E5E7EB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0D9488]" />
-              <div>
-                <label className="block text-sm font-medium text-[#374151] mb-1">Ngày mục tiêu</label>
-                <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-[#E5E7EB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0D9488]" />
-              </div>
-              <input value={targetLevel} onChange={(e) => setTargetLevel(e.target.value)} placeholder="Trình độ mục tiêu (VD: B2) — không bắt buộc"
-                className="w-full px-3 py-2.5 border border-[#E5E7EB] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0D9488]" />
-            </div>
-            <div className="flex gap-3 mt-5">
-              <button onClick={() => setOpen(false)} className="flex-1 px-4 py-2.5 border border-[#E5E7EB] rounded-xl font-semibold hover:bg-gray-50">Hủy</button>
-              <button onClick={create} disabled={busy} className="flex-1 px-4 py-2.5 bg-[#0D9488] text-white rounded-xl font-semibold hover:bg-[#0F766E] disabled:opacity-60 flex items-center justify-center gap-2">
-                {busy && <Loader2 className="w-4 h-4 animate-spin" />} Tạo
-              </button>
-            </div>
-          </div>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Tạo mục tiêu lớp"
+        footer={
+          <>
+            <button onClick={() => setOpen(false)} className={`${btnGhost} flex-1`}>Hủy</button>
+            <button onClick={create} disabled={busy} className={`${btnPrimary} flex-1`}>
+              {busy && <Loader2 className="w-4 h-4 animate-spin" />} Tạo
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <Field label="Tên mục tiêu *">
+            <input autoFocus value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} placeholder="VD: Thi VSTEP B2" className={inputClass} />
+          </Field>
+          <Field label="Ngày mục tiêu *">
+            <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className={inputClass} />
+          </Field>
+          <Field label="Trình độ mục tiêu" hint="Không bắt buộc — VD: B2, IELTS 6.5...">
+            <input value={targetLevel} onChange={(e) => setTargetLevel(e.target.value)} placeholder="VD: B2" className={inputClass} />
+          </Field>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }
 
-function EmptyState({ icon: Icon, text }: { icon: any; text: string }) {
+function EmptyState({ icon: Icon, title, text }: { icon: any; title: string; text: string }) {
   return (
-    <div className="text-center py-16 bg-white rounded-2xl border border-gray-200">
-      <div className="inline-flex items-center justify-center w-14 h-14 bg-gray-100 rounded-full mb-3">
-        <Icon className="w-7 h-7 text-gray-400" />
+    <div className="text-center py-16 bg-white rounded-2xl border border-gray-200 cm-rise">
+      <div className="inline-flex items-center justify-center w-14 h-14 bg-teal-50 rounded-full mb-3 ring-1 ring-teal-100">
+        <Icon className="w-7 h-7 text-[#0D9488]" />
       </div>
-      <p className="text-[#6B7280]">{text}</p>
+      <h3 className="font-semibold text-[#111827] mb-1">{title}</h3>
+      <p className="text-sm text-[#6B7280] max-w-sm mx-auto px-4">{text}</p>
     </div>
   );
 }

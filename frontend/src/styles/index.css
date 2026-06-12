@@ -998,3 +998,69 @@
 .blog-settings-scroll::-webkit-scrollbar-thumb:hover {
   background-color: rgba(100, 116, 139, 0.6);
 }
+
+/* ──────────────────────────────────────────────────────────────
+   Teacher Class Management — refined, tasteful micro-interactions
+   Subtle motion only (200–300ms, ease-out), monochrome-friendly.
+   ────────────────────────────────────────────────────────────── */
+
+/* Card / row entrance — gentle rise. Use inline animation-delay for stagger. */
+@keyframes cm-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.cm-rise {
+  animation: cm-rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Modal panel — quiet scale-in */
+@keyframes cm-modal-in {
+  from { opacity: 0; transform: scale(0.97) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.cm-modal-in {
+  animation: cm-modal-in 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Backdrop — fade + soft blur */
+@keyframes cm-backdrop-in {
+  from { opacity: 0; backdrop-filter: blur(0); }
+  to   { opacity: 1; backdrop-filter: blur(3px); }
+}
+.cm-backdrop-in {
+  animation: cm-backdrop-in 0.2s ease-out;
+}
+
+/* Tab content — fade up on switch */
+@keyframes cm-tab-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.cm-tab-in {
+  animation: cm-tab-in 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Thin capacity bar fill — animate width on mount */
+@keyframes cm-bar-fill {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.cm-bar-fill {
+  transform-origin: left center;
+  animation: cm-bar-fill 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Soft pulse for the "pending handover" dot */
+@keyframes cm-dot-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45); }
+  50%      { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0); }
+}
+.cm-dot-pulse {
+  animation: cm-dot-pulse 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cm-rise, .cm-modal-in, .cm-backdrop-in, .cm-tab-in, .cm-bar-fill, .cm-dot-pulse {
+    animation: none !important;
+  }
+}
