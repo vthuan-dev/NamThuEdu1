@@ -1907,24 +1907,19 @@ function LiveMicWaveform({ stream }: { stream: MediaStream | null }) {
   return <canvas ref={canvasRef} width={400} height={150} className="w-full h-[150px] bg-slate-200 rounded" />;
 }
 
-function buildSpeakingPrompt(part: SpeakingPart, partNumber: number): string {
-  if (partNumber === 1 && part.part1Data) {
-    const topics = part.part1Data.map((t, i) => {
-      const linker = i === 0 ? "Let's start with the first topic." : i === 1 ? "Now, let's move on to the next topic." : "Finally, let's talk about another topic.";
-      return `${linker} ${t.topicName}. ${t.questions.join(" ")}`;
-    }).join(" ");
-    return `Hello, and welcome to the Speaking section. In Part 1, Social Interaction, I will ask you some questions about familiar topics. You will have three minutes. Now, let's begin. ${topics} That is the end of Part 1. Please start speaking after the beep.`;
-  }
-  if (partNumber === 2 && part.part2Data) {
-    const solutions = part.part2Data.solutions.map((s, i) => `Option ${String.fromCharCode(65 + i)}: ${s}.`).join(" ");
-    return `Welcome to Part 2, Solution Discussion. Here is the situation. ${part.part2Data.situation} Here are your three options. ${solutions} ${part.part2Data.question} Please start speaking after the beep.`;
-  }
-  if (partNumber === 3 && part.part3Data) {
-    const ideas = part.part3Data.suggestedIdeas?.length ? `Some ideas you may consider include: ${part.part3Data.suggestedIdeas.join(", ")}. ` : "";
-    const follow = part.part3Data.followUpQuestions.map((q, i) => `${i + 1}. ${q}`).join(" ");
-    return `Welcome to Part 3, Topic Development. Your topic is: ${part.part3Data.mainTopic}. ${ideas}Please also address the following questions. ${follow} Now, please begin after the beep.`;
-  }
-  return "";
+// Chỉ thông báo NGẮN GỌN học viên đang ở Part mấy + thời gian nói,
+// KHÔNG đọc lại toàn bộ đề (đề đã hiển thị trên màn hình) để tiết kiệm thời gian.
+function buildSpeakingPrompt(_part: SpeakingPart, partNumber: number): string {
+  const PART_NAMES: Record<number, string> = {
+    1: "Social Interaction",
+    2: "Solution Discussion",
+    3: "Topic Development",
+  };
+  const recSec = SPEAKING_TIMES[partNumber]?.recSec ?? 180;
+  const minutes = Math.max(1, Math.round(recSec / 60));
+  const name = PART_NAMES[partNumber];
+  const intro = name ? `Part ${partNumber}, ${name}.` : `Part ${partNumber}.`;
+  return `${intro} You have ${minutes} minute${minutes > 1 ? "s" : ""}. Please read the question on the screen, then start speaking after the beep.`;
 }
 
 function formatPartContent(part: SpeakingPart, partNumber: number): React.ReactNode {

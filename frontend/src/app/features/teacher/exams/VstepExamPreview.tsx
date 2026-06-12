@@ -1194,57 +1194,19 @@ function formatPartContent(part: SpeakingPart, partNumber: number): React.ReactN
   return null;
 }
 
-/* ── Build TTS prompt from part data ──────────────────── */
-function buildSpeakingPrompt(part: SpeakingPart, partNumber: number): string {
-  if (partNumber === 1 && part.part1Data) {
-    const topics = part.part1Data
-      .map((t, i) => {
-        const linker = i === 0 ? "Let's start with the first topic." : i === 1 ? "Now, let's move on to the next topic." : "Finally, let's talk about another topic.";
-        return `${linker} ${t.topicName}. ${t.questions.join(" ")}`;
-      })
-      .join(" ");
-    return (
-      `Hello, and welcome to the Speaking section of the V-STEP exam. ` +
-      `In Part 1, also called Social Interaction, I will ask you some questions about familiar topics. ` +
-      `You will have three minutes to answer all of the questions. Please answer each question with at least two or three sentences. ` +
-      `Now, let's begin. ${topics} ` +
-      `That is the end of Part 1. When you are ready, please start speaking after the beep.`
-    );
-  }
-  if (partNumber === 2 && part.part2Data) {
-    const solutions = part.part2Data.solutions
-      .map((s, i) => `Option ${String.fromCharCode(65 + i)}: ${s}.`)
-      .join(" ");
-    return (
-      `Welcome to Part 2 of the Speaking test, the Solution Discussion. ` +
-      `In this part, you will be given a situation along with three possible solutions. ` +
-      `Your task is to discuss the advantages and disadvantages of each option, then choose the best one and explain why. ` +
-      `You will have one minute to prepare and four minutes to speak. ` +
-      `Here is the situation. ${part.part2Data.situation} ` +
-      `Here are your three options. ${solutions} ` +
-      `${part.part2Data.question} ` +
-      `Please start speaking after the beep.`
-    );
-  }
-  if (partNumber === 3 && part.part3Data) {
-    const ideas = part.part3Data.suggestedIdeas?.length
-      ? `Some ideas you may consider include: ${part.part3Data.suggestedIdeas.join(", ")}. `
-      : "";
-    const follow = part.part3Data.followUpQuestions
-      .map((q, i) => `${i + 1}. ${q}`)
-      .join(" ");
-    return (
-      `Welcome to Part 3, the final part of the Speaking test, called Topic Development. ` +
-      `In this part, you will be asked to develop a topic in detail. ` +
-      `You will have ninety seconds to prepare and five minutes to speak. ` +
-      `Try to organize your ideas clearly with examples and personal experience. ` +
-      `Your topic is: ${part.part3Data.mainTopic}. ` +
-      `${ideas}` +
-      `Please also address the following follow-up questions in your talk. ${follow} ` +
-      `Now, please begin your talk after the beep.`
-    );
-  }
-  return "";
+/* ── Build TTS prompt — chỉ thông báo NGẮN GỌN Part + thời gian ──
+   KHÔNG đọc lại toàn bộ đề (đề đã hiển thị trên màn hình) để tiết kiệm thời gian. */
+function buildSpeakingPrompt(_part: SpeakingPart, partNumber: number): string {
+  const PART_NAMES: Record<number, string> = {
+    1: "Social Interaction",
+    2: "Solution Discussion",
+    3: "Topic Development",
+  };
+  const recSec = SPEAKING_TIMES[partNumber]?.recSec ?? 180;
+  const minutes = Math.max(1, Math.round(recSec / 60));
+  const name = PART_NAMES[partNumber];
+  const intro = name ? `Part ${partNumber}, ${name}.` : `Part ${partNumber}.`;
+  return `${intro} You have ${minutes} minute${minutes > 1 ? "s" : ""}. Please read the question on the screen, then start speaking after the beep.`;
 }
 
 /* ── Speaking Question Screen — image 3/4 style ───────── */
