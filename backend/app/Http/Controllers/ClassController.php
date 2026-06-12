@@ -310,6 +310,7 @@ class ClassController extends Controller
                 return [
                     'id' => $c->id,
                     'status' => $c->status,
+                    'type' => $c->type,
                     'message' => $c->message,
                     'teacher' => [
                         'uId' => $c->teacher->uId ?? $c->teacher_id,
@@ -511,37 +512,46 @@ class ClassController extends Controller
             ], 404);
         }
 
-        // R2.8: lớp đang chờ bàn giao → không cho xóa.
+        // Không cho trùng yêu cầu đang chờ (bàn giao hoặc xóa).
         $hasPending = ClassHandoverRequest::where('class_id', $id)
             ->where('status', 'pending')->exists();
         if ($hasPending) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Lớp đang chờ bàn giao; không thể xóa.'
+                'message' => 'Lớp đang có yêu cầu chờ admin xử lý.'
             ], 409);
         }
 
-        // R2.7: còn học viên → 409 trừ khi force=true (gỡ hết HV rồi xóa).
+        // R: Xóa lớp phải được admin duyệt → tạo yêu cầu xóa thay vì xóa ngay.
         $count = $this->liveStudentCount($id);
-        if ($count > 0) {
-            if (!$request->boolean('force')) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => "Lớp còn {$count} học viên; vui lòng chuyển hoặc xóa học viên khỏi lớp trước khi xóa lớp."
-                ], 409);
-            }
-            User::where('class_id', $id)->where('uRole', 'student')->update(['class_id' => null]);
-            ClassEnrollment::where('class_id', $id)->delete();
-        }
+        $req = ClassHandoverRequest::create([
+            'class_id'        => $id,
+            'request_type'    => 'deletion',
+            'from_teacher_id' => $user->uId,
+            'status'          => 'pending',
+            'reason'          => $request->input('reason')
+                ?: ($count > 0 ? "Lớp còn {$count} học viên." : 'Yêu cầu xóa lớp.'),
+        ]);
 
-        $class->delete();
+        try {
+            $adminIds = User::where('uRole', 'admin')->whereNull('uDeleted_at')->pluck('uId')->toArray();
+            if (!empty($adminIds)) {
+                (new PushNotificationService())->sendToUsers(
+                    $adminIds,
+                    '🗑️ Yêu cầu xóa lớp',
+                    "GV {$user->uName} xin xóa lớp \"{$class->cName}\".",
+                    ['url' => '/admin/ban-giao-lop']
+                );
+            }
+        } catch (\Exception $e) {
+            \Log::warning('Class deletion request push failed: ' . $e->getMessage());
+        }
 
         return response()->json([
             'status' => 'success',
-            'data' => [
-                'message' => 'Xóa lớp học thành công'
-            ]
-        ]);
+            'data' => $req,
+            'message' => 'Đã gửi yêu cầu xóa lớp tới admin. Lớp sẽ bị xóa sau khi admin duyệt.'
+        ], 201);
     }
 
     /**
@@ -1316,12 +1326,14 @@ class ClassController extends Controller
         $validator = Validator::make($request->all(), [
             'teacher_id' => 'required|integer',
             'message'    => 'nullable|string|max:500',
+            'type'       => 'nullable|in:co_teach,transfer',
         ]);
         if ($validator->fails()) {
             return response()->json(['status' => 'error', 'message' => 'Dữ liệu không hợp lệ.', 'errors' => $validator->errors()], 400);
         }
 
         $teacherId = (int) $request->teacher_id;
+        $type = $request->type === 'transfer' ? 'transfer' : 'co_teach';
 
         if ($teacherId === (int) $user->uId || $teacherId === (int) $class->cTeacher_id) {
             return response()->json(['status' => 'error', 'message' => 'Không thể mời chính chủ lớp.'], 409);
@@ -1342,6 +1354,7 @@ class ClassController extends Controller
             // Mời lại sau khi bị từ chối/gỡ.
             $existing->update([
                 'inviter_id'   => $user->uId,
+                'type'         => $type,
                 'status'       => 'pending',
                 'message'      => $request->message,
                 'responded_at' => null,
@@ -1352,18 +1365,18 @@ class ClassController extends Controller
                 'class_id'   => $id,
                 'inviter_id' => $user->uId,
                 'teacher_id' => $teacherId,
+                'type'       => $type,
                 'status'     => 'pending',
                 'message'    => $request->message,
             ]);
         }
 
         try {
-            (new PushNotificationService())->sendToUsers(
-                [$teacherId],
-                '🤝 Lời mời cùng quản lý lớp',
-                "GV {$user->uName} mời bạn cùng quản lý lớp \"{$class->cName}\".",
-                ['url' => '/giao-vien/lop-hoc']
-            );
+            $title = $type === 'transfer' ? '🔁 Lời mời nhận chuyển lớp' : '🤝 Lời mời cùng quản lý lớp';
+            $body = $type === 'transfer'
+                ? "GV {$user->uName} muốn chuyển quyền chủ lớp \"{$class->cName}\" cho bạn."
+                : "GV {$user->uName} mời bạn cùng quản lý lớp \"{$class->cName}\".";
+            (new PushNotificationService())->sendToUsers([$teacherId], $title, $body, ['url' => '/giao-vien/lop-hoc']);
         } catch (\Exception $e) {
             \Log::warning('Co-teacher invite push failed: ' . $e->getMessage());
         }
@@ -1371,7 +1384,7 @@ class ClassController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => $invite,
-            'message' => 'Đã gửi lời mời cùng quản lý lớp.'
+            'message' => $type === 'transfer' ? 'Đã gửi lời mời chuyển quyền chủ lớp.' : 'Đã gửi lời mời cùng quản lý lớp.'
         ], 201);
     }
 
@@ -1422,6 +1435,7 @@ class ClassController extends Controller
             ->map(function ($c) {
                 return [
                     'id' => $c->id,
+                    'type' => $c->type,
                     'message' => $c->message,
                     'invited_by' => $c->inviter->uName ?? null,
                     'class' => [
@@ -1462,27 +1476,56 @@ class ClassController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Không tìm thấy lời mời đang chờ.'], 404);
         }
 
-        $invite->status = $request->action === 'accept' ? 'accepted' : 'declined';
-        $invite->responded_at = now();
-        $invite->save();
+        $class = Classes::where('cId', $invite->class_id)->first();
+        $isTransfer = $invite->type === 'transfer';
+        $accept = $request->action === 'accept';
+        $previousOwnerId = $class->cTeacher_id ?? null;
 
-        // Báo cho chủ lớp biết kết quả.
+        DB::transaction(function () use ($invite, $accept, $isTransfer, $class) {
+            $invite->status = $accept ? 'accepted' : 'declined';
+            $invite->responded_at = now();
+            $invite->save();
+
+            if ($accept && $isTransfer && $class) {
+                // Chuyển quyền chủ lớp cho người được mời; chủ lớp cũ rời lớp.
+                $class->cTeacher_id = $invite->teacher_id;
+                $class->save();
+                // Người mới làm chủ lớp không còn là co-teacher nữa.
+                ClassCoTeacher::where('class_id', $class->cId)
+                    ->where('teacher_id', $invite->teacher_id)
+                    ->where('id', '!=', $invite->id)
+                    ->update(['status' => 'revoked', 'responded_at' => now()]);
+            }
+        });
+
+        // Báo cho chủ lớp/người mời biết kết quả.
         try {
-            $class = Classes::where('cId', $invite->class_id)->first();
-            $verb = $request->action === 'accept' ? 'đã chấp nhận' : 'đã từ chối';
-            (new PushNotificationService())->sendToUsers(
-                [$invite->inviter_id],
-                '🤝 Phản hồi lời mời quản lý lớp',
-                "GV {$user->uName} {$verb} lời mời cùng quản lý lớp \"" . ($class->cName ?? '') . "\".",
-                ['url' => '/giao-vien/lop-hoc']
-            );
+            $verb = $accept ? 'đã chấp nhận' : 'đã từ chối';
+            if ($accept && $isTransfer) {
+                (new PushNotificationService())->sendToUsers(
+                    array_filter([$previousOwnerId]),
+                    '🔁 Chuyển quyền chủ lớp hoàn tất',
+                    "GV {$user->uName} đã nhận làm chủ lớp \"" . ($class->cName ?? '') . "\". Bạn không còn quản lý lớp này.",
+                    ['url' => '/giao-vien/lop-hoc']
+                );
+            } else {
+                $label = $isTransfer ? 'lời mời nhận chuyển lớp' : 'lời mời cùng quản lý lớp';
+                (new PushNotificationService())->sendToUsers(
+                    [$invite->inviter_id],
+                    '🤝 Phản hồi lời mời',
+                    "GV {$user->uName} {$verb} {$label} \"" . ($class->cName ?? '') . "\".",
+                    ['url' => '/giao-vien/lop-hoc']
+                );
+            }
         } catch (\Exception $e) {
             \Log::warning('Co-teacher respond push failed: ' . $e->getMessage());
         }
 
         return response()->json([
             'status' => 'success',
-            'message' => $request->action === 'accept' ? 'Bạn đã nhận cùng quản lý lớp.' : 'Đã từ chối lời mời.'
+            'message' => $accept
+                ? ($isTransfer ? 'Bạn đã trở thành chủ lớp.' : 'Bạn đã nhận cùng quản lý lớp.')
+                : 'Đã từ chối lời mời.'
         ]);
     }
 }

@@ -89,17 +89,14 @@ export function ClassManage() {
   };
 
   const remove = async (c: ClassItem) => {
-    const hasStudents = c.current_student_count > 0;
-    const msg = hasStudents
-      ? `Lớp "${c.cName}" còn ${c.current_student_count} học viên. Xóa lớp sẽ gỡ tất cả học viên khỏi lớp. Tiếp tục?`
-      : `Xóa lớp "${c.cName}"?`;
+    const msg = `Gửi yêu cầu xóa lớp "${c.cName}" tới admin? Lớp chỉ bị xóa sau khi admin duyệt.`;
     if (!window.confirm(msg)) return;
     try {
-      await classMgmtApi.remove(c.cId, hasStudents);
-      toast.success("Đã xóa lớp.");
+      const res = await classMgmtApi.remove(c.cId);
+      toast.success(res?.message || "Đã gửi yêu cầu xóa lớp tới admin.");
       load();
     } catch (e: any) {
-      toast.error(e?.response?.data?.message || "Không thể xóa lớp.");
+      toast.error(e?.response?.data?.message || "Không gửi được yêu cầu xóa.");
     }
   };
 

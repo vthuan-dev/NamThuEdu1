@@ -40,10 +40,22 @@ export function AdminHandoverPage() {
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [statusFilter]);
 
   const reject = async (r: HandoverRequest) => {
-    if (!window.confirm(`Từ chối yêu cầu bàn giao lớp "${r.class_name}"?`)) return;
+    const what = r.request_type === "deletion" ? "yêu cầu xóa lớp" : "yêu cầu bàn giao lớp";
+    if (!window.confirm(`Từ chối ${what} "${r.class_name}"?`)) return;
     try {
       await adminHandoverApi.reject(r.id);
       toast.success("Đã từ chối yêu cầu.");
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Thao tác thất bại.");
+    }
+  };
+
+  const approveDeletion = async (r: HandoverRequest) => {
+    if (!window.confirm(`Duyệt xóa lớp "${r.class_name}"? Lớp sẽ bị xóa và gỡ toàn bộ học viên khỏi lớp.`)) return;
+    try {
+      await adminHandoverApi.approve(r.id);
+      toast.success(`Đã xóa lớp "${r.class_name}".`);
       load();
     } catch (e: any) {
       toast.error(e?.response?.data?.message || "Thao tác thất bại.");
@@ -57,8 +69,8 @@ export function AdminHandoverPage() {
           <ArrowRightLeft className="w-6 h-6 text-white" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Yêu cầu bàn giao lớp</h1>
-          <p className="text-sm text-slate-500">Duyệt và chỉ định giáo viên tiếp nhận lớp</p>
+          <h1 className="text-2xl font-bold text-slate-900">Yêu cầu bàn giao & xóa lớp</h1>
+          <p className="text-sm text-slate-500">Duyệt bàn giao (chỉ định GV tiếp nhận) và yêu cầu xóa lớp</p>
         </div>
       </div>
 
@@ -90,6 +102,9 @@ export function AdminHandoverPage() {
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-bold text-slate-900">{r.class_name}</h3>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_BADGE[r.status]}`}>{r.status}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${r.request_type === "deletion" ? "bg-red-50 text-red-600 ring-1 ring-red-200" : "bg-indigo-50 text-indigo-600 ring-1 ring-indigo-200"}`}>
+                      {r.request_type === "deletion" ? "Xóa lớp" : "Bàn giao"}
+                    </span>
                   </div>
                   <p className="text-sm text-slate-600">GV gửi: <span className="font-semibold">{r.from_teacher.name || `#${r.from_teacher.id}`}</span></p>
                   {r.receiving_teacher && (
@@ -100,8 +115,11 @@ export function AdminHandoverPage() {
                 </div>
                 {r.status === "pending" && (
                   <div className="flex items-center gap-2">
-                    <button onClick={() => setApproving(r)} className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700">
-                      <Check className="w-4 h-4" /> Duyệt
+                    <button
+                      onClick={() => r.request_type === "deletion" ? approveDeletion(r) : setApproving(r)}
+                      className={`flex items-center gap-1.5 px-4 py-2 text-white rounded-lg text-sm font-semibold ${r.request_type === "deletion" ? "bg-red-600 hover:bg-red-700" : "bg-emerald-600 hover:bg-emerald-700"}`}
+                    >
+                      <Check className="w-4 h-4" /> {r.request_type === "deletion" ? "Duyệt xóa" : "Duyệt"}
                     </button>
                     <button onClick={() => reject(r)} className="flex items-center gap-1.5 px-4 py-2 border border-red-300 text-red-600 rounded-lg text-sm font-semibold hover:bg-red-50">
                       <X className="w-4 h-4" /> Từ chối

@@ -43,6 +43,7 @@ class AdminHandoverController extends Controller
                 return [
                     'id'         => $r->id,
                     'class_id'   => $r->class_id,
+                    'request_type' => $r->request_type ?? 'handover',
                     'class_name' => $r->class->cName ?? ('Lớp #' . $r->class_id),
                     'from_teacher' => [
                         'id'   => $r->from_teacher_id,
@@ -72,23 +73,58 @@ class AdminHandoverController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 403);
         }
 
+        $req = ClassHandoverRequest::find($id);
+        if (!$req) {
+            return response()->json(['status' => 'error', 'message' => 'Không tìm thấy yêu cầu.'], 404);
+        }
+        if ($req->status !== 'pending') {
+            return response()->json(['status' => 'error', 'message' => 'Yêu cầu này đã được xử lý.'], 409);
+        }
+
+        $class = Classes::find($req->class_id);
+        if (!$class) {
+            return response()->json(['status' => 'error', 'message' => 'Không tìm thấy lớp học.'], 404);
+        }
+
+        // ── Yêu cầu XÓA lớp ──────────────────────────────────────
+        if (($req->request_type ?? 'handover') === 'deletion') {
+            $fromTeacherId = $req->from_teacher_id;
+            $className = $class->cName;
+
+            DB::transaction(function () use ($class, $req) {
+                // Gỡ học viên khỏi lớp và xóa enrollment trước khi xóa lớp.
+                User::where('class_id', $class->cId)->where('uRole', 'student')->update(['class_id' => null]);
+                \App\Models\ClassEnrollment::where('class_id', $class->cId)->delete();
+                $req->status = 'approved';
+                $req->resolved_at = now();
+                $req->save();
+                $class->delete();
+            });
+
+            try {
+                (new PushNotificationService())->sendToUser(
+                    (int) $fromTeacherId,
+                    '🗑️ Yêu cầu xóa lớp đã được duyệt',
+                    "Lớp \"{$className}\" đã được xóa.",
+                    ['url' => '/giao-vien/lop-hoc']
+                );
+            } catch (\Exception $e) {
+                \Log::warning('Deletion approve push failed: ' . $e->getMessage());
+            }
+
+            return response()->json(['status' => 'success', 'message' => "Đã xóa lớp \"{$className}\"."]);
+        }
+
+        // ── Yêu cầu BÀN GIAO lớp ─────────────────────────────────
         $validator = Validator::make($request->all(), [
             'receiving_teacher_id' => 'required|integer',
         ]);
         if ($validator->fails()) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Dữ liệu không hợp lệ.',
+                'message' => 'Vui lòng chọn giáo viên tiếp nhận.',
                 'errors' => $validator->errors()
             ], 400);
-        }
-
-        $req = ClassHandoverRequest::find($id);
-        if (!$req) {
-            return response()->json(['status' => 'error', 'message' => 'Không tìm thấy yêu cầu bàn giao.'], 404);
-        }
-        if ($req->status !== 'pending') {
-            return response()->json(['status' => 'error', 'message' => 'Yêu cầu này đã được xử lý.'], 409);
         }
 
         $receivingId = (int) $request->receiving_teacher_id;
@@ -99,11 +135,6 @@ class AdminHandoverController extends Controller
         $receiving = User::where('uId', $receivingId)->where('uRole', 'teacher')->whereNull('uDeleted_at')->first();
         if (!$receiving) {
             return response()->json(['status' => 'error', 'message' => 'Người tiếp nhận phải là giáo viên.'], 400);
-        }
-
-        $class = Classes::find($req->class_id);
-        if (!$class) {
-            return response()->json(['status' => 'error', 'message' => 'Không tìm thấy lớp học.'], 404);
         }
 
         $previousOwnerId = $class->cTeacher_id;

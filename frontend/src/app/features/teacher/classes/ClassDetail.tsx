@@ -643,6 +643,7 @@ function CoTeachersTab({ classId, items, isOwner, onChanged, toast }: any) {
   const [search, setSearch] = useState("");
   const [pickedId, setPickedId] = useState<number | null>(null);
   const [message, setMessage] = useState("");
+  const [inviteType, setInviteType] = useState<"co_teach" | "transfer">("co_teach");
   const [busy, setBusy] = useState(false);
 
   const accepted = items.filter((c: CoTeacher) => c.status === "accepted");
@@ -650,7 +651,7 @@ function CoTeachersTab({ classId, items, isOwner, onChanged, toast }: any) {
   const existingIds = new Set(items.map((c: CoTeacher) => c.teacher.uId));
 
   const openInvite = async () => {
-    setOpen(true); setPickedId(null); setMessage(""); setSearch(""); setLoadingList(true);
+    setOpen(true); setPickedId(null); setMessage(""); setSearch(""); setInviteType("co_teach"); setLoadingList(true);
     try {
       const res = await classMgmtApi.colleagues();
       const list = res?.data || [];
@@ -664,8 +665,8 @@ function CoTeachersTab({ classId, items, isOwner, onChanged, toast }: any) {
     if (!pickedId) { toast.error("Chọn một giáo viên để mời."); return; }
     setBusy(true);
     try {
-      await classMgmtApi.inviteCoTeacher(classId, pickedId, message || undefined);
-      toast.success("Đã gửi lời mời cùng quản lý lớp.");
+      await classMgmtApi.inviteCoTeacher(classId, pickedId, message || undefined, inviteType);
+      toast.success(inviteType === "transfer" ? "Đã gửi lời mời chuyển quyền chủ lớp." : "Đã gửi lời mời cùng quản lý lớp.");
       setOpen(false); onChanged();
     } catch (e: any) {
       toast.error(e?.response?.data?.message || "Không gửi được lời mời.");
@@ -740,7 +741,7 @@ function CoTeachersTab({ classId, items, isOwner, onChanged, toast }: any) {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 ring-1 ring-amber-200">
-                  <Clock className="w-3.5 h-3.5" /> Chờ phản hồi
+                  <Clock className="w-3.5 h-3.5" /> {c.type === "transfer" ? "Chờ nhận chuyển lớp" : "Chờ phản hồi"}
                 </span>
                 {isOwner && (
                   <button onClick={() => remove(c)} aria-label="Thu hồi lời mời" className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
@@ -794,6 +795,25 @@ function CoTeachersTab({ classId, items, isOwner, onChanged, toast }: any) {
         <Field label="Lời nhắn" hint="Không bắt buộc — gửi kèm lời mời.">
           <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={2} placeholder="VD: Nhờ thầy/cô hỗ trợ lớp này giúp em..." className={`${inputClass} resize-none`} />
         </Field>
+        <div className="mt-4">
+          <p className="text-sm font-medium text-[#374151] mb-2">Hình thức</p>
+          <div className="space-y-2">
+            <label className={`flex items-start gap-3 px-3.5 py-3 rounded-xl border cursor-pointer transition-colors ${inviteType === "co_teach" ? "border-[#0D9488] bg-teal-50/50 ring-1 ring-[#0D9488]/30" : "border-[#E5E7EB] hover:bg-gray-50"}`}>
+              <input type="radio" name="inviteType" checked={inviteType === "co_teach"} onChange={() => setInviteType("co_teach")} className="mt-0.5 accent-[#0D9488]" />
+              <span>
+                <span className="block text-sm font-semibold text-[#111827]">Cùng quản lý lớp</span>
+                <span className="block text-xs text-[#6B7280] mt-0.5">Hai giáo viên cùng quản lý. Bạn vẫn là chủ lớp.</span>
+              </span>
+            </label>
+            <label className={`flex items-start gap-3 px-3.5 py-3 rounded-xl border cursor-pointer transition-colors ${inviteType === "transfer" ? "border-amber-400 bg-amber-50/50 ring-1 ring-amber-300" : "border-[#E5E7EB] hover:bg-gray-50"}`}>
+              <input type="radio" name="inviteType" checked={inviteType === "transfer"} onChange={() => setInviteType("transfer")} className="mt-0.5 accent-amber-500" />
+              <span>
+                <span className="block text-sm font-semibold text-[#111827]">Chuyển quyền chủ lớp</span>
+                <span className="block text-xs text-[#6B7280] mt-0.5">Khi giáo viên đó chấp nhận, họ trở thành chủ lớp và <span className="font-semibold text-amber-700">bạn sẽ rời lớp</span>. Không cần admin duyệt.</span>
+              </span>
+            </label>
+          </div>
+        </div>
       </Modal>
     </div>
   );

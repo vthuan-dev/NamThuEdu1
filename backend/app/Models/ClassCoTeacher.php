@@ -15,6 +15,7 @@ class ClassCoTeacher extends Model
         'class_id',
         'inviter_id',
         'teacher_id',
+        'type',
         'status',
         'message',
         'responded_at',

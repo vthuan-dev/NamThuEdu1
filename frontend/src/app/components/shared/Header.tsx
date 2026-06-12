@@ -715,15 +715,18 @@ export function Header({ breadcrumb, action }: HeaderProps) {
             </div>
             <div className="px-6 py-5">
               <div className="text-center mb-5">
-                <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-50 to-white ring-1 ring-teal-100 flex items-center justify-center mb-3">
-                  <UserCog className="w-7 h-7 text-[#0D9488]" />
+                <div className={`mx-auto w-14 h-14 rounded-2xl ring-1 flex items-center justify-center mb-3 ${activeInvite.type === "transfer" ? "bg-gradient-to-br from-amber-50 to-white ring-amber-100" : "bg-gradient-to-br from-teal-50 to-white ring-teal-100"}`}>
+                  <UserCog className={`w-7 h-7 ${activeInvite.type === "transfer" ? "text-amber-600" : "text-[#0D9488]"}`} />
                 </div>
                 <p className="text-sm text-[#374151] leading-relaxed">
-                  <span className="font-semibold text-[#111827]">{activeInvite.invited_by || "Một giáo viên"}</span> mời bạn cùng quản lý lớp{" "}
+                  <span className="font-semibold text-[#111827]">{activeInvite.invited_by || "Một giáo viên"}</span>{" "}
+                  {activeInvite.type === "transfer" ? "muốn chuyển quyền chủ lớp" : "mời bạn cùng quản lý lớp"}{" "}
                   <span className="font-semibold text-[#111827]">{activeInvite.class?.cName}</span>.
                 </p>
                 <p className="text-xs text-[#6B7280] mt-2 leading-relaxed">
-                  Khi chấp nhận, bạn sẽ cùng quản lý học viên, thông báo và mục tiêu của lớp này.
+                  {activeInvite.type === "transfer"
+                    ? "Khi chấp nhận, bạn sẽ trở thành chủ lớp và toàn quyền quản lý; giáo viên cũ sẽ rời lớp."
+                    : "Khi chấp nhận, bạn sẽ cùng quản lý học viên, thông báo và mục tiêu của lớp này."}
                 </p>
               </div>
               {activeInvite.message && (

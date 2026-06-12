@@ -13,6 +13,7 @@ class ClassHandoverRequest extends Model
 
     protected $fillable = [
         'class_id',
+        'request_type',
         'from_teacher_id',
         'receiving_teacher_id',
         'status',

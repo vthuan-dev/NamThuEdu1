@@ -22,6 +22,7 @@ export interface ClassItem {
 export interface CoTeacher {
   id: number;
   status: 'pending' | 'accepted' | 'declined' | 'revoked';
+  type?: 'co_teach' | 'transfer';
   message?: string | null;
   teacher: { uId: number; uName: string | null; uPhone?: string | null; avatar_url?: string | null };
   invited_by?: string | null;
@@ -37,6 +38,7 @@ export interface Colleague {
 
 export interface CoTeacherInvitation {
   id: number;
+  type?: 'co_teach' | 'transfer';
   message?: string | null;
   invited_by?: string | null;
   class: { cId: number; cName: string | null; age_group?: string | null };
@@ -84,6 +86,7 @@ export interface HandoverRequest {
   id: number;
   class_id: number;
   class_name: string;
+  request_type?: 'handover' | 'deletion';
   from_teacher: { id: number; name: string | null };
   receiving_teacher: { id: number; name: string | null } | null;
   reason: string | null;
@@ -136,8 +139,8 @@ export const classMgmtApi = {
 
   // ── Co-teaching: mời GV khác cùng quản lý lớp ─────────────
   colleagues: () => api.get('/teacher/colleagues').then(r => r.data),
-  inviteCoTeacher: (classId: number, teacherId: number, message?: string) =>
-    api.post(`/teacher/classes/${classId}/co-teachers`, { teacher_id: teacherId, message }).then(r => r.data),
+  inviteCoTeacher: (classId: number, teacherId: number, message?: string, type: 'co_teach' | 'transfer' = 'co_teach') =>
+    api.post(`/teacher/classes/${classId}/co-teachers`, { teacher_id: teacherId, message, type }).then(r => r.data),
   removeCoTeacher: (classId: number, coId: number) =>
     api.delete(`/teacher/classes/${classId}/co-teachers/${coId}`).then(r => r.data),
   myCoTeacherInvitations: () =>
@@ -152,8 +155,8 @@ export const classMgmtApi = {
 export const adminHandoverApi = {
   list: (status?: string) =>
     api.get('/admin/handover-requests', { params: status ? { status } : {} }).then(r => r.data),
-  approve: (id: number, receivingTeacherId: number) =>
-    api.post(`/admin/handover-requests/${id}/approve`, { receiving_teacher_id: receivingTeacherId }).then(r => r.data),
+  approve: (id: number, receivingTeacherId?: number) =>
+    api.post(`/admin/handover-requests/${id}/approve`, receivingTeacherId ? { receiving_teacher_id: receivingTeacherId } : {}).then(r => r.data),
   reject: (id: number, adminNote?: string) =>
     api.post(`/admin/handover-requests/${id}/reject`, { admin_note: adminNote }).then(r => r.data),
   teachers: () => api.get('/admin/classes/assignment-teachers').then(r => r.data),
