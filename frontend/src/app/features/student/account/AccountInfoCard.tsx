@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { User, Save, Camera, ChevronDown, Loader2, MapPin, X } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
 import { useToastContext } from '../../../../contexts/ToastContext';
+import { getFullMediaUrl } from '../../../../utils/mediaUtils';
 
 // ─── Vietnam Address API v2 (mô hình 2 cấp sau sáp nhập 2025: Tỉnh → Phường/Xã) ──
 // Dùng provinces.open-api.vn API v2 — dữ liệu hành chính mới, không còn cấp
@@ -270,7 +271,8 @@ export function AccountInfoCard({ defaultExpanded = true }: Props = {}) {
         const raw = localStorage.getItem('user');
         if (raw) {
           const u = JSON.parse(raw);
-          const newUrl = res?.data?.data?.avatar_url || res?.data?.avatar_url;
+          const rawUrl = res?.data?.data?.avatar_url || res?.data?.avatar_url;
+          const newUrl = getFullMediaUrl(rawUrl);
           if (newUrl) {
             u.avatar_url = newUrl;
             u.avatar = newUrl;
@@ -307,6 +309,9 @@ export function AccountInfoCard({ defaultExpanded = true }: Props = {}) {
     .slice(0, 2)
     .toUpperCase();
 
+  // Avatar lưu dưới dạng path tương đối (/storage/avatars/…) → resolve thành full URL backend.
+  const avatarSrc = getFullMediaUrl(profile?.avatar_url);
+
   return (
     <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
       {/* Header — clickable for collapse/expand */}
@@ -335,7 +340,7 @@ export function AccountInfoCard({ defaultExpanded = true }: Props = {}) {
       {expanded && (
         <div id="account-info-body" className="px-4 sm:px-6 pb-5 sm:pb-6 -mt-2">
           {/* Avatar Lightbox Preview Modal */}
-          {isPreviewOpen && profile?.avatar_url && (
+          {isPreviewOpen && avatarSrc && (
             <div
               className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm cursor-zoom-out"
               onClick={() => setIsPreviewOpen(false)}
@@ -356,8 +361,8 @@ export function AccountInfoCard({ defaultExpanded = true }: Props = {}) {
                 onClick={(e) => e.stopPropagation()}
               >
                 <img
-                  src={profile.avatar_url}
-                  alt={profile.uName}
+                  src={avatarSrc}
+                  alt={profile?.uName}
                   className="w-full h-full object-contain rounded-2xl shadow-2xl border border-white/10"
                 />
               </div>
@@ -371,10 +376,10 @@ export function AccountInfoCard({ defaultExpanded = true }: Props = {}) {
             className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-violet-500 via-purple-500 to-indigo-500
                        text-white flex items-center justify-center text-xl sm:text-2xl font-bold shadow-md shadow-violet-200/60"
           >
-            {profile?.avatar_url ? (
+            {avatarSrc ? (
               <img
-                src={profile.avatar_url}
-                alt={profile.uName}
+                src={avatarSrc}
+                alt={profile?.uName}
                 className="w-full h-full rounded-2xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
                 onClick={() => setIsPreviewOpen(true)}
                 title="Bấm để xem ảnh phóng to"

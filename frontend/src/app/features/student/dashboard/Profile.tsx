@@ -6,6 +6,7 @@ import { PasswordChangeCard } from '../account/PasswordChangeCard';
 import { SecurityCard } from '../account/SecurityCard';
 import { usePageTitle, PAGE_TITLES } from '../../../../hooks/usePageTitle';
 import { studentApi } from '../../../../services/studentApi';
+import { getFullMediaUrl } from '../../../../utils/mediaUtils';
 
 type ProfileData = {
   uId: number;
@@ -141,7 +142,7 @@ export function Profile() {
                 }}
               >
                 {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt={name} className="w-full h-full object-cover" />
+                  <img src={getFullMediaUrl(profile.avatar_url) ?? undefined} alt={name} className="w-full h-full object-cover" />
                 ) : (
                   <span>{initialsFrom(name)}</span>
                 )}
