@@ -701,10 +701,9 @@ function VstepGradingDetailInternal() {
                     </button>
                     <button
                       onClick={() => {
-                        if (!isOverrideKey && question.options && question.options.length > 0) {
-                          // Default to setting the first option as correct when entering override mode
-                          changeCorrectOption(question.id, question.options[0].letter);
-                        }
+                        // Chỉ bật chế độ sửa — KHÔNG tự ý đổi đáp án đúng sang A.
+                        // Giữ nguyên đáp án hiện tại để giáo viên tự click chọn lại.
+                        setOverrideKeyIds((prev) => { const s = new Set(prev); s.add(question.id); return s; });
                       }}
                       className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all duration-300 ease-out border hover:scale-105 active:scale-[0.98] cursor-pointer ${
                         isOverrideKey
