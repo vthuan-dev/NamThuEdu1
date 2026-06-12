@@ -102,13 +102,10 @@ export function Header({ breadcrumb, action }: HeaderProps) {
     setRespondingAction(action);
     try {
       await classMgmtApi.respondCoTeacherInvitation(activeInvite.id, action);
-      const accepted = action === "accept";
-      const classId = activeInvite.class?.cId;
+      // Không điều hướng tự động — chỉ cập nhật lại danh sách lời mời.
+      // Lớp sẽ xuất hiện trong "Lớp học của tôi" (nhãn Đồng quản lý) khi đã chấp nhận.
       setCoInvites((prev) => prev.filter((i) => i.id !== activeInvite.id));
       setActiveInvite(null);
-      if (accepted && classId) {
-        navigate(`/giao-vien/lop-hoc/${classId}`);
-      }
     } catch (e) {
       // Lỗi: giữ modal để người dùng thử lại.
     } finally {
