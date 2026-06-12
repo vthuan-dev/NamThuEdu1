@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { logout } from "../../../services/authApi";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { studentApi } from "../../../services/studentApi";
+import { getFullMediaUrl } from "../../../utils/mediaUtils";
 import {
   Home,
   ClipboardList,
@@ -92,7 +93,7 @@ export function StudentNavbar() {
     staleTime: 10 * 60 * 1000,
   });
   const profile = (profileData as any)?.data?.data ?? (profileData as any)?.data;
-  const avatarUrl: string | null = profile?.avatar_url ?? null;
+  const avatarUrl: string | null = getFullMediaUrl(profile?.avatar_url ?? null);
   const displayName: string = profile?.uName ?? '';
   const initials: string = displayName
     ? displayName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
@@ -444,7 +445,7 @@ export function StudentNavbar() {
                       }}
                     >
                       {avatarUrl ? (
-                        <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" />
+                        <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
                       ) : initials}
                     </div>
                   </div>
@@ -497,7 +498,7 @@ export function StudentNavbar() {
                             }}
                           >
                             {avatarUrl ? (
-                              <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" />
+                              <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
                             ) : initials}
                           </div>
                         </div>
