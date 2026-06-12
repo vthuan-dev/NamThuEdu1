@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { Loader2, AlertCircle, ArrowLeft, Trophy, Clock, Target } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowLeft, Trophy, Clock, Target, Sparkles } from 'lucide-react';
 import { api } from '../../../../../services/api';
 import type { ThptAnswers, ThptConfig } from './types';
 import { SectionView } from './views/SectionView';
@@ -22,6 +22,7 @@ interface ResultData {
   scale_max: number;
   sections: SectionStat[];
   correct_answers: ThptAnswers;
+  speaking?: { score: number; scale_max: number; parts: Record<string, any> };
 }
 
 export function ThptResultPage() {
@@ -32,6 +33,7 @@ export function ThptResultPage() {
   const [config, setConfig] = useState<ThptConfig | null>(null);
   const [answers, setAnswers] = useState<ThptAnswers>({});
   const [result, setResult] = useState<ResultData | null>(null);
+  const [speakingAudio, setSpeakingAudio] = useState<Record<string, string>>({});
   const [durationSec, setDurationSec] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +53,7 @@ export function ThptResultPage() {
         setExamTitle(data.exam_title || 'Đề thi');
         setAnswers(data.answers || {});
         setResult(data.result || null);
+        setSpeakingAudio(data.speaking_audio || {});
         setConfig(data.thpt_config || null);
         setDurationSec(data.duration_seconds || 0);
         setLoading(false);
@@ -67,7 +70,7 @@ export function ThptResultPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
       </div>
     );
   }
@@ -81,7 +84,7 @@ export function ThptResultPage() {
           <button
             type="button"
             onClick={() => navigate('/hoc-vien')}
-            className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-lg bg-teal-600 text-white font-semibold text-sm hover:bg-teal-700 transition-colors cursor-pointer"
           >
             Về trang chủ
           </button>
@@ -117,10 +120,10 @@ export function ThptResultPage() {
 
       <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
         {/* Score hero */}
-        <section className="rounded-2xl p-6 bg-gradient-to-br from-blue-50 via-white to-blue-50 border border-blue-100">
+        <section className="rounded-2xl p-6 bg-gradient-to-br from-teal-50 via-white to-teal-50 border border-teal-100">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="md:col-span-2 flex items-center gap-4">
-              <div className="w-20 h-20 rounded-2xl bg-blue-600 flex items-center justify-center flex-shrink-0">
+              <div className="w-20 h-20 rounded-2xl bg-teal-600 flex items-center justify-center flex-shrink-0">
                 <Trophy className="w-10 h-10 text-white" />
               </div>
               <div>
@@ -130,36 +133,58 @@ export function ThptResultPage() {
                   <span className="text-lg text-slate-400">/{result.scale_max}</span>
                 </p>
                 <p className="text-xs text-slate-500 mt-0.5">Điểm thô: {result.raw_score}/{result.raw_score_max}</p>
+                {result.speaking && typeof result.speaking.score === 'number' && (
+                  <p className="inline-flex items-center gap-1 text-xs font-semibold text-teal-700 mt-1">
+                    <Sparkles className="w-3.5 h-3.5" /> Nói (AI): {Number(result.speaking.score).toFixed(1)}/{result.speaking.scale_max ?? 10}
+                  </p>
+                )}
               </div>
             </div>
             <Stat icon={<Target className="w-5 h-5 text-emerald-600" />} label="Độ chính xác" value={`${accuracy}%`} sub={`${totalCorrect}/${totalQuestions} câu đúng`} tone="emerald" />
-            <Stat icon={<Clock className="w-5 h-5 text-blue-600" />} label="Thời gian" value={`${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`} sub="Đã làm bài" tone="blue" />
+            <Stat icon={<Clock className="w-5 h-5 text-teal-600" />} label="Thời gian" value={`${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`} sub="Đã làm bài" tone="blue" />
           </div>
         </section>
 
         {/* Per-section breakdown */}
         <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {result.sections.map((p, idx) => {
-            const pct = p.total_count > 0 ? Math.round((p.correct_count / p.total_count) * 100) : 0;
             const isActive = activeIdx === idx;
+            const isSpeaking = p.type === 'speaking';
+            const spk = result.speaking;
+            const pct = isSpeaking
+              ? (spk ? Math.round((Number(spk.score) / (spk.scale_max ?? 10)) * 100) : 0)
+              : (p.total_count > 0 ? Math.round((p.correct_count / p.total_count) * 100) : 0);
             return (
               <button
                 key={p.section_id ?? idx}
                 type="button"
                 onClick={() => setActiveIdx(idx)}
                 className={`rounded-2xl border p-4 text-left transition-all cursor-pointer ${
-                  isActive ? 'border-blue-400 shadow-sm bg-blue-50' : 'border-slate-200 bg-white hover:border-blue-300'
+                  isActive ? 'border-teal-400 shadow-sm bg-teal-50' : 'border-slate-200 bg-white hover:border-teal-300'
                 }`}
               >
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 truncate">{p.title}</p>
-                <div className="flex items-baseline gap-1 mt-1">
-                  <span className="text-2xl font-bold text-slate-900">{p.correct_count}</span>
-                  <span className="text-sm text-slate-400">/{p.total_count}</span>
-                </div>
+                {isSpeaking ? (
+                  <div className="flex items-baseline gap-1 mt-1">
+                    {spk ? (
+                      <>
+                        <span className="text-2xl font-bold text-slate-900 tabular-nums">{Number(spk.score).toFixed(1)}</span>
+                        <span className="text-sm text-slate-400">/{spk.scale_max ?? 10}</span>
+                      </>
+                    ) : (
+                      <span className="text-sm font-semibold text-amber-600">Đang chấm…</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-2xl font-bold text-slate-900">{p.correct_count}</span>
+                    <span className="text-sm text-slate-400">/{p.total_count}</span>
+                  </div>
+                )}
                 <div className="h-1.5 rounded-full bg-slate-100 mt-2 overflow-hidden">
                   <div className="h-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">{pct}% đúng</p>
+                <p className="text-[11px] text-slate-500 mt-1">{isSpeaking ? (spk ? `${pct}% điểm` : 'AI đang chấm') : `${pct}% đúng`}</p>
               </button>
             );
           })}
@@ -174,6 +199,8 @@ export function ThptResultPage() {
             correctAnswers={result.correct_answers}
             onAnswerChange={() => {}}
             mode="review"
+            speakingParts={result.speaking?.parts}
+            speakingAudio={speakingAudio}
           />
         )}
       </main>
@@ -182,7 +209,7 @@ export function ThptResultPage() {
 }
 
 function Stat({ icon, label, value, sub, tone }: { icon: React.ReactNode; label: string; value: string; sub: string; tone: 'emerald' | 'blue' }) {
-  const bg = tone === 'emerald' ? 'bg-emerald-50' : 'bg-blue-100';
+  const bg = tone === 'emerald' ? 'bg-emerald-50' : 'bg-teal-50';
   return (
     <div className="rounded-2xl p-4 bg-white border border-slate-200">
       <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center mb-3`}>{icon}</div>

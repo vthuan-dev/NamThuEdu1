@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CheckCircle2, XCircle, Headphones } from 'lucide-react';
+import { CheckCircle2, XCircle, Headphones, Mic, Sparkles, Loader2 } from 'lucide-react';
 import type { ThptAnswers, ThptSection, ViewMode } from '../types';
 import { ThptSpeakingRecorder } from '../components/ThptSpeakingRecorder';
 
@@ -34,9 +34,13 @@ interface Props {
   onAnswerChange: (key: string, value: boolean | string) => void;
   mode: ViewMode;
   submissionId?: number | null;
+  /** Kết quả AI chấm Nói theo câu (review): { q5: {score, feedback, ...}, ... } */
+  speakingParts?: Record<string, any>;
+  /** URL bản ghi âm Nói theo câu (review): { "5": url, "6": url } */
+  speakingAudio?: Record<string, string>;
 }
 
-export function SectionView({ section, answers, correctAnswers, onAnswerChange, mode, submissionId }: Props) {
+export function SectionView({ section, answers, correctAnswers, onAnswerChange, mode, submissionId, speakingParts, speakingAudio }: Props) {
   const typeLabel = TYPE_LABEL[section.type] ?? 'Phần thi';
   return (
     <section className="space-y-5">
@@ -50,12 +54,12 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
           <p className="text-sm text-slate-500 mt-1.5 leading-relaxed max-w-2xl">{section.instructions}</p>
         )}
       </header>
-      <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} />
+      <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} />
     </section>
   );
 }
 
-function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissionId }: Props) {
+function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissionId, speakingParts, speakingAudio }: Props) {
   const isReview = mode === 'review';
   // Đề Nói: mỗi lần chỉ cho ghi âm 1 đề. activeSpeakingQ = số câu đang ghi (hoặc null).
   const [activeSpeakingQ, setActiveSpeakingQ] = useState<number | null>(null);
@@ -213,6 +217,18 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             const key = `q${item.question_number}`;
             const recorded = String(answers[key] ?? '').trim() !== '';
             const lockedByOther = activeSpeakingQ !== null && activeSpeakingQ !== item.question_number;
+            // Review: hiển thị điểm AI + transcript + nghe lại; chưa chấm thì báo đang chấm.
+            if (isReview) {
+              return (
+                <SpeakingResultCard
+                  key={key}
+                  n={item.question_number}
+                  prompt={item.prompt}
+                  result={speakingParts?.[key]}
+                  audioUrl={speakingAudio?.[String(item.question_number)]}
+                />
+              );
+            }
             return (
               <ThptSpeakingRecorder
                 key={key}
@@ -221,7 +237,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                 prompt={item.prompt}
                 prepSeconds={Number(item.prep_seconds ?? 5)}
                 speakSeconds={Number(item.speak_seconds ?? 120)}
-                recorded={recorded || isReview}
+                recorded={recorded}
                 disabled={lockedByOther}
                 onActiveChange={(busy) => setActiveSpeakingQ(busy ? item.question_number : null)}
                 onRecorded={() => onAnswerChange(key, '[recorded]')}
@@ -503,6 +519,90 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
 }
 
 // ── Reusable pieces ──────────────────────────────────────────────────────────
+function SpeakingResultCard({ n, prompt, result, audioUrl }: { n: number; prompt: string; result?: any; audioUrl?: string }) {
+  const graded = result && typeof result.score === 'number';
+  const score = graded ? Number(result.score) : 0;
+  const scoreColor = score >= 8 ? '#10B981' : score >= 6.5 ? '#0D9488' : score >= 5 ? '#F59E0B' : '#EF4444';
+  const pron = result?.pronunciation_score;
+  const content = result?.content_score;
+  const suggestions: string[] = Array.isArray(result?.suggestions) ? result.suggestions : [];
+
+  return (
+    <article className="rounded-2xl bg-white border border-slate-200 p-5">
+      <div className="flex items-center gap-2.5 mb-3.5">
+        <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-teal-600 text-white text-[13px] font-bold tabular-nums">{n}</span>
+        <h3 className="text-[13px] font-semibold uppercase tracking-wider text-slate-400">Câu {n} · Nói</h3>
+      </div>
+
+      <div className="flex items-start gap-3 mb-4">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-teal-50 text-teal-700 ring-1 ring-teal-100 flex-shrink-0">
+          <Mic className="w-[18px] h-[18px]" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[15px] font-medium text-slate-800 leading-relaxed">{prompt}</p>
+          {audioUrl && <audio controls src={audioUrl} className="w-full h-9 mt-2.5" />}
+        </div>
+      </div>
+
+      {!graded ? (
+        <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <Loader2 className="w-4 h-4 animate-spin text-amber-600 flex-shrink-0" />
+          <p className="text-sm font-medium text-amber-800">AI đang chấm phần Nói — quay lại sau ít phút để xem điểm &amp; nhận xét nhé.</p>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-slate-200 overflow-hidden">
+          <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-teal-50/60 to-white border-b border-slate-100">
+            <div className="w-16 h-16 rounded-2xl flex flex-col items-center justify-center flex-shrink-0 text-white" style={{ background: scoreColor }}>
+              <span className="text-xl font-extrabold leading-none tabular-nums">{score.toFixed(1)}</span>
+              <span className="text-[9px] font-bold opacity-85 mt-0.5">/ 10</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-teal-700 mb-1.5">
+                <Sparkles className="w-3.5 h-3.5" /> AI chấm điểm
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {typeof pron === 'number' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600">Phát âm <b className="text-slate-800 tabular-nums">{Number(pron).toFixed(1)}</b></span>
+                )}
+                {typeof content === 'number' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600">Nội dung <b className="text-slate-800 tabular-nums">{Number(content).toFixed(1)}</b></span>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="p-4 space-y-3">
+            {result?.feedback && (
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Nhận xét</p>
+                <p className="text-sm text-slate-700 leading-relaxed">{result.feedback}</p>
+              </div>
+            )}
+            {suggestions.length > 0 && (
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Gợi ý cải thiện</p>
+                <ul className="space-y-1.5">
+                  {suggestions.map((s, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                      <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0" />
+                      <span className="leading-relaxed">{s}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {result?.transcript && (
+              <details className="group">
+                <summary className="text-[11px] font-bold uppercase tracking-wider text-slate-400 cursor-pointer select-none hover:text-teal-700 transition-colors">Lời bạn đã nói (AI nghe được)</summary>
+                <p className="mt-1.5 text-sm text-slate-600 italic leading-relaxed bg-slate-50 rounded-lg p-3 border border-slate-100">“{result.transcript}”</p>
+              </details>
+            )}
+          </div>
+        </div>
+      )}
+    </article>
+  );
+}
+
 function QCard({ n, children }: { n: number; children: React.ReactNode }) {
   return (
     <article className="rounded-2xl bg-white border border-slate-200 p-5 transition-colors hover:border-slate-300">

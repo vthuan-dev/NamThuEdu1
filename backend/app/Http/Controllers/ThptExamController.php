@@ -629,6 +629,10 @@ class ThptExamController extends Controller
 
         $result = $payload['result'] ?? $this->gradeSubmission($reviewConfig, $answers);
 
+        // Bản ghi âm phần Nói (để học viên nghe lại khi xem kết quả).
+        $rawFeedback = json_decode($submission->sGemini_feedback ?? '{}', true) ?: [];
+        $speakingAudio = $rawFeedback['speaking_audio'] ?? [];
+
         return response()->json([
             'status' => 'success',
             'data' => [
@@ -639,6 +643,7 @@ class ThptExamController extends Controller
                 'duration_seconds' => $submission->sTime_taken,
                 'answers' => $answers,
                 'result' => $result,
+                'speaking_audio' => $speakingAudio,
                 'thpt_config' => $reviewConfig,            // Snapshot — không phải bản live
                 'thpt_version' => $snapshotVersion,        // Version mà student đã làm
                 'thpt_live_version' => (int) ($exam->thpt_version ?? 0),
