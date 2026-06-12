@@ -634,6 +634,10 @@ class ThptExamController extends Controller
 
         $result = $payload['result'] ?? $this->gradeSubmission($reviewConfig, $answers);
 
+        // Overlay điểm giáo viên (teacher_*) lên field AI khi đọc — KHÔNG sửa DB.
+        // Học viên thấy điểm giáo viên ở các câu đã chấm lại (Req 6.7).
+        $result = $this->overlayTeacherScores($result);
+
         // Bản ghi âm phần Nói (để học viên nghe lại khi xem kết quả).
         $rawFeedback = json_decode($submission->sGemini_feedback ?? '{}', true) ?: [];
         $speakingAudio = $rawFeedback['speaking_audio'] ?? [];
@@ -1151,6 +1155,56 @@ class ThptExamController extends Controller
             }
         }
         return false;
+    }
+
+    /**
+     * Overlay điểm/nhận xét của giáo viên (teacher_*) lên field AI trong
+     * result['speaking']['parts'] khi đọc kết quả cho học viên. Chỉ thao tác
+     * trên bản sao trong bộ nhớ — KHÔNG sửa field AI đã lưu trong DB.
+     *
+     * Với mỗi câu có teacher_score: đặt score = teacher_score, criteria theo
+     * teacher_*, feedback = teacher_feedback ?? feedback, thêm graded_by='teacher'.
+     * Tính lại result.speaking.score từ điểm hiệu lực (teacher_score ?? score).
+     */
+    private function overlayTeacherScores(array $result): array
+    {
+        if (!isset($result['speaking']['parts']) || !is_array($result['speaking']['parts'])) {
+            return $result;
+        }
+
+        $parts = $result['speaking']['parts'];
+        $effScores = [];
+
+        foreach ($parts as $key => $node) {
+            if (!is_array($node)) continue;
+
+            if (isset($node['teacher_score'])) {
+                $node['score'] = (float) $node['teacher_score'];
+                if (isset($node['teacher_pronunciation_score'])) {
+                    $node['pronunciation_score'] = (float) $node['teacher_pronunciation_score'];
+                }
+                if (isset($node['teacher_content_score'])) {
+                    $node['content_score'] = (float) $node['teacher_content_score'];
+                }
+                if (isset($node['teacher_feedback']) && $node['teacher_feedback'] !== null && $node['teacher_feedback'] !== '') {
+                    $node['feedback'] = $node['teacher_feedback'];
+                }
+                $node['graded_by'] = 'teacher';
+                $parts[$key] = $node;
+            }
+
+            $eff = $node['teacher_score'] ?? ($node['score'] ?? null);
+            if ($eff !== null) {
+                $effScores[] = (float) $eff;
+            }
+        }
+
+        $result['speaking']['parts'] = $parts;
+        if (!empty($effScores)) {
+            $result['speaking']['score'] = round(array_sum($effScores) / count($effScores), 2);
+        }
+
+        return $result;
     }
 
     private function error(string $message, int $code = 400, $errors = null)

@@ -446,6 +446,10 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         Route::post('/submissions/{id}/save-all',                     [App\Http\Controllers\GradingReviewController::class, 'saveAll']);
         Route::get ('/submissions/{id}/grading-history',               [App\Http\Controllers\GradingReviewController::class, 'history']);
 
+        // THPT (Teens) teacher grading — payload-based, tách khỏi luồng VSTEP/IELTS
+        Route::get ('/thpt-submissions/{id}/grading', [App\Http\Controllers\ThptGradingController::class, 'show']);
+        Route::post('/thpt-submissions/{id}/grading', [App\Http\Controllers\ThptGradingController::class, 'save']);
+
         // Teacher Reports
         Route::get('/reports/overview', [TeacherReportController::class, 'overview']);
         Route::get('/reports/student-progress', [TeacherReportController::class, 'studentProgress']);

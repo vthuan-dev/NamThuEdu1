@@ -100,6 +100,12 @@ class GradeThptSpeakingJob implements ShouldQueue
             'scale_max' => 10,
             'parts'     => $parts,
         ];
+        // Lưu điểm khách quan THUẦN (trước khi blend Nói) để khi giáo viên chốt
+        // điểm sau này có thể blend lại an toàn mà không cần suy ngược. Không
+        // thay đổi công thức blend `scaled_score` hiện có (tương thích ngược).
+        if ($objectiveScaled !== null) {
+            $result['scaled_score_objective'] = $objectiveScaled;
+        }
         $result['scaled_score'] = $combined;
         $payload['result'] = $result;
 

@@ -2076,5 +2076,15 @@ export function GradingDetail() {
     );
   }
 
+  if (examType === "THPT") {
+    // Teens THPT grading is payload-based — fully separate from VSTEP/IELTS.
+    const LazyThpt = lazy(() => import("./ThptGradingDetail").then((m) => ({ default: m.ThptGradingDetail })));
+    return (
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-slate-500">Đang tải trang chấm điểm…</div>}>
+        <LazyThpt submissionId={Number(submissionId)} />
+      </Suspense>
+    );
+  }
+
   return <VstepGradingDetailInternal />;
 }
