@@ -253,7 +253,7 @@ export function ClassManage() {
               return (
                 <div
                   key={c.cId}
-                  className="group bg-white rounded-2xl p-6 border border-[#E5E7EB] hover:border-teal-200 hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-300 cm-rise"
+                  className="group flex flex-col h-full bg-white rounded-2xl p-6 border border-[#E5E7EB] hover:border-teal-200 hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-300 cm-rise"
                   style={{ animationDelay: `${Math.min(i, 8) * 50}ms` }}
                 >
                   <div className="flex items-start justify-between gap-3 mb-3">
@@ -277,40 +277,42 @@ export function ClassManage() {
 
                   {c.cDescription && <p className="text-sm text-[#6B7280] mb-4 line-clamp-2">{c.cDescription}</p>}
 
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between text-sm mb-1.5">
-                      <span className="inline-flex items-center gap-1.5 text-[#374151]">
-                        <Users className="w-4 h-4 text-[#0D9488]" /> Sĩ số
-                      </span>
-                      <span className="font-semibold text-[#111827] tabular-nums">
-                        {c.current_student_count}<span className="text-gray-400 font-normal">/{c.max_students}</span>
-                      </span>
-                    </div>
-                    <CapacityBar current={c.current_student_count} max={c.max_students} />
-                  </div>
-
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                    <button
-                      onClick={() => navigate(`/giao-vien/lop-hoc/${c.cId}`)}
-                      className="px-4 py-2 bg-[#0D9488] text-white rounded-lg text-sm font-semibold hover:bg-[#0F766E] active:scale-[0.98] transition-all"
-                    >
-                      Quản lý lớp
-                    </button>
-                    <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                      {c.is_owner !== false ? (
-                        <>
-                          <button onClick={() => openEdit(c)} aria-label="Sửa lớp" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                            <Pencil className="w-4 h-4 text-[#6B7280]" />
-                          </button>
-                          <button onClick={() => remove(c)} aria-label="Xóa lớp" className="p-2 hover:bg-red-50 rounded-lg transition-colors">
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </button>
-                        </>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-xs text-[#9CA3AF]">
-                          <UserCog className="w-3.5 h-3.5" /> Cộng sự
+                  <div className="mt-auto">
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between text-sm mb-1.5">
+                        <span className="inline-flex items-center gap-1.5 text-[#374151]">
+                          <Users className="w-4 h-4 text-[#0D9488]" /> Sĩ số
                         </span>
-                      )}
+                        <span className="font-semibold text-[#111827] tabular-nums">
+                          {c.current_student_count}<span className="text-gray-400 font-normal">/{c.max_students}</span>
+                        </span>
+                      </div>
+                      <CapacityBar current={c.current_student_count} max={c.max_students} />
+                    </div>
+
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                      <button
+                        onClick={() => navigate(`/giao-vien/lop-hoc/${c.cId}`)}
+                        className="px-4 py-2 bg-[#0D9488] text-white rounded-lg text-sm font-semibold hover:bg-[#0F766E] active:scale-[0.98] transition-all"
+                      >
+                        Quản lý lớp
+                      </button>
+                      <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                        {c.is_owner !== false ? (
+                          <>
+                            <button onClick={() => openEdit(c)} aria-label="Sửa lớp" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                              <Pencil className="w-4 h-4 text-[#6B7280]" />
+                            </button>
+                            <button onClick={() => remove(c)} aria-label="Xóa lớp" className="p-2 hover:bg-red-50 rounded-lg transition-colors">
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </button>
+                          </>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs text-[#9CA3AF]">
+                            <UserCog className="w-3.5 h-3.5" /> Cộng sự
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
