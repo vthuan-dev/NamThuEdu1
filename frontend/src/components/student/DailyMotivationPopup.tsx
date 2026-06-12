@@ -51,23 +51,34 @@ export function DailyMotivationPopup({
 
     // Đã hiện hôm nay rồi → bỏ qua
     if (localStorage.getItem(key)) return;
-    localStorage.setItem(key, '1');
 
     setName(user?.uName || user?.name || user?.full_name || 'bạn');
 
-    // Lấy lịch thi gần nhất (nếu có) để nhắc — best-effort
-    studentApi.getExamSchedules?.()
-      .then((res: any) => {
+    let cancelled = false;
+    const show = () => {
+      if (cancelled) return;
+      // Chỉ set cờ NGAY KHI popup thực sự bật lên (tránh mất lượt hiện do reload sớm)
+      localStorage.setItem(key, '1');
+      setOpen(true);
+    };
+
+    // Lấy lịch thi gần nhất (nếu có) để nhắc — best-effort, rồi mới hiện popup
+    const p = studentApi.getExamSchedules?.();
+    if (p && typeof p.then === 'function') {
+      p.then((res: any) => {
         const list = res?.data?.data?.schedules ?? [];
-        if (Array.isArray(list) && list.length > 0) {
+        if (!cancelled && Array.isArray(list) && list.length > 0) {
           const s = list[0];
           setNextExam({ title: s.title, date: s.exam_date ?? null, daysUntil: s.days_until ?? null });
         }
       })
-      .catch(() => {});
+        .catch(() => {})
+        .finally(() => setTimeout(show, 400));
+    } else {
+      setTimeout(show, 400);
+    }
 
-    const t = setTimeout(() => setOpen(true), 450);
-    return () => clearTimeout(t);
+    return () => { cancelled = true; };
   }, []);
 
   if (!open) return null;

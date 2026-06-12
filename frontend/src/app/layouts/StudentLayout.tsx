@@ -6,6 +6,7 @@ import { usePwaInstall } from "../../hooks/usePwaInstall";
 import { NotificationPermissionBanner } from "../../components/NotificationPermissionBanner";
 import { PwaInstallBanner } from "../../components/PwaInstallBanner";
 import { ResultDetail } from "../features/student/test-taking/ResultDetail";
+import { DailyMotivationPopup } from "../../components/student/DailyMotivationPopup";
 import { X } from "lucide-react";
 
 export function StudentLayout() {
@@ -65,6 +66,8 @@ export function StudentLayout() {
       <NotificationPermissionBanner push={push} />
       <PwaInstallBanner pwa={pwa} />
       <StudentNavbar />
+
+      <DailyMotivationPopup accent="#7C3AED" accentMid="#8B5CF6" accentSoft="#F5F3FF" />
 
       {/* Main content — extra bottom padding on mobile for bottom nav */}
       <main
