@@ -163,16 +163,19 @@ function LegacyStudentRedirect() {
  * Teens / Adults → render dashboard tương ứng dưới StudentLayout chung.
  * Mặc định / chưa phân nhóm → StudentDashboard cũ.
  */
+// Đọc age_group từ session đăng nhập — CẦN đọc cả localStorage (remember=true)
+// LẪN sessionStorage (remember=false). Nếu chỉ đọc localStorage, học viên không
+// tích "ghi nhớ" sẽ bị mất age_group → rơi vào dashboard mặc định (sai nhóm tuổi).
+function getSessionAgeGroup(): string | undefined {
+  const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
+  try { return raw ? (JSON.parse(raw) as { age_group?: string }).age_group : undefined; } catch { return undefined; }
+}
+
 function AdaptiveDashboard() {
-  const userStr = localStorage.getItem('user');
-  const user = userStr ? JSON.parse(userStr) : null;
-  const ageGroup = user?.age_group;
+  const ageGroup = getSessionAgeGroup();
 
   if (ageGroup === 'kids') {
     return <Suspense fallback={<LoadingFallback />}><KidsDashboard /></Suspense>;
-  }
-  if (ageGroup === 'adults') {
-    return <Suspense fallback={<LoadingFallback />}><AdultsDashboard /></Suspense>;
   }
   if (ageGroup === 'teens') {
     return <Suspense fallback={<LoadingFallback />}><TeensDashboard /></Suspense>;
@@ -182,8 +185,7 @@ function AdaptiveDashboard() {
 
 // Kids xem KidsPractice; còn lại xem PracticeList chung.
 function AdaptivePractice() {
-  const userStr = localStorage.getItem('user');
-  const ageGroup = userStr ? JSON.parse(userStr)?.age_group : undefined;
+  const ageGroup = getSessionAgeGroup();
   if (ageGroup === 'kids') {
     return <Suspense fallback={<LoadingFallback />}><KidsPractice /></Suspense>;
   }
