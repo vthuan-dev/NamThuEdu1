@@ -25,7 +25,7 @@ export interface SectionTypeMeta {
   label: string;
   description: string;
   icon: string; // lucide icon name
-  group: 'language' | 'reading' | 'writing';
+  group: 'language' | 'reading' | 'writing' | 'audio';
   autoGrade: boolean;
 }
 
@@ -118,6 +118,14 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
     group: 'writing',
     autoGrade: true,
   },
+  {
+    type: 'listening',
+    label: 'Nghe (Listening)',
+    description: 'Tải audio + câu hỏi trắc nghiệm — tự chấm',
+    icon: 'Headphones',
+    group: 'audio',
+    autoGrade: true,
+  },
 ];
 
 export function sectionMeta(type: SectionType): SectionTypeMeta {
@@ -152,6 +160,7 @@ export function collectQuestionNumbers(s: ThptSection): number[] {
     case 'tf_group':
     case 'matching':
     case 'reading_mixed':
+    case 'listening':
       return (s as any).items.map((i: any) => i.question_number);
     case 'mc_cloze':
     case 'open_cloze':
@@ -291,6 +300,15 @@ export function createSection(type: SectionType, startNum: number): ThptSection 
         title: 'Viết lại câu',
         instructions: 'Viết lại câu sao cho nghĩa không đổi.',
         items: [makeTransformItem(startNum)],
+      };
+    case 'listening':
+      return {
+        ...base,
+        type: 'listening',
+        title: 'Nghe',
+        instructions: 'Nghe đoạn ghi âm và chọn phương án đúng cho mỗi câu.',
+        audio_url: '',
+        items: [makeMcItem(startNum)],
       };
   }
 }

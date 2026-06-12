@@ -681,6 +681,10 @@ class ThptExamController extends Controller
                         $errors[] = "{$label}: chưa có câu hỏi nào.";
                     }
                     break;
+                case 'listening':
+                    if (empty($s['audio_url'])) $errors[] = "{$label}: chưa có audio.";
+                    if (empty($s['items'])) $errors[] = "{$label}: chưa có câu hỏi nào.";
+                    break;
                 case 'tf_group':
                     if (empty($s['items'])) {
                         $errors[] = "{$label}: chưa có câu hỏi nào.";
@@ -715,9 +719,14 @@ class ThptExamController extends Controller
                 case 'phonetics':
                 case 'mc_questions':
                 case 'error_identification':
+                case 'listening':
                     foreach (($s['items'] ?? []) as $i => $it) {
                         unset($it['correct_id'], $it['explanation']);
                         $sections[$si]['items'][$i] = $it;
+                    }
+                    // Listening: transcript chỉ dành cho giáo viên, ẩn khi học viên thi
+                    if (($s['type'] ?? '') === 'listening') {
+                        unset($sections[$si]['transcript']);
                     }
                     break;
                 case 'word_form':
@@ -823,6 +832,7 @@ class ThptExamController extends Controller
                 case 'phonetics':
                 case 'mc_questions':
                 case 'error_identification':
+                case 'listening':
                     foreach ($s['items'] ?? [] as $it) {
                         $qn = $it['question_number'] ?? '?';
                         $checkSingle("q{$qn}", $it['correct_id'] ?? null);

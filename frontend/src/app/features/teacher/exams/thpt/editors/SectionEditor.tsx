@@ -1,4 +1,7 @@
 import type { ThptSection } from '../../../../../../types/thpt';
+import { useState } from 'react';
+import { Upload, Loader2, Volume2, Trash2 } from 'lucide-react';
+import { api } from '../../../../../../services/api';
 import {
   makeMcItem,
   makePhoneticsItem,
@@ -54,6 +57,8 @@ export function SectionEditor({ section, allSections, onChange }: Props) {
       return <>{common}<MatchingEditor section={section} all={allSections} onChange={onChange} /></>;
     case 'sentence_transformation':
       return <>{common}<TransformationEditor section={section} all={allSections} onChange={onChange} /></>;
+    case 'listening':
+      return <>{common}<ListeningEditor section={section} all={allSections} onChange={onChange} /></>;
     default:
       return common;
   }
@@ -264,7 +269,106 @@ function McQuestionsEditor({ section, all, onChange }: { section: Extract<ThptSe
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// 3. WORD FORM
+// 2b. LISTENING (audio + trắc nghiệm)
+// ════════════════════════════════════════════════════════════════════════════
+function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSection, { type: 'listening' }>; all: ThptSection[]; onChange: (s: ThptSection) => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState('');
+  const update = (items: typeof section.items) => onChange({ ...section, items });
+
+  const uploadAudio = async (file: File) => {
+    setUploading(true); setErr('');
+    try {
+      const fd = new FormData();
+      fd.append('audio', file, file.name);
+      fd.append('questionId', `thpt-listening-${section.id}`);
+      const token = localStorage.getItem('auth_token');
+      const endpoint = token ? '/teacher/upload/audio' : '/test/upload/audio';
+      const { data: result } = await api.post(endpoint, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      if (result.success && result.data?.audioUrl) {
+        onChange({ ...section, audio_url: result.data.audioUrl });
+      } else {
+        throw new Error(result.message || 'Upload thất bại');
+      }
+    } catch (e: any) {
+      setErr(e?.message || 'Lỗi tải audio');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Audio uploader */}
+      <div className="rounded-xl bg-white border border-slate-200 p-4">
+        <p className="text-xs font-bold text-slate-500 mb-2">Audio cho phần Nghe</p>
+        {section.audio_url ? (
+          <div className="flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+            <Volume2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <audio controls src={section.audio_url} className="h-8 flex-1 min-w-0" />
+            <button type="button" onClick={() => onChange({ ...section, audio_url: '' })} className="text-slate-400 hover:text-rose-500 flex-shrink-0">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <label className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-200 px-4 py-3 cursor-pointer hover:border-blue-300 transition-colors text-sm font-medium text-slate-500">
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            {uploading ? 'Đang tải lên…' : 'Chọn file audio (mp3, m4a, wav…)'}
+            <input type="file" accept="audio/*" className="hidden" disabled={uploading}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAudio(f); e.currentTarget.value = ''; }} />
+          </label>
+        )}
+        {err && <p className="text-xs text-rose-500 mt-2">{err}</p>}
+        <input
+          type="text"
+          value={section.transcript ?? ''}
+          onChange={(e) => onChange({ ...section, transcript: e.target.value })}
+          placeholder="Transcript (tuỳ chọn — không hiển thị cho học viên khi thi)"
+          className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 mt-3 focus:outline-none focus:ring-2 focus:ring-blue-200"
+        />
+      </div>
+
+      {section.items.map((item, idx) => (
+        <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
+          <textarea
+            value={item.prompt}
+            onChange={(e) => {
+              const items = [...section.items];
+              items[idx] = { ...item, prompt: e.target.value };
+              update(items);
+            }}
+            rows={2}
+            placeholder="Nội dung câu hỏi nghe"
+            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-200"
+          />
+          <div className="space-y-2">
+            {item.options.map((opt, oi) => (
+              <OptionRow
+                key={opt.id}
+                letter={opt.id}
+                text={opt.text}
+                isCorrect={item.correct_id === opt.id}
+                onPick={() => {
+                  const items = [...section.items];
+                  items[idx] = { ...item, correct_id: opt.id };
+                  update(items);
+                }}
+                onTextChange={(v) => {
+                  const items = [...section.items];
+                  const options = [...item.options];
+                  options[oi] = { ...opt, text: v };
+                  items[idx] = { ...item, options };
+                  update(items);
+                }}
+              />
+            ))}
+          </div>
+        </ItemCard>
+      ))}
+      <AddButton label="Thêm câu" onClick={() => update([...section.items, makeMcItem(nextQuestionNumber(all))])} />
+    </div>
+  );
+}
 // ════════════════════════════════════════════════════════════════════════════
 function WordFormEditor({ section, all, onChange }: { section: Extract<ThptSection, { type: 'word_form' }>; all: ThptSection[]; onChange: (s: ThptSection) => void }) {
   const update = (items: typeof section.items) => onChange({ ...section, items });

@@ -130,6 +130,46 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode }: Props)
         </>
       );
 
+    case 'listening': {
+      const sec = section as any;
+      return (
+        <>
+          {sec.audio_url && (
+            <div className="rounded-2xl bg-white border border-slate-200 p-4">
+              <audio controls src={sec.audio_url} className="w-full" />
+            </div>
+          )}
+          {sec.items.map((item: any) => {
+            const key = `q${item.question_number}`;
+            const userVal = String(answers[key] ?? '');
+            const correctVal = String(correctAnswers?.[key] ?? '');
+            return (
+              <QCard key={key} n={item.question_number}>
+                {item.prompt && (
+                  <p className="text-sm text-slate-800 leading-relaxed font-medium mb-3">{item.prompt}</p>
+                )}
+                <div className="space-y-2">
+                  {item.options.map((opt: any) => (
+                    <ChoiceButton
+                      key={opt.id}
+                      letter={opt.id}
+                      label={opt.text}
+                      picked={userVal === opt.id}
+                      correct={isReview && correctVal === opt.id}
+                      wrong={isReview && userVal === opt.id && correctVal !== opt.id}
+                      disabled={isReview}
+                      onClick={() => onAnswerChange(key, opt.id)}
+                      block
+                    />
+                  ))}
+                </div>
+              </QCard>
+            );
+          })}
+        </>
+      );
+    }
+
     case 'sentence_transformation':
       return (
         <>

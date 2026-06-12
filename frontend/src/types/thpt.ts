@@ -42,7 +42,8 @@ export type SectionType =
   | 'sentence_transformation'
   | 'tf_group'
   | 'reading_mixed'
-  | 'matching';
+  | 'matching'
+  | 'listening';
 
 interface BaseSection {
   /** id ổn định để React key + reorder */
@@ -221,6 +222,15 @@ export interface MatchingSection extends BaseSection {
   items: MatchingItem[];
 }
 
+// ── 12. Listening (audio + trắc nghiệm) ───────────────────────────────────
+/** Dùng lại shape câu trắc nghiệm; thêm audio cho cả section. */
+export interface ListeningSection extends BaseSection {
+  type: 'listening';
+  audio_url: string;
+  transcript?: string;
+  items: McQuestionItem[];
+}
+
 // ── Union ───────────────────────────────────────────────────────────────────
 export type ThptSection =
   | PhoneticsSection
@@ -233,7 +243,8 @@ export type ThptSection =
   | TransformationSection
   | TfGroupSection
   | ReadingMixedSection
-  | MatchingSection;
+  | MatchingSection
+  | ListeningSection;
 
 // ── Full config ──────────────────────────────────────────────────────────
 export interface ThptConfig {
