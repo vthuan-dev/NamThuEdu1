@@ -1905,9 +1905,12 @@ class ExamController extends Controller
             ], 403);
         }
 
+        // Đề "chờ duyệt" = đề giáo viên đã gửi và đang đợi admin phê duyệt
+        // (eStatus='pending', sinh ra khi admin tắt auto-duyệt examAutoApprove).
+        // KHÔNG tính đề nháp (draft) đang soạn dở của giáo viên.
         $pendingExams = Exam::with(['teacher'])
                            ->withCount('questions')
-                           ->where('eIs_private', true)
+                           ->where('eStatus', 'pending')
                            ->orderBy('eCreated_at', 'desc')
                            ->get();
 
@@ -1934,8 +1937,11 @@ class ExamController extends Controller
 
         // Exams statistics
         $totalExams = Exam::count();
-        $publicExams = Exam::where('eIs_private', false)->count();
-        $privateExams = Exam::where('eIs_private', true)->count();
+        // "Đã xuất bản" = đề đã công bố; "Chờ duyệt" = đề đang đợi admin phê duyệt
+        // (eStatus='pending'). KHÔNG dùng eIs_private vì đề nháp (draft) cũng private
+        // nhưng không phải đề chờ duyệt → trước đây đếm nhầm cả draft.
+        $publicExams = Exam::where('eStatus', 'published')->count();
+        $privateExams = Exam::where('eStatus', 'pending')->count();
 
         // Exams by type
         $examsByType = Exam::selectRaw('eType, COUNT(*) as count')
