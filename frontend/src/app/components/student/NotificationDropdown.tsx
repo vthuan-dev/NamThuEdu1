@@ -6,7 +6,9 @@ import {
   MessageSquare, Trophy, Clock, ChevronRight, X,
 } from "lucide-react";
 import { studentApi } from "../../../services/studentApi";
+import type { ExamSchedule } from "../../../services/studentApi";
 import { formatTimeAgo, formatDateTime } from "../../../utils/formatters";
+import { ExamScheduleDetailPopup } from "./ExamScheduleDetailPopup";
 
 const PURPLE = "#7C3AED";
 const STUDENT_BASE_PATH = "/hoc-vien";
@@ -46,6 +48,7 @@ export function NotificationDropdown() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [scheduleDetail, setScheduleDetail] = useState<ExamSchedule | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isInitialLoadRef = useRef(true);
   const prevNotificationsRef = useRef<NotificationDto[]>([]);
@@ -400,8 +403,40 @@ export function NotificationDropdown() {
                   const isUnread = !notif.is_read;
                   const url = resolveStudentActionUrl(notif.action_url);
                   const isResultUrl = url?.includes("/ket-qua/");
-                  
+                  const isExamSchedule = String(notif.id).startsWith("exam_schedule_");
+
+                  const openScheduleDetail = async () => {
+                    const schId = Number(String(notif.id).replace("exam_schedule_", ""));
+                    try {
+                      const res = await studentApi.getExamSchedules();
+                      const list: ExamSchedule[] = (res as any)?.data?.data?.schedules ?? [];
+                      const found = list.find((s) => Number(s.id) === schId);
+                      setScheduleDetail(found ?? {
+                        id: schId,
+                        student_id: 0,
+                        title: notif.title.replace(/^📅\s*Lịch thi:\s*/, ""),
+                        exam_type: null,
+                        exam_date: "",
+                        exam_time: null,
+                        location: null,
+                        note: notif.message,
+                        days_until: null,
+                        is_urgent: false,
+                        teacher_name: null,
+                        created_at: notif.created_at,
+                      });
+                    } catch {
+                      /* ignore */
+                    }
+                    handleClose();
+                  };
+
                   const handleNotifClick = (e: React.MouseEvent) => {
+                    if (isExamSchedule) {
+                      e.preventDefault();
+                      openScheduleDetail();
+                      return;
+                    }
                     if (isResultUrl && url) {
                       e.preventDefault();
                       const parts = url.split("/");
@@ -415,8 +450,9 @@ export function NotificationDropdown() {
                     }
                   };
 
-                  const Wrapper: any = (url && !isResultUrl) ? Link : "div";
-                  const wrapperProps = (url && !isResultUrl)
+                  const useLink = url && !isResultUrl && !isExamSchedule;
+                  const Wrapper: any = useLink ? Link : "div";
+                  const wrapperProps = useLink
                     ? { to: url, onClick: () => handleClose() }
                     : { onClick: handleNotifClick };
 
@@ -500,6 +536,13 @@ export function NotificationDropdown() {
           </div>
         </div>
         </>
+      )}
+
+      {scheduleDetail && (
+        <ExamScheduleDetailPopup
+          schedule={scheduleDetail}
+          onClose={() => setScheduleDetail(null)}
+        />
       )}
     </div>
   );
