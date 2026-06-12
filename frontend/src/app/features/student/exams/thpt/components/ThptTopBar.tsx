@@ -33,7 +33,7 @@ export function ThptTopBar({ examTitle, totalSeconds, totalDurationSec, onBack, 
         </button>
 
         <div className="flex-1 min-w-0 flex items-center gap-2">
-          <BookOpen className="w-4 h-4 text-blue-600 flex-shrink-0" />
+          <BookOpen className="w-4 h-4 text-teal-600 flex-shrink-0" />
           <div className="min-w-0">
             <h1 className="text-sm font-bold text-slate-900 truncate">{examTitle}</h1>
             <p className="text-[11px] text-slate-500">Đề Tiếng Anh · Thi trên máy tính</p>
@@ -43,14 +43,14 @@ export function ThptTopBar({ examTitle, totalSeconds, totalDurationSec, onBack, 
         {!hideTimer && (
           <div
             className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
-              danger ? 'bg-red-50' : 'bg-blue-50'
+              danger ? 'bg-red-50' : 'bg-teal-50'
             }`}
           >
-            <Clock className={`w-4 h-4 ${danger ? 'text-red-600' : 'text-blue-600'}`} />
+            <Clock className={`w-4 h-4 ${danger ? 'text-red-600' : 'text-teal-600'}`} />
             <div>
               <div
                 className={`text-sm font-bold tabular-nums ${
-                  danger ? 'text-red-700' : 'text-blue-700'
+                  danger ? 'text-red-700' : 'text-teal-700'
                 }`}
               >
                 {formatTime(Math.max(0, totalSeconds))}
@@ -58,7 +58,7 @@ export function ThptTopBar({ examTitle, totalSeconds, totalDurationSec, onBack, 
               <div className="h-1 w-24 rounded-full bg-white overflow-hidden mt-0.5">
                 <div
                   className={`h-full transition-all duration-1000 ${
-                    danger ? 'bg-red-500' : 'bg-blue-500'
+                    danger ? 'bg-red-500' : 'bg-teal-500'
                   }`}
                   style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
                 />

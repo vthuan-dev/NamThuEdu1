@@ -141,7 +141,7 @@ export function StudentThptExamPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-3" />
+          <Loader2 className="w-8 h-8 animate-spin text-teal-600 mx-auto mb-3" />
           <p className="text-sm text-slate-600">Đang tải đề thi...</p>
         </div>
       </div>
@@ -158,7 +158,7 @@ export function StudentThptExamPage() {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-lg bg-teal-600 text-white font-semibold text-sm hover:bg-teal-700 transition-colors cursor-pointer"
           >
             Quay lại
           </button>

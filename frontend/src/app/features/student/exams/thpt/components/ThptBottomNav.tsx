@@ -44,7 +44,7 @@ export function ThptBottomNav({
             type="button"
             onClick={onNext}
             disabled={!canNext}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg font-semibold text-white transition-colors cursor-pointer text-sm disabled:opacity-40 disabled:cursor-not-allowed bg-blue-600 hover:bg-blue-700"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg font-semibold text-white transition-colors cursor-pointer text-sm disabled:opacity-40 disabled:cursor-not-allowed bg-teal-600 hover:bg-teal-700"
           >
             <span>Phần tiếp</span>
             <ChevronRight className="w-4 h-4" />

@@ -65,7 +65,7 @@ export function ThptPartNavigator({ config, answers, activeIdx, onSectionChange 
         <span className="text-xs font-bold text-slate-700">{answered}/{total}</span>
       </div>
       <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden mb-4">
-        <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${total ? (answered / total) * 100 : 0}%` }} />
+        <div className="h-full bg-teal-500 transition-all duration-300" style={{ width: `${total ? (answered / total) * 100 : 0}%` }} />
       </div>
 
       <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
@@ -79,7 +79,7 @@ export function ThptPartNavigator({ config, answers, activeIdx, onSectionChange 
                 type="button"
                 onClick={() => onSectionChange(idx)}
                 className={`w-full text-left px-2 py-1.5 rounded-md text-xs font-bold transition-colors cursor-pointer ${
-                  isActive ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'
+                  isActive ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">

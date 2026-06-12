@@ -1,14 +1,31 @@
 import { useMemo } from 'react';
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, Headphones } from 'lucide-react';
 import type { ThptAnswers, ThptSection, ViewMode } from '../types';
 import { ThptSpeakingRecorder } from '../components/ThptSpeakingRecorder';
 
 const THEME = {
-  primary: '#2563EB',
+  primary: '#0D9488',
   success: '#10B981',
   error: '#EF4444',
 };
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+// Nhãn ngắn theo loại phần thi — hiển thị trên header cho gọn gàng, có chủ đích.
+const TYPE_LABEL: Record<string, string> = {
+  listening: 'Nghe hiểu',
+  speaking: 'Nói',
+  phonetics: 'Ngữ âm',
+  mc_questions: 'Trắc nghiệm',
+  word_form: 'Chia dạng từ',
+  error_identification: 'Tìm lỗi sai',
+  mc_cloze: 'Đọc điền',
+  word_bank_cloze: 'Điền từ cho sẵn',
+  open_cloze: 'Điền từ',
+  tf_group: 'Đúng / Sai',
+  reading_mixed: 'Đọc hiểu',
+  matching: 'Nối câu',
+  sentence_transformation: 'Viết lại câu',
+};
 
 interface Props {
   section: ThptSection;
@@ -20,12 +37,17 @@ interface Props {
 }
 
 export function SectionView({ section, answers, correctAnswers, onAnswerChange, mode, submissionId }: Props) {
+  const typeLabel = TYPE_LABEL[section.type] ?? 'Phần thi';
   return (
     <section className="space-y-5">
-      <header className="rounded-2xl bg-white border border-slate-200 p-5">
-        <h2 className="text-lg font-bold text-slate-900">{section.title}</h2>
+      <header className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 p-5 pl-6">
+        <span className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: THEME.primary }} />
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-teal-700 mb-1.5">
+          {typeLabel}
+        </span>
+        <h2 className="text-xl font-bold text-slate-900 tracking-tight leading-snug">{section.title}</h2>
         {section.instructions && (
-          <p className="text-sm text-slate-600 mt-1 leading-relaxed">{section.instructions}</p>
+          <p className="text-sm text-slate-500 mt-1.5 leading-relaxed max-w-2xl">{section.instructions}</p>
         )}
       </header>
       <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} />
@@ -117,7 +139,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                 <p className="text-sm text-slate-800 mb-2">
                   {item.sentence}{' '}
                   {item.root_word && (
-                    <span className="font-bold text-blue-700">({item.root_word})</span>
+                    <span className="font-bold text-teal-700">({item.root_word})</span>
                   )}
                 </p>
                 <TextAnswer
@@ -138,7 +160,16 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
         <>
           {sec.audio_url && (
             <div className="rounded-2xl bg-white border border-slate-200 p-4">
-              <audio controls src={sec.audio_url} className="w-full" />
+              <div className="flex items-center gap-2.5 mb-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-teal-50 text-teal-700 ring-1 ring-teal-100 flex-shrink-0">
+                  <Headphones className="w-[18px] h-[18px]" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-slate-800 leading-tight">Đoạn ghi âm</p>
+                  <p className="text-[11px] text-slate-400">Nghe rồi chọn đáp án đúng cho mỗi câu</p>
+                </div>
+              </div>
+              <audio controls src={sec.audio_url} className="w-full h-10" />
             </div>
           )}
           {sec.items.map((item: any) => {
@@ -229,8 +260,8 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
           {section.items.map((item) => (
             <QCard key={item.question_number} n={item.question_number}>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="rounded-xl border border-blue-100 bg-blue-50/30 p-4">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-blue-700 mb-1">
+                <div className="rounded-xl border border-teal-100 bg-teal-50/40 p-4">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-teal-700 mb-1">
                     {item.context_style ?? 'Notice'}
                   </div>
                   <pre className="whitespace-pre-wrap text-sm text-slate-800 font-mono leading-relaxed">
@@ -283,7 +314,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                           value={userVal}
                           onChange={(e) => onAnswerChange(key, e.target.value)}
                           disabled={isReview}
-                          className="w-14 text-sm font-bold text-center border border-slate-300 rounded-md px-1 py-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-200 disabled:cursor-default"
+                          className="w-14 text-sm font-bold text-center border border-slate-300 rounded-md px-1 py-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-200 disabled:cursor-default"
                         >
                           <option value="">—</option>
                           {LETTERS.map((L) => (<option key={L} value={L}>{L}</option>))}
@@ -295,10 +326,10 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                     );
                   })}
                 </div>
-                <div className="rounded-xl border border-blue-100 bg-blue-50/30 p-3 space-y-2">
+                <div className="rounded-xl border border-teal-100 bg-teal-50/40 p-3 space-y-2">
                   {item.list_2.map((line, i) => (
                     <div key={i} className="flex items-start gap-2">
-                      <span className="text-xs font-bold text-blue-700 w-5 mt-0.5">{LETTERS[i]}.</span>
+                      <span className="text-xs font-bold text-teal-700 w-5 mt-0.5">{LETTERS[i]}.</span>
                       <p className="flex-1 text-sm text-slate-700 leading-snug">{line}</p>
                     </div>
                   ))}
@@ -348,7 +379,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Ngân hàng từ</p>
               <div className="flex flex-wrap gap-2">
                 {section.word_bank.map((w, i) => (
-                  <span key={i} className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-semibold">
+                  <span key={i} className="px-3 py-1 rounded-full bg-teal-50 text-teal-700 text-sm font-semibold">
                     {w}
                   </span>
                 ))}
@@ -427,7 +458,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
               {item.kind === 'sentence_insertion' && (
                 <div className="space-y-2">
                   <p className="text-sm text-slate-800 font-medium">{item.prompt}</p>
-                  <blockquote className="border-l-4 border-blue-300 pl-3 py-1 italic text-sm text-slate-700 bg-blue-50/30 rounded-r">
+                  <blockquote className="border-l-4 border-teal-300 pl-3 py-1 italic text-sm text-slate-700 bg-teal-50/40 rounded-r">
                     {item.sentence_to_insert}
                   </blockquote>
                   <div className="flex items-center gap-2">
@@ -445,7 +476,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                           onClick={() => onAnswerChange(key, m)}
                           disabled={isReview}
                           className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all cursor-pointer disabled:cursor-default ${
-                            correct ? 'text-white' : wrong ? 'text-white' : picked ? 'text-white' : 'bg-white border border-slate-200 text-slate-500 hover:border-blue-400'
+                            correct ? 'text-white' : wrong ? 'text-white' : picked ? 'text-white' : 'bg-white border border-slate-200 text-slate-500 hover:border-teal-400'
                           }`}
                           style={correct ? { backgroundColor: THEME.success } : wrong ? { backgroundColor: THEME.error } : picked ? { backgroundColor: THEME.primary } : {}}
                         >
@@ -469,12 +500,12 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
 // ── Reusable pieces ──────────────────────────────────────────────────────────
 function QCard({ n, children }: { n: number; children: React.ReactNode }) {
   return (
-    <article className="rounded-2xl bg-white border border-slate-200 p-5">
-      <div className="flex items-center gap-2 mb-3">
-        <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-600 text-white text-sm font-bold">
+    <article className="rounded-2xl bg-white border border-slate-200 p-5 transition-colors hover:border-slate-300">
+      <div className="flex items-center gap-2.5 mb-3.5">
+        <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-teal-600 text-white text-[13px] font-bold tabular-nums">
           {n}
         </span>
-        <h3 className="text-sm font-bold text-slate-700">Câu {n}</h3>
+        <h3 className="text-[13px] font-semibold uppercase tracking-wider text-slate-400">Câu {n}</h3>
       </div>
       {children}
     </article>
@@ -507,23 +538,23 @@ function ChoiceButton({
     : wrong
     ? 'border-red-400 bg-red-50'
     : picked
-    ? 'border-blue-400 bg-blue-50'
-    : 'border-slate-200 hover:border-blue-300';
+    ? 'border-teal-500 bg-teal-50'
+    : 'border-slate-200 hover:border-teal-300 hover:bg-teal-50/40';
   const badge = correct
     ? 'bg-emerald-500 text-white'
     : wrong
     ? 'bg-red-500 text-white'
     : picked
-    ? 'bg-blue-500 text-white'
+    ? 'bg-teal-600 text-white'
     : 'bg-slate-100 text-slate-500';
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`text-left flex items-center gap-2.5 rounded-lg border p-2.5 transition-colors cursor-pointer disabled:cursor-default ${border} ${block ? 'w-full' : ''}`}
+      className={`text-left flex items-center gap-3 rounded-xl border p-3 transition-all duration-150 cursor-pointer active:scale-[0.99] disabled:cursor-default disabled:active:scale-100 ${border} ${block ? 'w-full' : ''}`}
     >
-      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${badge}`}>
+      <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 transition-colors ${badge}`}>
         {letter}
       </span>
       <span className="flex-1 min-w-0">
@@ -606,7 +637,7 @@ function TextAnswer({
   multiline?: boolean;
 }) {
   const isCorrect = isReview && value && correct && value.trim().toLowerCase() === correct.trim().toLowerCase();
-  const cls = `w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200 ${
+  const cls = `w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-200 ${
     isReview ? (isCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-400 bg-red-50') : 'border-slate-300'
   }`;
   return (
@@ -647,7 +678,7 @@ function PassageBox({ text, markers }: { text: string; markers?: boolean }) {
               s.kind === 'text' ? (
                 <span key={i}>{s.value}</span>
               ) : (
-                <span key={i} className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-blue-100 text-blue-700 text-xs font-bold mx-0.5 align-middle">
+                <span key={i} className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-teal-100 text-teal-700 text-xs font-bold mx-0.5 align-middle">
                   [{s.value}]
                 </span>
               )
@@ -701,14 +732,14 @@ function ClozePassage({
           return (
             <span key={i} className="inline-flex flex-col items-center align-middle mx-1">
               <span className="inline-flex items-center gap-1">
-                <span className="text-xs font-bold text-blue-600 align-super">({tok.qn})</span>
+                <span className="text-xs font-bold text-teal-600 align-super">({tok.qn})</span>
                 <input
                   type="text"
                   value={userVal}
                   onChange={(e) => onAnswerChange(key, e.target.value)}
                   disabled={isReview}
                   className={`inline-block min-w-[80px] max-w-[160px] text-center text-sm font-semibold border-b-2 bg-transparent focus:outline-none px-1 py-0.5 ${
-                    isCorrect ? 'border-emerald-500 text-emerald-700' : isWrong ? 'border-red-500 text-red-700 line-through' : isMissing ? 'border-amber-400' : 'border-blue-400 focus:border-blue-600'
+                    isCorrect ? 'border-emerald-500 text-emerald-700' : isWrong ? 'border-red-500 text-red-700 line-through' : isMissing ? 'border-amber-400' : 'border-teal-400 focus:border-teal-600'
                   }`}
                   placeholder="..."
                 />
