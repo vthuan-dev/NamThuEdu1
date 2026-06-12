@@ -720,112 +720,6 @@ export function AdultsDashboard() {
           })}
         </section>
 
-        {/* ─── Bài tập được giao (card grid, đưa lên trên) ─────── */}
-        {pendingAssignments.length > 0 && (() => {
-          const SKILL_MAP: Record<string, { label: string; color: string; bg: string; border: string; icon: any }> = {
-            listening: { label: 'Listening', color: '#1D4ED8', bg: '#EFF6FF', border: '#BFDBFE', icon: Headphones },
-            reading:   { label: 'Reading',   color: '#047857', bg: '#ECFDF5', border: '#A7F3D0', icon: BookOpenCheck },
-            writing:   { label: 'Writing',   color: '#6D28D9', bg: '#F3E8FF', border: '#DDD6FE', icon: PenLine },
-            speaking:  { label: 'Speaking',  color: '#C2410C', bg: '#FFF7ED', border: '#FED7AA', icon: Mic },
-            mixed:     { label: 'Full Test', color: '#475569', bg: '#F1F5F9', border: '#E2E8F0', icon: ClipboardList },
-          };
-          const visible = showAllAssignments ? pendingAssignments : pendingAssignments.slice(0, 4);
-          return (
-            <section>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: '#FFF7ED' }}>
-                    <ClipboardList className="w-4 h-4" style={{ color: '#EA580C' }} />
-                  </div>
-                  <h2 className="text-sm font-extrabold text-slate-900 tracking-tight">Bài tập được giao</h2>
-                  <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-orange-500 text-white text-[10px] font-bold tabular-nums">
-                    {pendingAssignments.length}
-                  </span>
-                </div>
-                <Link to="/hoc-vien/bai-tap" className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1">
-                  Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                {visible.map((a) => {
-                  const skill = SKILL_MAP[a.exam_skill?.toLowerCase()] ?? SKILL_MAP['mixed'];
-                  const SkillIcon = skill.icon;
-                  const deadlineStr = a.deadline
-                    ? (() => {
-                        const d = new Date(a.deadline);
-                        const diff = Math.ceil((d.getTime() - Date.now()) / 86400000);
-                        if (diff <= 0) return { text: 'Hết hạn hôm nay', urgent: true };
-                        if (diff === 1) return { text: 'Còn 1 ngày', urgent: true };
-                        if (diff <= 3) return { text: `Còn ${diff} ngày`, urgent: true };
-                        return { text: `Hạn ${d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}`, urgent: false };
-                      })()
-                    : null;
-                  const attemptsLeft = a.attempts_allowed > 0 ? a.attempts_allowed - a.attempts_used : null;
-                  const urgent = a.is_urgent || deadlineStr?.urgent;
-                  return (
-                    <div
-                      key={a.assignment_id}
-                      className="group relative flex flex-col rounded-2xl bg-white p-4 hover:-translate-y-0.5 transition-all duration-200"
-                      style={{ border: `1.5px solid ${urgent ? '#FECACA' : '#F0F0F8'}`, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}
-                    >
-                      <div className="flex items-start gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                          style={{ background: skill.bg, border: `1px solid ${skill.border}` }}>
-                          <SkillIcon className="w-5 h-5" style={{ color: skill.color }} strokeWidth={2.2} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <h3 className="text-sm font-bold text-slate-900 truncate leading-snug">{a.exam_title}</h3>
-                            {urgent && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-600 text-white flex-shrink-0">KHẨN</span>
-                            )}
-                          </div>
-                          <p className="text-[11px] font-semibold mt-0.5" style={{ color: skill.color }}>
-                            {a.exam_type} · {skill.label}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 mb-3">
-                        {a.exam_duration > 0 && (
-                          <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3" />{a.exam_duration} phút</span>
-                        )}
-                        {a.total_questions > 0 && <span>{a.total_questions} câu</span>}
-                        {attemptsLeft !== null && <span>Còn {attemptsLeft} lượt</span>}
-                      </div>
-
-                      <div className="flex items-center justify-between gap-2 mt-auto pt-1">
-                        {deadlineStr ? (
-                          <span className={`text-[11px] font-semibold ${deadlineStr.urgent ? 'text-rose-600' : 'text-slate-400'}`}>
-                            {deadlineStr.text}
-                          </span>
-                        ) : <span />}
-                        <Link
-                          to={`/hoc-vien/phong-cho/${a.assignment_id}`}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-colors flex-shrink-0"
-                        >
-                          Làm bài <ArrowRight className="w-3 h-3" />
-                        </Link>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {pendingAssignments.length > 4 && (
-                <button
-                  onClick={() => setShowAllAssignments(v => !v)}
-                  className="mt-3 w-full py-2.5 rounded-2xl text-xs font-semibold text-slate-500 hover:text-slate-700 bg-white hover:bg-slate-50 transition-colors"
-                  style={{ border: '1.5px solid #F0F0F8' }}
-                >
-                  {showAllAssignments ? 'Thu gọn' : `Xem thêm ${pendingAssignments.length - 4} bài tập`}
-                </button>
-              )}
-            </section>
-          );
-        })()}
-
         {/* ─── Main grid: 3+2 ──────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
@@ -1150,6 +1044,112 @@ export function AdultsDashboard() {
 
           </div>
         </div>
+
+        {/* ─── Bài tập được giao (card grid) ─────── */}
+        {pendingAssignments.length > 0 && (() => {
+          const SKILL_MAP: Record<string, { label: string; color: string; bg: string; border: string; icon: any }> = {
+            listening: { label: 'Listening', color: '#1D4ED8', bg: '#EFF6FF', border: '#BFDBFE', icon: Headphones },
+            reading:   { label: 'Reading',   color: '#047857', bg: '#ECFDF5', border: '#A7F3D0', icon: BookOpenCheck },
+            writing:   { label: 'Writing',   color: '#6D28D9', bg: '#F3E8FF', border: '#DDD6FE', icon: PenLine },
+            speaking:  { label: 'Speaking',  color: '#C2410C', bg: '#FFF7ED', border: '#FED7AA', icon: Mic },
+            mixed:     { label: 'Full Test', color: '#475569', bg: '#F1F5F9', border: '#E2E8F0', icon: ClipboardList },
+          };
+          const visible = showAllAssignments ? pendingAssignments : pendingAssignments.slice(0, 4);
+          return (
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: '#FFF7ED' }}>
+                    <ClipboardList className="w-4 h-4" style={{ color: '#EA580C' }} />
+                  </div>
+                  <h2 className="text-sm font-extrabold text-slate-900 tracking-tight">Bài tập được giao</h2>
+                  <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-orange-500 text-white text-[10px] font-bold tabular-nums">
+                    {pendingAssignments.length}
+                  </span>
+                </div>
+                <Link to="/hoc-vien/bai-tap" className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1">
+                  Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {visible.map((a) => {
+                  const skill = SKILL_MAP[a.exam_skill?.toLowerCase()] ?? SKILL_MAP['mixed'];
+                  const SkillIcon = skill.icon;
+                  const deadlineStr = a.deadline
+                    ? (() => {
+                        const d = new Date(a.deadline);
+                        const diff = Math.ceil((d.getTime() - Date.now()) / 86400000);
+                        if (diff <= 0) return { text: 'Hết hạn hôm nay', urgent: true };
+                        if (diff === 1) return { text: 'Còn 1 ngày', urgent: true };
+                        if (diff <= 3) return { text: `Còn ${diff} ngày`, urgent: true };
+                        return { text: `Hạn ${d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })}`, urgent: false };
+                      })()
+                    : null;
+                  const attemptsLeft = a.attempts_allowed > 0 ? a.attempts_allowed - a.attempts_used : null;
+                  const urgent = a.is_urgent || deadlineStr?.urgent;
+                  return (
+                    <div
+                      key={a.assignment_id}
+                      className="group relative flex flex-col rounded-2xl bg-white p-4 hover:-translate-y-0.5 transition-all duration-200"
+                      style={{ border: `1.5px solid ${urgent ? '#FECACA' : '#F0F0F8'}`, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}
+                    >
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                          style={{ background: skill.bg, border: `1px solid ${skill.border}` }}>
+                          <SkillIcon className="w-5 h-5" style={{ color: skill.color }} strokeWidth={2.2} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <h3 className="text-sm font-bold text-slate-900 truncate leading-snug">{a.exam_title}</h3>
+                            {urgent && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-600 text-white flex-shrink-0">KHẨN</span>
+                            )}
+                          </div>
+                          <p className="text-[11px] font-semibold mt-0.5" style={{ color: skill.color }}>
+                            {a.exam_type} · {skill.label}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 mb-3">
+                        {a.exam_duration > 0 && (
+                          <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3" />{a.exam_duration} phút</span>
+                        )}
+                        {a.total_questions > 0 && <span>{a.total_questions} câu</span>}
+                        {attemptsLeft !== null && <span>Còn {attemptsLeft} lượt</span>}
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 mt-auto pt-1">
+                        {deadlineStr ? (
+                          <span className={`text-[11px] font-semibold ${deadlineStr.urgent ? 'text-rose-600' : 'text-slate-400'}`}>
+                            {deadlineStr.text}
+                          </span>
+                        ) : <span />}
+                        <Link
+                          to={`/hoc-vien/phong-cho/${a.assignment_id}`}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold transition-colors flex-shrink-0"
+                        >
+                          Làm bài <ArrowRight className="w-3 h-3" />
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {pendingAssignments.length > 4 && (
+                <button
+                  onClick={() => setShowAllAssignments(v => !v)}
+                  className="mt-3 w-full py-2.5 rounded-2xl text-xs font-semibold text-slate-500 hover:text-slate-700 bg-white hover:bg-slate-50 transition-colors"
+                  style={{ border: '1.5px solid #F0F0F8' }}
+                >
+                  {showAllAssignments ? 'Thu gọn' : `Xem thêm ${pendingAssignments.length - 4} bài tập`}
+                </button>
+              )}
+            </section>
+          );
+        })()}
 
       </div>
     </div>
