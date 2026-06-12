@@ -743,6 +743,7 @@ class UserController extends Controller
             'uGender' => 'sometimes|nullable|boolean',
             'age_group' => 'sometimes|nullable|in:kids,teens,adults',
             'uStatus' => 'sometimes|required|in:active,inactive',
+            'daily_goal_minutes' => 'sometimes|nullable|integer|min:5|max:600',
             'avatar' => 'sometimes|nullable|image|mimes:jpeg,jpg,png,gif,webp,bmp,svg|max:20480',
         ]);
 
@@ -763,6 +764,10 @@ class UserController extends Controller
         if ($request->has('uGender')) $updateData['uGender'] = $request->uGender;
         if ($request->has('age_group')) $updateData['age_group'] = $request->age_group;
         if ($request->has('uStatus')) $updateData['uStatus'] = $request->uStatus;
+        if ($request->has('daily_goal_minutes')) {
+            $goal = $request->daily_goal_minutes;
+            $updateData['daily_goal_minutes'] = ($goal === null || $goal === '') ? null : (int) $goal;
+        }
 
         // Handle avatar upload
         if ($request->hasFile('avatar')) {
@@ -785,6 +790,7 @@ class UserController extends Controller
                 'dateOfBirth' => $student->uDoB,
                 'ageGroup' => $student->age_group,
                 'status' => $student->uStatus,
+                'dailyGoal' => $student->daily_goal_minutes,
                 'avatarUrl' => $student->avatar_url,
             ]
         ]);

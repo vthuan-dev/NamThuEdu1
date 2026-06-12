@@ -239,6 +239,7 @@ export function StudentManagement() {
               createdAt: new Date(student.uCreated_at).toLocaleDateString('vi-VN'),
               uDoB: student.uDoB || null,
               dateOfBirth: student.uDoB ? student.uDoB.split(' ')[0] : null,
+              dailyGoal: student.daily_goal_minutes ?? null,
             };
           });
           

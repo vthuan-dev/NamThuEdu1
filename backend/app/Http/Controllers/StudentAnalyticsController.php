@@ -123,7 +123,7 @@ class StudentAnalyticsController extends Controller
             $sessions++;
         }
 
-        $dailyGoal = 30; // phút/ngày — đồng bộ với DAILY_GOAL_MIN ở frontend
+        $dailyGoal = (int) ($user->daily_goal_minutes ?: 30); // phút/ngày — giáo viên đặt cho từng học viên, fallback 30
         $minutes = (int) round($minutes);
 
         return response()->json([

@@ -12,6 +12,7 @@ import {
   Briefcase,
   CircleDot,
   CircleSlash,
+  Target,
 } from "lucide-react";
 import { getApiUrl, getAssetUrl } from "../../../../utils/apiConfig";
 import { useToast } from "../../../../hooks/useToast";
@@ -146,6 +147,7 @@ export function EditStudentModal({ isOpen, onClose, student, onSave, toast: toas
     dateOfBirth: "",
     ageGroup: "teens",
     status: "active",
+    dailyGoal: "",
   });
 
   const [originalData, setOriginalData] = useState(formData);
@@ -185,6 +187,7 @@ export function EditStudentModal({ isOpen, onClose, student, onSave, toast: toas
       dateOfBirth: dobFormatted,
       ageGroup: student.ageGroup || "teens",
       status: student.status || "active",
+      dailyGoal: student.dailyGoal != null ? String(student.dailyGoal) : "",
     };
     setFormData(initial);
     setOriginalData(initial);
@@ -220,6 +223,7 @@ export function EditStudentModal({ isOpen, onClose, student, onSave, toast: toas
       formData.dateOfBirth !== originalData.dateOfBirth ||
       formData.ageGroup !== originalData.ageGroup ||
       formData.status !== originalData.status ||
+      formData.dailyGoal !== originalData.dailyGoal ||
       avatarFile !== null;
 
     if (!hasAnyChange) {
@@ -245,6 +249,7 @@ export function EditStudentModal({ isOpen, onClose, student, onSave, toast: toas
       fd.append('uDoB', formData.dateOfBirth);
       fd.append('age_group', formData.ageGroup);
       fd.append('uStatus', formData.status);
+      fd.append('daily_goal_minutes', formData.dailyGoal === "" ? "" : String(parseInt(formData.dailyGoal, 10) || ""));
       if (avatarFile) fd.append('avatar', avatarFile);
 
       const response = await fetch(getApiUrl(`teacher/student/${student.id}`), {
@@ -469,6 +474,52 @@ export function EditStudentModal({ isOpen, onClose, student, onSave, toast: toas
                       ]}
                     />
                   </div>
+                </div>
+
+                {/* Mục tiêu học mỗi ngày */}
+                <div>
+                  <label className={labelCls}>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Target className="w-3.5 h-3.5 text-orange-500" />
+                      Mục tiêu học mỗi ngày
+                    </span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="number"
+                        min={5}
+                        max={600}
+                        step={5}
+                        value={formData.dailyGoal}
+                        onChange={(e) => setFormData({ ...formData, dailyGoal: e.target.value })}
+                        placeholder="30"
+                        className={inputCls + " pr-14"}
+                      />
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[13px] text-slate-400 pointer-events-none">
+                        phút
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {[15, 30, 45, 60].map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, dailyGoal: String(m) })}
+                          className={`px-2.5 h-9 rounded-lg text-[12px] font-semibold transition-colors ${
+                            formData.dailyGoal === String(m)
+                              ? 'bg-orange-100 text-orange-700 border border-orange-200'
+                              : 'bg-white text-slate-500 border border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1.5">
+                    Hiển thị ở vòng "Mục tiêu hôm nay" trên trang chủ học viên. Để trống = mặc định 30 phút.
+                  </p>
                 </div>
               </div>
 
