@@ -2430,12 +2430,21 @@ class StudentTestController extends Controller
             $decoded = json_decode($trimmed, true);
             if (is_array($decoded)) {
                 foreach ($decoded as $k => $v) {
-                    $map[(string) $k] = (string) $v;
+                    // Giữ boolean dạng 'true'/'false' (look_and_read lưu tick/cross = bool)
+                    // — tránh (string)false === '' bị hiểu nhầm là chưa trả lời.
+                    if (is_bool($v)) {
+                        $map[(string) $k] = $v ? 'true' : 'false';
+                    } else {
+                        $map[(string) $k] = (string) $v;
+                    }
                 }
             }
         } elseif ($trimmed !== '') {
             $map['0'] = $trimmed;
         }
+
+        // Một số editor lưu items/questions lồng trong 'config'.
+        $cfg = $data['config'] ?? [];
 
         $eq = function ($a, $b) {
             $na = $this->normalizeAnswer((string) $a);
@@ -2567,6 +2576,65 @@ class StudentTestController extends Controller
                     if ($got !== '' && (int) $got === (int) $i) $correct++;
                 }
                 if ($gradable === 0) return ['manual' => false, 'ratio' => 0.0];
+                return ['manual' => false, 'ratio' => $correct / $gradable];
+            }
+            case 'listen_and_tick': {
+                $items = $data['items'] ?? ($cfg['items'] ?? []);
+                $gradable = 0; $correct = 0;
+                foreach ($items as $i => $it) {
+                    if (!empty($it['isExample']) || !empty($it['is_example'])) continue;
+                    $gradable++;
+                    $corr = strtoupper((string) ($it['correctAnswer'] ?? $it['correct_answer'] ?? ''));
+                    $got = strtoupper((string) ($map[(string) $i] ?? ''));
+                    if ($got !== '' && $got === $corr) $correct++;
+                }
+                if ($gradable === 0) return ['manual' => false, 'ratio' => 0.0];
+                return ['manual' => false, 'ratio' => $correct / $gradable];
+            }
+            case 'listen_and_write': {
+                $list = !empty($data['questions']) ? $data['questions']
+                      : ($data['items'] ?? ($cfg['questions'] ?? $cfg['items'] ?? []));
+                $gradable = 0; $correct = 0;
+                foreach ($list as $i => $q) {
+                    if (!empty($q['isExample']) || !empty($q['is_example'])) continue;
+                    $gradable++;
+                    $corr = $q['answer'] ?? $q['correct_answer'] ?? $q['correctAnswer'] ?? '';
+                    if ($eq($map[(string) $i] ?? '', $corr)) $correct++;
+                }
+                if ($gradable === 0) return ['manual' => false, 'ratio' => 0.0];
+                return ['manual' => false, 'ratio' => $correct / $gradable];
+            }
+            case 'look_and_read': {
+                $list = !empty($data['questions']) ? $data['questions']
+                      : ($data['items'] ?? ($cfg['questions'] ?? $cfg['items'] ?? []));
+                $gradable = 0; $correct = 0;
+                foreach ($list as $i => $q) {
+                    if (!empty($q['isExample']) || !empty($q['is_example'])) continue;
+                    $gradable++;
+                    $corrRaw = strtolower((string) ($q['correctAnswer'] ?? $q['correct_answer'] ?? ''));
+                    $corrTrue = in_array($corrRaw, ['tick', 'true', 'yes', '1'], true);
+                    $rawVal = strtolower((string) ($map[(string) $i] ?? ''));
+                    $answered = $rawVal !== '';
+                    $studentTrue = in_array($rawVal, ['true', 'tick', 'yes', '1'], true);
+                    if ($answered && $studentTrue === $corrTrue) $correct++;
+                }
+                if ($gradable === 0) return ['manual' => false, 'ratio' => 0.0];
+                return ['manual' => false, 'ratio' => $correct / $gradable];
+            }
+            case 'look_read_write': {
+                $list = !empty($data['questions']) ? $data['questions']
+                      : ($data['items'] ?? ($cfg['questions'] ?? $cfg['items'] ?? []));
+                $gradable = 0; $correct = 0;
+                foreach ($list as $i => $q) {
+                    if (!empty($q['isExample']) || !empty($q['is_example'])) continue;
+                    $qType = $q['question_type'] ?? $q['questionType'] ?? '';
+                    if ($qType === 'free_write') continue; // tự luận → giáo viên chấm
+                    $gradable++;
+                    $corr = $q['correct_answer'] ?? $q['correctAnswer'] ?? '';
+                    if ($eq($map[(string) $i] ?? '', $corr)) $correct++;
+                }
+                // Toàn câu tự luận → để giáo viên chấm tay
+                if ($gradable === 0) return ['manual' => true, 'ratio' => 0.0];
                 return ['manual' => false, 'ratio' => $correct / $gradable];
             }
             default:

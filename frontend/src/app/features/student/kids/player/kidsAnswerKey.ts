@@ -187,6 +187,79 @@ export function buildReviewRows(
       });
       return rows;
     }
+    case 'listen_and_tick': {
+      const its: any[] = taskData?.items ?? taskData?.config?.items ?? [];
+      const rows: ReviewRow[] = [];
+      its.forEach((it: any, i: number) => {
+        if (it?.isExample || it?.is_example) return;
+        const corr = String(it?.correctAnswer ?? it?.correct_answer ?? '').toUpperCase();
+        const student = String(get(String(i))).toUpperCase();
+        rows.push({
+          label: String(it?.questionText ?? it?.text ?? it?.question ?? `Câu ${i + 1}`),
+          student: student || '—',
+          correct: corr,
+          isCorrect: student !== '' && student === corr,
+        });
+      });
+      return rows;
+    }
+    case 'listen_and_write': {
+      const list: any[] = (taskData?.questions?.length ? taskData.questions : (taskData?.items ?? [])) ?? [];
+      const rows: ReviewRow[] = [];
+      list.forEach((q: any, i: number) => {
+        if (q?.isExample || q?.is_example) return;
+        const corr = String(q?.answer ?? q?.correct_answer ?? q?.correctAnswer ?? '');
+        const student = get(String(i));
+        rows.push({
+          label: String(q?.text ?? q?.question ?? q?.questionText ?? `Câu ${i + 1}`),
+          student: student || '—',
+          correct: corr,
+          isCorrect: eq(student, corr),
+        });
+      });
+      return rows;
+    }
+    case 'look_and_read': {
+      const list: any[] = (taskData?.questions?.length ? taskData.questions : (taskData?.items ?? [])) ?? [];
+      const fmt = String(taskData?.answer_format ?? taskData?.answerFormat ?? taskData?.config?.answer_format ?? 'tick_cross');
+      const isYesNo = fmt === 'yes_no';
+      const tLabel = isYesNo ? 'Yes' : 'Đúng';
+      const fLabel = isYesNo ? 'No' : 'Sai';
+      const rows: ReviewRow[] = [];
+      list.forEach((q: any, i: number) => {
+        if (q?.isExample || q?.is_example) return;
+        const corrRaw = String(q?.correctAnswer ?? q?.correct_answer ?? '').toLowerCase();
+        const corrTrue = corrRaw === 'tick' || corrRaw === 'true' || corrRaw === 'yes' || corrRaw === '1';
+        const raw = String(get(String(i))).toLowerCase();
+        const answered = raw !== '';
+        const studentTrue = raw === 'true' || raw === 'tick' || raw === 'yes' || raw === '1';
+        rows.push({
+          label: String(q?.statement ?? q?.text ?? q?.question ?? `Câu ${i + 1}`),
+          student: !answered ? '—' : (studentTrue ? tLabel : fLabel),
+          correct: corrTrue ? tLabel : fLabel,
+          isCorrect: answered && studentTrue === corrTrue,
+        });
+      });
+      return rows;
+    }
+    case 'look_read_write': {
+      const list: any[] = (taskData?.questions?.length ? taskData.questions : (taskData?.items ?? [])) ?? [];
+      const rows: ReviewRow[] = [];
+      list.forEach((q: any, i: number) => {
+        if (q?.isExample || q?.is_example) return;
+        const qType = String(q?.question_type ?? q?.questionType ?? '');
+        if (qType === 'free_write') return; // tự luận → giáo viên chấm
+        const corr = String(q?.correct_answer ?? q?.correctAnswer ?? '');
+        const student = get(String(i));
+        rows.push({
+          label: String(q?.question ?? q?.text ?? q?.questionText ?? `Câu ${i + 1}`),
+          student: student || '—',
+          correct: corr,
+          isCorrect: eq(student, corr),
+        });
+      });
+      return rows;
+    }
     default:
       return [];
   }
@@ -202,4 +275,5 @@ export const MANUAL_REVIEW_TYPES = new Set([
   'information_exchange',
   'picture_sentence_writing',
   'picture_story_writing',
+  'listen_colour_write',
 ]);

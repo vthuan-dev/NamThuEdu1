@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, CheckCircle2, XCircle, Clock, Loader2 } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
+import { extractTaskData } from '../../../../utils/examDataExtractor';
 import { parseKidsAnswer } from './player/kidsAnswer';
 import { buildReviewRows, MANUAL_REVIEW_TYPES } from './player/kidsAnswerKey';
 
@@ -84,7 +85,8 @@ export function KidsAnswerReview() {
 
           // Câu không phải kids task → bỏ qua hiển thị chi tiết (hiếm)
           const taskType: string = cfg?.task_type ?? '';
-          const taskData = cfg?.task_data ?? null;
+          // Chuẩn hoá task_data (xử lý mọi kiểu lồng config/task_data) để build review.
+          const taskData = cfg ? extractTaskData(q) : null;
           const answerMap = parseKidsAnswer(studentAns?.saAnswer_text);
           const rows = taskData ? buildReviewRows(taskType, taskData, answerMap) : [];
           const isManualType = MANUAL_REVIEW_TYPES.has(taskType);
