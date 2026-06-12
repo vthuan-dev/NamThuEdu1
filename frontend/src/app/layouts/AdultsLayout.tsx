@@ -18,6 +18,7 @@ import { usePushNotification } from '../../hooks/usePushNotification';
 import { NotificationPermissionBanner } from '../../components/NotificationPermissionBanner';
 import { logout } from '../../services/authApi';
 import { getAuthUser } from '../../utils/authStorage';
+import { getFullMediaUrl } from '../../utils/mediaUtils';
 import { LogoutOverlay } from '../../components/shared/LogoutOverlay';
 import {
   Home,
@@ -145,6 +146,7 @@ export function AdultsLayout() {
 
   const initial = (user?.uName || 'H')[0]?.toUpperCase() || 'H';
   const className = user?.class?.cName || user?.class?.name || 'Lớp Adults';
+  const avatarUrl: string | null = getFullMediaUrl(user?.avatar_url || user?.avatar || null);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -220,8 +222,12 @@ export function AdultsLayout() {
           <div className="border-t border-slate-100 p-3 flex-shrink-0">
             <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors group">
               {/* Avatar */}
-              <div className="relative w-9 h-9 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center flex-shrink-0 shadow-sm">
-                <span className="text-white text-sm font-bold">{initial}</span>
+              <div className="relative w-9 h-9 rounded-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center flex-shrink-0 shadow-sm overflow-hidden">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={(user?.uName as string) || 'Avatar'} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-white text-sm font-bold">{initial}</span>
+                )}
                 <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white" />
               </div>
 

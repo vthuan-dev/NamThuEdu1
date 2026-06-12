@@ -8,6 +8,7 @@ import { PwaInstallBanner } from '../../components/PwaInstallBanner';
 import { ResultDetail } from '../features/student/test-taking/ResultDetail';
 import { studentApi } from '../../services/studentApi';
 import { logout } from '../../services/authApi';
+import { getFullMediaUrl } from '../../utils/mediaUtils';
 import { LogoutOverlay } from '../../components/shared/LogoutOverlay';
 import {
   Home, BookOpen, TrendingUp,
@@ -103,7 +104,7 @@ export function TeensLayout() {
   // Merge: API profile overwrites localStorage for avatar/name
   const user = profileFromApi || localUser;
   const initial = (user?.uName || 'B')[0]?.toUpperCase() || 'B';
-  const avatarUrl: string | null = profileFromApi?.avatar_url || localUser?.avatar_url || localUser?.avatar || null;
+  const avatarUrl: string | null = getFullMediaUrl(profileFromApi?.avatar_url || localUser?.avatar_url || localUser?.avatar || null);
 
   useEffect(() => {
     setActiveSubmissionId(null);

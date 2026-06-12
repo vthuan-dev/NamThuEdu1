@@ -7,6 +7,7 @@ import { ToastContainer } from "../../../../components/ui/ToastContainer";
 import { useToast } from "../../../../hooks/useToast";
 import { usePageTitle, PAGE_TITLES } from "../../../../hooks/usePageTitle";
 import { teacherApi } from "../../../../services/teacherApi";
+import { getFullMediaUrl } from "../../../../utils/mediaUtils";
 import {
   User,
   Bell,
@@ -161,15 +162,9 @@ export function Settings() {
 
 const getAvatarUrl = (avatar: string | null) => {
   if (!avatar) return '';
-  if (avatar.startsWith('http://') || avatar.startsWith('https://') || avatar.startsWith('data:')) {
-    return avatar;
-  }
-  const baseUrl = import.meta.env.VITE_API_BASE_URL;
-  if (!baseUrl) {
-    console.error('VITE_API_BASE_URL is not defined');
-    return '';
-  }
-  return avatar.startsWith('/') ? `${baseUrl}${avatar}` : `${baseUrl}/${avatar}`;
+  // data: URL (preview ảnh vừa chọn) giữ nguyên
+  if (avatar.startsWith('data:')) return avatar;
+  return getFullMediaUrl(avatar) || '';
 };
 
 const getInitials = (name: string) => {

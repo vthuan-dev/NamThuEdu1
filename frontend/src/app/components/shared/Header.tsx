@@ -7,6 +7,7 @@ import { Button } from "../ui/button";
 import { logout } from "../../../services/authApi";
 import { api } from "../../../services/api";
 import { getAuthUser } from "../../../utils/authStorage";
+import { getFullMediaUrl } from "../../../utils/mediaUtils";
 import { useNotificationSound } from "../../../hooks/useNotificationSound";
 import { classMgmtApi, CoTeacherInvitation } from "../../../services/classMgmtApi";
 
@@ -118,21 +119,8 @@ export function Header({ breadcrumb, action }: HeaderProps) {
   const userRole = (user?.role as string) || (user?.uRole as string) || "";
   const userAvatar = (user?.avatar_url as string) || (user?.avatar as string) || "";
   
-  // Helper function to get full avatar URL
-  const getAvatarUrl = (avatar: string) => {
-    if (!avatar) return '';
-    // If already a full URL, return as is
-    if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
-      return avatar;
-    }
-    // If relative path, prepend backend URL from .env
-    const baseUrl = import.meta.env.VITE_API_BASE_URL;
-    if (!baseUrl) {
-      console.error('VITE_API_BASE_URL is not defined in .env');
-      return '';
-    }
-    return avatar.startsWith('/') ? `${baseUrl}${avatar}` : `${baseUrl}/${avatar}`;
-  };
+  // Helper function to get full avatar URL (robust: fallback từ VITE_API_URL nếu thiếu base)
+  const getAvatarUrl = (avatar: string) => getFullMediaUrl(avatar) || '';
   
   // State to track avatar updates
   const [currentAvatar, setCurrentAvatar] = useState(getAvatarUrl(userAvatar));

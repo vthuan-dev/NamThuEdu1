@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { logout } from "../../../services/authApi";
 import { api } from "../../../services/api";
 import { getAuthToken, getAuthUser } from "../../../utils/authStorage";
+import { getFullMediaUrl } from "../../../utils/mediaUtils";
 import {
   LayoutDashboard,
   BookOpen,
@@ -124,21 +125,8 @@ export function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolean; onTog
   const userEmail = `${userPhone}@namthuedu.com`;
   const userAvatar = (user?.avatar_url as string) || (user?.avatar as string) || '';
   
-  // Helper function to get full avatar URL
-  const getAvatarUrl = (avatar: string) => {
-    if (!avatar) return '';
-    // If already a full URL, return as is
-    if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
-      return avatar;
-    }
-    // If relative path, prepend backend URL from .env
-    const baseUrl = import.meta.env.VITE_API_BASE_URL;
-    if (!baseUrl) {
-      console.error('VITE_API_BASE_URL is not defined in .env');
-      return '';
-    }
-    return avatar.startsWith('/') ? `${baseUrl}${avatar}` : `${baseUrl}/${avatar}`;
-  };
+  // Helper function to get full avatar URL (robust: fallback từ VITE_API_URL nếu thiếu base)
+  const getAvatarUrl = (avatar: string) => getFullMediaUrl(avatar) || '';
   
   // Generate initials from name
   const getInitials = (name: string) => {

@@ -26,6 +26,7 @@ import { NotificationDropdown } from '../components/student/NotificationDropdown
 import { LogoutOverlay } from '../../components/shared/LogoutOverlay';
 import { logout } from '../../services/authApi';
 import { getAuthUser } from '../../utils/authStorage';
+import { getFullMediaUrl } from '../../utils/mediaUtils';
 
 type NavItem = { icon: any; label: string; path: string };
 
@@ -51,7 +52,7 @@ export function KidsLayout() {
     };
   }, []);
 
-  const avatarUrl: string | null = user?.avatar_url || user?.avatar || null;
+  const avatarUrl: string | null = getFullMediaUrl(user?.avatar_url || user?.avatar || null);
 
   // Tên hiển thị — dữ liệu đăng nhập dùng key khác nhau tùy nguồn, nên dò nhiều khả năng.
   const displayName: string =
