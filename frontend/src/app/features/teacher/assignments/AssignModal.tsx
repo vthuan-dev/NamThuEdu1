@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   X, Search, CalendarClock, CalendarCheck, Bell, Send, Loader2,
   Check, Users, FileText, MessageSquare, RotateCcw, ChevronRight,
-  MapPin, Mail, Phone, CalendarDays,
+  MapPin, Mail, Phone, CalendarDays, GraduationCap, UserRound, Globe,
 } from "lucide-react";
 import { api } from "../../../../services/api";
 import { getAssetUrl } from "../../../../utils/apiConfig";
@@ -29,6 +29,18 @@ interface StudentItem {
   address?: string | null;
   createdAt?: string | null;
 }
+
+/** Lớp mà giáo viên đang quản lý (chủ lớp hoặc đồng quản lý). */
+interface ClassItem {
+  id: string;
+  name: string;
+  studentCount: number;
+  ageGroup?: string | null;
+  isOwner?: boolean;
+}
+
+/** Chế độ giao: theo lớp · từng cá nhân · tất cả học viên. */
+type AssignMode = "class" | "student" | "all";
 
 interface AssignModalProps {
   open: boolean;
@@ -70,6 +82,12 @@ export function AssignModal({ open, exams, onClose, onAssigned }: AssignModalPro
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  // Chế độ giao + danh sách lớp giáo viên quản lý
+  const [mode, setMode] = useState<AssignMode>("class");
+  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [loadingClasses, setLoadingClasses] = useState(false);
+  const [selectedClasses, setSelectedClasses] = useState<Set<string>>(new Set());
 
   const [startTime, setStartTime] = useState("");
   const [deadline, setDeadline] = useState("");
@@ -118,9 +136,31 @@ export function AssignModal({ open, exams, onClose, onAssigned }: AssignModalPro
       .finally(() => setLoadingStudents(false));
   }, [open]);
 
+  // Lấy danh sách lớp giáo viên đang quản lý (chủ lớp + đồng quản lý)
+  useEffect(() => {
+    if (!open) return;
+    setLoadingClasses(true);
+    api.get("/teacher/classes")
+      .then((res: any) => {
+        const raw = res?.data?.data ?? res?.data ?? [];
+        const arr = Array.isArray(raw) ? raw : [];
+        setClasses(arr.map((c: any) => ({
+          id: String(c.cId ?? c.id),
+          name: c.cName ?? c.name ?? "Lớp",
+          studentCount: c.current_student_count ?? c.student_count ?? 0,
+          ageGroup: c.age_group ?? null,
+          isOwner: c.is_owner ?? true,
+        })));
+      })
+      .catch(() => setClasses([]))
+      .finally(() => setLoadingClasses(false));
+  }, [open]);
+
   useEffect(() => {
     if (!open) {
       setSelected(new Set());
+      setSelectedClasses(new Set());
+      setMode("class");
       setSearch("");
       setStartTime("");
       setDeadline("");
@@ -172,13 +212,67 @@ export function AssignModal({ open, exams, onClose, onAssigned }: AssignModalPro
       return next;
     });
 
-  const canSubmit = exams.length > 0 && selected.size > 0 && !!deadline && !submitting;
+  // ── Lớp: lọc theo nhóm tuổi đề + toggle chọn ──
+  const filteredClasses = useMemo(() => {
+    const q = search.toLowerCase();
+    return classes.filter((c) => {
+      const matchSearch = c.name.toLowerCase().includes(q);
+      const matchGroup = !requiredAgeGroup || !c.ageGroup || c.ageGroup === requiredAgeGroup;
+      return matchSearch && matchGroup;
+    });
+  }, [classes, search, requiredAgeGroup]);
+
+  const allClassesSelected = filteredClasses.length > 0 && filteredClasses.every((c) => selectedClasses.has(c.id));
+
+  const toggleClass = (id: string) =>
+    setSelectedClasses((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const toggleAllClasses = () =>
+    setSelectedClasses((prev) => {
+      const next = new Set(prev);
+      if (allClassesSelected) filteredClasses.forEach((c) => next.delete(c.id));
+      else filteredClasses.forEach((c) => next.add(c.id));
+      return next;
+    });
+
+  // Số học viên ước tính theo chế độ (hiển thị ở footer)
+  const targetSummary = useMemo(() => {
+    if (mode === "class") {
+      const count = filteredClasses
+        .filter((c) => selectedClasses.has(c.id))
+        .reduce((s, c) => s + (c.studentCount || 0), 0);
+      return { units: selectedClasses.size, students: count };
+    }
+    if (mode === "all") {
+      return { units: filtered.length, students: filtered.length };
+    }
+    return { units: selected.size, students: selected.size };
+  }, [mode, filteredClasses, selectedClasses, filtered, selected]);
+
+  const hasTarget =
+    mode === "class" ? selectedClasses.size > 0
+      : mode === "all" ? filtered.length > 0
+      : selected.size > 0;
+  const canSubmit = exams.length > 0 && hasTarget && !!deadline && !submitting;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
 
-    const targets = Array.from(selected).map((id) => ({ type: "student" as const, id: Number(id) }));
+    // Xác định targets theo chế độ giao
+    let targets: { type: "class" | "student"; id: number }[] = [];
+    if (mode === "class") {
+      targets = Array.from(selectedClasses).map((id) => ({ type: "class" as const, id: Number(id) }));
+    } else if (mode === "all") {
+      targets = filtered.map((s) => ({ type: "student" as const, id: Number(s.id) }));
+    } else {
+      targets = Array.from(selected).map((id) => ({ type: "student" as const, id: Number(id) }));
+    }
+
     const payload: Record<string, unknown> = {
       targets,
       taDeadline: deadline,
@@ -201,8 +295,11 @@ export function AssignModal({ open, exams, onClose, onAssigned }: AssignModalPro
 
     setSubmitting(false);
     if (ok > 0) {
+      const targetLabel =
+        mode === "class" ? `${selectedClasses.size} lớp`
+          : `${targetSummary.students} học viên`;
       toast.success(
-        `Đã giao ${ok} đề cho ${selected.size} học viên` + (fail ? ` (${fail} đề lỗi)` : ""),
+        `Đã giao ${ok} đề cho ${targetLabel}` + (fail ? ` (${fail} đề lỗi)` : ""),
       );
       onAssigned();
       onClose();
@@ -268,42 +365,146 @@ export function AssignModal({ open, exams, onClose, onAssigned }: AssignModalPro
                   ))}
                 </div>
               )}
+
+              {/* Tabs chọn chế độ giao */}
+              <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-lg">
+                {([
+                  { key: "class", label: "Lớp học", icon: GraduationCap },
+                  { key: "student", label: "Cá nhân", icon: UserRound },
+                  { key: "all", label: "Tất cả", icon: Globe },
+                ] as const).map((t) => {
+                  const active = mode === t.key;
+                  return (
+                    <button
+                      key={t.key}
+                      onClick={() => setMode(t.key)}
+                      className={`flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[12.5px] font-medium transition-all duration-150 ${
+                        active ? "bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200" : "text-slate-500 hover:text-slate-700"
+                      }`}
+                    >
+                      <t.icon className="w-3.5 h-3.5" /> {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+
               <div className="flex items-center justify-between">
                 <span className={labelCls}>
-                  Học viên
-                  {selected.size > 0 && (
+                  {mode === "class" ? "Lớp học của tôi" : mode === "all" ? "Tất cả học viên" : "Học viên"}
+                  {mode === "class" && selectedClasses.size > 0 && (
+                    <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 text-[11px] font-semibold">
+                      {selectedClasses.size}
+                    </span>
+                  )}
+                  {mode === "student" && selected.size > 0 && (
                     <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 text-[11px] font-semibold">
                       {selected.size}
                     </span>
                   )}
                 </span>
-                {filtered.length > 0 && (
+                {mode === "class" && filteredClasses.length > 0 && (
+                  <button onClick={toggleAllClasses} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline transition-colors">
+                    {allClassesSelected ? "Bỏ chọn" : "Chọn tất cả"}
+                  </button>
+                )}
+                {mode === "student" && filtered.length > 0 && (
                   <button onClick={toggleAll} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline transition-colors">
                     {allFilteredSelected ? "Bỏ chọn" : "Chọn tất cả"}
                   </button>
                 )}
               </div>
+
               {requiredAgeGroup && (
                 <p className="text-[11px] text-slate-500 bg-amber-50 border border-amber-100 rounded-md px-2 py-1.5">
-                  Chỉ hiển thị học viên nhóm{" "}
+                  Chỉ hiển thị {mode === "class" ? "lớp" : "học viên"} nhóm{" "}
                   <span className="font-semibold text-amber-700">{AGE_GROUP_LABEL[requiredAgeGroup] ?? requiredAgeGroup}</span>{" "}
                   — đúng nhóm tuổi của đề.
                 </p>
               )}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Tìm theo tên hoặc SĐT..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className={`${inputCls} pl-9`}
-                />
-              </div>
+
+              {mode !== "all" && (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder={mode === "class" ? "Tìm lớp..." : "Tìm theo tên hoặc SĐT..."}
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className={`${inputCls} pl-9`}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto px-2 pb-2">
-              {loadingStudents ? (
+              {/* ── Chế độ LỚP HỌC: chọn lớp mình quản lý ── */}
+              {mode === "class" && (
+                loadingClasses ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-5 h-5 animate-spin text-slate-300" />
+                  </div>
+                ) : filteredClasses.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center px-4">
+                    <GraduationCap className="w-8 h-8 text-slate-200 mb-2" />
+                    <p className="text-sm text-slate-400">
+                      Chưa có lớp nào{requiredAgeGroup ? " phù hợp nhóm tuổi của đề" : ""}.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-0.5">
+                    {filteredClasses.map((c) => {
+                      const sel = selectedClasses.has(c.id);
+                      return (
+                        <button
+                          key={c.id}
+                          onClick={() => toggleClass(c.id)}
+                          className={`group w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all duration-200 ${sel ? "bg-white ring-1 ring-indigo-200 shadow-sm" : "hover:bg-white hover:shadow-sm"}`}
+                        >
+                          <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${sel ? "bg-indigo-600 border-indigo-600" : "border-slate-300 bg-white group-hover:border-indigo-400"}`}>
+                            <Check className={`w-3 h-3 text-white transition-opacity ${sel ? "opacity-100" : "opacity-0"}`} strokeWidth={3} />
+                          </span>
+                          <span className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                            <GraduationCap className="w-4 h-4" />
+                          </span>
+                          <span className="flex-1 min-w-0">
+                            <span className={`block text-sm font-medium truncate ${sel ? "text-indigo-700" : "text-slate-800"}`}>{c.name}</span>
+                            <span className="block text-xs text-slate-400">
+                              {c.studentCount} học viên{!c.isOwner ? " · Đồng quản lý" : ""}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )
+              )}
+
+              {/* ── Chế độ TẤT CẢ: giao cho toàn bộ học viên phù hợp ── */}
+              {mode === "all" && (
+                loadingStudents ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-5 h-5 animate-spin text-slate-300" />
+                  </div>
+                ) : (
+                  <div className="px-3 py-4">
+                    <div className="rounded-xl bg-white ring-1 ring-indigo-100 p-4 flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                        <Globe className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-800">Giao cho tất cả học viên</p>
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                          <span className="font-semibold text-indigo-600">{filtered.length}</span> học viên
+                          {requiredAgeGroup ? ` thuộc nhóm ${AGE_GROUP_LABEL[requiredAgeGroup] ?? requiredAgeGroup}` : ""} sẽ nhận đề này.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              )}
+
+              {/* ── Chế độ CÁ NHÂN: chọn từng học viên ── */}
+              {mode === "student" && (loadingStudents ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="w-5 h-5 animate-spin text-slate-300" />
                 </div>
@@ -384,7 +585,7 @@ export function AssignModal({ open, exams, onClose, onAssigned }: AssignModalPro
                     );
                   })}
                 </div>
-              )}
+              ))}
             </div>
           </div>
 
@@ -479,7 +680,14 @@ export function AssignModal({ open, exams, onClose, onAssigned }: AssignModalPro
         <div className="px-5 py-3.5 border-t border-slate-200 flex items-center justify-between bg-slate-50">
           <p className="text-xs text-slate-500">
             <span className="font-semibold text-indigo-600">{exams.length}</span> đề ·{" "}
-            <span className="font-semibold text-indigo-600">{selected.size}</span> học viên
+            {mode === "class" ? (
+              <>
+                <span className="font-semibold text-indigo-600">{targetSummary.units}</span> lớp
+                {targetSummary.students > 0 && <span className="text-slate-400"> (~{targetSummary.students} học viên)</span>}
+              </>
+            ) : (
+              <><span className="font-semibold text-indigo-600">{targetSummary.students}</span> học viên</>
+            )}
           </p>
           <div className="flex items-center gap-2">
             <button
