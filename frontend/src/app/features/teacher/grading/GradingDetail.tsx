@@ -297,7 +297,10 @@ function VstepGradingDetailInternal() {
           setActiveSkillTab(availableSkills[0]);
         }
       })
-      .catch(() => {})
+      .catch((err: any) => {
+        console.error("Lỗi tải bài chấm điểm:", err);
+        toast.error(err?.response?.data?.message || "Không tải được bài chấm điểm. Vui lòng thử lại.");
+      })
       .finally(() => setPageLoading(false));
   }, [submissionId]);
 

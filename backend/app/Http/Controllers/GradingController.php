@@ -362,8 +362,17 @@ class GradingController extends Controller
                 // Read and update sGemini_feedback
                 $raw = $sub->sGemini_feedback ? (json_decode($sub->sGemini_feedback, true) ?: []) : [];
                 $vstepScores = $raw['vstep_scores'] ?? [];
-                
-                // Apply manual skill overrides from the request if present
+
+                // FIX: Apply the freshly computed per-skill scores derived from the
+                // teacher-edited saPoints_awarded. Without this, editing per-question
+                // points (the page only sends questionScores) never updated the skill
+                // scores nor sScore — the old AI values kept showing (override lost).
+                if (!is_null($listeningScore)) $vstepScores['listening'] = $listeningScore;
+                if (!is_null($readingScore))   $vstepScores['reading']   = $readingScore;
+                if (!is_null($writingScore))   $vstepScores['writing']   = $writingScore;
+                if (!is_null($speakingScore))  $vstepScores['speaking']  = $speakingScore;
+
+                // Apply manual skill overrides from the request if present (takes precedence)
                 if ($request->has('skill_overrides') && is_array($request->skill_overrides)) {
                     foreach (['listening', 'reading', 'writing', 'speaking'] as $skill) {
                         if (isset($request->skill_overrides[$skill]) && is_numeric($request->skill_overrides[$skill])) {
