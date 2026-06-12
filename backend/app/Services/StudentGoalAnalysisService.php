@@ -246,6 +246,7 @@ PROMPT;
 
         try {
             $resp = Http::withToken($apiKey)
+                ->withOptions(['verify' => config('services.groq.verify_ssl', true)])
                 ->timeout(45)
                 ->post(self::LLM_URL, [
                     'model' => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
