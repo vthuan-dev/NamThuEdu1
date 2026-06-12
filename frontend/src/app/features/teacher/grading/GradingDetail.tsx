@@ -1974,12 +1974,12 @@ function VstepGradingDetailInternal() {
                   <div className="bg-white rounded-2xl border border-slate-100 p-5">
                     <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-4">{t("teacher.grading.detail.scoreSummary")}</p>
                     <div className="text-center mb-5">
-                      <div className="text-6xl font-black mb-0.5" style={{ color: scoreColor }}>{totalScore}</div>
-                      <div className="text-sm text-slate-400 mb-3">/ {maxScore} {t("teacher.grading.detail.points")}</div>
+                      <div className="text-6xl font-black mb-0.5" style={{ color: scoreColor }}>{(pct / 10).toFixed(1)}</div>
+                      <div className="text-sm text-slate-400 mb-3">/ 10 điểm</div>
                       <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                         <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: scoreColor }} />
                       </div>
-                      <p className="text-xs text-slate-400 mt-1">{pct}% {t("teacher.grading.detail.totalPct")}</p>
+                      <p className="text-xs text-slate-400 mt-1">{pct}% · {totalScore}/{maxScore} điểm thô</p>
                     </div>
                     <div className="space-y-2">
                       {[

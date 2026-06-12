@@ -84,17 +84,20 @@ export function ExamDetail() {
     
     const grouped: { [key: number]: Question[] } = {};
     examData.questions.forEach(q => {
-      if (!grouped[q.qPart]) {
-        grouped[q.qPart] = [];
+      const part = (q.qPart === null || q.qPart === undefined || isNaN(Number(q.qPart))) ? 1 : Number(q.qPart);
+      if (!grouped[part]) {
+        grouped[part] = [];
       }
-      grouped[q.qPart].push(q);
+      grouped[part].push(q);
     });
     
     // Sort questions within each part by qSubPart
     Object.keys(grouped).forEach(partKey => {
-      grouped[parseInt(partKey)].sort((a, b) => {
-        if (a.qSubPart === null) return -1;
-        if (b.qSubPart === null) return 1;
+      const arr = grouped[parseInt(partKey)];
+      if (!Array.isArray(arr)) return;
+      arr.sort((a, b) => {
+        if (a.qSubPart === null || a.qSubPart === undefined) return -1;
+        if (b.qSubPart === null || b.qSubPart === undefined) return 1;
         return a.qSubPart - b.qSubPart;
       });
     });
