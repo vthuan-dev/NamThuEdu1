@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Clock, ListChecks, Search, CheckCircle2, Play, RotateCcw,
+  Clock, ListChecks, Search, Play, RotateCcw,
   Sparkles, Gift, ClipboardList, BookOpen, AlertTriangle,
   Headphones, Mic, PenLine, FileText, ArrowRight,
 } from 'lucide-react';
@@ -83,10 +83,6 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
         ? `${BASE}/phong-cho/${item.assignmentId}`
         : `${BASE}/lam-bai/${item.examId}?autostart=1&direct=1`);
 
-  const resultTo = isThpt
-    ? `${BASE}/ket-qua-thpt/${item.submissionId}`
-    : `${BASE}/ket-qua/${item.submissionId}`;
-
   return (
     <div className="group flex flex-col bg-white rounded-2xl border border-slate-200 p-5 transition-all duration-200 hover:border-teal-300 hover:shadow-[0_6px_20px_-8px_rgba(13,148,136,0.25)]">
       {/* Icon kỹ năng + trạng thái */}
@@ -128,21 +124,13 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
       {/* Action */}
       <div className="mt-auto">
         {isCompleted ? (
-          <div className="space-y-2">
-            <Link to={startTo}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
-              style={{ background: TEAL }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#0B7E74')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = TEAL)}>
-              <RotateCcw className="w-4 h-4" /> Làm lại
-            </Link>
-            {item.submissionId && (
-              <Link to={resultTo}
-                className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-[13px] font-medium text-slate-500 hover:text-teal-700 hover:bg-teal-50 transition-colors">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Xem kết quả
-              </Link>
-            )}
-          </div>
+          <Link to={startTo}
+            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
+            style={{ background: TEAL }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#0B7E74')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = TEAL)}>
+            <RotateCcw className="w-4 h-4" /> Làm lại
+          </Link>
         ) : (
           <Link to={startTo}
             className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
