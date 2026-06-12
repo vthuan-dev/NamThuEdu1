@@ -216,6 +216,7 @@ export function AssignModal({ open, exams, onClose, onAssigned }: AssignModalPro
   const filteredClasses = useMemo(() => {
     const q = search.toLowerCase();
     return classes.filter((c) => {
+      if ((c.studentCount || 0) <= 0) return false; // ẩn lớp chưa có học viên
       const matchSearch = c.name.toLowerCase().includes(q);
       const matchGroup = !requiredAgeGroup || !c.ageGroup || c.ageGroup === requiredAgeGroup;
       return matchSearch && matchGroup;
