@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { studentApi } from "../../../../services/studentApi";
 import { getSkillColor } from "../../../../utils/skillHelpers";
+import { studentRolePalette } from "../../../../utils/studentRoleTheme";
 import {
   RadarChart,
   Radar,
@@ -22,9 +23,10 @@ import {
   CartesianGrid,
 } from "recharts";
 
-const PRIMARY = "#7C3AED";
-const PRIMARY_MID = "#8B5CF6";
-const PRIMARY_LIGHT = "#EDE9FE";
+const PAL = studentRolePalette();
+const PRIMARY = PAL.accent;
+const PRIMARY_MID = PAL.accentMid;
+const PRIMARY_LIGHT = PAL.accentLight;
 
 const masteryLabel: Record<string, { label: string; color: string; bg: string }> = {
   expert: { label: "Thành thạo", color: "#10B981", bg: "#D1FAE5" },
@@ -57,8 +59,8 @@ export function Progress() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen" style={{ background: "#F8F7FF" }}>
-        <div style={{ background: "linear-gradient(135deg, #1E0B4B 0%, #3B1B8F 45%, #1D4ED8 100%)" }}>
+      <div className="min-h-screen" style={{ background: PAL.bg }}>
+        <div style={{ background: PAL.hero }}>
           <div className="px-8 lg:px-16 py-10">
             <div className="animate-pulse">
               <div className="h-3 w-32 rounded-full mb-3" style={{ background: "rgba(255,255,255,0.2)" }} />
@@ -81,33 +83,33 @@ export function Progress() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: "#F8F7FF" }}>
+    <div className="min-h-screen" style={{ background: PAL.bg }}>
 
       {/* ══ Hero */}
       <div className="relative overflow-hidden"
-        style={{ background: "linear-gradient(135deg, #1E0B4B 0%, #3B1B8F 45%, #1D4ED8 100%)" }}>
+        style={{ background: PAL.hero }}>
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-0 left-1/3 w-80 h-80 rounded-full opacity-20"
-            style={{ background: "radial-gradient(circle, #A78BFA, transparent)", transform: "translateY(-50%)" }} />
+            style={{ background: `radial-gradient(circle, ${PAL.orb}, transparent)`, transform: "translateY(-50%)" }} />
           <div className="absolute bottom-0 right-1/4 w-56 h-56 rounded-full opacity-15"
-            style={{ background: "radial-gradient(circle, #60A5FA, transparent)", transform: "translateY(40%)" }} />
+            style={{ background: `radial-gradient(circle, ${PAL.orb}, transparent)`, transform: "translateY(40%)" }} />
         </div>
         <div className="relative z-10 px-8 lg:px-16 py-10">
           <div className="flex items-start gap-4 mb-6">
             <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg"
-              style={{ background: "linear-gradient(135deg, #7C3AED, #8B5CF6)" }}>
+              style={{ background: PAL.iconGrad }}>
               <TrendingUp className="w-7 h-7 text-white" />
             </div>
             <div>
-              <p className="text-purple-300 text-sm font-semibold tracking-widest uppercase mb-1">Kết quả học tập</p>
+              <p className="text-sm font-semibold tracking-widest uppercase mb-1" style={{ color: PAL.label }}>Kết quả học tập</p>
               <h1 className="text-3xl font-extrabold text-white tracking-tight leading-tight">Tiến độ</h1>
-              <p className="text-purple-200 text-sm mt-1 font-medium">Phân tích kết quả và kỹ năng của bạn</p>
+              <p className="text-sm mt-1 font-medium" style={{ color: PAL.sub }}>Phân tích kết quả và kỹ năng của bạn</p>
             </div>
           </div>
           {/* Stat chips */}
           <div className="flex items-center gap-3 flex-wrap">
             {[
-              { label: "Tổng bài thi", value: overview.total_tests ?? 0, color: "#C4B5FD" },
+              { label: "Tổng bài thi", value: overview.total_tests ?? 0, color: PAL.label },
               { label: "Điểm TB", value: Number(overview.average_score ?? 0).toFixed(1), color: "#FCD34D" },
               { label: "Cao nhất", value: Number(overview.highest_score ?? 0).toFixed(1), color: "#86EFAC" },
             ].map((s) => (

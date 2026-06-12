@@ -68,24 +68,62 @@ export function Profile() {
 
   const name = profile?.uName?.trim() || 'Học viên';
 
+  // ─── Màu theo độ tuổi: mỗi role học viên 1 màu đặc trưng ──────
+  // kids = cam, teens = teal, adults = tím. Fallback localStorage khi profile chưa kịp tải.
+  const lsAge = (() => {
+    try { return JSON.parse(localStorage.getItem('user') || sessionStorage.getItem('user') || '{}')?.age_group; }
+    catch { return undefined; }
+  })();
+  const age = String(profile?.age_group ?? lsAge ?? 'adults').toLowerCase();
+  const THEMES: Record<string, any> = {
+    kids: {
+      bg: '#FFF7ED',
+      hero: 'linear-gradient(135deg, #7C2D12 0%, #C2410C 45%, #F97316 100%)',
+      orb: '#FDBA74', avatar: 'linear-gradient(135deg, #FDBA74 0%, #EA580C 100%)',
+      accent: '#EA580C', accentDeep: '#C2410C', rail: '#F97316',
+      label: '#FED7AA', sub: '#FFEDD5',
+      chipBg: 'rgba(253,186,116,0.20)', chipText: '#FFEDD5', chipBorder: 'rgba(253,186,116,0.32)',
+      avatarShadow: '0 12px 32px -8px rgba(234,88,12,0.45), 0 0 0 3px rgba(255,255,255,0.12)',
+    },
+    teens: {
+      bg: '#F0FDFA',
+      hero: 'linear-gradient(135deg, #134E4A 0%, #0F766E 45%, #14B8A6 100%)',
+      orb: '#5EEAD4', avatar: 'linear-gradient(135deg, #5EEAD4 0%, #0D9488 100%)',
+      accent: '#0D9488', accentDeep: '#0F766E', rail: '#0D9488',
+      label: '#99F6E4', sub: '#CCFBF1',
+      chipBg: 'rgba(94,234,212,0.18)', chipText: '#CCFBF1', chipBorder: 'rgba(94,234,212,0.32)',
+      avatarShadow: '0 12px 32px -8px rgba(13,148,136,0.45), 0 0 0 3px rgba(255,255,255,0.12)',
+    },
+    adults: {
+      bg: '#F8F7FF',
+      hero: 'linear-gradient(135deg, #1E0B4B 0%, #4C1D95 45%, #6D28D9 100%)',
+      orb: '#A78BFA', avatar: 'linear-gradient(135deg, #A78BFA 0%, #7C3AED 100%)',
+      accent: '#7C3AED', accentDeep: '#6D28D9', rail: '#7C3AED',
+      label: '#C4B5FD', sub: '#DDD6FE',
+      chipBg: 'rgba(167,139,250,0.20)', chipText: '#DDD6FE', chipBorder: 'rgba(167,139,250,0.30)',
+      avatarShadow: '0 12px 32px -8px rgba(124,58,237,0.45), 0 0 0 3px rgba(255,255,255,0.12)',
+    },
+  };
+  const T = THEMES[age] ?? THEMES.adults;
+
   return (
-    <div className="min-h-screen" style={{ background: '#F8F7FF' }}>
+    <div className="min-h-screen" style={{ background: T.bg }}>
 
       {/* ══ Hero ════════════════════════════════════════════════ */}
       <div
         className="relative overflow-hidden"
-        style={{ background: 'linear-gradient(135deg, #1E0B4B 0%, #4C1D95 45%, #6D28D9 100%)' }}
+        style={{ background: T.hero }}
       >
         {/* Decorative orbs */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-0 right-1/4 w-72 h-72 rounded-full opacity-20"
-            style={{ background: 'radial-gradient(circle, #A78BFA, transparent)', transform: 'translateY(-50%)' }} />
+            style={{ background: `radial-gradient(circle, ${T.orb}, transparent)`, transform: 'translateY(-50%)' }} />
           <div className="absolute bottom-0 left-1/3 w-56 h-56 rounded-full opacity-15"
-            style={{ background: 'radial-gradient(circle, #60A5FA, transparent)', transform: 'translateY(40%)' }} />
+            style={{ background: `radial-gradient(circle, ${T.orb}, transparent)`, transform: 'translateY(40%)' }} />
         </div>
 
         <div className="relative z-10 px-6 sm:px-8 lg:px-12 py-8">
-          <p className="text-purple-300 text-[11px] font-bold tracking-[0.18em] uppercase mb-5">Hồ sơ của tôi</p>
+          <p className="text-[11px] font-bold tracking-[0.18em] uppercase mb-5" style={{ color: T.label }}>Hồ sơ của tôi</p>
 
           <div className="flex items-center gap-5 sm:gap-6 flex-wrap">
             {/* ── Avatar with camera overlay ── */}
@@ -98,8 +136,8 @@ export function Profile() {
               <div
                 className="w-[88px] h-[88px] rounded-2xl overflow-hidden flex items-center justify-center text-white text-3xl font-extrabold transition-transform duration-300 group-hover:scale-[1.03]"
                 style={{
-                  background: 'linear-gradient(135deg, #A78BFA 0%, #7C3AED 100%)',
-                  boxShadow: '0 12px 32px -8px rgba(124,58,237,0.45), 0 0 0 3px rgba(255,255,255,0.12)',
+                  background: T.avatar,
+                  boxShadow: T.avatarShadow,
                 }}
               >
                 {profile?.avatar_url ? (
@@ -111,7 +149,7 @@ export function Profile() {
               {/* Camera overlay */}
               <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 group-hover:scale-110"
                 style={{ background: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.18)' }}>
-                <Camera className="w-4 h-4" style={{ color: '#6D28D9' }} strokeWidth={2.4} />
+                <Camera className="w-4 h-4" style={{ color: T.accentDeep }} strokeWidth={2.4} />
               </div>
             </button>
 
@@ -122,19 +160,19 @@ export function Profile() {
               </h1>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold"
-                  style={{ background: 'rgba(167,139,250,0.20)', color: '#DDD6FE', border: '1px solid rgba(167,139,250,0.30)' }}>
+                  style={{ background: T.chipBg, color: T.chipText, border: `1px solid ${T.chipBorder}` }}>
                   <GraduationCap className="w-3 h-3" strokeWidth={2.4} />
                   Học viên
                 </span>
                 {profile?.uPhone && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold text-purple-100"
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold"
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: T.sub }}>
                     <Phone className="w-3 h-3" strokeWidth={2.4} />
                     {profile.uPhone}
                   </span>
                 )}
               </div>
-              <p className="text-purple-200/80 text-xs mt-2 leading-relaxed max-w-md">
+              <p className="text-xs mt-2 leading-relaxed max-w-md" style={{ color: T.sub, opacity: 0.85 }}>
                 {pct === 100
                   ? 'Hồ sơ của bạn đã hoàn thiện — sẵn sàng cho mọi tính năng.'
                   : `Hồ sơ chưa đầy đủ — bổ sung ${missingLabels.length} mục để mở khóa hết tính năng.`}
@@ -196,7 +234,7 @@ export function Profile() {
                   <span className="text-lg font-extrabold text-white tabular-nums leading-none">{filled}</span>
                   <span className="text-xs font-medium text-white/55 leading-none">/ {total} mục</span>
                 </div>
-                <span className="text-[10px] font-medium text-purple-200/80 leading-none mt-1">
+                <span className="text-[10px] font-medium leading-none mt-1" style={{ color: T.sub, opacity: 0.85 }}>
                   {pct === 100 ? 'Đã đầy đủ' : `Còn thiếu ${missingLabels.length} mục`}
                 </span>
               </div>
@@ -212,7 +250,7 @@ export function Profile() {
           {/* LEFT — main: Account info (wider column) */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-2 px-1">
-              <span className="inline-block w-1 h-4 rounded-full" style={{ background: '#7C3AED' }} />
+              <span className="inline-block w-1 h-4 rounded-full" style={{ background: T.rail }} />
               <p className="text-[11px] font-bold tracking-[0.14em] uppercase text-slate-500">
                 Thông tin cá nhân
               </p>

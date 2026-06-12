@@ -1,9 +1,11 @@
 import { Trophy, Medal, Star, TrendingUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { studentApi } from "../../../../services/studentApi";
+import { studentRolePalette } from "../../../../utils/studentRoleTheme";
 
-const PRIMARY = "#7C3AED";
-const PRIMARY_LIGHT = "#EDE9FE";
+const PAL = studentRolePalette();
+const PRIMARY = PAL.accent;
+const PRIMARY_LIGHT = PAL.accentLight;
 
 type LeaderboardRow = {
   rank: number;
@@ -38,8 +40,8 @@ export function StudentLeaderboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen" style={{ background: "#F8F7FF" }}>
-        <div style={{ background: "linear-gradient(135deg, #4C1D95 0%, #6D28D9 45%, #7C3AED 100%)" }}>
+      <div className="min-h-screen" style={{ background: PAL.bg }}>
+        <div style={{ background: PAL.hero }}>
           <div className="px-8 lg:px-16 py-10 animate-pulse">
             <div className="h-3 w-28 rounded-full mb-3" style={{ background: "rgba(255,255,255,0.2)" }} />
             <div className="h-8 w-56 rounded-xl mb-2" style={{ background: "rgba(255,255,255,0.2)" }} />
@@ -54,16 +56,16 @@ export function StudentLeaderboard() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: "#F8F7FF" }}>
+    <div className="min-h-screen" style={{ background: PAL.bg }}>
 
       {/* Hero */}
       <div className="relative overflow-hidden"
-        style={{ background: "linear-gradient(135deg, #4C1D95 0%, #6D28D9 45%, #7C3AED 100%)" }}>
+        style={{ background: PAL.hero }}>
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-0 left-1/3 w-80 h-80 rounded-full opacity-20"
-            style={{ background: "radial-gradient(circle, #C4B5FD, transparent)", transform: "translateY(-50%)" }} />
+            style={{ background: `radial-gradient(circle, ${PAL.orb}, transparent)`, transform: "translateY(-50%)" }} />
           <div className="absolute bottom-0 right-1/4 w-56 h-56 rounded-full opacity-15"
-            style={{ background: "radial-gradient(circle, #A5B4FC, transparent)", transform: "translateY(40%)" }} />
+            style={{ background: `radial-gradient(circle, ${PAL.orb}, transparent)`, transform: "translateY(40%)" }} />
         </div>
         <div className="relative z-10 px-8 lg:px-16 py-10">
           <div className="flex items-start gap-4 mb-6">
@@ -72,15 +74,15 @@ export function StudentLeaderboard() {
               <Trophy className="w-7 h-7 text-white" />
             </div>
             <div>
-              <p className="text-purple-200 text-sm font-semibold tracking-widest uppercase mb-1">Thứ hạng</p>
+              <p className="text-sm font-semibold tracking-widest uppercase mb-1" style={{ color: PAL.label }}>Thứ hạng</p>
               <h1 className="text-3xl font-extrabold text-white tracking-tight leading-tight">Bảng xếp hạng</h1>
-              <p className="text-purple-200 text-sm mt-1 font-medium">Theo dõi vị trí và bứt phá thứ hạng mỗi tuần</p>
+              <p className="text-sm mt-1 font-medium" style={{ color: PAL.sub }}>Theo dõi vị trí và bứt phá thứ hạng mỗi tuần</p>
             </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { label: "Xếp hạng của bạn", value: `#${rank}`, color: "#FCD34D" },
-              { label: "Tổng học viên", value: totalUsers, color: "#DDD6FE" },
+              { label: "Tổng học viên", value: totalUsers, color: PAL.sub },
               { label: "Điểm TB", value: Number(avg).toFixed(1), color: "#86EFAC" },
               { label: "Mục tiêu tuần", value: "Top 10", color: "#FDBA74" },
             ].map(s => (

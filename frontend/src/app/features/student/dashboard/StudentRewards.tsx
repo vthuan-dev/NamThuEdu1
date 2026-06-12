@@ -1,8 +1,10 @@
 import { Award, Gift, Sparkles, Lock, CheckCircle2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { studentApi } from "../../../../services/studentApi";
+import { studentRolePalette } from "../../../../utils/studentRoleTheme";
 
-const PURPLE = "#7C3AED";
+const PAL = studentRolePalette();
+const PURPLE = PAL.accent;
 
 export function StudentRewards() {
   const { data: gamiData, isLoading: gamiLoading } = useQuery({
@@ -53,7 +55,7 @@ export function StudentRewards() {
           {totalCount > 0 && (
             <div className="text-right">
               <p className="text-xs text-slate-500">Thành tựu</p>
-              <p className="text-xl font-black text-purple-600">{completedCount}/{totalCount}</p>
+              <p className="text-xl font-black" style={{ color: PURPLE }}>{completedCount}/{totalCount}</p>
             </div>
           )}
         </div>
@@ -81,12 +83,12 @@ export function StudentRewards() {
                 <div className="flex items-start gap-3">
                   <div
                     className="w-11 h-11 rounded-xl flex items-center justify-center text-xl"
-                    style={{ background: unlocked ? "#EDE9FE" : "#F3F4F6" }}
+                    style={{ background: unlocked ? PAL.accentLight : "#F3F4F6" }}
                   >
                     {achievement.icon ? (
                       <span>{achievement.icon}</span>
                     ) : unlocked ? (
-                      <Award className="w-5 h-5 text-purple-600" />
+                      <Award className="w-5 h-5" style={{ color: PURPLE }} />
                     ) : (
                       <Lock className="w-5 h-5 text-gray-500" />
                     )}
