@@ -240,6 +240,7 @@ const CreateKidsExam: React.FC = () => {
         eDescription: examData.description,
         eDuration: examData.duration,
         mode: examData.mode, // Save mode when publishing
+        eStatus: status, // Persist draft/published status to backend
       });
 
       if (status === 'published') {

@@ -778,23 +778,22 @@ const ListenDrawLinesEditor: React.FC<ListenDrawLinesEditorProps> = ({
               )}
               
               {/* Image info card */}
-              <div className="mt-4 flex items-center justify-between rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-                <div className="flex items-center space-x-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-50">
-                    <ImageIcon className="h-5 w-5 text-orange-600" />
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-orange-50">
+                    <ImageIcon className="h-3.5 w-3.5 text-orange-600" />
                   </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-500">Hình ảnh nền</p>
-                    <p className="text-sm font-semibold text-slate-800">{imageFile?.name}</p>
+                  <div className="flex min-w-0 items-baseline gap-1.5">
+                    <span className="flex-shrink-0 text-[11px] font-medium text-slate-400">Hình ảnh nền</span>
+                    <span className="truncate text-xs font-semibold text-slate-700" title={imageFile?.name}>
+                      {imageFile?.name}
+                    </span>
                   </div>
                 </div>
                 {imageRef.current && (
-                  <div className="text-right">
-                    <p className="text-xs text-slate-500">Kích thước</p>
-                    <p className="text-sm font-semibold text-orange-600">
-                      {imageRef.current.naturalWidth} × {imageRef.current.naturalHeight}px
-                    </p>
-                  </div>
+                  <span className="flex-shrink-0 text-[11px] font-semibold text-orange-600">
+                    {imageRef.current.naturalWidth} × {imageRef.current.naturalHeight}px
+                  </span>
                 )}
               </div>
             </div>
