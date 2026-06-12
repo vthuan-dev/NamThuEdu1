@@ -4,7 +4,7 @@ import {
   BarChart3, BookOpen, Target, Clock, TrendingUp, Award,
   Flame, ArrowRight, Play, CheckCircle2, ChevronRight, Sparkles,
   AlertCircle, Bell, CalendarClock, X, MessageSquareQuote,
-  ClipboardList, Mic, Headphones, PenLine, BookOpenCheck,
+  ClipboardList, Mic, Headphones, PenLine, BookOpenCheck, History,
 } from 'lucide-react';
 import { api } from '../../../../services/api';
 import {
@@ -694,7 +694,7 @@ export function AdultsDashboard() {
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {([
             { icon: BookOpenCheck, label: 'Đề thi',    sub: 'Thi thử & đánh giá',      href: '/hoc-vien/de-thi',    color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
-            { icon: Target,        label: 'Luyện tập', sub: 'Ôn luyện theo kỹ năng',   href: '/hoc-vien/luyen-tap', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+            { icon: History,       label: 'Lịch sử',   sub: 'Kết quả bài đã làm',      href: '/hoc-vien/lich-su',   color: '#0284C7', bg: '#F0F9FF', border: '#BAE6FD' },
             { icon: ClipboardList, label: 'Bài tập',   sub: pendingAssignments.length > 0 ? `${pendingAssignments.length} đang chờ` : 'Bài được giao', href: '/hoc-vien/bai-tap', color: '#EA580C', bg: '#FFF7ED', border: '#FED7AA' },
             { icon: TrendingUp,    label: 'Tiến độ',   sub: 'Xem lịch sử học',         href: '/hoc-vien/tien-do',   color: PURPLE,    bg: PURPLE_LIGHT, border: '#C4B5FD' },
           ] as const).map((a) => {
