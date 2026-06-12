@@ -15,6 +15,7 @@ import {
   type TestAssignment,
   type TodayActivity,
 } from '../../../../services/studentApi';
+import { NextGoalCard } from '../components/NextGoalCard';
 
 // ─── Design tokens (mirrors StudentExamBrowser) ─────────────────────────────
 const PURPLE       = '#7C3AED';
@@ -685,6 +686,9 @@ export function AdultsDashboard() {
             </button>
           </div>
         )}
+
+        {/* Mục tiêu lớp sắp tới */}
+        <NextGoalCard ageGroup="adults" />
 
         {/* ─── Quick Actions ───────────────────────────────────── */}
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">

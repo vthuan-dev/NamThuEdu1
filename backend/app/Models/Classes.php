@@ -60,6 +60,22 @@ class Classes extends Model
         return $this->hasMany(ClassTransfer::class, 'to_class_id', 'cId');
     }
 
+    public function announcements()
+    {
+        return $this->hasMany(ClassAnnouncement::class, 'class_id', 'cId');
+    }
+
+    public function goals()
+    {
+        return $this->hasMany(ClassGoal::class, 'class_id', 'cId');
+    }
+
+    public function pendingHandover()
+    {
+        return $this->hasOne(ClassHandoverRequest::class, 'class_id', 'cId')
+                    ->where('status', 'pending');
+    }
+
     /**
      * Scopes
      */

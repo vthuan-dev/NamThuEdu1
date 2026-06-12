@@ -33,6 +33,9 @@ use App\Http\Controllers\AdminSystemController;
 use App\Http\Controllers\MonitoringController;
 use App\Http\Controllers\PushController;
 use App\Http\Controllers\ExamHighlightController;
+use App\Http\Controllers\ClassAnnouncementController;
+use App\Http\Controllers\ClassGoalController;
+use App\Http\Controllers\AdminHandoverController;
 
 /*
 |--------------------------------------------------------------------------
@@ -200,9 +203,9 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         // Categories
         Route::get('/categories', [CategoryController::class, 'index']);
         
-        // ─── Class Management (DEPRECATED) ───────────────────────────────
-        // Class system đã bị gỡ khỏi UI flow. Giữ routes này để backward
-        // compat cho client cũ / data migration. Sẽ xóa hẳn ở phase drop DB.
+        // ─── Class Management (Teacher Class Management feature) ─────────
+        // Lớp do giáo viên sở hữu: CRUD, học viên, giao đề, thông báo, mục
+        // tiêu, bàn giao. users.class_id là nguồn membership chính.
         Route::get('/classes', [ClassController::class, 'index']);
         Route::post('/classes', [ClassController::class, 'store']);
         Route::get('/classes/statistics', [ClassController::class, 'statistics']);
@@ -213,6 +216,26 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         Route::post('/classes/{fromId}/transfer/{toId}', [ClassController::class, 'transferStudents']);
         Route::get('/classes/{id}/transfer-history', [ClassController::class, 'transferHistory']);
         Route::delete('/classes/{id}/students/{studentId}', [ClassController::class, 'removeStudent']);
+
+        // Giao đề cho lớp (liệt kê assignment theo lớp)
+        Route::get('/classes/{id}/assignments', [TestAssignmentController::class, 'byClass']);
+
+        // Thông báo của lớp
+        Route::get('/classes/{classId}/announcements', [ClassAnnouncementController::class, 'index']);
+        Route::post('/classes/{classId}/announcements', [ClassAnnouncementController::class, 'store']);
+        Route::put('/classes/{classId}/announcements/{id}', [ClassAnnouncementController::class, 'update']);
+        Route::delete('/classes/{classId}/announcements/{id}', [ClassAnnouncementController::class, 'destroy']);
+
+        // Mục tiêu của lớp
+        Route::get('/classes/{classId}/goals', [ClassGoalController::class, 'index']);
+        Route::post('/classes/{classId}/goals', [ClassGoalController::class, 'store']);
+        Route::put('/classes/{classId}/goals/{id}', [ClassGoalController::class, 'update']);
+        Route::delete('/classes/{classId}/goals/{id}', [ClassGoalController::class, 'destroy']);
+
+        // Bàn giao lớp (giáo viên gửi/hủy yêu cầu)
+        Route::post('/classes/{id}/handover-request', [ClassController::class, 'requestHandover']);
+        Route::delete('/classes/{id}/handover-request', [ClassController::class, 'cancelHandover']);
+
         
         // Practice Sessions Routes
         Route::prefix('practice-sessions')->group(function () {
@@ -496,6 +519,10 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         Route::get('/reminders', [StudentTestController::class, 'getReminders']);
         Route::put('/reminders/{id}/read', [StudentTestController::class, 'markReminderRead']);
         Route::delete('/reminders/{id}', [StudentTestController::class, 'dismissReminder']);
+
+        // Mục tiêu lớp gần nhất (countdown trên dashboard)
+        Route::get('/class-goals/next', [StudentTestController::class, 'nextClassGoal']);
+
         
         // WebSocket Real-time Features
         Route::post('/websocket/connect', [App\Http\Controllers\TestWebSocketController::class, 'connect']);
@@ -634,6 +661,11 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         Route::get('/classes/assignments', [UserController::class, 'adminClassAssignments']);
         Route::get('/classes/assignment-teachers', [UserController::class, 'adminAssignmentTeachers']);
         Route::put('/classes/{id}/assign-teacher', [UserController::class, 'adminAssignTeacherToClass']);
+
+        // Bàn giao lớp (admin xử lý yêu cầu)
+        Route::get('/handover-requests', [AdminHandoverController::class, 'index']);
+        Route::post('/handover-requests/{id}/approve', [AdminHandoverController::class, 'approve']);
+        Route::post('/handover-requests/{id}/reject', [AdminHandoverController::class, 'reject']);
         Route::get('/students/new-registrations', [UserController::class, 'adminStudentNewRegistrations']);
         Route::get('/students/complaints', [UserController::class, 'adminStudentComplaints']);
         Route::post('/students/complaints/{id}/resolve', [UserController::class, 'resolveStudentComplaint']);

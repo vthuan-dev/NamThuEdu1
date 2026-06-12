@@ -4,6 +4,7 @@ import { Play, ArrowRight, Flame, ChevronRight, AlertCircle, Headphones, BookOpe
 import { api } from '../../../../services/api';
 import { studentApi } from '../../../../services/studentApi';
 import { usePageTitle, PAGE_TITLES } from '../../../../hooks/usePageTitle';
+import { NextGoalCard } from '../components/NextGoalCard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -291,6 +292,9 @@ export function KidsDashboard() {
         </section>
 
         {/* ─── Nội dung ──────────────────────────────────────────── */}
+
+        {/* 🎯 Mục tiêu sắp tới của lớp */}
+        <NextGoalCard ageGroup="kids" />
 
 
         {/* ─── Bài thi được giao ───────────────────────────────── */}

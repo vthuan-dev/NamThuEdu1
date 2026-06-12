@@ -48,6 +48,11 @@ const navigationData: MenuItem[] = [
     ],
   },
   {
+    name: "classes",
+    href: "/giao-vien/lop-hoc",
+    icon: GraduationCap,
+  },
+  {
     name: "examBank",
     icon: FileText,
     submenu: [

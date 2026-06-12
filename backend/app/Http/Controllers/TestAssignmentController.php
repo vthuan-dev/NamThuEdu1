@@ -13,6 +13,46 @@ use App\Services\PushNotificationService;
 class TestAssignmentController extends Controller
 {
     /**
+     * GET /api/teacher/classes/{id}/assignments
+     * Liệt kê các bài đã giao cho một lớp + số bài đã nộp.
+     */
+    public function byClass(Request $request, $id)
+    {
+        $user = $request->user();
+
+        if (!$user || !in_array($user->uRole, ['teacher', 'admin'])) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Bạn không có quyền truy cập.'
+            ], 401);
+        }
+
+        $assignments = TestAssignment::with('exam')
+            ->where('taTarget_type', 'class')
+            ->where('taTarget_id', $id)
+            ->orderByDesc('taCreated_at')
+            ->get()
+            ->map(function ($a) {
+                return [
+                    'taId'             => $a->taId,
+                    'exam_id'          => $a->exam_id,
+                    'exam_title'       => $a->exam->eTitle ?? null,
+                    'taDeadline'       => $a->taDeadline,
+                    'taStart_time'     => $a->taStart_time,
+                    'taInstructions'   => $a->taInstructions,
+                    'submission_count' => \App\Models\Submission::where('assignment_id', $a->taId)
+                        ->whereIn('sStatus', ['submitted', 'graded'])
+                        ->distinct('user_id')->count('user_id'),
+                ];
+            });
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => $assignments,
+        ]);
+    }
+
+    /**
      * @OA\Post(
      *     path="/teacher/exams/{examId}/assign",
      *     tags={"Assignments"},

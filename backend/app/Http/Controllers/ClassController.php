@@ -8,11 +8,40 @@ use Illuminate\Support\Facades\DB;
 use App\Models\Classes;
 use App\Models\ClassEnrollment;
 use App\Models\ClassTransfer;
+use App\Models\ClassAnnouncement;
+use App\Models\ClassGoal;
+use App\Models\ClassHandoverRequest;
+use App\Models\TestAssignment;
 use App\Models\Course;
 use App\Models\User;
+use App\Services\PushNotificationService;
 
 class ClassController extends Controller
 {
+    /**
+     * Helper: lấy lớp thuộc sở hữu của giáo viên hiện tại hoặc trả null.
+     * Admin được phép truy cập mọi lớp.
+     */
+    private function ownedClassOrNull($user, $id)
+    {
+        $query = Classes::where('cId', $id);
+        if ($user->uRole !== 'admin') {
+            $query->where('cTeacher_id', $user->uId);
+        }
+        return $query->first();
+    }
+
+    /**
+     * Helper: đếm số học viên thực tế của lớp (nguồn chính = users.class_id).
+     */
+    private function liveStudentCount($classId): int
+    {
+        return User::where('class_id', $classId)
+            ->where('uRole', 'student')
+            ->whereNull('uDeleted_at')
+            ->count();
+    }
+
     /**
      * @OA\Get(
      *     path="/teacher/classes",
@@ -48,8 +77,15 @@ class ClassController extends Controller
                          ->orderBy('cCreated_at', 'desc')
                          ->get();
 
+        // Lấy danh sách lớp đang có yêu cầu bàn giao chờ xử lý.
+        $pendingClassIds = ClassHandoverRequest::where('status', 'pending')
+            ->whereIn('class_id', $classes->pluck('cId'))
+            ->pluck('class_id')
+            ->flip();
+
         // Add stats for each class
-        $classesWithStats = $classes->map(function($class) {
+        $classesWithStats = $classes->map(function($class) use ($pendingClassIds) {
+            $count = $this->liveStudentCount($class->cId);
             return [
                 'cId' => $class->cId,
                 'cName' => $class->cName,
@@ -57,8 +93,9 @@ class ClassController extends Controller
                 'cStatus' => $class->cStatus,
                 'age_group' => $class->age_group,
                 'max_students' => $class->max_students,
-                'current_student_count' => $class->current_student_count,
-                'is_full' => $class->is_full,
+                'current_student_count' => $count,
+                'is_full' => $class->max_students ? $count >= $class->max_students : false,
+                'has_pending_handover' => $pendingClassIds->has($class->cId),
                 'cCreated_at' => $class->cCreated_at,
             ];
         });
@@ -142,7 +179,7 @@ class ClassController extends Controller
             'status' => 'success',
             'data' => $class,
             'message' => 'Tạo lớp học thành công.'
-        ]);
+        ], 201);
     }
 
     /**
@@ -205,12 +242,48 @@ class ClassController extends Controller
                        ->whereNull('uDeleted_at')
                        ->get(['uId', 'uName', 'uPhone', 'uDoB', 'age_group']);
 
+        $announcements = ClassAnnouncement::where('class_id', $id)
+            ->orderByDesc('is_pinned')
+            ->orderByDesc('created_at')
+            ->get();
+
+        $goals = ClassGoal::where('class_id', $id)
+            ->orderByRaw("FIELD(status,'active','completed','cancelled')")
+            ->orderBy('target_date')
+            ->get();
+
+        $assignments = TestAssignment::with('exam')
+            ->where('taTarget_type', 'class')
+            ->where('taTarget_id', $id)
+            ->orderByDesc('taCreated_at')
+            ->get()
+            ->map(function ($a) {
+                return [
+                    'taId' => $a->taId,
+                    'exam_id' => $a->exam_id,
+                    'exam_title' => $a->exam->eTitle ?? null,
+                    'taDeadline' => $a->taDeadline,
+                    'taStart_time' => $a->taStart_time,
+                    'submission_count' => \App\Models\Submission::where('assignment_id', $a->taId)
+                        ->whereIn('sStatus', ['submitted', 'graded'])
+                        ->distinct('user_id')->count('user_id'),
+                ];
+            });
+
+        $pendingHandover = ClassHandoverRequest::where('class_id', $id)
+            ->where('status', 'pending')
+            ->first();
+
         return response()->json([
             'status' => 'success',
             'data' => [
                 'class' => $class,
                 'students' => $students,
                 'student_count' => $students->count(),
+                'announcements' => $announcements,
+                'goals' => $goals,
+                'assignments' => $assignments,
+                'pending_handover' => $pendingHandover,
             ]
         ]);
     }
@@ -292,6 +365,32 @@ class ClassController extends Controller
             ], 400);
         }
 
+        // R2.4: đổi age_group khi lớp đang có HV khác độ tuổi → chặn.
+        if ($request->has('age_group') && $request->age_group !== $class->age_group) {
+            $mismatch = User::where('class_id', $id)
+                ->where('uRole', 'student')
+                ->whereNull('uDeleted_at')
+                ->where('age_group', '!=', $request->age_group)
+                ->exists();
+            if ($mismatch) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Lớp đang có học viên không cùng độ tuổi; vui lòng chuyển học viên trước khi đổi độ tuổi lớp.'
+                ], 409);
+            }
+        }
+
+        // R2.5: max_students không nhỏ hơn sĩ số hiện tại.
+        if ($request->has('max_students')) {
+            $current = $this->liveStudentCount($id);
+            if ($request->max_students < $current) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Sĩ số tối đa không được nhỏ hơn số học viên hiện tại ({$current})."
+                ], 409);
+            }
+        }
+
         $updateData = [];
         if ($request->has('name')) $updateData['cName'] = $request->name;
         if ($request->has('description')) $updateData['cDescription'] = $request->description;
@@ -358,6 +457,29 @@ class ClassController extends Controller
                 'status' => 'error',
                 'message' => 'Không tìm thấy lớp học.'
             ], 404);
+        }
+
+        // R2.8: lớp đang chờ bàn giao → không cho xóa.
+        $hasPending = ClassHandoverRequest::where('class_id', $id)
+            ->where('status', 'pending')->exists();
+        if ($hasPending) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Lớp đang chờ bàn giao; không thể xóa.'
+            ], 409);
+        }
+
+        // R2.7: còn học viên → 409 trừ khi force=true (gỡ hết HV rồi xóa).
+        $count = $this->liveStudentCount($id);
+        if ($count > 0) {
+            if (!$request->boolean('force')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => "Lớp còn {$count} học viên; vui lòng chuyển hoặc xóa học viên khỏi lớp trước khi xóa lớp."
+                ], 409);
+            }
+            User::where('class_id', $id)->where('uRole', 'student')->update(['class_id' => null]);
+            ClassEnrollment::where('class_id', $id)->delete();
         }
 
         $class->delete();
@@ -455,6 +577,7 @@ class ClassController extends Controller
 
         $successCount = 0;
         $errors = [];
+        $liveCount = $this->liveStudentCount($id);
 
         DB::beginTransaction();
         try {
@@ -470,21 +593,36 @@ class ClassController extends Controller
                     continue;
                 }
 
-                // Check if already enrolled
-                $exists = ClassEnrollment::where('class_id', $id)
-                                        ->where('student_id', $studentId)
-                                        ->exists();
-
-                if ($exists) {
-                    $errors[] = "Học viên {$student->uName} đã được ghi danh vào lớp này.";
+                // Đã ở trong lớp này rồi.
+                if ((int) $student->class_id === (int) $id) {
+                    $errors[] = "Học viên {$student->uName} đã ở trong lớp này.";
                     continue;
                 }
 
-                ClassEnrollment::create([
-                    'class_id' => $id,
-                    'student_id' => $studentId,
-                ]);
+                // R3.3: độ tuổi phải khớp lớp.
+                if ($class->age_group && $student->age_group && $student->age_group !== $class->age_group) {
+                    $errors[] = "Học viên {$student->uName} không cùng độ tuổi với lớp.";
+                    continue;
+                }
 
+                // R3.4: không vượt sĩ số tối đa.
+                if ($class->max_students && $liveCount >= $class->max_students) {
+                    $errors[] = "Lớp đã đầy ({$class->max_students}).";
+                    break;
+                }
+
+                // Nguồn chính: users.class_id. Giữ ClassEnrollment để tương thích cũ.
+                $student->class_id = $id;
+                $student->save();
+
+                if (!ClassEnrollment::where('class_id', $id)->where('student_id', $studentId)->exists()) {
+                    ClassEnrollment::create([
+                        'class_id' => $id,
+                        'student_id' => $studentId,
+                    ]);
+                }
+
+                $liveCount++;
                 $successCount++;
             }
 
@@ -874,28 +1012,36 @@ class ClassController extends Controller
             ], 404);
         }
 
-        $enrollment = ClassEnrollment::where('class_id', $id)
-                                   ->where('student_id', $studentId)
-                                   ->first();
+        $student = User::where('uId', $studentId)->where('uRole', 'student')->first();
 
-        if (!$enrollment) {
+        $inClass = $student && (int) $student->class_id === (int) $id;
+        $hasEnrollment = ClassEnrollment::where('class_id', $id)
+                                   ->where('student_id', $studentId)
+                                   ->exists();
+
+        if (!$inClass && !$hasEnrollment) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Học viên không có trong lớp này.'
             ], 404);
         }
 
-        $student = User::find($studentId);
-        
+        if ($inClass) {
+            $student->class_id = null;
+            $student->save();
+        }
+
         // Delete using composite key
         ClassEnrollment::where('class_id', $id)
                       ->where('student_id', $studentId)
                       ->delete();
 
+        $studentName = $student->uName ?? ('#' . $studentId);
+
         return response()->json([
             'status' => 'success',
             'data' => [
-                'message' => "Đã xóa học viên {$student->uName} khỏi lớp {$class->cName}."
+                'message' => "Đã xóa học viên {$studentName} khỏi lớp {$class->cName}."
             ]
         ]);
     }
@@ -965,6 +1111,119 @@ class ClassController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => $statistics
+        ]);
+    }
+
+    /**
+     * POST /api/teacher/classes/{id}/handover-request
+     * Giáo viên gửi yêu cầu bàn giao lớp lên admin.
+     */
+    public function requestHandover(Request $request, $id)
+    {
+        $user = $request->user();
+
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Bạn không có quyền truy cập.'
+            ], 401);
+        }
+
+        $class = Classes::where('cId', $id)
+                       ->where('cTeacher_id', $user->uId)
+                       ->first();
+
+        if (!$class) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Không tìm thấy lớp học.'
+            ], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'reason' => 'nullable|string|max:500',
+        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Dữ liệu không hợp lệ.',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        // R7.2: chỉ một pending mỗi lớp.
+        $existing = ClassHandoverRequest::where('class_id', $id)
+            ->where('status', 'pending')->exists();
+        if ($existing) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Lớp này đã có yêu cầu bàn giao đang chờ xử lý.'
+            ], 409);
+        }
+
+        $req = ClassHandoverRequest::create([
+            'class_id'        => $id,
+            'from_teacher_id' => $user->uId,
+            'status'          => 'pending',
+            'reason'          => $request->reason,
+        ]);
+
+        // R7.3: thông báo tới tất cả admin (push fire-and-forget).
+        try {
+            $adminIds = User::where('uRole', 'admin')->whereNull('uDeleted_at')->pluck('uId')->toArray();
+            if (!empty($adminIds)) {
+                (new PushNotificationService())->sendToUsers(
+                    $adminIds,
+                    '📦 Yêu cầu bàn giao lớp',
+                    "GV {$user->uName} xin bàn giao lớp \"{$class->cName}\".",
+                    ['url' => '/admin/ban-giao-lop']
+                );
+            }
+        } catch (\Exception $e) {
+            \Log::warning('Handover request push failed: ' . $e->getMessage());
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $req,
+            'message' => 'Đã gửi yêu cầu bàn giao lớp tới quản trị viên.'
+        ], 201);
+    }
+
+    /**
+     * DELETE /api/teacher/classes/{id}/handover-request
+     * Giáo viên hủy yêu cầu bàn giao đang chờ của chính mình.
+     */
+    public function cancelHandover(Request $request, $id)
+    {
+        $user = $request->user();
+
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Bạn không có quyền truy cập.'
+            ], 401);
+        }
+
+        $req = ClassHandoverRequest::where('class_id', $id)
+            ->where('from_teacher_id', $user->uId)
+            ->where('status', 'pending')
+            ->first();
+
+        if (!$req) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Không tìm thấy yêu cầu bàn giao đang chờ.'
+            ], 404);
+        }
+
+        $req->status = 'cancelled';
+        $req->resolved_at = now();
+        $req->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Đã hủy yêu cầu bàn giao.'
         ]);
     }
 }

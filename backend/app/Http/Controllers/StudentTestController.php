@@ -19,6 +19,42 @@ use App\Jobs\GradeVstepSubjectiveJob;
 class StudentTestController extends Controller
 {
     /**
+     * GET /api/student/class-goals/next
+     * Trả mục tiêu lớp gần nhất (active, chưa quá hạn) của lớp học viên + số ngày còn lại.
+     */
+    public function nextClassGoal(Request $request)
+    {
+        $student = $request->user();
+        if (!$student || !$student->class_id) {
+            return response()->json(['status' => 'success', 'data' => null]);
+        }
+
+        $goal = \App\Models\ClassGoal::where('class_id', $student->class_id)
+            ->where('status', 'active')
+            ->whereDate('target_date', '>=', \Carbon\Carbon::today())
+            ->orderBy('target_date')
+            ->first();
+
+        if (!$goal) {
+            return response()->json(['status' => 'success', 'data' => null]);
+        }
+
+        $daysRemaining = (int) \Carbon\Carbon::today()->diffInDays(\Carbon\Carbon::parse($goal->target_date), false);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'id'             => $goal->id,
+                'goal_title'     => $goal->goal_title,
+                'target_date'    => $goal->target_date->toDateString(),
+                'target_level'   => $goal->target_level,
+                'description'    => $goal->description,
+                'days_remaining' => $daysRemaining,
+            ],
+        ]);
+    }
+
+    /**
      * Áp dụng bộ lọc đề thi theo độ tuổi học viên lên một query của bảng exams.
      *
      * Quy tắc phân loại:
@@ -2057,6 +2093,58 @@ class StudentTestController extends Controller
                     'created_at'   => $reply->created_at,
                     'action_url'   => $actionUrl,
                     'action_label' => 'Xem bình luận',
+                ];
+            }
+        }
+
+        // ── Thông báo quan trọng của lớp (important/urgent, 30 ngày) ──
+        if (!empty($classIds)) {
+            $classAnns = \App\Models\ClassAnnouncement::whereIn('class_id', $classIds)
+                ->whereIn('priority', ['important', 'urgent'])
+                ->where('created_at', '>=', now()->subDays(30))
+                ->orderByDesc('created_at')
+                ->take(10)
+                ->get();
+
+            foreach ($classAnns as $ann) {
+                $preview = mb_substr(strip_tags((string) $ann->content), 0, 100);
+                if (mb_strlen(strip_tags((string) $ann->content)) > 100) {
+                    $preview .= '…';
+                }
+                $notifications[] = [
+                    'id'           => 'announcement_' . $ann->id,
+                    'title'        => ($ann->priority === 'urgent' ? '🚨 ' : '📢 ') . $ann->title,
+                    'message'      => $preview,
+                    'type'         => 'message',
+                    'color'        => $ann->priority === 'urgent' ? '#EF4444' : '#F59E0B',
+                    'is_read'      => false,
+                    'created_at'   => $ann->created_at,
+                    'action_url'   => '/thong-bao',
+                    'action_label' => 'Xem thông báo',
+                ];
+            }
+        }
+
+        // ── Đếm ngược mục tiêu lớp gần nhất (entry động, đổi theo ngày) ──
+        if ($student && $student->class_id) {
+            $goal = \App\Models\ClassGoal::where('class_id', $student->class_id)
+                ->where('status', 'active')
+                ->whereDate('target_date', '>=', now()->toDateString())
+                ->orderBy('target_date')
+                ->first();
+
+            if ($goal) {
+                $daysLeft = (int) \Carbon\Carbon::today()->diffInDays(\Carbon\Carbon::parse($goal->target_date), false);
+                $notifications[] = [
+                    'id'           => 'goal_' . $goal->id . '_' . now()->toDateString(),
+                    'title'        => '🎯 Mục tiêu sắp tới',
+                    'message'      => "Còn {$daysLeft} ngày đến {$goal->goal_title}. Cố gắng lên nhé!",
+                    'type'         => 'reminder',
+                    'color'        => '#7C3AED',
+                    'is_read'      => false,
+                    'created_at'   => now(),
+                    'action_url'   => '/',
+                    'action_label' => 'Bắt đầu học',
                 ];
             }
         }

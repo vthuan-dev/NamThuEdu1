@@ -26,6 +26,14 @@ class Kernel extends ConsoleKernel
                  ->everyMinute()
                  ->withoutOverlapping()
                  ->runInBackground();
+
+        // Gửi thông báo động lực hằng ngày theo mục tiêu của lớp — 07:00 (giờ VN)
+        $schedule->command('goals:send-daily-reminders')
+                 ->dailyAt('07:00')
+                 ->timezone('Asia/Ho_Chi_Minh')
+                 ->withoutOverlapping()
+                 ->runInBackground();
+
                  
         // Monitor WebSocket connections mỗi phút
         $schedule->call(function () {

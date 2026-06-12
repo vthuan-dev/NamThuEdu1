@@ -16,6 +16,7 @@ import {
 } from '../../../../services/studentApi';
 import { usePageTitle, PAGE_TITLES } from '../../../../hooks/usePageTitle';
 import { ExamNewsFeed } from './components/ExamNewsFeed';
+import { NextGoalCard } from '../components/NextGoalCard';
 
 // ─── Design tokens (Teal/Cyan — Teens theme, distinct from Adults' purple) ──────
 const INDIGO       = '#0D9488';
@@ -405,6 +406,9 @@ export function TeensDashboard() {
             </button>
           </div>
         )}
+
+        {/* Mục tiêu lớp sắp tới */}
+        <NextGoalCard ageGroup="teens" />
 
         {/* Quick Actions */}
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">

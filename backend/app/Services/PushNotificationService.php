@@ -10,6 +10,7 @@ use Minishlink\WebPush\Subscription;
 class PushNotificationService
 {
     private WebPush $webPush;
+    private bool $enabled = true;
 
     public function __construct()
     {
@@ -28,11 +29,20 @@ class PushNotificationService
             }
         }
 
+        $publicKey  = env('VAPID_PUBLIC_KEY');
+        $privateKey = env('VAPID_PRIVATE_KEY');
+
+        // Không cấu hình VAPID (vd môi trường test) → tắt push, no-op an toàn.
+        if (empty($publicKey) || empty($privateKey)) {
+            $this->enabled = false;
+            return;
+        }
+
         $auth = [
             'VAPID' => [
                 'subject'    => env('VAPID_SUBJECT', 'mailto:admin@namthu.edu.vn'),
-                'publicKey'  => env('VAPID_PUBLIC_KEY'),
-                'privateKey' => env('VAPID_PRIVATE_KEY'),
+                'publicKey'  => $publicKey,
+                'privateKey' => $privateKey,
             ],
         ];
 
@@ -46,6 +56,11 @@ class PushNotificationService
      */
     public function sendToUser(int $userId, string $title, string $body, array $data = []): void
     {
+        if (!$this->enabled) {
+            Log::info("[Push] Bỏ qua — VAPID chưa cấu hình (user {$userId}).");
+            return;
+        }
+
         $subscriptions = PushSubscription::where('user_id', $userId)->get();
 
         if ($subscriptions->isEmpty()) {

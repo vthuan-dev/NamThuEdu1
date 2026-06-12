@@ -81,6 +81,10 @@ import { Categories } from "../features/teacher/blog/Categories";
 // Reports
 import { ReportsOverview } from "../features/teacher/reports/ReportsOverview";
 
+// Lớp học (Teacher Class Management)
+import { ClassManage } from "../features/teacher/classes/ClassManage";
+import { ClassDetail } from "../features/teacher/classes/ClassDetail";
+
 // Protected Teacher Layout
 function ProtectedTeacherLayout() {
   return (
@@ -101,15 +105,9 @@ export const teacherRoutes = {
     { path: "students", Component: StudentManagement },
     { path: "students/them-moi", Component: AddStudent },
 
-    // ─── Lớp học (DEPRECATED) ────────────────────────────────────────
-    // Class system đã gỡ khỏi UI flow. Routes bị disable. Files
-    // ClassList/CreateClass/TransferClass/ClassStats vẫn còn trong
-    // codebase phòng cần lookup data class cũ.
-    // { path: "lop-hoc", Component: ClassList },
-    // { path: "lop-hoc/danh-sach", Component: ClassList },
-    // { path: "lop-hoc/tao-moi", Component: CreateClass },
-    // { path: "lop-hoc/chuyen-lop", Component: TransferClass },
-    // { path: "lop-hoc/thong-ke", Component: ClassStats },
+    // ─── Lớp học (Teacher Class Management) ──────────────────────────
+    { path: "lop-hoc", Component: ClassManage },
+    { path: "lop-hoc/:id", Component: ClassDetail },
 
     // Khóa học
     { path: "khoa-hoc", Component: CourseList },

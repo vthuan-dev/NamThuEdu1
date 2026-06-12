@@ -54,6 +54,7 @@ const adminNav: NavItem[] = [
     ],
   },
   { label: "Bài viết", href: "/admin/content/posts", icon: FileEdit },
+  { label: "Bàn giao lớp", href: "/admin/ban-giao-lop", icon: Users },
   {
     label: "Báo cáo",
     icon: BarChart3,
