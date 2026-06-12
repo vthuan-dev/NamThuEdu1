@@ -354,7 +354,11 @@ export const loadVstepSpeakingExam = async (examId: string, admin = false) => {
  * Nhẹ & nhanh hơn parseVstepPdf vì không upload file.
  */
 export const parseVstepTextWithAi = async (text: string) => {
-  const response = await api.post('/teacher/vstep/parse-text', { text });
+  const response = await api.post('/teacher/vstep/parse-text', { text }, {
+    // Gemini phân tích text→JSON có thể mất 30–90s; nới timeout để không bị
+    // axios hủy giữa chừng (mặc định chỉ 30s).
+    timeout: 180000,
+  });
   return response.data as {
     success: boolean;
     message?: string;
