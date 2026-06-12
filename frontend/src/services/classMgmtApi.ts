@@ -15,7 +15,32 @@ export interface ClassItem {
   current_student_count: number;
   is_full: boolean;
   has_pending_handover?: boolean;
+  is_owner?: boolean;
   cCreated_at?: string;
+}
+
+export interface CoTeacher {
+  id: number;
+  status: 'pending' | 'accepted' | 'declined' | 'revoked';
+  message?: string | null;
+  teacher: { uId: number; uName: string | null; uPhone?: string | null; avatar_url?: string | null };
+  invited_by?: string | null;
+  created_at?: string;
+}
+
+export interface Colleague {
+  uId: number;
+  uName: string;
+  uPhone?: string | null;
+  avatar_url?: string | null;
+}
+
+export interface CoTeacherInvitation {
+  id: number;
+  message?: string | null;
+  invited_by?: string | null;
+  class: { cId: number; cName: string | null; age_group?: string | null };
+  created_at?: string;
 }
 
 export interface ClassStudent {
@@ -108,6 +133,17 @@ export const classMgmtApi = {
     api.post(`/teacher/classes/${id}/handover-request`, { reason }).then(r => r.data),
   cancelHandover: (id: number) =>
     api.delete(`/teacher/classes/${id}/handover-request`).then(r => r.data),
+
+  // ── Co-teaching: mời GV khác cùng quản lý lớp ─────────────
+  colleagues: () => api.get('/teacher/colleagues').then(r => r.data),
+  inviteCoTeacher: (classId: number, teacherId: number, message?: string) =>
+    api.post(`/teacher/classes/${classId}/co-teachers`, { teacher_id: teacherId, message }).then(r => r.data),
+  removeCoTeacher: (classId: number, coId: number) =>
+    api.delete(`/teacher/classes/${classId}/co-teachers/${coId}`).then(r => r.data),
+  myCoTeacherInvitations: () =>
+    api.get('/teacher/co-teacher-invitations').then(r => r.data),
+  respondCoTeacherInvitation: (coId: number, action: 'accept' | 'decline') =>
+    api.post(`/teacher/co-teacher-invitations/${coId}/respond`, { action }).then(r => r.data),
 
   // ── Enrollable students (dùng danh sách học viên của GV) ──
   availableStudents: () => api.get('/teacher/students', { params: { per_page: 500 } }).then(r => r.data),

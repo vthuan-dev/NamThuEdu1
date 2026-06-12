@@ -236,6 +236,13 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         Route::post('/classes/{id}/handover-request', [ClassController::class, 'requestHandover']);
         Route::delete('/classes/{id}/handover-request', [ClassController::class, 'cancelHandover']);
 
+        // Cộng tác: mời giáo viên khác cùng quản lý lớp (co-teaching)
+        Route::get('/colleagues', [ClassController::class, 'colleagues']);
+        Route::post('/classes/{id}/co-teachers', [ClassController::class, 'inviteCoTeacher']);
+        Route::delete('/classes/{id}/co-teachers/{coId}', [ClassController::class, 'removeCoTeacher']);
+        Route::get('/co-teacher-invitations', [ClassController::class, 'myCoTeacherInvitations']);
+        Route::post('/co-teacher-invitations/{coId}/respond', [ClassController::class, 'respondCoTeacherInvitation']);
+
         
         // Practice Sessions Routes
         Route::prefix('practice-sessions')->group(function () {

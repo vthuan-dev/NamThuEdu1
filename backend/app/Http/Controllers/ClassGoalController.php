@@ -12,11 +12,12 @@ class ClassGoalController extends Controller
 {
     private function ownedClassOrNull($user, $classId)
     {
-        $query = Classes::where('cId', $classId);
-        if ($user->uRole !== 'admin') {
-            $query->where('cTeacher_id', $user->uId);
-        }
-        return $query->first();
+        $class = Classes::where('cId', $classId)->first();
+        if (!$class) return null;
+        if ($user->uRole === 'admin') return $class;
+        if ((int) $class->cTeacher_id === (int) $user->uId) return $class;
+        if (\App\Models\ClassCoTeacher::teacherCanAccess($classId, $user->uId)) return $class;
+        return null;
     }
 
     private function guard(Request $request)

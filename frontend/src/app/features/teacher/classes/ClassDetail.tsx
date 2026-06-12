@@ -3,22 +3,24 @@ import { useParams, useNavigate } from "react-router";
 import {
   ArrowLeft, Users, FileText, Megaphone, Target, ArrowRightLeft,
   Loader2, AlertCircle, Trash2, Plus, UserPlus, Search, Calendar, CheckCircle2, Info,
+  UserCog, ShieldCheck, Clock,
 } from "lucide-react";
 import {
-  classMgmtApi, ClassItem, ClassStudent, ClassAnnouncement, ClassGoal, ClassAssignmentRow,
+  classMgmtApi, ClassItem, ClassStudent, ClassAnnouncement, ClassGoal, ClassAssignmentRow, CoTeacher, Colleague,
 } from "../../../../services/classMgmtApi";
 import { useToastContext } from "../../../../contexts/ToastContext";
 import {
   ageMeta, Avatar, Modal, Field, inputClass, btnPrimary, btnGhost,
 } from "./classMgmtUi";
 
-type TabKey = "roster" | "assignments" | "announcements" | "goals";
+type TabKey = "roster" | "assignments" | "announcements" | "goals" | "coteachers";
 
 const TABS: { key: TabKey; label: string; icon: any }[] = [
   { key: "roster", label: "Học viên", icon: Users },
   { key: "assignments", label: "Giao đề", icon: FileText },
   { key: "announcements", label: "Thông báo", icon: Megaphone },
   { key: "goals", label: "Mục tiêu", icon: Target },
+  { key: "coteachers", label: "Cộng tác", icon: UserCog },
 ];
 
 export function ClassDetail() {
@@ -35,6 +37,8 @@ export function ClassDetail() {
   const [goals, setGoals] = useState<ClassGoal[]>([]);
   const [assignments, setAssignments] = useState<ClassAssignmentRow[]>([]);
   const [pendingHandover, setPendingHandover] = useState<any>(null);
+  const [coTeachers, setCoTeachers] = useState<CoTeacher[]>([]);
+  const [isOwner, setIsOwner] = useState(true);
   const [tab, setTab] = useState<TabKey>("roster");
 
   const load = useCallback(async () => {
@@ -49,6 +53,8 @@ export function ClassDetail() {
       setGoals(d.goals || []);
       setAssignments(d.assignments || []);
       setPendingHandover(d.pending_handover || null);
+      setCoTeachers(d.co_teachers || []);
+      setIsOwner(d.is_owner !== false);
     } catch (e: any) {
       setError(e?.response?.status === 404 ? "Không tìm thấy lớp học." : "Không thể tải lớp. Vui lòng thử lại.");
     } finally {
@@ -87,6 +93,7 @@ export function ClassDetail() {
     assignments: assignments.length,
     announcements: announcements.length,
     goals: goals.filter((g) => g.status === "active").length,
+    coteachers: coTeachers.filter((c) => c.status === "accepted").length,
   };
 
   return (
@@ -115,6 +122,11 @@ export function ClassDetail() {
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500 cm-dot-pulse" /> Chờ bàn giao
                   </span>
                 )}
+                {!isOwner && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-teal-50 text-[#0F766E] ring-1 ring-teal-200">
+                    <UserCog className="w-3 h-3" /> Đồng quản lý
+                  </span>
+                )}
               </div>
               <p className="text-xs sm:text-sm text-[#6B7280] mt-0.5 inline-flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-gray-400" />
@@ -122,7 +134,7 @@ export function ClassDetail() {
               </p>
             </div>
           </div>
-          <HandoverButton classId={classId} pending={!!pendingHandover} onChanged={load} />
+          {isOwner && <HandoverButton classId={classId} pending={!!pendingHandover} onChanged={load} />}
         </div>
       </div>
 
@@ -155,6 +167,7 @@ export function ClassDetail() {
         {tab === "assignments" && <AssignmentsTab assignments={assignments} />}
         {tab === "announcements" && <AnnouncementsTab classId={classId} items={announcements} onChanged={load} toast={toast} />}
         {tab === "goals" && <GoalsTab classId={classId} items={goals} onChanged={load} toast={toast} />}
+        {tab === "coteachers" && <CoTeachersTab classId={classId} items={coTeachers} isOwner={isOwner} onChanged={load} toast={toast} />}
       </div>
     </div>
   );
@@ -617,6 +630,170 @@ function GoalsTab({ classId, items, onChanged, toast }: any) {
             <input value={targetLevel} onChange={(e) => setTargetLevel(e.target.value)} placeholder="VD: B2" className={inputClass} />
           </Field>
         </div>
+      </Modal>
+    </div>
+  );
+}
+
+// ─── Co-teachers tab ──────────────────────────────────────────
+function CoTeachersTab({ classId, items, isOwner, onChanged, toast }: any) {
+  const [open, setOpen] = useState(false);
+  const [colleagues, setColleagues] = useState<Colleague[]>([]);
+  const [loadingList, setLoadingList] = useState(false);
+  const [search, setSearch] = useState("");
+  const [pickedId, setPickedId] = useState<number | null>(null);
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const accepted = items.filter((c: CoTeacher) => c.status === "accepted");
+  const pending = items.filter((c: CoTeacher) => c.status === "pending");
+  const existingIds = new Set(items.map((c: CoTeacher) => c.teacher.uId));
+
+  const openInvite = async () => {
+    setOpen(true); setPickedId(null); setMessage(""); setSearch(""); setLoadingList(true);
+    try {
+      const res = await classMgmtApi.colleagues();
+      const list = res?.data || [];
+      setColleagues((Array.isArray(list) ? list : []).filter((t: Colleague) => !existingIds.has(t.uId)));
+    } catch {
+      toast.error("Không tải được danh sách giáo viên.");
+    } finally { setLoadingList(false); }
+  };
+
+  const invite = async () => {
+    if (!pickedId) { toast.error("Chọn một giáo viên để mời."); return; }
+    setBusy(true);
+    try {
+      await classMgmtApi.inviteCoTeacher(classId, pickedId, message || undefined);
+      toast.success("Đã gửi lời mời cùng quản lý lớp.");
+      setOpen(false); onChanged();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Không gửi được lời mời.");
+    } finally { setBusy(false); }
+  };
+
+  const remove = async (c: CoTeacher) => {
+    const label = c.status === "accepted" ? "Gỡ giáo viên này khỏi việc cùng quản lý lớp?" : "Thu hồi lời mời này?";
+    if (!window.confirm(label)) return;
+    try {
+      await classMgmtApi.removeCoTeacher(classId, c.id);
+      toast.success(c.status === "accepted" ? "Đã gỡ giáo viên." : "Đã thu hồi lời mời.");
+      onChanged();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Không thực hiện được.");
+    }
+  };
+
+  const filteredColleagues = colleagues.filter((t) => (t.uName || "").toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div>
+      <div className="flex items-start gap-2.5 mb-4 px-3.5 py-3 rounded-xl bg-gradient-to-br from-teal-50 to-white ring-1 ring-teal-100">
+        <Info className="w-4 h-4 text-[#0D9488] mt-0.5 shrink-0" />
+        <p className="text-sm text-[#374151] leading-relaxed">
+          Giáo viên được mời cùng quản lý có thể quản lý học viên, thông báo và mục tiêu của lớp.
+          Chỉ <span className="font-semibold">chủ lớp</span> mới mời/gỡ cộng sự và xin bàn giao.
+        </p>
+      </div>
+
+      {isOwner && (
+        <div className="flex justify-end mb-4">
+          <button onClick={openInvite} className={btnPrimary}>
+            <UserPlus className="w-4 h-4" /> Mời giáo viên
+          </button>
+        </div>
+      )}
+
+      {accepted.length === 0 && pending.length === 0 ? (
+        <EmptyState icon={UserCog} title="Chưa có cộng sự" text={isOwner ? "Mời giáo viên khác để cùng quản lý lớp này." : "Lớp này hiện chỉ có chủ lớp quản lý."} />
+      ) : (
+        <div className="space-y-3">
+          {accepted.map((c: CoTeacher) => (
+            <div key={c.id} className="bg-white rounded-2xl border border-[#E5E7EB] p-4 flex items-center justify-between gap-3 cm-rise">
+              <div className="flex items-center gap-3 min-w-0">
+                <Avatar name={c.teacher.uName || "?"} src={c.teacher.avatar_url} />
+                <div className="min-w-0">
+                  <p className="font-semibold text-[#111827] truncate">{c.teacher.uName}</p>
+                  <p className="text-xs text-[#6B7280]">{c.teacher.uPhone || "—"}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-50 text-[#0F766E] ring-1 ring-teal-200">
+                  <ShieldCheck className="w-3.5 h-3.5" /> Đang cùng quản lý
+                </span>
+                {isOwner && (
+                  <button onClick={() => remove(c)} aria-label="Gỡ cộng sự" className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          {pending.map((c: CoTeacher) => (
+            <div key={c.id} className="bg-white rounded-2xl border border-dashed border-amber-200 p-4 flex items-center justify-between gap-3 cm-rise">
+              <div className="flex items-center gap-3 min-w-0">
+                <Avatar name={c.teacher.uName || "?"} src={c.teacher.avatar_url} />
+                <div className="min-w-0">
+                  <p className="font-semibold text-[#111827] truncate">{c.teacher.uName}</p>
+                  {c.message && <p className="text-xs text-[#6B7280] truncate">"{c.message}"</p>}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 ring-1 ring-amber-200">
+                  <Clock className="w-3.5 h-3.5" /> Chờ phản hồi
+                </span>
+                {isOwner && (
+                  <button onClick={() => remove(c)} aria-label="Thu hồi lời mời" className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Mời giáo viên cùng quản lý"
+        maxWidth="max-w-lg"
+        footer={
+          <>
+            <button onClick={() => setOpen(false)} className={`${btnGhost} flex-1`}>Hủy</button>
+            <button onClick={invite} disabled={!pickedId || busy} className={`${btnPrimary} flex-1`}>
+              {busy && <Loader2 className="w-4 h-4 animate-spin" />} Gửi lời mời
+            </button>
+          </>
+        }
+      >
+        <div className="relative mb-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Tìm giáo viên..." className={`${inputClass} pl-9`} />
+        </div>
+        <div className="border border-[#E5E7EB] rounded-xl overflow-hidden max-h-[40vh] overflow-y-auto mb-4">
+          {loadingList ? (
+            <div className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-[#0D9488]" /></div>
+          ) : filteredColleagues.length === 0 ? (
+            <p className="p-8 text-center text-sm text-[#6B7280]">Không còn giáo viên phù hợp để mời.</p>
+          ) : filteredColleagues.map((t, i) => {
+            const picked = pickedId === t.uId;
+            return (
+              <button
+                key={t.uId}
+                onClick={() => setPickedId(t.uId)}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${picked ? "bg-teal-50/70" : "hover:bg-gray-50"} ${i > 0 ? "border-t border-gray-100" : ""}`}
+              >
+                <Avatar name={t.uName} size={32} src={t.avatar_url} />
+                <span className="flex-1 text-sm font-medium text-[#111827]">{t.uName}</span>
+                {picked && <CheckCircle2 className="w-5 h-5 text-[#0D9488]" />}
+              </button>
+            );
+          })}
+        </div>
+        <Field label="Lời nhắn" hint="Không bắt buộc — gửi kèm lời mời.">
+          <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={2} placeholder="VD: Nhờ thầy/cô hỗ trợ lớp này giúp em..." className={`${inputClass} resize-none`} />
+        </Field>
       </Modal>
     </div>
   );

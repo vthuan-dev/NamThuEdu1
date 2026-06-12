@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Plus, Users, School, AlertCircle, Trash2, Pencil, ArrowRightLeft,
-  Loader2, GraduationCap, Layers,
+  Loader2, GraduationCap, Layers, UserCog, Check, X,
 } from "lucide-react";
-import { classMgmtApi, ClassItem } from "../../../../services/classMgmtApi";
+import { classMgmtApi, ClassItem, CoTeacherInvitation } from "../../../../services/classMgmtApi";
 import { useToastContext } from "../../../../contexts/ToastContext";
 import {
   ageMeta, CapacityBar, Modal, Field, CardSkeleton,
@@ -30,17 +30,32 @@ export function ClassManage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [invites, setInvites] = useState<CoTeacherInvitation[]>([]);
 
   const load = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await classMgmtApi.list();
+      const [res, invRes] = await Promise.all([
+        classMgmtApi.list(),
+        classMgmtApi.myCoTeacherInvitations().catch(() => ({ data: [] })),
+      ]);
       setClasses(res.data || []);
+      setInvites(invRes?.data || []);
     } catch {
       setError("Không thể tải danh sách lớp. Vui lòng thử lại.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const respondInvite = async (inv: CoTeacherInvitation, action: "accept" | "decline") => {
+    try {
+      await classMgmtApi.respondCoTeacherInvitation(inv.id, action);
+      toast.success(action === "accept" ? "Đã nhận cùng quản lý lớp." : "Đã từ chối lời mời.");
+      load();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || "Không thực hiện được.");
     }
   };
 
@@ -131,6 +146,39 @@ export function ClassManage() {
     <div className="p-6 sm:p-8 min-h-screen bg-[#F9FAFB]">
       {Header}
 
+      {invites.length > 0 && (
+        <div className="mb-6 space-y-3">
+          {invites.map((inv) => {
+            const m = ageMeta(inv.class.age_group || "");
+            return (
+              <div key={inv.id} className="bg-white rounded-2xl border border-teal-200 ring-1 ring-teal-50 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cm-rise">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-teal-50 ring-1 ring-teal-100 flex items-center justify-center shrink-0">
+                    <UserCog className="w-5 h-5 text-[#0D9488]" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm text-[#374151]">
+                      <span className="font-semibold text-[#111827]">{inv.invited_by || "Một giáo viên"}</span> mời bạn cùng quản lý lớp{" "}
+                      <span className="font-semibold text-[#111827]">{inv.class.cName}</span>
+                      <span className={`ml-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold ${m.pill}`}>{m.label}</span>
+                    </p>
+                    {inv.message && <p className="text-xs text-[#6B7280] mt-1 italic">"{inv.message}"</p>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={() => respondInvite(inv, "decline")} className={`${btnGhost} px-3 py-2`}>
+                    <X className="w-4 h-4" /> Từ chối
+                  </button>
+                  <button onClick={() => respondInvite(inv, "accept")} className={`${btnPrimary} px-3 py-2`}>
+                    <Check className="w-4 h-4" /> Chấp nhận
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {classes.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-2xl border border-gray-200 cm-rise">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-teal-50 rounded-full mb-4 ring-1 ring-teal-100">
@@ -177,6 +225,11 @@ export function ClassManage() {
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500 cm-dot-pulse" /> Chờ bàn giao
                     </span>
                   )}
+                  {c.is_owner === false && (
+                    <span className="inline-flex items-center gap-1.5 mb-3 px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-50 text-[#0F766E] ring-1 ring-teal-200">
+                      <UserCog className="w-3 h-3" /> Đồng quản lý
+                    </span>
+                  )}
 
                   {c.cDescription && <p className="text-sm text-[#6B7280] mb-4 line-clamp-2">{c.cDescription}</p>}
 
@@ -200,12 +253,20 @@ export function ClassManage() {
                       Quản lý lớp
                     </button>
                     <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openEdit(c)} aria-label="Sửa lớp" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                        <Pencil className="w-4 h-4 text-[#6B7280]" />
-                      </button>
-                      <button onClick={() => remove(c)} aria-label="Xóa lớp" className="p-2 hover:bg-red-50 rounded-lg transition-colors">
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      </button>
+                      {c.is_owner !== false ? (
+                        <>
+                          <button onClick={() => openEdit(c)} aria-label="Sửa lớp" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                            <Pencil className="w-4 h-4 text-[#6B7280]" />
+                          </button>
+                          <button onClick={() => remove(c)} aria-label="Xóa lớp" className="p-2 hover:bg-red-50 rounded-lg transition-colors">
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </button>
+                        </>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs text-[#9CA3AF]">
+                          <UserCog className="w-3.5 h-3.5" /> Cộng sự
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

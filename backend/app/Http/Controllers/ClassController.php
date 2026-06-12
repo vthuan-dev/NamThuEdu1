@@ -24,6 +24,26 @@ class ClassController extends Controller
      */
     private function ownedClassOrNull($user, $id)
     {
+        $class = Classes::where('cId', $id)->first();
+        if (!$class) {
+            return null;
+        }
+        if ($user->uRole === 'admin') {
+            return $class;
+        }
+        // Chủ lớp hoặc co-teacher đã chấp nhận đều được quản lý lớp.
+        if ((int) $class->cTeacher_id === (int) $user->uId) {
+            return $class;
+        }
+        if (\App\Models\ClassCoTeacher::teacherCanAccess($id, $user->uId)) {
+            return $class;
+        }
+        return null;
+    }
+
+    /** Chỉ chủ lớp (hoặc admin) — dùng cho thao tác nhạy cảm: mời/gỡ co-teacher, bàn giao. */
+    private function ownerOnlyClassOrNull($user, $id)
+    {
         $query = Classes::where('cId', $id);
         if ($user->uRole !== 'admin') {
             $query->where('cTeacher_id', $user->uId);
@@ -73,7 +93,14 @@ class ClassController extends Controller
             ], 401);
         }
 
-        $classes = Classes::where('cTeacher_id', $user->uId)
+        $coClassIds = \App\Models\ClassCoTeacher::acceptedClassIdsFor($user->uId);
+
+        $classes = Classes::where(function ($q) use ($user, $coClassIds) {
+                            $q->where('cTeacher_id', $user->uId);
+                            if (!empty($coClassIds)) {
+                                $q->orWhereIn('cId', $coClassIds);
+                            }
+                         })
                          ->orderBy('cCreated_at', 'desc')
                          ->get();
 
@@ -84,7 +111,7 @@ class ClassController extends Controller
             ->flip();
 
         // Add stats for each class
-        $classesWithStats = $classes->map(function($class) use ($pendingClassIds) {
+        $classesWithStats = $classes->map(function($class) use ($pendingClassIds, $user) {
             $count = $this->liveStudentCount($class->cId);
             return [
                 'cId' => $class->cId,
@@ -96,6 +123,7 @@ class ClassController extends Controller
                 'current_student_count' => $count,
                 'is_full' => $class->max_students ? $count >= $class->max_students : false,
                 'has_pending_handover' => $pendingClassIds->has($class->cId),
+                'is_owner' => (int) $class->cTeacher_id === (int) $user->uId,
                 'cCreated_at' => $class->cCreated_at,
             ];
         });
@@ -225,9 +253,7 @@ class ClassController extends Controller
             ], 401);
         }
 
-        $class = Classes::where('cId', $id)
-                       ->where('cTeacher_id', $user->uId)
-                       ->first();
+        $class = $this->ownedClassOrNull($user, $id);
 
         if (!$class) {
             return response()->json([
@@ -274,16 +300,42 @@ class ClassController extends Controller
             ->where('status', 'pending')
             ->first();
 
+        // Co-teachers (chấp nhận + đang mời) — kèm thông tin giáo viên.
+        $coTeachers = \App\Models\ClassCoTeacher::with(['teacher:uId,uName,uPhone,avatar_url', 'inviter:uId,uName'])
+            ->where('class_id', $id)
+            ->whereIn('status', ['accepted', 'pending'])
+            ->orderByRaw("FIELD(status,'accepted','pending')")
+            ->get()
+            ->map(function ($c) {
+                return [
+                    'id' => $c->id,
+                    'status' => $c->status,
+                    'message' => $c->message,
+                    'teacher' => [
+                        'uId' => $c->teacher->uId ?? $c->teacher_id,
+                        'uName' => $c->teacher->uName ?? null,
+                        'uPhone' => $c->teacher->uPhone ?? null,
+                        'avatar_url' => $c->teacher->avatar_url ?? null,
+                    ],
+                    'invited_by' => $c->inviter->uName ?? null,
+                    'created_at' => $c->created_at,
+                ];
+            });
+
+        $isOwner = (int) $class->cTeacher_id === (int) $user->uId || $user->uRole === 'admin';
+
         return response()->json([
             'status' => 'success',
             'data' => [
                 'class' => $class,
+                'is_owner' => $isOwner,
                 'students' => $students,
                 'student_count' => $students->count(),
                 'announcements' => $announcements,
                 'goals' => $goals,
                 'assignments' => $assignments,
                 'pending_handover' => $pendingHandover,
+                'co_teachers' => $coTeachers,
             ]
         ]);
     }
@@ -551,9 +603,7 @@ class ClassController extends Controller
             ], 401);
         }
 
-        $class = Classes::where('cId', $id)
-                       ->where('cTeacher_id', $user->uId)
-                       ->first();
+        $class = $this->ownedClassOrNull($user, $id);
 
         if (!$class) {
             return response()->json([
@@ -1001,9 +1051,7 @@ class ClassController extends Controller
             ], 401);
         }
 
-        $class = Classes::where('cId', $id)
-                       ->where('cTeacher_id', $user->uId)
-                       ->first();
+        $class = $this->ownedClassOrNull($user, $id);
 
         if (!$class) {
             return response()->json([
@@ -1224,6 +1272,217 @@ class ClassController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Đã hủy yêu cầu bàn giao.'
+        ]);
+    }
+
+    // ─── Co-teaching: mời giáo viên khác cùng quản lý lớp ──────────────
+
+    /**
+     * GET /api/teacher/colleagues
+     * Danh sách giáo viên khác (để mời cùng quản lý lớp).
+     */
+    public function colleagues(Request $request)
+    {
+        $user = $request->user();
+        if (!$user || !in_array($user->uRole, ['teacher', 'admin'])) {
+            return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 403);
+        }
+
+        $teachers = User::where('uRole', 'teacher')
+            ->where('uId', '!=', $user->uId)
+            ->whereNull('uDeleted_at')
+            ->orderBy('uName')
+            ->get(['uId', 'uName', 'uPhone', 'avatar_url']);
+
+        return response()->json(['status' => 'success', 'data' => $teachers]);
+    }
+
+    /**
+     * POST /api/teacher/classes/{id}/co-teachers
+     * Chủ lớp mời một giáo viên cùng quản lý lớp.
+     */
+    public function inviteCoTeacher(Request $request, $id)
+    {
+        $user = $request->user();
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
+        }
+
+        $class = $this->ownerOnlyClassOrNull($user, $id);
+        if (!$class) {
+            return response()->json(['status' => 'error', 'message' => 'Không tìm thấy lớp học hoặc bạn không phải chủ lớp.'], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'teacher_id' => 'required|integer',
+            'message'    => 'nullable|string|max:500',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['status' => 'error', 'message' => 'Dữ liệu không hợp lệ.', 'errors' => $validator->errors()], 400);
+        }
+
+        $teacherId = (int) $request->teacher_id;
+
+        if ($teacherId === (int) $user->uId || $teacherId === (int) $class->cTeacher_id) {
+            return response()->json(['status' => 'error', 'message' => 'Không thể mời chính chủ lớp.'], 409);
+        }
+
+        $invitee = User::where('uId', $teacherId)->where('uRole', 'teacher')->whereNull('uDeleted_at')->first();
+        if (!$invitee) {
+            return response()->json(['status' => 'error', 'message' => 'Giáo viên không tồn tại.'], 404);
+        }
+
+        $existing = ClassCoTeacher::where('class_id', $id)->where('teacher_id', $teacherId)->first();
+        if ($existing && in_array($existing->status, ['pending', 'accepted'])) {
+            $msg = $existing->status === 'accepted' ? 'Giáo viên này đã cùng quản lý lớp.' : 'Đã gửi lời mời cho giáo viên này rồi.';
+            return response()->json(['status' => 'error', 'message' => $msg], 409);
+        }
+
+        if ($existing) {
+            // Mời lại sau khi bị từ chối/gỡ.
+            $existing->update([
+                'inviter_id'   => $user->uId,
+                'status'       => 'pending',
+                'message'      => $request->message,
+                'responded_at' => null,
+            ]);
+            $invite = $existing;
+        } else {
+            $invite = ClassCoTeacher::create([
+                'class_id'   => $id,
+                'inviter_id' => $user->uId,
+                'teacher_id' => $teacherId,
+                'status'     => 'pending',
+                'message'    => $request->message,
+            ]);
+        }
+
+        try {
+            (new PushNotificationService())->sendToUsers(
+                [$teacherId],
+                '🤝 Lời mời cùng quản lý lớp',
+                "GV {$user->uName} mời bạn cùng quản lý lớp \"{$class->cName}\".",
+                ['url' => '/giao-vien/lop-hoc']
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Co-teacher invite push failed: ' . $e->getMessage());
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $invite,
+            'message' => 'Đã gửi lời mời cùng quản lý lớp.'
+        ], 201);
+    }
+
+    /**
+     * DELETE /api/teacher/classes/{id}/co-teachers/{coId}
+     * Chủ lớp gỡ co-teacher hoặc thu hồi lời mời.
+     */
+    public function removeCoTeacher(Request $request, $id, $coId)
+    {
+        $user = $request->user();
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
+        }
+
+        $class = $this->ownerOnlyClassOrNull($user, $id);
+        if (!$class) {
+            return response()->json(['status' => 'error', 'message' => 'Không tìm thấy lớp học hoặc bạn không phải chủ lớp.'], 404);
+        }
+
+        $invite = ClassCoTeacher::where('id', $coId)->where('class_id', $id)->first();
+        if (!$invite) {
+            return response()->json(['status' => 'error', 'message' => 'Không tìm thấy bản ghi.'], 404);
+        }
+
+        $invite->status = 'revoked';
+        $invite->responded_at = now();
+        $invite->save();
+
+        return response()->json(['status' => 'success', 'message' => 'Đã gỡ giáo viên khỏi việc cùng quản lý lớp.']);
+    }
+
+    /**
+     * GET /api/teacher/co-teacher-invitations
+     * Các lời mời cùng quản lý lớp đang chờ mình phản hồi.
+     */
+    public function myCoTeacherInvitations(Request $request)
+    {
+        $user = $request->user();
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
+        }
+
+        $invites = ClassCoTeacher::with(['class:cId,cName,age_group', 'inviter:uId,uName'])
+            ->where('teacher_id', $user->uId)
+            ->where('status', 'pending')
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function ($c) {
+                return [
+                    'id' => $c->id,
+                    'message' => $c->message,
+                    'invited_by' => $c->inviter->uName ?? null,
+                    'class' => [
+                        'cId' => $c->class->cId ?? $c->class_id,
+                        'cName' => $c->class->cName ?? null,
+                        'age_group' => $c->class->age_group ?? null,
+                    ],
+                    'created_at' => $c->created_at,
+                ];
+            });
+
+        return response()->json(['status' => 'success', 'data' => $invites]);
+    }
+
+    /**
+     * POST /api/teacher/co-teacher-invitations/{coId}/respond
+     * Giáo viên được mời chấp nhận hoặc từ chối.
+     */
+    public function respondCoTeacherInvitation(Request $request, $coId)
+    {
+        $user = $request->user();
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'action' => 'required|in:accept,decline',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['status' => 'error', 'message' => 'Dữ liệu không hợp lệ.', 'errors' => $validator->errors()], 400);
+        }
+
+        $invite = ClassCoTeacher::where('id', $coId)
+            ->where('teacher_id', $user->uId)
+            ->where('status', 'pending')
+            ->first();
+        if (!$invite) {
+            return response()->json(['status' => 'error', 'message' => 'Không tìm thấy lời mời đang chờ.'], 404);
+        }
+
+        $invite->status = $request->action === 'accept' ? 'accepted' : 'declined';
+        $invite->responded_at = now();
+        $invite->save();
+
+        // Báo cho chủ lớp biết kết quả.
+        try {
+            $class = Classes::where('cId', $invite->class_id)->first();
+            $verb = $request->action === 'accept' ? 'đã chấp nhận' : 'đã từ chối';
+            (new PushNotificationService())->sendToUsers(
+                [$invite->inviter_id],
+                '🤝 Phản hồi lời mời quản lý lớp',
+                "GV {$user->uName} {$verb} lời mời cùng quản lý lớp \"" . ($class->cName ?? '') . "\".",
+                ['url' => '/giao-vien/lop-hoc']
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Co-teacher respond push failed: ' . $e->getMessage());
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => $request->action === 'accept' ? 'Bạn đã nhận cùng quản lý lớp.' : 'Đã từ chối lời mời.'
         ]);
     }
 }
