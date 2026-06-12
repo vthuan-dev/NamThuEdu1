@@ -16,6 +16,7 @@ use App\Models\TestAssignment;
 use App\Models\Course;
 use App\Models\User;
 use App\Services\PushNotificationService;
+use App\Models\AdminNotification;
 
 class ClassController extends Controller
 {
@@ -538,13 +539,19 @@ class ClassController extends Controller
         ]);
 
         try {
+            AdminNotification::create([
+                'title'   => '🗑️ Yêu cầu xóa lớp',
+                'body'    => "GV {$user->uName} xin xóa lớp \"{$class->cName}\".",
+                'is_read' => false,
+            ]);
+
             $adminIds = User::where('uRole', 'admin')->whereNull('uDeleted_at')->pluck('uId')->toArray();
             if (!empty($adminIds)) {
                 (new PushNotificationService())->sendToUsers(
                     $adminIds,
                     '🗑️ Yêu cầu xóa lớp',
                     "GV {$user->uName} xin xóa lớp \"{$class->cName}\".",
-                    ['url' => '/admin/ban-giao-lop']
+                    ['url' => '/admin/quan-ly-lop']
                 );
             }
         } catch (\Exception $e) {
@@ -1232,13 +1239,20 @@ class ClassController extends Controller
 
         // R7.3: thông báo tới tất cả admin (push fire-and-forget).
         try {
+            // Bản ghi cho chuông thông báo admin (AdminNotification)
+            AdminNotification::create([
+                'title'   => '📦 Yêu cầu bàn giao lớp',
+                'body'    => "GV {$user->uName} xin bàn giao lớp \"{$class->cName}\".",
+                'is_read' => false,
+            ]);
+
             $adminIds = User::where('uRole', 'admin')->whereNull('uDeleted_at')->pluck('uId')->toArray();
             if (!empty($adminIds)) {
                 (new PushNotificationService())->sendToUsers(
                     $adminIds,
                     '📦 Yêu cầu bàn giao lớp',
                     "GV {$user->uName} xin bàn giao lớp \"{$class->cName}\".",
-                    ['url' => '/admin/ban-giao-lop']
+                    ['url' => '/admin/quan-ly-lop']
                 );
             }
         } catch (\Exception $e) {
