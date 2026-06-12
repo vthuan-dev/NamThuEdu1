@@ -164,6 +164,9 @@ export const teacherRoutes = {
     { path: "de-thi/thpt/tao-moi", Component: CreateThptExam },
     { path: "de-thi/thpt/:examId/sua", Component: CreateThptExam },
 
+    // ── Teens Listening / Speaking ──────────────────────────────────────
+    { path: "de-thi/teens/:skill/tao-moi", Component: lazy(() => import("@/app/features/teacher/exams/teens/CreateTeensExam").then(m => ({ default: m.CreateTeensExam }))) },
+
     { path: "de-thi/mau-de", Component: ExamTemplates },
     // /de-thi/cua-toi đã gộp vào /de-thi (AllExams có sẵn filter "Của tôi")
     { path: "de-thi/cua-toi", Component: () => <Navigate to="/giao-vien/de-thi" replace /> },

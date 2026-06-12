@@ -18,7 +18,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import {
   ArrowLeft, ArrowRight, CheckCircle2, Volume2, AlertTriangle,
-  Flag, Clock, ListChecks, Loader2, PenLine, Send,
+  Flag, Clock, ListChecks, Loader2, PenLine, Send, Mic, Square,
 } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
 
@@ -80,6 +80,13 @@ function formatClock(seconds: number): string {
 
 function normType(q: any): string {
   return String(q?.qType ?? '').toLowerCase();
+}
+
+// Câu hỏi dạng nói (Speaking) — học viên ghi âm, AI chấm.
+function isSpeakingQuestion(q: any): boolean {
+  const t = normType(q);
+  const sk = String(q?.qSkill ?? q?.qSection ?? '').toLowerCase();
+  return t === 'speaking' || sk === 'speaking';
 }
 
 // Đoạn đọc của câu (đọc hiểu). Rỗng nếu không phải dạng có bài đọc.
@@ -273,6 +280,112 @@ function QuestionRenderer({ q, value, onChange }:
           </button>
         );
       })}
+    </div>
+  );
+}
+
+// ─── Recorder cho câu Speaking (teens) ────────────────────────────────────────
+function TeensSpeakingRecorder({ submissionId, partNumber, prepSeconds, speakSeconds, recorded, onRecorded }:
+  { submissionId: number | null; partNumber: number; prepSeconds: number; speakSeconds: number; recorded: boolean; onRecorded: () => void }) {
+  type Phase = 'idle' | 'prep' | 'recording' | 'uploading' | 'done';
+  const [phase, setPhase] = useState<Phase>(recorded ? 'done' : 'idle');
+  const [left, setLeft] = useState(prepSeconds || speakSeconds);
+  const [denied, setDenied] = useState(false);
+  const mrRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const timerRef = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (timerRef.current) window.clearInterval(timerRef.current);
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    if (mrRef.current?.state === 'recording') mrRef.current.stop();
+  }, []);
+
+  const countdown = (secs: number, done: () => void) => {
+    setLeft(secs);
+    if (timerRef.current) window.clearInterval(timerRef.current);
+    timerRef.current = window.setInterval(() => {
+      setLeft((s) => { if (s <= 1) { if (timerRef.current) window.clearInterval(timerRef.current); done(); return 0; } return s - 1; });
+    }, 1000);
+  };
+
+  const begin = (stream: MediaStream) => {
+    chunksRef.current = [];
+    const mr = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+    mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+    mr.onstop = async () => {
+      const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+      setPhase('uploading');
+      try {
+        if (submissionId) await studentApi.uploadSpeakingAudio(submissionId, partNumber, blob);
+        setPhase('done');
+        onRecorded();
+      } catch { setPhase('idle'); }
+    };
+    mrRef.current = mr;
+    mr.start();
+    setPhase('recording');
+    countdown(speakSeconds, stop);
+  };
+
+  const stop = () => { if (timerRef.current) window.clearInterval(timerRef.current); if (mrRef.current?.state === 'recording') mrRef.current.stop(); };
+
+  const start = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      if (prepSeconds > 0) { setPhase('prep'); countdown(prepSeconds, () => begin(stream)); }
+      else begin(stream);
+    } catch { setDenied(true); }
+  };
+
+  const fmt = (s: number) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+  if (phase === 'done') {
+    return (
+      <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex items-center gap-3">
+        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+        <p className="text-sm font-semibold text-emerald-800">Đã ghi âm xong. Bài nói sẽ được AI chấm sau khi nộp.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+      {denied && (
+        <div className="mb-3 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-800">
+          <strong>Không truy cập được micro.</strong> Hãy cấp quyền và tải lại trang.
+        </div>
+      )}
+      {phase === 'idle' && !denied && (
+        <button onClick={start}
+          className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl text-white font-bold text-sm transition-transform hover:scale-[1.01] active:scale-95"
+          style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
+          <Mic className="w-4 h-4" /> {prepSeconds > 0 ? `Chuẩn bị ${prepSeconds}s rồi ghi âm` : 'Bắt đầu ghi âm'}
+        </button>
+      )}
+      {(phase === 'prep' || phase === 'recording') && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-center gap-3 py-2">
+            <Clock className={`w-5 h-5 ${phase === 'recording' ? 'text-red-600' : 'text-amber-600'}`} />
+            <span className={`text-3xl font-black tabular-nums ${phase === 'recording' ? 'text-red-600' : 'text-amber-600'}`}>{fmt(left)}</span>
+          </div>
+          <p className="text-center text-xs text-slate-500">
+            {phase === 'prep' ? 'Đang chuẩn bị — ghi âm sẽ tự bắt đầu khi hết giờ.' : 'Nói tự nhiên — sẽ tự dừng khi hết giờ.'}
+          </p>
+          {phase === 'recording' && (
+            <button onClick={stop} className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold">
+              <Square className="w-3.5 h-3.5 fill-current" /> Dừng sớm
+            </button>
+          )}
+        </div>
+      )}
+      {phase === 'uploading' && (
+        <div className="flex items-center justify-center gap-2 py-3 text-sm font-semibold text-slate-500">
+          <Loader2 className="w-4 h-4 animate-spin" /> Đang tải bài ghi âm lên…
+        </div>
+      )}
     </div>
   );
 }
@@ -618,7 +731,28 @@ export function TeensTestTaking() {
               dangerouslySetInnerHTML={{ __html: q?.qContent ?? `Câu ${current + 1}` }} />
 
             {/* Renderer theo dạng câu */}
-            <QuestionRenderer q={q} value={selected} onChange={handleAnswer} />
+            {isSpeakingQuestion(q) ? (
+              (() => {
+                let sd: any = q?.qData;
+                if (typeof sd === 'string') { try { sd = JSON.parse(sd); } catch { sd = {}; } }
+                sd = sd || {};
+                const prepSeconds = Number(sd.prepSeconds ?? 30);
+                const speakSeconds = Number(sd.speakSeconds ?? q?.qTime_limit ?? 120);
+                return (
+                  <TeensSpeakingRecorder
+                    key={qid}
+                    submissionId={submissionId}
+                    partNumber={Number(q?.qPart ?? current + 1)}
+                    prepSeconds={prepSeconds}
+                    speakSeconds={speakSeconds}
+                    recorded={String(selected).trim() !== ''}
+                    onRecorded={() => handleAnswer('[recorded]')}
+                  />
+                );
+              })()
+            ) : (
+              <QuestionRenderer q={q} value={selected} onChange={handleAnswer} />
+            )}
           </section>
 
           {/* Điều hướng dưới (desktop) */}

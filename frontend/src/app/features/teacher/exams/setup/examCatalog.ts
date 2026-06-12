@@ -31,7 +31,7 @@ export interface ExamTypeOption {
   /** key duy nhất, dùng làm id để chọn */
   value: string;
   /** loại đề kỹ thuật để truyền cho creator (VSTEP/IELTS/Cambridge/THPT/Kids/General) */
-  examType: 'VSTEP' | 'IELTS' | 'Cambridge' | 'THPT' | 'Kids' | 'General';
+  examType: 'VSTEP' | 'IELTS' | 'Cambridge' | 'THPT' | 'Kids' | 'General' | 'TeensAudio';
   name: string;
   /** Câu giới thiệu ngắn cho card chọn loại đề */
   description: string;
@@ -121,6 +121,28 @@ export const AGE_GROUP_CATALOG: AgeGroupCatalog[] = [
         ],
         needsSkill: false,
         badge: 'Mới',
+      },
+      {
+        value: 'teens-audio',
+        examType: 'TeensAudio',
+        name: 'Nghe & Nói',
+        description: 'Đề Listening (audio + trắc nghiệm) hoặc Speaking (chấm bằng AI)',
+        tagline: 'Luyện Nghe và Nói cho teen — Speaking ghi âm và chấm tự động bằng AI',
+        duration: '15 - 30 phút',
+        iconName: 'Headphones',
+        iconColor: '#0D9488',
+        themeColor: '#0D9488',
+        highlights: [
+          { iconName: 'Headphones', label: 'Listening', value: 'Audio + trắc nghiệm tự chấm' },
+          { iconName: 'Mic', label: 'Speaking', value: 'Ghi âm · AI chấm điểm' },
+          { iconName: 'Users', label: 'Đối tượng', value: 'Lớp 6 → 12' },
+        ],
+        needsSkill: true,
+        badge: 'Mới',
+        skills: [
+          { value: 'listening', label: 'Listening', description: 'Audio + câu hỏi trắc nghiệm' },
+          { value: 'speaking', label: 'Speaking', description: 'Đề nói — AI chấm điểm' },
+        ],
       },
     ],
   },
@@ -244,6 +266,11 @@ export function buildCreatorUrl(opts: {
 
     case 'THPT':
       return '/giao-vien/de-thi/thpt/tao-moi';
+
+    case 'TeensAudio': {
+      const slug = skill === 'speaking' ? 'speaking' : 'listening';
+      return `/giao-vien/de-thi/teens/${slug}/tao-moi`;
+    }
 
     case 'IELTS': {
       const slug = !skill || skill === 'mixed' ? 'full' : skill;
