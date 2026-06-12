@@ -1125,6 +1125,36 @@ class ExamController extends Controller
             $validationErrors[] = 'Đề thi phải có thời gian làm bài hợp lệ.';
         }
 
+        // BẮT BUỘC ĐÁP ÁN: mọi câu khách quan phải có đáp án đúng mới được xuất bản.
+        // Câu tự luận/nói (essay/writing/speaking) do chấm tay/AI nên bỏ qua.
+        $subjectiveTypes = ['essay', 'writing', 'speaking', 'short_writing', 'speaking_task'];
+        $exam->loadMissing('questions.answers');
+        $noAnswerKey = [];
+        foreach ($exam->questions as $q) {
+            $type = strtolower((string) $q->qType);
+            $skill = strtolower((string) ($q->qSkill ?? ''));
+            if (in_array($type, $subjectiveTypes, true) || in_array($skill, ['writing', 'speaking'], true)) {
+                continue;
+            }
+            $hasKey = false;
+            if ($q->relationLoaded('answers') && $q->answers->contains(fn($a) => (bool) $a->aIs_correct)) {
+                $hasKey = true;
+            }
+            if (!$hasKey) {
+                $d = is_array($q->qData) ? $q->qData : [];
+                foreach (['correct_answer', 'answer'] as $k) {
+                    if (isset($d[$k]) && trim((string) $d[$k]) !== '') { $hasKey = true; break; }
+                }
+                if (!$hasKey && !empty($d['correct_answers'])) $hasKey = true;
+                if (!$hasKey && !empty($d['accepted_answers'])) $hasKey = true;
+            }
+            if (!$hasKey) $noAnswerKey[] = $q->qSection_order ?? $q->qId;
+        }
+        if (!empty($noAnswerKey)) {
+            $shown = implode(', ', array_slice($noAnswerKey, 0, 20)) . (count($noAnswerKey) > 20 ? '…' : '');
+            $validationErrors[] = "Còn câu chưa có đáp án đúng (câu {$shown}). Phải nhập đáp án cho TẤT CẢ câu khách quan mới xuất bản được.";
+        }
+
         if (!empty($validationErrors)) {
             return response()->json([
                 'status' => 'error',

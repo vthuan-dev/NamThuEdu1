@@ -239,6 +239,19 @@ class IeltsExamController extends Controller
             );
         }
 
+        // BẮT BUỘC ĐÁP ÁN: Listening & Reading toàn câu khách quan → mọi câu phải có
+        // đáp án đúng mới được xuất bản. Writing/Speaking do chấm tay/AI nên bỏ qua.
+        if (in_array($skill, ['listening', 'reading'], true)) {
+            $missing = $this->ieltsMissingAnswers($data);
+            if (!empty($missing)) {
+                $shown = implode(', ', array_slice($missing, 0, 20)) . (count($missing) > 20 ? '…' : '');
+                return $this->errorResponse(
+                    "Không thể xuất bản: còn {$shown} câu chưa có đáp án đúng. Vui lòng nhập đáp án cho TẤT CẢ câu hỏi trước khi xuất bản.",
+                    422
+                );
+            }
+        }
+
         try {
             // Wrap data theo format mà IELTSService expect (full structure với 4 skills)
             // Vì service hiện tại dùng publishIeltsExam(exam, testType, fullData)
@@ -564,6 +577,32 @@ class IeltsExamController extends Controller
 
         $items = $data[$key] ?? (is_array($data) ? $data : []);
         return is_array($items) && count($items) > 0;
+    }
+
+    /**
+     * Quét đệ quy mọi mảng "questions" trong dữ liệu IELTS và trả về danh sách
+     * số câu (questionNumber) CHƯA có đáp án đúng (correctAnswer rỗng).
+     * Dùng cho Listening/Reading khi xuất bản — đề không có đáp án thì không cho publish.
+     */
+    private function ieltsMissingAnswers(array $data): array
+    {
+        $missing = [];
+        $walk = function ($node) use (&$walk, &$missing) {
+            if (!is_array($node)) return;
+            foreach ($node as $key => $val) {
+                if ($key === 'questions' && is_array($val)) {
+                    foreach ($val as $i => $q) {
+                        if (!is_array($q)) continue;
+                        $qn = $q['questionNumber'] ?? ($i + 1);
+                        $ca = trim((string) ($q['correctAnswer'] ?? ''));
+                        if ($ca === '') $missing[] = $qn;
+                    }
+                }
+                if (is_array($val)) $walk($val);
+            }
+        };
+        $walk($data);
+        return $missing;
     }
 
     /**

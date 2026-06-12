@@ -682,42 +682,124 @@ class ThptExamController extends Controller
             return $errors;
         }
 
+        // Một "đáp án" hợp lệ: chuỗi/giá trị khác rỗng (id A/B/C/D), hoặc
+        // mảng accepted_answers có ít nhất 1 phần tử khác rỗng.
+        $hasId = fn($v) => $v !== null && trim((string) $v) !== '';
+        $hasAccepted = function ($arr): bool {
+            if (!is_array($arr)) return false;
+            foreach ($arr as $a) { if (trim((string) $a) !== '') return true; }
+            return false;
+        };
+
         foreach ($sections as $idx => $s) {
             $label = ($s['title'] ?? ('Phần ' . ($idx + 1)));
             $type = $s['type'] ?? null;
+            $items = $s['items'] ?? [];
+            $qlabel = fn($it, $i) => 'câu ' . ($it['question_number'] ?? ($i + 1));
+
             switch ($type) {
                 case 'phonetics':
                 case 'mc_questions':
-                case 'word_form':
                 case 'error_identification':
-                case 'sentence_transformation':
-                case 'matching':
-                    if (empty($s['items'])) {
-                        $errors[] = "{$label}: chưa có câu hỏi nào.";
+                    if (empty($items)) { $errors[] = "{$label}: chưa có câu hỏi nào."; break; }
+                    foreach ($items as $i => $it) {
+                        if (!$hasId($it['correct_id'] ?? null)) {
+                            $errors[] = "{$label} ({$qlabel($it, $i)}): chưa chọn đáp án đúng.";
+                        }
                     }
                     break;
+
+                case 'word_form':
+                    if (empty($items)) { $errors[] = "{$label}: chưa có câu hỏi nào."; break; }
+                    foreach ($items as $i => $it) {
+                        if (!$hasAccepted($it['accepted_answers'] ?? null)) {
+                            $errors[] = "{$label} ({$qlabel($it, $i)}): chưa nhập đáp án đúng.";
+                        }
+                    }
+                    break;
+
+                case 'sentence_transformation':
+                    if (empty($items)) { $errors[] = "{$label}: chưa có câu hỏi nào."; break; }
+                    foreach ($items as $i => $it) {
+                        if (!$hasAccepted($it['accepted_answers'] ?? null)) {
+                            $errors[] = "{$label} ({$qlabel($it, $i)}): chưa nhập đáp án chấp nhận.";
+                        }
+                    }
+                    break;
+
+                case 'matching':
+                    if (empty($items)) { $errors[] = "{$label}: chưa có câu hỏi nào."; break; }
+                    foreach ($items as $i => $it) {
+                        $ans = $it['answers'] ?? [];
+                        $missing = false;
+                        foreach (['1', '2', '3', '4'] as $k) {
+                            if (!$hasId($ans[$k] ?? null)) { $missing = true; break; }
+                        }
+                        if ($missing) $errors[] = "{$label} ({$qlabel($it, $i)}): chưa nối đủ đáp án.";
+                    }
+                    break;
+
                 case 'listening':
                     if (empty($s['audio_url'])) $errors[] = "{$label}: chưa có audio.";
-                    if (empty($s['items'])) $errors[] = "{$label}: chưa có câu hỏi nào.";
-                    break;
-                case 'speaking':
-                    if (empty($s['items'])) $errors[] = "{$label}: chưa có đề nói nào.";
-                    break;
-                case 'tf_group':
-                    if (empty($s['items'])) {
-                        $errors[] = "{$label}: chưa có câu hỏi nào.";
+                    if (empty($items)) { $errors[] = "{$label}: chưa có câu hỏi nào."; break; }
+                    foreach ($items as $i => $it) {
+                        if (!$hasId($it['correct_id'] ?? null)) {
+                            $errors[] = "{$label} ({$qlabel($it, $i)}): chưa chọn đáp án đúng.";
+                        }
                     }
                     break;
+
+                case 'speaking':
+                    // Phần Nói do AI chấm — không cần đáp án.
+                    if (empty($items)) $errors[] = "{$label}: chưa có đề nói nào.";
+                    break;
+
+                case 'tf_group':
+                    if (empty($items)) { $errors[] = "{$label}: chưa có câu hỏi nào."; break; }
+                    foreach ($items as $i => $it) {
+                        if (empty($it['statements'])) {
+                            $errors[] = "{$label} ({$qlabel($it, $i)}): chưa có mệnh đề Đúng/Sai.";
+                        }
+                    }
+                    break;
+
                 case 'reading_mixed':
                     if (empty($s['passage'])) $errors[] = "{$label}: thiếu đoạn văn.";
-                    if (empty($s['items'])) $errors[] = "{$label}: chưa có câu hỏi nào.";
+                    if (empty($items)) { $errors[] = "{$label}: chưa có câu hỏi nào."; break; }
+                    foreach ($items as $i => $it) {
+                        $kind = $it['kind'] ?? 'mc';
+                        if ($kind === 'tf_group') {
+                            if (empty($it['statements'])) $errors[] = "{$label} ({$qlabel($it, $i)}): chưa có mệnh đề Đúng/Sai.";
+                        } else {
+                            // mc / sentence_insertion → cần correct_id / correct
+                            if (!$hasId($it['correct_id'] ?? null) && !$hasId($it['correct'] ?? null)) {
+                                $errors[] = "{$label} ({$qlabel($it, $i)}): chưa chọn đáp án đúng.";
+                            }
+                        }
+                    }
                     break;
+
                 case 'mc_cloze':
+                    if (empty($s['passage'])) $errors[] = "{$label}: thiếu đoạn văn.";
+                    if (empty($s['blanks'])) { $errors[] = "{$label}: chưa có chỗ trống nào."; break; }
+                    foreach (($s['blanks'] ?? []) as $i => $b) {
+                        if (!$hasId($b['correct_id'] ?? null)) {
+                            $errors[] = "{$label} (chỗ trống " . ($b['question_number'] ?? ($i + 1)) . "): chưa chọn đáp án đúng.";
+                        }
+                    }
+                    break;
+
                 case 'word_bank_cloze':
                 case 'open_cloze':
                     if (empty($s['passage'])) $errors[] = "{$label}: thiếu đoạn văn.";
-                    if (empty($s['blanks'])) $errors[] = "{$label}: chưa có chỗ trống nào.";
+                    if (empty($s['blanks'])) { $errors[] = "{$label}: chưa có chỗ trống nào."; break; }
+                    foreach (($s['blanks'] ?? []) as $i => $b) {
+                        if (!$hasAccepted($b['accepted_answers'] ?? null)) {
+                            $errors[] = "{$label} (chỗ trống " . ($b['question_number'] ?? ($i + 1)) . "): chưa nhập đáp án đúng.";
+                        }
+                    }
                     break;
+
                 default:
                     $errors[] = "{$label}: loại phần không hợp lệ ({$type}).";
             }
