@@ -42,35 +42,33 @@ const values = [
   },
 ];
 
-const team = [
+const commitments = [
   {
-    name: "Cô Nam Thu",
-    role: "Sáng lập & Giám đốc học thuật",
-    desc: "Hơn 10 năm kinh nghiệm luyện thi IELTS và VSTEP. Tốt nghiệp Đại học Ngoại ngữ Hà Nội.",
-    initials: "NT",
-    gradient: "from-orange-400 to-amber-500",
+    Icon: GraduationCap,
+    title: "Bám sát chuẩn chính thức",
+    desc: "Đề thi được xây dựng theo đúng cấu trúc VSTEP, Cambridge YLE và IELTS — phản ánh sát định dạng bài thi thật.",
   },
   {
-    name: "Thầy Minh Khoa",
-    role: "Trưởng nhóm VSTEP",
-    desc: "Chuyên gia VSTEP B2–C1, tác giả nhiều tài liệu luyện thi được sử dụng rộng rãi.",
-    initials: "MK",
-    gradient: "from-slate-500 to-slate-700",
+    Icon: Target,
+    title: "Chấm điểm minh bạch",
+    desc: "Mỗi bài làm có kết quả chi tiết từng câu, hiển thị rõ đúng/sai và đáp án chuẩn — không chấm cảm tính.",
   },
   {
-    name: "Cô Hà Linh",
-    role: "Giáo viên IELTS",
-    desc: "IELTS 8.5, chuyên Writing & Speaking. Đào tạo hơn 500 học viên đạt band 6.5+.",
-    initials: "HL",
-    gradient: "from-orange-500 to-red-400",
+    Icon: TrendingUp,
+    title: "Lộ trình cá nhân hóa",
+    desc: "Hệ thống theo dõi tiến độ và phân tích điểm yếu, gợi ý nội dung luyện tập phù hợp với từng học viên.",
   },
   {
-    name: "Thầy Bảo Long",
-    role: "Giáo viên thiếu niên",
-    desc: "Chuyên biệt Cambridge Young Learners, Cambridge KET/PET. Yêu trẻ, tận tâm.",
-    initials: "BL",
-    gradient: "from-amber-400 to-orange-500",
+    Icon: Heart,
+    title: "Đồng hành tận tâm",
+    desc: "Giáo viên hỗ trợ trực tiếp, phản hồi nhanh và sẵn sàng giải đáp trong suốt quá trình học.",
   },
+];
+
+const trustBadges = [
+  { Icon: BookOpen, label: "Nội dung biên soạn bởi giáo viên giàu kinh nghiệm" },
+  { Icon: Zap, label: "Cập nhật theo định dạng đề thi mới nhất" },
+  { Icon: Award, label: "Thông tin học viên được bảo mật" },
 ];
 
 export function AboutPage() {
@@ -216,37 +214,45 @@ export function AboutPage() {
           </div>
         </section>
 
-        {/* ── TEAM ─────────────────────────────────────────────────────────── */}
+        {/* ── CAM KẾT & UY TÍN ─────────────────────────────────────────────── */}
         <section className="px-4 py-16">
           <div className="mx-auto max-w-6xl">
             <div className="mb-10 text-center">
               <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-orange-500">
-                Đội ngũ
+                Cam kết của chúng tôi
               </p>
               <h2 className="text-2xl font-bold text-slate-900 md:text-3xl">
-                Những người đồng hành cùng bạn
+                Vì sao học viên tin tưởng NamThuEdu
               </h2>
-              <p className="mx-auto mt-3 max-w-lg text-sm text-slate-500">
-                Đội ngũ giáo viên giàu kinh nghiệm, tận tâm và luôn sẵn sàng hỗ trợ bạn đạt mục tiêu.
+              <p className="mx-auto mt-3 max-w-xl text-sm text-slate-500">
+                Chúng tôi đặt chất lượng học thuật và sự minh bạch lên hàng đầu — để mỗi giờ học của bạn đều thực sự hiệu quả.
               </p>
             </div>
 
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              {team.map(({ name, role, desc, initials, gradient }) => (
+              {commitments.map(({ Icon, title, desc }) => (
                 <div
-                  key={name}
-                  className="flex flex-col items-center rounded-xl border border-gray-200 bg-white p-6 text-center shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md"
+                  key={title}
+                  className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md"
                 >
-                  {/* Avatar */}
-                  <div
-                    className={`mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br ${gradient} text-lg font-bold text-white shadow-md`}
-                  >
-                    {initials}
+                  <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-orange-50">
+                    <Icon className="h-5 w-5 text-orange-500" />
                   </div>
-                  <h3 className="mb-0.5 text-sm font-bold text-slate-900">{name}</h3>
-                  <p className="mb-3 text-xs font-medium text-orange-500">{role}</p>
-                  <div className="mb-4 h-px w-full bg-gray-100" />
-                  <p className="text-xs leading-relaxed text-slate-500">{desc}</p>
+                  <h3 className="mb-2 text-base font-bold text-slate-900">{title}</h3>
+                  <p className="text-sm leading-relaxed text-slate-500">{desc}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Trust strip */}
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              {trustBadges.map(({ Icon, label }) => (
+                <div
+                  key={label}
+                  className="inline-flex items-center gap-2.5 rounded-full border border-gray-200 bg-white px-4 py-2 shadow-sm"
+                >
+                  <Icon className="h-4 w-4 flex-shrink-0 text-orange-500" />
+                  <span className="text-xs font-medium text-slate-600">{label}</span>
                 </div>
               ))}
             </div>
