@@ -1,5 +1,7 @@
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { getFullMediaUrl } from "../../../../utils/mediaUtils";
 
 /** Shared, on-theme UI primitives for the teacher class-management screens.
  *  Calm palette: neutral surfaces + a single teal accent, soft semantic tints. */
@@ -20,17 +22,32 @@ export function ageMeta(group?: string) {
   return AGE_META[group || ""] || { label: group || "—", pill: "bg-gray-100 text-gray-600 ring-1 ring-gray-200", bar: "#9CA3AF", soft: "bg-gray-50" };
 }
 
-/** Initials avatar — quiet, monochrome with a subtle teal tint. */
-export function Avatar({ name, size = 40 }: { name?: string; size?: number }) {
+/** Initials avatar with optional real photo. Falls back to initials on missing/broken image. */
+export function Avatar({ name, size = 40, src }: { name?: string; size?: number; src?: string | null }) {
+  const [failed, setFailed] = useState(false);
   const initials = (name || "?")
     .trim()
     .split(/\s+/)
     .slice(-2)
     .map((w) => w[0]?.toUpperCase() || "")
     .join("");
+  const resolved = src ? getFullMediaUrl(src) : null;
+
+  if (resolved && !failed) {
+    return (
+      <img
+        src={resolved}
+        alt={name || "avatar"}
+        onError={() => setFailed(true)}
+        className="rounded-full object-cover ring-1 ring-black/5 shrink-0 bg-teal-50"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+
   return (
     <div
-      className="flex items-center justify-center rounded-full bg-teal-50 text-[#0F766E] font-semibold ring-1 ring-teal-100 shrink-0"
+      className="flex items-center justify-center rounded-full bg-gradient-to-br from-teal-100 to-teal-50 text-[#0F766E] font-semibold ring-1 ring-teal-100 shrink-0"
       style={{ width: size, height: size, fontSize: size * 0.36 }}
       aria-hidden="true"
     >
@@ -77,7 +94,7 @@ export function Modal({
   }, [open, onClose]);
 
   if (!open) return null;
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 cm-backdrop-in"
       onMouseDown={onClose}
@@ -102,7 +119,8 @@ export function Modal({
         <div className="px-6 py-5 overflow-y-auto">{children}</div>
         {footer && <div className="flex gap-3 px-6 py-4 border-t border-gray-100">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

@@ -214,9 +214,19 @@ function HandoverButton({ classId, pending, onChanged }: { classId: number; pend
           </>
         }
       >
-        <p className="text-sm text-[#6B7280] mb-3">Yêu cầu sẽ được gửi tới admin để chỉ định giáo viên tiếp nhận lớp.</p>
-        <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="Lý do (không bắt buộc)"
-          className={`${inputClass} resize-none`} />
+        <div className="text-center mb-5">
+          <div className="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-50 to-white ring-1 ring-amber-100 flex items-center justify-center mb-3">
+            <ArrowRightLeft className="w-7 h-7 text-amber-600" />
+          </div>
+          <p className="text-sm text-[#374151] leading-relaxed max-w-sm mx-auto">
+            Yêu cầu sẽ được gửi tới <span className="font-semibold text-[#111827]">admin</span> để chỉ định giáo viên tiếp nhận.
+            Bạn vẫn quản lý lớp bình thường cho đến khi admin duyệt.
+          </p>
+        </div>
+        <Field label="Lý do bàn giao" hint="Không bắt buộc — nêu lý do giúp admin xử lý nhanh hơn.">
+          <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="VD: Chuyển công tác, thay đổi lịch dạy..."
+            className={`${inputClass} resize-none`} />
+        </Field>
       </Modal>
     </>
   );
@@ -293,7 +303,7 @@ function RosterTab({ classId, students, max, ageGroup, onChanged, toast }: any) 
           {students.map((s: ClassStudent, i: number) => (
             <div key={s.uId} className={`flex items-center justify-between px-4 sm:px-5 py-3 hover:bg-gray-50/70 transition-colors ${i > 0 ? "border-t border-gray-100" : ""}`}>
               <div className="flex items-center gap-3 min-w-0">
-                <Avatar name={s.uName} />
+                <Avatar name={s.uName} src={s.avatar_url} />
                 <div className="min-w-0">
                   <p className="font-semibold text-[#111827] truncate">{s.uName}</p>
                   <p className="text-sm text-[#6B7280]">{s.uPhone || "—"}</p>
@@ -365,7 +375,7 @@ function RosterTab({ classId, students, max, ageGroup, onChanged, toast }: any) 
                 <input type="checkbox" checked={checked}
                   onChange={(e) => setPicked(e.target.checked ? [...picked, s.uId] : picked.filter((x) => x !== s.uId))}
                   className="w-4 h-4 rounded accent-[#0D9488]" />
-                <Avatar name={s.uName} size={32} />
+                <Avatar name={s.uName} size={32} src={s.avatar_url} />
                 <span className="flex-1 text-sm font-medium text-[#111827]">{s.uName}</span>
                 {s.uPhone && <span className="text-xs text-[#9CA3AF] tabular-nums">{s.uPhone}</span>}
               </label>

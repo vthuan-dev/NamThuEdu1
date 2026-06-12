@@ -240,7 +240,7 @@ class ClassController extends Controller
         $students = User::where('uRole', 'student')
                        ->where('class_id', $id)
                        ->whereNull('uDeleted_at')
-                       ->get(['uId', 'uName', 'uPhone', 'uDoB', 'age_group']);
+                       ->get(['uId', 'uName', 'uPhone', 'uDoB', 'age_group', 'avatar_url']);
 
         $announcements = ClassAnnouncement::where('class_id', $id)
             ->orderByDesc('is_pinned')

@@ -23,6 +23,7 @@ export interface ClassStudent {
   uName: string;
   uPhone?: string;
   age_group?: string;
+  avatar_url?: string | null;
 }
 
 export interface ClassAnnouncement {
