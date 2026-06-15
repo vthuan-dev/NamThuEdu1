@@ -1,4 +1,5 @@
 import { api } from './api';
+import { getAuthToken } from '../utils/authStorage';
 
 export interface TestAssignment {
   assignment_id: number;
@@ -199,6 +200,19 @@ export interface BrowseTeensExam {
   score: number | null;
 }
 
+/**
+ * Một câu trả lời gửi kèm các endpoint /draft và /auto-submit.
+ * Tuỳ dạng đề mà chỉ một trong các trường giá trị được set.
+ */
+export interface DraftAnswer {
+  question_id: number;
+  answer_id?: number | null;
+  answer_text?: string | null;
+  saAnswer_text?: string | null;
+}
+
+export type AutoSubmitReason = 'unload' | 'timeout' | 'manual_force';
+
 export const studentApi = {
   // Tests — always real backend
   getTests: (params?: { status?: string; type?: string; skill?: string }) =>
@@ -248,6 +262,85 @@ export const studentApi = {
 
   submitTest: (submissionId: number) =>
     api.post(`/student/tests/${submissionId}/submit`),
+
+  // ─── Auto-save / auto-submit (defense-in-depth, Phase 2) ────────────────
+  /**
+   * Batch upsert nhiều đáp án trong một request. Idempotent.
+   * BE cập nhật `last_activity_at = now()` và trả về `timeRemaining` server-truth.
+   */
+  saveDraft: (submissionId: number, answers: DraftAnswer[]) =>
+    api.post<{
+      status: string;
+      savedCount: number;
+      serverTime: string;
+      timeRemaining: number;
+    }>(`/student/tests/${submissionId}/draft`, { answers }),
+
+  /**
+   * Ping nhỏ để cập nhật `last_activity_at`. Trả về `timeRemaining`,
+   * `serverTime` để FE hiệu chỉnh đồng hồ. BE tự auto-submit nếu hết giờ.
+   */
+  heartbeat: (submissionId: number) =>
+    api.post<{
+      status: string;
+      timeRemaining: number;
+      serverTime: string;
+    }>(`/student/tests/${submissionId}/heartbeat`),
+
+  /**
+   * Mục tiêu của `pagehide` / `visibilitychange === hidden`.
+   *
+   * Ưu tiên `fetch(..., { keepalive: true })` để giữ được header Authorization
+   * (sendBeacon không gửi custom headers). Fallback sang `navigator.sendBeacon`
+   * với token đính kèm dạng query khi `keepalive` không khả dụng.
+   *
+   * Trả về `true` nếu đã enqueue thành công (không đảm bảo BE xử lý xong).
+   */
+  autoSubmitOnUnload: (
+    submissionId: number,
+    payload: { reason: AutoSubmitReason; answers?: DraftAnswer[] },
+  ): boolean => {
+    try {
+      const baseUrl =
+        (import.meta.env.VITE_API_URL as string | undefined) ||
+        (import.meta.env.VITE_API_BASE_URL as string | undefined) ||
+        '';
+      const url = `${baseUrl}/student/tests/${submissionId}/auto-submit`;
+      const token = getAuthToken();
+      const body = JSON.stringify(payload);
+
+      // Đường ưu tiên: fetch keepalive — preserved trên Chromium/Firefox/Safari.
+      if (typeof fetch === 'function') {
+        try {
+          void fetch(url, {
+            method: 'POST',
+            keepalive: true,
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body,
+          }).catch(() => undefined);
+          return true;
+        } catch {
+          /* fall through */
+        }
+      }
+
+      // Fallback: sendBeacon — không có custom headers, token đi qua query.
+      if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+        const beaconUrl = token ? `${url}?token=${encodeURIComponent(token)}` : url;
+        const blob = new Blob([body], { type: 'application/json' });
+        return navigator.sendBeacon(beaconUrl, blob);
+      }
+      return false;
+    } catch (err) {
+      console.warn('[studentApi.autoSubmitOnUnload] failed', err);
+      return false;
+    }
+  },
 
   // Practice
   getPracticeTopics: () =>

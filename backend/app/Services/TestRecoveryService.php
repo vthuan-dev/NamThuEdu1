@@ -3,105 +3,86 @@
 namespace App\Services;
 
 use App\Models\Submission;
-use App\Models\Question;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * TestRecoveryService
+ *
+ * Cron-based recovery cho các bài thi đang in_progress nhưng đã:
+ *   1. Hết thời gian thi (start_time + duration < now)         → reason = timeout
+ *   2. "Câm" quá ngưỡng INACTIVITY_THRESHOLD_MIN phút           → reason = inactive
+ *
+ * Toàn bộ logic chấm + cập nhật trạng thái đã được tách ra
+ * {@see ExamAutoSubmitService} để dùng chung với sendBeacon endpoint.
+ */
 class TestRecoveryService
 {
     /**
-     * Kiểm tra và xử lý các bài thi bị gián đoạn
-     * Chạy định kỳ bằng cron job
+     * Kiểm tra và xử lý các bài thi bị gián đoạn.
+     * Chạy định kỳ bằng cron job (every minute).
+     *
+     * @return array ['timeout' => int, 'inactive' => int, 'failed' => int]
      */
-    public static function handleInterruptedTests()
+    public static function handleInterruptedTests(): array
     {
-        // Tìm các submission đang in_progress quá thời gian cho phép
-        $interruptedSubmissions = Submission::with(['exam', 'answers'])
+        $threshold = ExamAutoSubmitService::INACTIVITY_THRESHOLD_MIN;
+
+        // 1) Hết giờ thi (sStart_time + eDuration_minutes < now)
+        $timeoutSubs = Submission::with(['exam.questions.answers', 'answers.question'])
             ->where('sStatus', 'in_progress')
             ->whereRaw('TIMESTAMPDIFF(MINUTE, sStart_time, NOW()) > (SELECT eDuration_minutes FROM exams WHERE eId = submissions.exam_id)')
             ->get();
 
-        $processedCount = 0;
+        // 2) Câm quá ngưỡng (last_activity_at IS NOT NULL AND > threshold)
+        // Loại trừ những bài đã match nhánh 1 để tránh double-process
+        $timeoutIds = $timeoutSubs->pluck('sId')->all();
+        $inactiveSubs = Submission::with(['exam.questions.answers', 'answers.question'])
+            ->where('sStatus', 'in_progress')
+            ->whereNotNull('last_activity_at')
+            ->whereRaw('TIMESTAMPDIFF(MINUTE, last_activity_at, NOW()) > ?', [$threshold])
+            ->when(!empty($timeoutIds), fn($q) => $q->whereNotIn('sId', $timeoutIds))
+            ->get();
 
-        foreach ($interruptedSubmissions as $submission) {
-            try {
-                self::autoSubmitExpiredTest($submission);
-                $processedCount++;
-                
-                Log::info("Auto-submitted expired test", [
+        $service = app(ExamAutoSubmitService::class);
+
+        $stats = ['timeout' => 0, 'inactive' => 0, 'failed' => 0];
+
+        foreach ($timeoutSubs as $submission) {
+            $result = $service->autoSubmit($submission, ExamAutoSubmitService::REASON_TIMEOUT);
+            if ($result['ok'] && !$result['idempotent']) {
+                $stats['timeout']++;
+                Log::info('TestRecoveryService timeout auto-submit', [
                     'submission_id' => $submission->sId,
-                    'user_id' => $submission->user_id,
-                    'exam_id' => $submission->exam_id
+                    'user_id'       => $submission->user_id,
+                    'exam_id'       => $submission->exam_id,
                 ]);
-                
-            } catch (\Exception $e) {
-                Log::error("Failed to auto-submit expired test", [
-                    'submission_id' => $submission->sId,
-                    'error' => $e->getMessage()
-                ]);
+            } elseif (!$result['ok']) {
+                $stats['failed']++;
             }
         }
 
-        return $processedCount;
-    }
-
-    /**
-     * Tự động nộp bài thi hết thời gian
-     */
-    private static function autoSubmitExpiredTest($submission)
-    {
-        DB::beginTransaction();
-        try {
-            // Tự động chấm điểm các câu đã trả lời
-            $totalScore = 0;
-            $maxScore = 0;
-
-            foreach ($submission->answers as $submissionAnswer) {
-                $question = Question::with('answers')->find($submissionAnswer->question_id);
-                if (!$question) continue;
-
-                $correctAnswer = $question->answers->where('aIs_correct', true)->first();
-                $maxScore += $question->qPoints;
-
-                if ($correctAnswer && self::isCorrectAnswer($submissionAnswer->saAnswer_text, $correctAnswer->aContent)) {
-                    $submissionAnswer->update([
-                        'saIs_correct' => true,
-                        'saPoints_awarded' => $question->qPoints,
-                    ]);
-                    $totalScore += $question->qPoints;
-                } else {
-                    $submissionAnswer->update([
-                        'saIs_correct' => false,
-                        'saPoints_awarded' => 0,
-                    ]);
-                }
+        foreach ($inactiveSubs as $submission) {
+            $result = $service->autoSubmit($submission, ExamAutoSubmitService::REASON_INACTIVE);
+            if ($result['ok'] && !$result['idempotent']) {
+                $stats['inactive']++;
+                Log::info('TestRecoveryService inactive auto-submit', [
+                    'submission_id'    => $submission->sId,
+                    'user_id'          => $submission->user_id,
+                    'exam_id'          => $submission->exam_id,
+                    'last_activity_at' => $submission->last_activity_at,
+                ]);
+            } elseif (!$result['ok']) {
+                $stats['failed']++;
             }
-
-            // Tính điểm
-            $answeredQuestions = $submission->answers->count();
-            $totalQuestions = $submission->exam->questions->count();
-            $scorePercentage = $maxScore > 0 ? round(($totalScore / $maxScore) * 100, 2) : 0;
-
-            // Cập nhật submission
-            $submission->update([
-                'sSubmit_time' => now(),
-                'sGraded_time' => now(),
-                'sScore' => $scorePercentage,
-                'sStatus' => 'auto_submitted',
-                'sTeacher_feedback' => "Bài thi được tự động nộp do hết thời gian (có thể do cúp điện/mất mạng). Đã trả lời {$answeredQuestions}/{$totalQuestions} câu hỏi.",
-            ]);
-
-            DB::commit();
-            return true;
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
         }
+
+        return $stats;
     }
 
     /**
-     * Kiểm tra trạng thái bài thi của học viên
+     * Kiểm tra trạng thái bài thi của học viên.
+     * Dùng khi học viên reload trang / quay lại từ tab khác.
      */
     public static function checkStudentTestStatus($userId, $assignmentId)
     {
@@ -116,33 +97,25 @@ class TestRecoveryService
         }
 
         $timeElapsed = now()->diffInMinutes($submission->sStart_time);
-        $timeRemaining = $submission->exam->eDuration_minutes - $timeElapsed;
+        $timeRemaining = (int) $submission->exam->eDuration_minutes - $timeElapsed;
 
         if ($timeRemaining <= 0) {
-            // Tự động nộp bài hết thời gian
-            self::autoSubmitExpiredTest($submission);
+            // Tự động nộp bài hết thời gian thông qua service trung tâm
+            $submission->load(['exam.questions.answers', 'answers.question']);
+            app(ExamAutoSubmitService::class)
+                ->autoSubmit($submission, ExamAutoSubmitService::REASON_TIMEOUT);
+
             return [
-                'status' => 'auto_submitted',
-                'message' => 'Bài thi đã hết thời gian và được tự động nộp.'
+                'status'  => 'auto_submitted',
+                'message' => 'Bài thi đã hết thời gian và được tự động nộp.',
             ];
         }
 
         return [
-            'status' => 'in_progress',
+            'status'        => 'in_progress',
             'submission_id' => $submission->sId,
             'time_remaining' => $timeRemaining,
-            'can_resume' => true
+            'can_resume'    => true,
         ];
-    }
-
-    private static function normalizeAnswer($value)
-    {
-        $normalized = trim((string) $value);
-        return function_exists('mb_strtolower') ? mb_strtolower($normalized, 'UTF-8') : strtolower($normalized);
-    }
-
-    private static function isCorrectAnswer($studentAnswer, $correctAnswer)
-    {
-        return self::normalizeAnswer($studentAnswer) === self::normalizeAnswer($correctAnswer);
     }
 }

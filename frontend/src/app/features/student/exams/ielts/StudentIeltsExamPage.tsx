@@ -21,6 +21,14 @@ import { studentApi } from "../../../../../services/studentApi";
 import { api } from "../../../../../services/api";
 import { usePageTitle } from "../../../../../hooks/usePageTitle";
 import { useToastContext } from "../../../../../contexts/ToastContext";
+import { useExamSession } from "../../../../../hooks/exam/useExamSession";
+import {
+  SaveStatusIndicator,
+  OfflineBanner,
+  MultiTabWarning,
+  ResumeExamModal,
+} from "../../../../../components/exam";
+import { examDraftStorage } from "../../../../../lib/exam/examDraftStorage";
 
 import { IeltsTopBar } from "./components/IeltsTopBar";
 import { IeltsSubmitDialog } from "./components/IeltsSubmitDialog";
@@ -86,12 +94,24 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
   const [submissionId, setSubmissionId] = useState<number | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [startedAtServer, setStartedAtServer] = useState('');
+  const [resumeDraft, setResumeDraft] = useState<any>(null);
+
+  const session = useExamSession({
+    submissionId: reviewMode ? null : submissionId,
+    examId,
+    durationMinutes: 9999,
+    startedAtServer,
+    examType: 'IELTS',
+    role: 'adults',
+    enableAutoSubmitOnUnload: !reviewMode,
+  });
 
   // Skill payload (loaded per skill)
   const [payload, setPayload] = useState<any>(null);
   const [payloadLoading, setPayloadLoading] = useState(false);
 
-  // Answer state
+  // Answer state (local for display; session.setAnswer handles save layers)
   const [answers, setAnswers] = useState<AnswerMap>({});
   const [flagged, setFlagged] = useState<Record<number, boolean>>({});
 
@@ -138,6 +158,13 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
         if (typeof remainingSec === "number" && remainingSec >= 0) {
           serverRemainingRef.current = remainingSec;
         }
+        // Tính startedAtServer để useExamSession dùng cho draft/sendBeacon
+        const skillDurationSec = (TIMES[currentSkill] ?? 60) * 60;
+        const elapsed = skillDurationSec - (typeof remainingSec === 'number' ? remainingSec : skillDurationSec);
+        setStartedAtServer(new Date(Date.now() - elapsed * 1000).toISOString());
+        // Kiểm tra draft localStorage
+        const draft = examDraftStorage.load(sId);
+        if (draft && Object.keys(draft.answers).length > 0) setResumeDraft(draft);
         setSessionLoading(false);
       } catch (e: any) {
         if (cancelled) return;
@@ -283,29 +310,12 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payload]);
 
-  // ─── 4) Auto-save answer (debounced) ──────────────────────────────────
-  const saveTimers = useRef<Record<number, number>>({});
+  // ─── 4) Answer handler — dual-write: local display + session save layers
   const handleAnswer = useCallback((qId: number, value: any) => {
-    if (reviewMode) return; // Review: chỉ xem, không cho sửa
+    if (reviewMode) return;
     setAnswers((prev) => ({ ...prev, [qId]: value }));
-
-    // Debounce per question (700ms)
-    if (saveTimers.current[qId]) {
-      window.clearTimeout(saveTimers.current[qId]);
-    }
-    saveTimers.current[qId] = window.setTimeout(async () => {
-      if (!submissionId) return;
-      try {
-        const text = Array.isArray(value) ? value.join("|") : String(value ?? "");
-        await api.post(`/student/tests/${submissionId}/answer`, {
-          question_id: qId,
-          saAnswer_text: text,
-        });
-      } catch {
-        // Silently retry on next change; surface critical errors via toast in Phase 6
-      }
-    }, 700);
-  }, [submissionId, reviewMode]);
+    session.setAnswer(qId, value);
+  }, [reviewMode, session.setAnswer]);
 
   const handleToggleFlag = useCallback((qId: number) => {
     setFlagged((prev) => ({ ...prev, [qId]: !prev[qId] }));
@@ -361,6 +371,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
 
     try {
       if (submissionId) {
+        await session.flushNow().catch(() => {});
         await api.post(`/student/tests/${submissionId}/submit`, {});
       }
     } catch {
@@ -395,7 +406,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
     if (!submissionId) return;
     try {
       setSubmitting(true);
-      // Send final flush of current answer values just before submit
+      await session.flushNow().catch(() => {});
       await api.post(`/student/tests/${submissionId}/submit`, {});
 
       // Xoá deadline của skill vừa nộp để lần làm mới không dính giờ cũ
@@ -505,6 +516,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]">
+      <OfflineBanner online={session.online} pendingCount={session.pendingCount} />
       <IeltsTopBar
         candidateName={(user?.uName as string) ?? "Candidate"}
         testId={`#${examId}`}
@@ -581,6 +593,20 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
           onConfirm={handleConfirmSubmit}
           forceSubmit={forceSubmit}
         />
+      )}
+      {!reviewMode && (
+        <>
+          <div className="fixed bottom-4 right-4 z-50">
+            <SaveStatusIndicator status={session.saveStatus} lastSavedAt={session.lastSavedAt} pendingCount={session.pendingCount} />
+          </div>
+          <ResumeExamModal
+            draft={resumeDraft}
+            open={!!resumeDraft}
+            onResume={(draft) => { session.resume(draft); setResumeDraft(null); }}
+            onDiscard={() => { if (submissionId) examDraftStorage.clear(submissionId); setResumeDraft(null); }}
+          />
+          <MultiTabWarning hasOtherTab={session.hasOtherTab} position="floating" />
+        </>
       )}
     </div>
   );

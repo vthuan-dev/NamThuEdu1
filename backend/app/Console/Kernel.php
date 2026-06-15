@@ -15,9 +15,11 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        // Tự động xử lý bài thi hết thời gian mỗi 5 phút
+        // Tự động xử lý bài thi hết thời gian / "câm" quá ngưỡng — mỗi phút
+        // (delegates to TestRecoveryService → ExamAutoSubmitService cho cả 2 nhánh
+        //  timeout và inactive)
         $schedule->command('tests:process-expired')
-                 ->everyFiveMinutes()
+                 ->everyMinute()
                  ->withoutOverlapping()
                  ->runInBackground();
 

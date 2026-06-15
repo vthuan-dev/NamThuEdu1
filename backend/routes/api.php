@@ -37,6 +37,7 @@ use App\Http\Controllers\ClassAnnouncementController;
 use App\Http\Controllers\ClassGoalController;
 use App\Http\Controllers\AdminHandoverController;
 use App\Http\Controllers\StudentExamScheduleController;
+use App\Http\Controllers\StudentExamSessionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -541,6 +542,15 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         Route::post('/tests/{id}/start', [StudentTestController::class, 'start'])->where('id', '[0-9]+');
         Route::post('/tests/{submissionId}/answer', [StudentTestController::class, 'answer'])->where('submissionId', '[0-9]+')->middleware('throttle:120,1');
         Route::post('/tests/{submissionId}/submit', [StudentTestController::class, 'submit'])->where('submissionId', '[0-9]+')->middleware('throttle:30,1');
+
+        // ── Auto-save / Auto-submit session endpoints ──────────────────────────
+        // Idempotent endpoints used by the 5-layer defense-in-depth system.
+        // - draft     : debounced server-side save of in-progress answers (1.5s/5s)
+        // - heartbeat : keep last_activity_at fresh (cron uses this for inactivity)
+        // - auto-submit: called via navigator.sendBeacon on pagehide/visibilitychange
+        Route::post('/tests/{submissionId}/draft',       [StudentExamSessionController::class, 'draft'])->where('submissionId', '[0-9]+')->middleware('throttle:240,1');
+        Route::post('/tests/{submissionId}/heartbeat',   [StudentExamSessionController::class, 'heartbeat'])->where('submissionId', '[0-9]+')->middleware('throttle:120,1');
+        Route::post('/tests/{submissionId}/auto-submit', [StudentExamSessionController::class, 'autoSubmit'])->where('submissionId', '[0-9]+')->middleware('throttle:30,1');
 
         // Other dashboard endpoints
         Route::get('/recommendations/practice', [StudentTestController::class, 'practiceRecommendations']);

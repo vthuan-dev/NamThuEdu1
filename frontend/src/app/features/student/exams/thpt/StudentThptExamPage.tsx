@@ -1,8 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { api } from '../../../../../services/api';
 import { useToast } from '../../../../../hooks/useToast';
+import { useExamSession } from '../../../../../hooks/exam/useExamSession';
+import {
+  SaveStatusIndicator,
+  OfflineBanner,
+  MultiTabWarning,
+  ResumeExamModal,
+} from '../../../../../components/exam';
+import { examDraftStorage } from '../../../../../lib/exam/examDraftStorage';
 import type { ThptAnswers, ThptConfig } from './types';
 import { ThptTopBar } from './components/ThptTopBar';
 import { ThptPartNavigator } from './components/ThptPartNavigator';
@@ -21,17 +29,28 @@ export function StudentThptExamPage() {
   const [examTitle, setExamTitle] = useState('Đề thi');
   const [config, setConfig] = useState<ThptConfig | null>(null);
   const [submissionId, setSubmissionId] = useState<number | null>(null);
-  const [answers, setAnswers] = useState<ThptAnswers>({});
   const [activeIdx, setActiveIdx] = useState(0);
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const [remainingSec, setRemainingSec] = useState(0);
+  const [resumeDraft, setResumeDraft] = useState<any>(null);
+  const [startedAtServer, setStartedAtServer] = useState('');
   const [totalDurationSec, setTotalDurationSec] = useState(0);
+  const [remainingSec, setRemainingSec] = useState(0);
 
-  const startedAtRef = useRef<number | null>(null);
+  // useExamSession: localStorage layer (layer 2) + online/hasOtherTab UI only.
+  // Server save (layer 3) uses the manual saveDraft interval below because
+  // THPT answers use composite string keys incompatible with the default
+  // numeric-key serializer in useExamSession.
+  const session = useExamSession({
+    submissionId,
+    examId: examId ? parseInt(examId) : 0,
+    durationMinutes: 9999,
+    startedAtServer,
+    examType: 'THPT',
+    role: 'adults',
+    enableAutoSubmitOnUnload: true,
+  });
 
   useEffect(() => {
     let mounted = true;
@@ -55,13 +74,18 @@ export function StudentThptExamPage() {
         const startData = startRes.data?.data;
         if (!mounted || !startData) return;
 
-        setSubmissionId(startData.submission_id);
-        setAnswers(startData.submission_payload?.answers || {});
-
+        const sid = startData.submission_id;
         const startedAt = startData.sStart_time ? new Date(startData.sStart_time).getTime() : Date.now();
-        startedAtRef.current = startedAt;
+        setStartedAtServer(new Date(startedAt).toISOString());
+        setSubmissionId(sid);
         const elapsed = Math.floor((Date.now() - startedAt) / 1000);
         setRemainingSec(Math.max(0, durationMin * 60 - elapsed));
+        const restored = startData.submission_payload?.answers || {};
+        Object.entries(restored).forEach(([k, v]) => session.setAnswer(k, v));
+        if (sid) {
+          const draft = examDraftStorage.load(sid);
+          if (draft && Object.keys(draft.answers).length > 0) setResumeDraft(draft);
+        }
         setLoading(false);
       } catch (err: any) {
         setError(err?.response?.data?.message || 'Không tải được bài thi.');
@@ -73,7 +97,28 @@ export function StudentThptExamPage() {
     };
   }, [examId, assignmentId]);
 
-  // Timer
+  const handleSubmit = useCallback(async (auto = false) => {
+    if (!submissionId || !examId || isSubmitting) return;
+    if (!auto && !window.confirm('Bạn chắc chắn muốn nộp bài? Sau khi nộp sẽ không sửa được.')) return;
+    setIsSubmitting(true);
+    try {
+      // Flush last answers before final submit
+      await saveDraft().catch(() => {});
+      await api.post(`/student/thpt-exams/${examId}/submit`, {
+        submission_id: submissionId,
+        answers: session.answers,
+        final: true,
+      });
+      examDraftStorage.clear(submissionId);
+      toast.success('Đã nộp bài thành công!');
+      navigate(`/hoc-vien/ket-qua-thpt/${submissionId}`, { replace: true });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Nộp bài thất bại.');
+      setIsSubmitting(false);
+    }
+  }, [submissionId, examId, isSubmitting, session.answers, navigate, toast]);
+
+  // Manual countdown (THPT-specific; session.timeRemaining not used here)
   useEffect(() => {
     if (loading || !config) return;
     const t = window.setInterval(() => {
@@ -87,21 +132,21 @@ export function StudentThptExamPage() {
       });
     }, 1000);
     return () => window.clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, config]);
+  }, [loading, config, handleSubmit]);
 
+  // Manual server auto-save every 30s via THPT-specific endpoint
   const saveDraft = useCallback(async () => {
     if (!submissionId || !examId) return;
     try {
       await api.post(`/student/thpt-exams/${examId}/submit`, {
         submission_id: submissionId,
-        answers,
+        answers: session.answers,
         final: false,
       });
     } catch (err) {
       console.warn('[thpt] autosave failed', err);
     }
-  }, [submissionId, examId, answers]);
+  }, [submissionId, examId, session.answers]);
 
   useEffect(() => {
     if (!submissionId) return;
@@ -116,25 +161,7 @@ export function StudentThptExamPage() {
   }, [saveDraft]);
 
   const onAnswerChange = (key: string, value: boolean | string) => {
-    setAnswers((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleSubmit = async (auto = false) => {
-    if (!submissionId || !examId || isSubmitting) return;
-    if (!auto && !window.confirm('Bạn chắc chắn muốn nộp bài? Sau khi nộp sẽ không sửa được.')) return;
-    setIsSubmitting(true);
-    try {
-      await api.post(`/student/thpt-exams/${examId}/submit`, {
-        submission_id: submissionId,
-        answers,
-        final: true,
-      });
-      toast.success('Đã nộp bài thành công!');
-      navigate(`/hoc-vien/ket-qua-thpt/${submissionId}`, { replace: true });
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Nộp bài thất bại.');
-      setIsSubmitting(false);
-    }
+    session.setAnswer(key, value);
   };
 
   if (loading) {
@@ -171,6 +198,7 @@ export function StudentThptExamPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
+      <OfflineBanner online={session.online} pendingCount={session.pendingCount} />
       <ThptTopBar examTitle={examTitle} totalSeconds={remainingSec} totalDurationSec={totalDurationSec} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
@@ -179,7 +207,7 @@ export function StudentThptExamPage() {
             <SectionView
               key={activeSection.id}
               section={activeSection}
-              answers={answers}
+              answers={session.answers as ThptAnswers}
               onAnswerChange={onAnswerChange}
               submissionId={submissionId}
               mode="taking"
@@ -187,7 +215,7 @@ export function StudentThptExamPage() {
           )}
         </div>
 
-        <ThptPartNavigator config={config} answers={answers} activeIdx={activeIdx} onSectionChange={setActiveIdx} />
+        <ThptPartNavigator config={config} answers={session.answers as ThptAnswers} activeIdx={activeIdx} onSectionChange={setActiveIdx} />
       </main>
 
       <ThptBottomNav
@@ -200,6 +228,18 @@ export function StudentThptExamPage() {
         onSubmit={() => handleSubmit(false)}
         isSubmitting={isSubmitting}
       />
+      <SaveStatusIndicator
+        status={session.saveStatus}
+        lastSavedAt={session.lastSavedAt}
+        pendingCount={session.pendingCount}
+      />
+      <ResumeExamModal
+        draft={resumeDraft}
+        open={!!resumeDraft}
+        onResume={(draft) => { session.resume(draft); setResumeDraft(null); }}
+        onDiscard={() => { if (submissionId) examDraftStorage.clear(submissionId); setResumeDraft(null); }}
+      />
+      <MultiTabWarning hasOtherTab={session.hasOtherTab} position="floating" />
     </div>
   );
 }

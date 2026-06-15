@@ -29,6 +29,8 @@ class Submission extends Model
         'teacher_reviewed_at',
         'sTime_taken',
         'submission_payload',
+        'last_activity_at',
+        'auto_submit_reason',
     ];
 
     protected $attributes = [
@@ -40,6 +42,7 @@ class Submission extends Model
         'sSubmit_time' => 'datetime',
         'sGraded_time' => 'datetime',
         'teacher_reviewed_at' => 'datetime',
+        'last_activity_at' => 'datetime',
         'sScore' => 'decimal:2',
         'submission_payload' => 'array',
     ];

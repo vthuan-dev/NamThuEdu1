@@ -21,6 +21,14 @@ import {
   Flag, Clock, ListChecks, Loader2, PenLine, Send, Mic, Square,
 } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
+import { useExamSession } from '../../../../hooks/exam/useExamSession';
+import {
+  SaveStatusIndicator,
+  OfflineBanner,
+  MultiTabWarning,
+  ResumeExamModal,
+} from '../../../../components/exam';
+import { examDraftStorage } from '../../../../lib/exam/examDraftStorage';
 
 const BASE = '/hoc-vien';
 const TEAL = '#0D9488';
@@ -405,25 +413,42 @@ export function TeensTestTaking() {
 
   const [submissionId, setSubmissionId] = useState<number | null>(null);
   const [exam, setExam] = useState<any>(null);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [flagged, setFlagged] = useState<Record<string, boolean>>({});
   const [current, setCurrent] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(0);
   const [started, setStarted] = useState(false);
   const [showSubmit, setShowSubmit] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [resumeDraft, setResumeDraft] = useState<any>(null);
+  const [startedAtServer, setStartedAtServer] = useState('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cardRefs = useRef<Record<number, HTMLElement | null>>({});
+
+  const session = useExamSession({
+    submissionId,
+    examId: exam?.id ?? exam?.eId ?? (direct ? assignmentId : 0),
+    durationMinutes: exam?.eDuration_minutes ?? exam?.exam_duration ?? 30,
+    startedAtServer,
+    examType: exam?.exam_type ?? 'TEENS',
+    role: 'teens',
+    onSubmitted: (res: any) => {
+      const sid = res?.data?.data?.submissionId ?? submissionId;
+      navigate(`${BASE}/ket-qua/${sid}`);
+    },
+  });
 
   const questions: any[] = exam?.questions ?? [];
   const total = questions.length;
   const q = questions[current];
   const qid = q ? getQuestionId(q) : '';
 
-  const answeredCount = useMemo(
-    () => Object.keys(answers).filter(k => String(answers[k] ?? '').trim() !== '').length,
-    [answers]
-  );
+  const answeredCount = useMemo(() => {
+    return Object.entries(session.answers).filter(([_, v]) => {
+      if (v == null) return false;
+      if (typeof v === 'string') return v.trim() !== '';
+      if (typeof v === 'object') return Object.keys(v as object).length > 0;
+      return true;
+    }).length;
+  }, [session.answers]);
 
   const startMutation = useMutation({
     mutationFn: async () => {
@@ -445,29 +470,27 @@ export function TeensTestTaking() {
         setLoadError('Không tải được bài thi. Vui lòng thử lại.');
         return;
       }
-      setSubmissionId(data?.submissionId ?? querySubmissionId ?? null);
-      setExam(fetchedExam);
-      const restored = mapSavedAnswers(data?.savedAnswers);
-      if (Object.keys(restored).length) setAnswers(restored);
+      const sid = data?.submissionId ?? querySubmissionId ?? null;
       const mins = Number(data?.timeRemaining ?? 0);
       const dur = Number(fetchedExam?.eDuration_minutes ?? fetchedExam?.exam_duration ?? 30);
-      setTimeLeft((mins > 0 ? mins : dur) * 60);
+      setStartedAtServer(new Date(Date.now() - (dur - mins) * 60_000).toISOString());
+      setSubmissionId(sid);
+      setExam(fetchedExam);
+      if (sid) {
+        const restored = mapSavedAnswers(data?.savedAnswers);
+        if (Object.keys(restored).length) {
+          Object.entries(restored).forEach(([qid, val]) => session.setAnswer(qid, val));
+        }
+        const draft = examDraftStorage.load(sid);
+        if (draft && Object.keys(draft.answers).length > 0) setResumeDraft(draft);
+      }
       setStarted(true);
     },
     onError: () => setLoadError('Không kết nối được máy chủ. Vui lòng tải lại trang.'),
   });
 
-  const saveAnswerMutation = useMutation({
-    mutationFn: (p: { question_id: number; saAnswer_text: string }) =>
-      studentApi.saveAnswer(submissionId!, { question_id: p.question_id, saAnswer_text: p.saAnswer_text } as any),
-  });
-
   const submitMutation = useMutation({
-    mutationFn: () => studentApi.submitTest(submissionId!),
-    onSuccess: (res: any) => {
-      const sid = res?.data?.data?.submissionId ?? submissionId;
-      navigate(`${BASE}/ket-qua/${sid}`);
-    },
+    mutationFn: () => session.submit(),
     onError: () => setLoadError('Chưa nộp được bài. Vui lòng thử lại.'),
   });
 
@@ -476,34 +499,19 @@ export function TeensTestTaking() {
     startMutation.mutate();
   }, [autoStart, started, startMutation]);
 
-  useEffect(() => {
-    if (!started || timeLeft <= 0) return;
-    const timer = setInterval(() => {
-      setTimeLeft(s => {
-        if (s <= 1) { clearInterval(timer); submitMutation.mutate(); return 0; }
-        return s - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [started, timeLeft, submitMutation]);
+  const { setAnswer: setSessionAnswer } = session;
 
   const handleAnswer = useCallback((value: string) => {
     if (!q) return;
-    setAnswers(prev => ({ ...prev, [qid]: value }));
-    if (submissionId && q?.qId) {
-      saveAnswerMutation.mutate({ question_id: Number(q.qId), saAnswer_text: value });
-    }
-  }, [q, qid, submissionId, saveAnswerMutation]);
+    setSessionAnswer(qid, value);
+  }, [q, qid, setSessionAnswer]);
 
   // Lưu đáp án cho 1 câu bất kỳ (dùng cho danh sách câu chế độ đọc hiểu).
   const setAnswerFor = useCallback((target: any, value: string) => {
     const tid = getQuestionId(target);
     if (!tid) return;
-    setAnswers(prev => ({ ...prev, [tid]: value }));
-    if (submissionId && target?.qId) {
-      saveAnswerMutation.mutate({ question_id: Number(target.qId), saAnswer_text: value });
-    }
-  }, [submissionId, saveAnswerMutation]);
+    setSessionAnswer(tid, value);
+  }, [setSessionAnswer]);
 
   const toggleFlag = useCallback(() => {
     if (!qid) return;
@@ -559,7 +567,7 @@ export function TeensTestTaking() {
   }
 
   const progress = total > 0 ? Math.round(((current + 1) / total) * 100) : 0;
-  const selected = answers[qid] ?? '';
+  const selected = String(session.answers[qid] ?? '');
   const isLast = current >= total - 1;
   const isFlagged = !!flagged[qid];
 
@@ -578,12 +586,13 @@ export function TeensTestTaking() {
     const id = getQuestionId(questions[i]);
     if (i === current) return 'current';
     if (flagged[id]) return 'flagged';
-    if (String(answers[id] ?? '').trim() !== '') return 'answered';
+    if (String(session.answers[id] ?? '').trim() !== '') return 'answered';
     return 'empty';
   };
 
   return (
     <div className="pb-28 lg:pb-8">
+      <OfflineBanner online={session.online} pendingCount={session.pendingCount} />
       {/* Header */}
       <div className="sticky top-16 z-30 -mx-4 sm:-mx-8 px-4 sm:px-8 py-3 bg-white/90 backdrop-blur-md border-b border-slate-200">
         <div className="flex items-center gap-4">
@@ -597,9 +606,14 @@ export function TeensTestTaking() {
               <span className="text-xs font-semibold text-slate-400">Câu {current + 1}/{total}</span>
             </div>
           </div>
+          <SaveStatusIndicator
+            status={session.saveStatus}
+            lastSavedAt={session.lastSavedAt}
+            pendingCount={session.pendingCount}
+          />
           <span className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold tabular-nums"
-            style={{ background: timeLeft <= 60 ? '#FEE2E2' : '#F0FDFA', color: timeLeft <= 60 ? '#DC2626' : TEAL }}>
-            <Clock className="w-4 h-4" /> {formatClock(timeLeft)}
+            style={{ background: session.timeRemaining <= 60 ? '#FEE2E2' : '#F0FDFA', color: session.timeRemaining <= 60 ? '#DC2626' : TEAL }}>
+            <Clock className="w-4 h-4" /> {formatClock(session.timeRemaining)}
           </span>
         </div>
       </div>
@@ -627,7 +641,7 @@ export function TeensTestTaking() {
               {groupIndices.map((idx) => {
                 const gq = questions[idx];
                 const gid = getQuestionId(gq);
-                const gSelected = answers[gid] ?? '';
+                const gSelected = String(session.answers[gid] ?? '');
                 const gFlagged = !!flagged[gid];
                 const isCur = idx === current;
                 return (
@@ -848,6 +862,13 @@ export function TeensTestTaking() {
         onConfirm={() => submitMutation.mutate()}
         loading={submitMutation.isPending}
       />
+      <ResumeExamModal
+        draft={resumeDraft}
+        open={!!resumeDraft}
+        onResume={(draft) => { session.resume(draft); setResumeDraft(null); }}
+        onDiscard={() => { if (submissionId) examDraftStorage.clear(submissionId); setResumeDraft(null); }}
+      />
+      <MultiTabWarning hasOtherTab={session.hasOtherTab} position="floating" />
     </div>
   );
 }

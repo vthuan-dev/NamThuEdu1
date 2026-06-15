@@ -29,11 +29,22 @@ class ProcessExpiredTests extends Command
     public function handle()
     {
         $this->info('Processing expired tests...');
-        
-        $processedCount = TestRecoveryService::handleInterruptedTests();
-        
-        $this->info("Processed {$processedCount} expired tests.");
-        
+
+        $stats = TestRecoveryService::handleInterruptedTests();
+
+        // Backwards compatibility: nếu service cũ trả về int thì format gọn,
+        // còn không thì in chi tiết theo từng nhánh.
+        if (is_int($stats)) {
+            $this->info("Processed {$stats} expired tests.");
+        } else {
+            $timeout  = $stats['timeout']  ?? 0;
+            $inactive = $stats['inactive'] ?? 0;
+            $failed   = $stats['failed']   ?? 0;
+            $total    = $timeout + $inactive;
+
+            $this->info("Processed {$total} expired tests (timeout: {$timeout}, inactive: {$inactive}, failed: {$failed}).");
+        }
+
         return 0;
     }
 }

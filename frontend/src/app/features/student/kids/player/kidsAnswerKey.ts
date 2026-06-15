@@ -265,6 +265,132 @@ export function buildReviewRows(
   }
 }
 
+/**
+ * Tạo answer map chứa đáp án ĐÚNG từ taskData — dùng để render giao diện thật
+ * với đáp án đúng hiển thị (mode answer-key).
+ */
+export function buildCorrectAnswerMap(taskType: string, taskData: any): KidsAnswerMap {
+  const out: KidsAnswerMap = {};
+  switch (taskType) {
+    case 'listen_and_draw_lines': {
+      const items: any[] = taskData?.items ?? [];
+      items.forEach((it: any, i: number) => {
+        if (it?.isExample || it?.is_example) return;
+        out[String(i)] = String(i); // label i → hotspot i
+      });
+      break;
+    }
+    case 'listen_and_tick': {
+      const its: any[] = taskData?.items ?? taskData?.config?.items ?? [];
+      its.forEach((it: any, i: number) => {
+        if (it?.isExample || it?.is_example) return;
+        out[String(i)] = String(it?.correctAnswer ?? it?.correct_answer ?? '');
+      });
+      break;
+    }
+    case 'listen_and_write': {
+      const list: any[] = (taskData?.questions?.length ? taskData.questions : (taskData?.items ?? [])) ?? [];
+      list.forEach((q: any, i: number) => {
+        if (q?.isExample || q?.is_example) return;
+        out[String(i)] = String(q?.answer ?? q?.correct_answer ?? q?.correctAnswer ?? '');
+      });
+      break;
+    }
+    case 'look_and_read': {
+      const list: any[] = (taskData?.questions?.length ? taskData.questions : (taskData?.items ?? [])) ?? [];
+      list.forEach((q: any, i: number) => {
+        if (q?.isExample || q?.is_example) return;
+        const corr = String(q?.correctAnswer ?? q?.correct_answer ?? '').toLowerCase();
+        const isTrue = corr === 'tick' || corr === 'true' || corr === 'yes' || corr === '1';
+        out[String(i)] = isTrue ? 'true' : 'false';
+      });
+      break;
+    }
+    case 'look_read_write': {
+      const list: any[] = (taskData?.questions?.length ? taskData.questions : (taskData?.items ?? [])) ?? [];
+      list.forEach((q: any, i: number) => {
+        if (q?.isExample || q?.is_example) return;
+        const qType = String(q?.question_type ?? q?.questionType ?? '');
+        if (qType === 'free_write') return;
+        out[String(i)] = String(q?.correct_answer ?? q?.correctAnswer ?? '');
+      });
+      break;
+    }
+    case 'word_bank_fill': {
+      const gaps: any[] = (taskData?.gaps ?? []).filter((g: any) => !g.isExample);
+      gaps.forEach((g: any, i: number) => {
+        out[String(g.gap_number ?? i + 1)] = String(g.correct_word ?? '');
+      });
+      break;
+    }
+    case 'cloze_test': {
+      const gaps: any[] = taskData?.gaps ?? [];
+      gaps.forEach((g: any) => {
+        out[String(g.gap_id ?? '')] = String(g.correct_answer ?? '');
+      });
+      if (taskData?.story_title_question) {
+        out['title'] = String(taskData.story_title_question.correct_answer ?? '');
+      }
+      break;
+    }
+    case 'open_cloze': {
+      const gaps: any[] = taskData?.gaps ?? [];
+      gaps.forEach((g: any) => {
+        const accepts: string[] = g.correct_answers ?? [];
+        out[String(g.gap_id ?? '')] = accepts[0] ?? '';
+      });
+      break;
+    }
+    case 'unscramble_words': {
+      const items: any[] = (taskData?.items ?? []).filter((it: any) => !it.isExample);
+      items.forEach((it: any, i: number) => {
+        out[String(i)] = String(it.correct_answer ?? '');
+      });
+      break;
+    }
+    case 'reading_comprehension': {
+      const questions: any[] = taskData?.questions ?? [];
+      questions.forEach((qq: any, i: number) => {
+        out[String(i)] = String(qq.answer ?? '');
+      });
+      break;
+    }
+    case 'dialogue_matching': {
+      const dialogues: any[] = taskData?.dialogues ?? [];
+      dialogues.forEach((d: any, i: number) => {
+        out[String(i)] = String(d.correct_answer ?? '');
+      });
+      break;
+    }
+    case 'word_definition_matching': {
+      const words: any[] = taskData?.words ?? [];
+      words.forEach((_w: any, i: number) => {
+        out[String(i)] = String.fromCharCode(65 + i);
+      });
+      break;
+    }
+    case 'listening_letter_match': {
+      const subjects: any[] = (taskData?.subjects ?? []).filter((s: any) => !(s.is_example ?? s.isExample));
+      subjects.forEach((s: any, i: number) => {
+        out[String(i)] = String(s.correct_letter ?? s.correctLetter ?? '');
+      });
+      break;
+    }
+    case 'odd_one_out': {
+      out['0'] = String(taskData?.correct_odd_one ?? '');
+      break;
+    }
+    case 'story_completion': {
+      const sentences: any[] = taskData?.completion_sentences ?? [];
+      sentences.forEach((s: any, i: number) => {
+        out[String(i)] = String(s.correct_answer ?? '');
+      });
+      break;
+    }
+  }
+  return out;
+}
+
 /** Dạng nói / viết tự do → review chỉ hiển thị bài làm, không có đáp án máy. */
 export const MANUAL_REVIEW_TYPES = new Set([
   'picture_questions',

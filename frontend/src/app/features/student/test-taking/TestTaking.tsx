@@ -7,6 +7,14 @@ import {
 import { useLocation, useNavigate, useParams } from "react-router";
 import { studentApi } from "../../../../services/studentApi";
 import { IntroScreen } from "./components/IntroScreen";
+import { useExamSession } from "../../../../hooks/exam/useExamSession";
+import {
+  SaveStatusIndicator,
+  OfflineBanner,
+  MultiTabWarning,
+  ResumeExamModal,
+} from "../../../../components/exam";
+import { examDraftStorage } from "../../../../lib/exam/examDraftStorage";
 import { useTranslation } from "react-i18next";
 
 // VSTEP Structure - 4 Skills, 7 Parts
@@ -229,14 +237,29 @@ export function TestTaking() {
   const [submissionId, setSubmissionId] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [exam, setExam] = useState<any>(null);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [startedAtServer, setStartedAtServer] = useState('');
+
+  const session = useExamSession({
+    submissionId,
+    examId: exam?.id ?? exam?.eId ?? 0,
+    durationMinutes: exam?.eDuration_minutes ?? exam?.exam_duration ?? 120,
+    startedAtServer,
+    examType: exam?.exam_type ?? 'VSTEP',
+    role: 'adults',
+    onSubmitted: (res: any) => {
+      const sid = res?.data?.data?.submissionId ?? submissionId;
+      navigate(`${STUDENT_BASE_PATH}/ket-qua/${sid}`);
+    },
+  });
+  const { setAnswer: setSessionAnswer } = session;
+
   const [activeSkill, setActiveSkill] = useState<string>("listening");
   const [activePart, setActivePart] = useState<number>(1);
-  const [timeLeft, setTimeLeft] = useState(0);
   const [showSubmit, setShowSubmit] = useState(false);
   const [started, setStarted] = useState(false);
   const [showBottomNav, setShowBottomNav] = useState(true);
   const [autoSaving, setAutoSaving] = useState(false);
+  const [resumeDraft, setResumeDraft] = useState<any>(null);
   const [playerSeconds, setPlayerSeconds] = useState(0);
   const [isPlayerRunning, setIsPlayerRunning] = useState(false);
   const [listeningPlayedSections, setListeningPlayedSections] = useState<Record<string, boolean>>({});
@@ -293,22 +316,26 @@ export function TestTaking() {
   const activeSectionKey = `${activeSkill}-${activePart}`;
   const playerInitialSeconds = Number(currentPartQuestions[0]?.qAudio_duration ?? 420);
 
-  const answeredCount = useMemo(
-    () => Object.keys(answers).filter((k) => String(answers[k] ?? "").trim() !== "").length,
-    [answers]
-  );
+  const answeredCount = useMemo(() => {
+    return Object.entries(session.answers).filter(([_, v]) => {
+      if (v == null) return false;
+      if (typeof v === 'string') return v.trim() !== '';
+      if (typeof v === 'object') return Object.keys(v as object).length > 0;
+      return true;
+    }).length;
+  }, [session.answers]);
 
   const answeredBySection = useMemo(() => {
     const map = new Map<string, number>();
     questions.forEach((q: any) => {
       const key = `${getQuestionSkill(q)}-${getQuestionPart(q)}`;
       const qid = getQuestionId(q);
-      const val = String(answers[qid] ?? "").trim();
+      const val = String(session.answers[qid] ?? "").trim();
       if (!val) return;
       map.set(key, (map.get(key) ?? 0) + 1);
     });
     return map;
-  }, [questions, answers]);
+  }, [questions, session.answers]);
 
   const startMutation = useMutation({
     mutationFn: async () => {
@@ -334,18 +361,19 @@ export function TestTaking() {
         return;
       }
       setSubmissionId(data?.submissionId ?? querySubmissionId ?? null);
-      setExam(fetchedExam);
-      const restoredAnswers = mapSavedAnswers(data?.savedAnswers);
-      if (Object.keys(restoredAnswers).length > 0) {
-        setAnswers(restoredAnswers);
-      }
-
+      const sid = data?.submissionId ?? querySubmissionId ?? null;
       const remainingMinutes = Number(data?.timeRemaining ?? 0);
-      if (remainingMinutes > 0) {
-        setTimeLeft(remainingMinutes * 60);
-      } else {
-        const durationMinutes = Number(fetchedExam?.eDuration_minutes ?? fetchedExam?.exam_duration ?? 120);
-        setTimeLeft(durationMinutes * 60);
+      const durationMinutes = Number(fetchedExam?.eDuration_minutes ?? fetchedExam?.exam_duration ?? 120);
+      setStartedAtServer(new Date(Date.now() - (durationMinutes - remainingMinutes) * 60_000).toISOString());
+      setSubmissionId(sid);
+      setExam(fetchedExam);
+      if (sid) {
+        const restoredAnswers = mapSavedAnswers(data?.savedAnswers);
+        if (Object.keys(restoredAnswers).length > 0) {
+          Object.entries(restoredAnswers).forEach(([qid, val]) => session.setAnswer(qid, val));
+        }
+        const draft = examDraftStorage.load(sid);
+        if (draft && Object.keys(draft.answers).length > 0) setResumeDraft(draft);
       }
       setStarted(true);
     },
@@ -354,15 +382,10 @@ export function TestTaking() {
     },
   });
 
-  const saveAnswerMutation = useMutation({
-    mutationFn: (p: { question_id: number; saAnswer_text: string }) =>
-      studentApi.saveAnswer(submissionId!, { question_id: p.question_id, saAnswer_text: p.saAnswer_text } as any),
-  });
-
   const submitMutation = useMutation({
-    mutationFn: () => studentApi.submitTest(submissionId!),
+    mutationFn: () => session.submit(),
     onSuccess: (res: any) => {
-      const sid = res.data?.data?.submissionId ?? submissionId;
+      const sid = res?.data?.data?.submissionId ?? submissionId;
       navigate(`${STUDENT_BASE_PATH}/ket-qua/${sid}`);
     },
     onError: () => {
@@ -375,22 +398,6 @@ export function TestTaking() {
     setTimeout(() => setAutoSaving(false), 700);
   }, []);
 
-  useEffect(() => {
-    if (!started || timeLeft <= 0) return;
-
-    const t = setInterval(() => {
-      setTimeLeft((s) => {
-        if (s <= 1) {
-          clearInterval(t);
-          submitMutation.mutate();
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(t);
-  }, [started, timeLeft, submitMutation]);
 
   useEffect(() => {
     if (!started) return;
@@ -468,10 +475,7 @@ export function TestTaking() {
     const qKey = getQuestionId(question);
     if (!qKey) return;
 
-    setAnswers((prev) => ({ ...prev, [qKey]: value }));
-    if (submissionId && question?.qId) {
-      saveAnswerMutation.mutate({ question_id: Number(question.qId), saAnswer_text: value });
-    }
+    setSessionAnswer(qKey, value);
   };
 
   const goToSection = (skill: string, part: number) => {
@@ -560,7 +564,7 @@ export function TestTaking() {
           URL.revokeObjectURL(localUrl);
           setSpeakingMediaMap((prev) => ({ ...prev, [qid]: { url: publicUrl, recording: false } }));
           setSpeakingUploadStatus((prev) => ({ ...prev, [qid]: 'uploaded' }));
-          setAnswers((prev) => ({ ...prev, [qid]: '[recorded]' }));
+          setSessionAnswer(qid, '[recorded]');
         } catch {
           setSpeakingUploadStatus((prev) => ({ ...prev, [qid]: 'error' }));
         }
@@ -631,6 +635,7 @@ export function TestTaking() {
 
   return (
     <div className="min-h-screen" style={{ background: PAGE_BG }}>
+      <OfflineBanner online={session.online} pendingCount={session.pendingCount} />
       <header className="fixed top-0 left-0 right-0 z-40 h-[64px] bg-[#CBD5E1] border-b border-slate-300 px-4 lg:px-6">
         <div className="h-full max-w-[1600px] mx-auto grid grid-cols-3 items-center gap-3">
           <div className="flex items-center gap-2 text-slate-800 text-sm font-semibold">
@@ -638,10 +643,15 @@ export function TestTaking() {
             Nguyen Van Thuan
           </div>
 
-          <div className="flex justify-center">
+          <div className="flex justify-center items-center gap-3">
             <div className="px-4 py-1 rounded-md bg-blue-500 text-white font-mono font-bold text-lg tracking-wider">
-              {formatClock(timeLeft)}
+              {formatClock(session.timeRemaining)}
             </div>
+            <SaveStatusIndicator
+              status={session.saveStatus}
+              lastSavedAt={session.lastSavedAt}
+              pendingCount={session.pendingCount}
+            />
           </div>
 
           <div className="flex items-center justify-end gap-3">
@@ -707,7 +717,7 @@ export function TestTaking() {
                 <div className="space-y-5">
                   {currentPartQuestions.map((question: any, index: number) => {
                     const qKey = getQuestionId(question);
-                    const selected = answers[qKey] ?? "";
+                    const selected = String(session.answers[qKey] ?? "");
                     const options = getOptions(question);
 
                     return (
@@ -741,7 +751,7 @@ export function TestTaking() {
                 <div className="rounded-lg border border-slate-200 p-5 max-h-[62vh] overflow-y-auto space-y-5">
                   {currentPartQuestions.map((question: any, index: number) => {
                     const qKey = getQuestionId(question);
-                    const selected = answers[qKey] ?? "";
+                    const selected = String(session.answers[qKey] ?? "");
                     const options = getOptions(question);
 
                     return (
@@ -775,7 +785,7 @@ export function TestTaking() {
               <section className="space-y-6">
                 {currentPartQuestions.map((question: any, index: number) => {
                   const qKey = getQuestionId(question);
-                  const value = answers[qKey] ?? "";
+                  const value = String(session.answers[qKey] ?? "");
                   const minWords = Number(question?.qWord_count ?? (getQuestionPart(question) === 1 ? 120 : 250));
                   const wc = value.trim() ? value.trim().split(/\s+/).length : 0;
 
@@ -802,7 +812,7 @@ export function TestTaking() {
               <section className="space-y-6">
                 {currentPartQuestions.map((question: any, index: number) => {
                   const qKey = getQuestionId(question);
-                  const value = answers[qKey] ?? "";
+                  const value = String(session.answers[qKey] ?? "");
 
                   return (
                     <article key={qKey || index} className="rounded-lg border border-slate-200 p-5 space-y-4">
@@ -932,6 +942,13 @@ export function TestTaking() {
         onConfirm={() => submitMutation.mutate()}
         loading={submitMutation.isPending}
       />
+      <ResumeExamModal
+        draft={resumeDraft}
+        open={!!resumeDraft}
+        onResume={(draft) => { session.resume(draft); setResumeDraft(null); }}
+        onDiscard={() => { if (submissionId) examDraftStorage.clear(submissionId); setResumeDraft(null); }}
+      />
+      <MultiTabWarning hasOtherTab={session.hasOtherTab} position="floating" />
     </div>
   );
 }

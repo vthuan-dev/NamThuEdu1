@@ -479,6 +479,7 @@ class StudentTestController extends Controller
             'sAttempt' => $attemptsUsed + 1,
             'sStart_time' => now(),
             'sStatus' => 'in_progress',
+            'last_activity_at' => now(),
         ]);
 
         // Hide correct answers and add frontend compatibility aliases
@@ -609,6 +610,10 @@ class StudentTestController extends Controller
                         'saAnswer_text' => $request->saAnswer_text,
                     ]
                 );
+
+                // Bump activity timestamp so cron inactivity check (> 15 min) stays accurate
+                // even for clients still on the legacy /answer endpoint.
+                $submission->update(['last_activity_at' => now()]);
 
                 return [
                     'status' => 200,
@@ -1206,63 +1211,28 @@ class StudentTestController extends Controller
     }
 
     /**
-     * Auto-submit when time expires or interrupted
+     * Auto-submit when time expires (called by start/resume helpers).
+     * Delegates to {@see ExamAutoSubmitService} for the unified grading + status logic.
      */
     private function autoSubmit($submission)
     {
-        DB::beginTransaction();
-        try {
-            // Grade answers — skip subjective types for VSTEP/IELTS
-            $isVstepAuto = in_array(strtoupper($submission->exam->eType ?? ''), ['VSTEP', 'IELTS']);
-            $subjTypes   = ['essay', 'writing', 'speaking'];
-            $gradingResult = $this->gradeAnswers($submission->answers, $submission->exam_id, $isVstepAuto, $subjTypes);
-            if ($gradingResult['error']) {
-                DB::rollBack();
-                return response()->json(['status' => 'error', 'message' => $gradingResult['error']], 400);
-            }
+        $submission->loadMissing(['exam.questions.answers', 'answers.question']);
 
-            $scorePercentage   = $gradingResult['scorePercentage'];
-            $vstepMeta         = $gradingResult['vstepMeta'];
-            $answeredQuestions = $submission->answers->count();
-            $totalQuestions    = $submission->exam->questions->count();
+        $result = app(\App\Services\ExamAutoSubmitService::class)
+            ->autoSubmit($submission, \App\Services\ExamAutoSubmitService::REASON_TIMEOUT);
 
-            $updateData = [
-                'sSubmit_time'     => now(),
-                'sGraded_time'     => now(),
-                'sScore'           => $scorePercentage,
-                'sStatus'          => 'auto_submitted',
-                'sTeacher_feedback'=> "Bài thi được tự động nộp do hết thời gian. Đã trả lời {$answeredQuestions}/{$totalQuestions} câu hỏi.",
-            ];
-            if ($vstepMeta) {
-                $updateData['sGemini_feedback'] = json_encode(['vstep_scores' => $vstepMeta]);
-            }
-            $submission->update($updateData);
-
-            DB::commit();
-
-            $responseData = [
-                'submissionId'     => $submission->sId,
-                'sScore'           => $scorePercentage,
-                'answeredQuestions'=> $answeredQuestions,
-                'totalQuestions'   => $totalQuestions,
-                'autoSubmitted'    => true,
-            ];
-            if ($vstepMeta) {
-                $responseData['vstep_scores'] = $vstepMeta;
-            }
+        if (!$result['ok']) {
             return response()->json([
-                'status'  => 'warning',
-                'message' => 'Bài thi đã hết thời gian và được tự động nộp.',
-                'data'    => $responseData,
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Lỗi khi tự động nộp bài.',
+                'status'  => 'error',
+                'message' => $result['message'] ?? 'Lỗi khi tự động nộp bài.',
             ], 500);
         }
+
+        return response()->json([
+            'status'  => 'warning',
+            'message' => $result['message'] ?? 'Bài thi đã hết thời gian và được tự động nộp.',
+            'data'    => $result['data'] ?? [],
+        ]);
     }
 
     /**
@@ -2677,7 +2647,11 @@ class StudentTestController extends Controller
      * Returns:
      *   ['error' => null|string, 'scorePercentage' => float, 'vstepMeta' => array|null]
      */
-    private function gradeAnswers($answers, $examId, bool $isVstep, array $subjectiveTypes): array
+    /**
+     * Public so that ExamAutoSubmitService (cron / unload / heartbeat-timeout)
+     * can reuse the exact same grading logic without duplicating it.
+     */
+    public function gradeAnswers($answers, $examId, bool $isVstep, array $subjectiveTypes): array
     {
         $totalScore   = 0;
         $maxScore     = 0;
@@ -3025,6 +2999,7 @@ class StudentTestController extends Controller
             'user_id'      => $user->uId,
             'sStart_time'  => now(),
             'sStatus'      => 'in_progress',
+            'last_activity_at' => now(),
         ]);
 
         return response()->json([
@@ -4029,6 +4004,7 @@ class StudentTestController extends Controller
                 'sAttempt'    => $attemptsUsed + 1,
                 'sStart_time' => now(),
                 'sStatus'     => 'in_progress',
+                'last_activity_at' => now(),
             ]);
             $timeRemaining = $duration;
             $savedAnswers  = collect();
@@ -4186,6 +4162,7 @@ class StudentTestController extends Controller
                 'sAttempt'    => $attemptsUsed + 1,
                 'sStart_time' => now(),
                 'sStatus'     => 'in_progress',
+                'last_activity_at' => now(),
             ]);
             $timeRemaining = $duration;
             $savedAnswers  = collect();

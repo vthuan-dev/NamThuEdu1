@@ -8,6 +8,14 @@ import { useLocation, useNavigate, useParams } from "react-router";
 import { studentApi } from "../../../../services/studentApi";
 import { IntroScreen } from "./components/IntroScreen";
 import { useTranslation } from "react-i18next";
+import { useExamSession } from "../../../../hooks/exam/useExamSession";
+import {
+  SaveStatusIndicator,
+  OfflineBanner,
+  MultiTabWarning,
+  ResumeExamModal,
+} from "../../../../components/exam";
+import { examDraftStorage } from "../../../../lib/exam/examDraftStorage";
 
 // VSTEP Structure - 4 Skills, 7 Parts
 const VSTEP_STRUCTURE = {
@@ -196,14 +204,29 @@ export function TestTakingVSTEP() {
   const [submissionId, setSubmissionId] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [exam, setExam] = useState<any>(null);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [startedAtServer, setStartedAtServer] = useState('');
+
+  const session = useExamSession({
+    submissionId,
+    examId: exam?.id ?? exam?.eId ?? 0,
+    durationMinutes: exam?.eDuration_minutes ?? exam?.exam_duration ?? 179,
+    startedAtServer,
+    examType: exam?.exam_type ?? 'VSTEP',
+    role: 'adults',
+    onSubmitted: (res: any) => {
+      const sid = res?.data?.data?.submissionId ?? submissionId;
+      navigate(`${STUDENT_BASE_PATH}/ket-qua/${sid}`);
+    },
+  });
+  const { setAnswer: setSessionAnswer } = session;
+
   const [bookmarks, setBookmarks] = useState<Set<string>>(new Set());
   const [currentSkill, setCurrentSkill] = useState<SkillType>("listening");
   const [currentPart, setCurrentPart] = useState(1);
-  const [timeLeft, setTimeLeft] = useState(0);
   const [showSubmit, setShowSubmit] = useState(false);
   const [started, setStarted] = useState(false);
   const [autoSaving, setAutoSaving] = useState(false);
+  const [resumeDraft, setResumeDraft] = useState<any>(null);
   const [speakingMediaMap, setSpeakingMediaMap] = useState<Record<string, { url?: string; recording: boolean }>>({});
   const [recordingQuestionId, setRecordingQuestionId] = useState<string | null>(null);
   const [speakingUploadStatus, setSpeakingUploadStatus] = useState<Record<string, 'idle' | 'uploading' | 'uploaded' | 'error'>>({});
@@ -220,17 +243,21 @@ export function TestTakingVSTEP() {
   );
 
   // Calculate answered count
-  const answeredCount = useMemo(
-    () => Object.keys(answers).filter((k) => String(answers[k] ?? "").trim() !== "").length,
-    [answers]
-  );
+  const answeredCount = useMemo(() => {
+    return Object.entries(session.answers).filter(([_, v]) => {
+      if (v == null) return false;
+      if (typeof v === 'string') return v.trim() !== '';
+      if (typeof v === 'object') return Object.keys(v as object).length > 0;
+      return true;
+    }).length;
+  }, [session.answers]);
 
   // Get answered count per part
   const getPartAnsweredCount = (skill: SkillType, part: number) => {
     const partQuestions = questions.filter((q: any) => getQuestionSkill(q) === skill && getQuestionPart(q) === part);
     return partQuestions.filter((q: any) => {
       const qid = getQuestionId(q);
-      return String(answers[qid] ?? "").trim() !== "";
+      return String(session.answers[qid] ?? "").trim() !== "";
     }).length;
   };
 
@@ -239,15 +266,7 @@ export function TestTakingVSTEP() {
     const qKey = getQuestionId(question);
     if (!qKey) return;
 
-    setAnswers((prev) => ({ ...prev, [qKey]: value }));
-    
-    // Auto-save to server
-    if (submissionId && question?.qId) {
-      studentApi.saveAnswer(submissionId, { 
-        question_id: Number(question.qId), 
-        saAnswer_text: value 
-      } as any).catch(console.error);
-    }
+    setSessionAnswer(qKey, value);
   };
 
   // Toggle bookmark
@@ -330,11 +349,7 @@ export function TestTakingVSTEP() {
           setSpeakingMediaMap((prev) => ({ ...prev, [partKey]: { url: publicUrl, recording: false } }));
           setSpeakingUploadStatus((prev) => ({ ...prev, [partKey]: 'uploaded' }));
           // Mark all questions in this part as answered
-          setAnswers((prev) => {
-            const updated = { ...prev };
-            partQuestions.forEach((q: any) => { updated[getQuestionId(q)] = '[recorded]'; });
-            return updated;
-          });
+          partQuestions.forEach((q: any) => { setSessionAnswer(getQuestionId(q), '[recorded]'); });
         } catch {
           setSpeakingUploadStatus((prev) => ({ ...prev, [partKey]: 'error' }));
         }
@@ -364,9 +379,9 @@ export function TestTakingVSTEP() {
 
   // Submit mutation
   const submitMutation = useMutation({
-    mutationFn: () => studentApi.submitTest(submissionId!),
+    mutationFn: () => session.submit(),
     onSuccess: (res: any) => {
-      const sid = res.data?.data?.submissionId ?? submissionId;
+      const sid = res?.data?.data?.submissionId ?? submissionId;
       navigate(`${STUDENT_BASE_PATH}/ket-qua/${sid}`);
     },
     onError: () => {
@@ -376,22 +391,6 @@ export function TestTakingVSTEP() {
   });
 
   // Timer effect
-  useEffect(() => {
-    if (!started || timeLeft <= 0) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((s) => {
-        if (s <= 1) {
-          clearInterval(timer);
-          submitMutation.mutate();
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [started, timeLeft, submitMutation]);
 
   // Start / resume real exam from backend
   const startMutation = useMutation({
@@ -413,12 +412,20 @@ export function TestTakingVSTEP() {
         setLoadError("Không thể tải dữ liệu bài thi. Vui lòng thử lại.");
         return;
       }
-      setExam(rawExam);
-      setSubmissionId(data?.submissionId ?? querySubmissionId ?? null);
-      const restored = mapSavedAnswers(data?.savedAnswers);
-      if (Object.keys(restored).length > 0) setAnswers(restored);
+      const sid = data?.submissionId ?? querySubmissionId ?? null;
       const remaining = Number(data?.timeRemaining ?? 0);
-      setTimeLeft(remaining > 0 ? remaining * 60 : Number(rawExam?.eDuration_minutes ?? 179) * 60);
+      const dur = Number(rawExam?.eDuration_minutes ?? 179);
+      setStartedAtServer(new Date(Date.now() - (dur - remaining) * 60_000).toISOString());
+      setExam(rawExam);
+      setSubmissionId(sid);
+      if (sid) {
+        const restored = mapSavedAnswers(data?.savedAnswers);
+        if (Object.keys(restored).length > 0) {
+          Object.entries(restored).forEach(([qid, val]) => session.setAnswer(qid, val));
+        }
+        const draft = examDraftStorage.load(sid);
+        if (draft && Object.keys(draft.answers).length > 0) setResumeDraft(draft);
+      }
       setStarted(true);
     },
     onError: () => {
@@ -463,6 +470,7 @@ export function TestTakingVSTEP() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+      <OfflineBanner online={session.online} pendingCount={session.pendingCount} />
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-40 h-16 bg-white border-b border-gray-200 px-4 lg:px-6 shadow-sm">
         <div className="h-full max-w-[1600px] mx-auto flex items-center justify-between gap-4">
@@ -472,11 +480,16 @@ export function TestTakingVSTEP() {
           </div>
 
           <div className="flex items-center gap-4">
+            <SaveStatusIndicator
+              status={session.saveStatus}
+              lastSavedAt={session.lastSavedAt}
+              pendingCount={session.pendingCount}
+            />
             <div className="text-sm text-gray-600">
               Đã trả lời: <span className="font-bold text-gray-900">{answeredCount}/{questions.length}</span>
             </div>
             <div className="px-4 py-1.5 rounded-lg bg-blue-500 text-white font-mono font-bold text-lg">
-              {formatClock(timeLeft)}
+              {formatClock(session.timeRemaining)}
             </div>
             <button
               onClick={() => setShowSubmit(true)}
@@ -643,7 +656,7 @@ export function TestTakingVSTEP() {
                   ) : (
                     currentPartQuestions.map((question: any, index: number) => {
                       const qKey = getQuestionId(question);
-                      const selected = answers[qKey] ?? "";
+                      const selected = String(session.answers[qKey] ?? "");
                       const isBookmarked = bookmarks.has(qKey);
 
                       // Render based on skill type
@@ -750,7 +763,7 @@ export function TestTakingVSTEP() {
                   <div className="grid grid-cols-5 gap-2 mb-4">
                     {currentPartQuestions.map((q: any, idx: number) => {
                       const qid = getQuestionId(q);
-                      const isAnswered = String(answers[qid] ?? "").trim() !== "";
+                      const isAnswered = String(session.answers[qid] ?? "").trim() !== "";
                       const isBookmarked = bookmarks.has(qid);
 
                       return (
@@ -800,6 +813,13 @@ export function TestTakingVSTEP() {
         onCancel={() => setShowSubmit(false)}
         loading={submitMutation.isPending}
       />
+      <ResumeExamModal
+        draft={resumeDraft}
+        open={!!resumeDraft}
+        onResume={(draft) => { session.resume(draft); setResumeDraft(null); }}
+        onDiscard={() => { if (submissionId) examDraftStorage.clear(submissionId); setResumeDraft(null); }}
+      />
+      <MultiTabWarning hasOtherTab={session.hasOtherTab} position="floating" />
     </div>
   );
 }

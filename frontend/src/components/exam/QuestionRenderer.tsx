@@ -43,6 +43,7 @@ const TASK_COMPONENT_MAP: Record<string, React.ComponentType<any>> = {
   listen_and_tick: ListenAndTick,
   listen_and_write: ListenAndWrite,
   listen_colour_write: ListenColourWrite,
+  listen_and_colour: ListenColourWrite,
   listen_colour: ListenColourWrite,
   listening_letter_match: ListeningLetterMatch,
   // Reading & Writing

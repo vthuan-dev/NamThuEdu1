@@ -12,6 +12,14 @@ import { useLocation, useNavigate, useParams } from 'react-router';
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Volume2, AlertTriangle, PartyPopper } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
 import { QuestionRenderer } from '../../../../components/exam/QuestionRenderer';
+import { useExamSession } from '../../../../hooks/exam/useExamSession';
+import {
+  SaveStatusIndicator,
+  OfflineBanner,
+  MultiTabWarning,
+  ResumeExamModal,
+} from '../../../../components/exam';
+import { examDraftStorage } from '../../../../lib/exam/examDraftStorage';
 
 const BASE = '/hoc-vien';
 
@@ -121,13 +129,26 @@ export function KidsTestTaking() {
 
   const [submissionId, setSubmissionId] = useState<number | null>(null);
   const [exam, setExam] = useState<any>(null);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [current, setCurrent] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(0);
   const [started, setStarted] = useState(false);
   const [showSubmit, setShowSubmit] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [resumeDraft, setResumeDraft] = useState<any>(null);
+  const [startedAtServer, setStartedAtServer] = useState('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const session = useExamSession({
+    submissionId,
+    examId: exam?.id ?? exam?.eId ?? (isDirect ? assignmentId : 0),
+    durationMinutes: exam?.eDuration_minutes ?? exam?.exam_duration ?? 30,
+    startedAtServer,
+    examType: exam?.exam_type ?? 'KIDS',
+    role: 'kids',
+    onSubmitted: (res: any) => {
+      const sid = res?.data?.data?.submissionId ?? submissionId;
+      navigate(`${BASE}/ket-qua/${sid}`);
+    },
+  });
 
   const questions: any[] = exam?.questions ?? [];
   const total = questions.length;
@@ -139,10 +160,14 @@ export function KidsTestTaking() {
   const options = q && !isKidsTask ? getOptions(q) : [];
   const isWriting = q && !isKidsTask && options.length === 0;
 
-  const answeredCount = useMemo(
-    () => Object.keys(answers).filter(k => String(answers[k] ?? '').trim() !== '').length,
-    [answers]
-  );
+  const answeredCount = useMemo(() => {
+    return Object.entries(session.answers).filter(([_, v]) => {
+      if (v == null) return false;
+      if (typeof v === 'string') return v.trim() !== '';
+      if (typeof v === 'object') return Object.keys(v as object).length > 0;
+      return true;
+    }).length;
+  }, [session.answers]);
 
   const startMutation = useMutation({
     mutationFn: async () => {
@@ -164,13 +189,23 @@ export function KidsTestTaking() {
         setLoadError('Không tải được bài thi. Em thử lại nhé!');
         return;
       }
-      setSubmissionId(data?.submissionId ?? querySubmissionId ?? null);
-      setExam(fetchedExam);
-      const restored = mapSavedAnswers(data?.savedAnswers);
-      if (Object.keys(restored).length) setAnswers(restored);
+      const sid = data?.submissionId ?? querySubmissionId ?? null;
       const mins = Number(data?.timeRemaining ?? 0);
       const dur = Number(fetchedExam?.eDuration_minutes ?? fetchedExam?.exam_duration ?? 30);
-      setTimeLeft((mins > 0 ? mins : dur) * 60);
+      const startedAt = new Date(Date.now() - (dur - mins) * 60_000).toISOString();
+      setStartedAtServer(startedAt);
+      setSubmissionId(sid);
+      setExam(fetchedExam);
+      if (sid) {
+        const restored = mapSavedAnswers(data?.savedAnswers);
+        if (Object.keys(restored).length) {
+          Object.entries(restored).forEach(([qid, val]) => session.setAnswer(qid, val));
+        }
+        const draft = examDraftStorage.load(sid);
+        if (draft && Object.keys(draft.answers).length > 0) {
+          setResumeDraft(draft);
+        }
+      }
       setStarted(true);
     },
     onError: (err: any) => {
@@ -183,17 +218,8 @@ export function KidsTestTaking() {
     },
   });
 
-  const saveAnswerMutation = useMutation({
-    mutationFn: (p: { question_id: number; saAnswer_text: string }) =>
-      studentApi.saveAnswer(submissionId!, { question_id: p.question_id, saAnswer_text: p.saAnswer_text } as any),
-  });
-
   const submitMutation = useMutation({
-    mutationFn: () => studentApi.submitTest(submissionId!),
-    onSuccess: (res: any) => {
-      const sid = res?.data?.data?.submissionId ?? submissionId;
-      navigate(`${BASE}/ket-qua/${sid}`);
-    },
+    mutationFn: () => session.submit(),
     onError: () => setLoadError('Chưa nộp được bài. Em thử lại nhé!'),
   });
 
@@ -204,28 +230,15 @@ export function KidsTestTaking() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStart, started, startMutation.isPending, startMutation.isError]);
 
-  // Countdown — auto submit at 0
-  useEffect(() => {
-    if (!started || timeLeft <= 0) return;
-    const timer = setInterval(() => {
-      setTimeLeft(s => {
-        if (s <= 1) { clearInterval(timer); submitMutation.mutate(); return 0; }
-        return s - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [started, timeLeft, submitMutation]);
+  const { setAnswer } = session;
 
   const handleAnswer = useCallback((value: string) => {
     if (!q) return;
-    setAnswers(prev => ({ ...prev, [qid]: value }));
-    if (submissionId && q?.qId) {
-      saveAnswerMutation.mutate({ question_id: Number(q.qId), saAnswer_text: value });
-    }
-  }, [q, qid, submissionId, saveAnswerMutation]);
+    setAnswer(qid, value);
+  }, [q, qid, setAnswer]);
 
-  // Kids task: QuestionRenderer trả về answer dạng object → gói JSON lưu saAnswer_text.
-  // Rỗng thì lưu '' để không tính là đã trả lời.
+  // Kids task: QuestionRenderer trả về answer dạng object → truyền raw object cho session.
+  // Hook tự JSON.stringify khi gửi lên server.
   const handleKidsAnswer = useCallback((obj: any) => {
     const hasContent = obj && typeof obj === 'object' && Object.values(obj).some((v) => {
       if (v == null) return false;
@@ -233,8 +246,9 @@ export function KidsTestTaking() {
       if (typeof v === 'object') return Object.keys(v as object).length > 0;
       return true;
     });
-    handleAnswer(hasContent ? JSON.stringify(obj) : '');
-  }, [handleAnswer]);
+    if (!q) return;
+    setAnswer(qid, hasContent ? obj : '');
+  }, [q, qid, setAnswer]);
 
   const playAudio = () => {
     const url = q?.qMedia_url as string | undefined;
@@ -280,7 +294,8 @@ export function KidsTestTaking() {
   }
 
   const progress = total > 0 ? Math.round(((current + 1) / total) * 100) : 0;
-  const selected = answers[qid] ?? '';
+  const selected = String(session.answers[qid] ?? '');
+  const kidsAnswer = (session.answers[qid] as Record<string, unknown>) ?? {};
   const isLast = current >= total - 1;
   // Kids task (ảnh + cột câu hỏi) cần khung rộng hơn để không bị cắt/scroll ngang.
   const wrap = isKidsTask ? 'max-w-6xl' : 'max-w-3xl';
@@ -288,8 +303,9 @@ export function KidsTestTaking() {
   return (
     <div className="min-h-screen pb-28" style={{ background: 'linear-gradient(160deg, #FFF1F2 0%, #FFF7ED 50%, #F0FDF4 100%)' }}>
       {/* Top bar */}
+      <OfflineBanner online={session.online} pendingCount={session.pendingCount} variant="kids" />
       <header className="sticky top-0 z-30" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(14px)', borderBottom: '1.5px solid #FFE4E6' }}>
-        <div className={`${wrap} mx-auto px-4 sm:px-6 h-16 flex items-center gap-4`}>
+        <div className={`${wrap} mx-auto px-4 sm:px-6 h-16 flex items-center gap-3`}>
           <span className="text-sm font-extrabold flex-shrink-0" style={{ color: '#9F1239' }}>
             Câu {current + 1}/{total}
           </span>
@@ -297,9 +313,15 @@ export function KidsTestTaking() {
             <div className="h-full rounded-full transition-all duration-300"
               style={{ width: `${progress}%`, background: 'linear-gradient(90deg, #FB7185, #F97316)' }} />
           </div>
+          <SaveStatusIndicator
+            status={session.saveStatus}
+            lastSavedAt={session.lastSavedAt}
+            pendingCount={session.pendingCount}
+            variant="kids"
+          />
           <span className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-extrabold tabular-nums"
-            style={{ background: timeLeft <= 60 ? '#FEE2E2' : '#EFF6FF', color: timeLeft <= 60 ? '#DC2626' : '#2563EB' }}>
-            ⏱ {formatClock(timeLeft)}
+            style={{ background: session.timeRemaining <= 60 ? '#FEE2E2' : '#EFF6FF', color: session.timeRemaining <= 60 ? '#DC2626' : '#2563EB' }}>
+            ⏱ {formatClock(session.timeRemaining)}
           </span>
         </div>
       </header>
@@ -340,7 +362,7 @@ export function KidsTestTaking() {
               <QuestionRenderer
                 question={q}
                 mode="student"
-                answer={parseAnswerObject(selected)}
+                answer={kidsAnswer}
                 onAnswer={handleKidsAnswer}
               />
             </div>
@@ -413,6 +435,20 @@ export function KidsTestTaking() {
         onConfirm={() => submitMutation.mutate()}
         loading={submitMutation.isPending}
       />
+      <ResumeExamModal
+        draft={resumeDraft}
+        open={!!resumeDraft}
+        onResume={(draft) => {
+          session.resume(draft);
+          setResumeDraft(null);
+        }}
+        onDiscard={() => {
+          if (submissionId) examDraftStorage.clear(submissionId);
+          setResumeDraft(null);
+        }}
+        variant="kids"
+      />
+      <MultiTabWarning hasOtherTab={session.hasOtherTab} variant="kids" position="floating" />
     </div>
   );
 }

@@ -8,7 +8,7 @@
  *
  * Style: tươi sáng, bo tròn lớn, emoji, 1 điểm nhấn rose/cam — đúng tinh thần kids.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Clock, ListChecks, Search, CheckCircle2, Play, RotateCcw, Sparkles, Gift, BookOpenCheck } from 'lucide-react';
@@ -147,6 +147,11 @@ export function KidsTests() {
     }));
   }, [browseData]);
 
+  const isPastDeadline = useCallback((d: string | null | undefined) => {
+    if (!d) return false;
+    return new Date(d) < new Date();
+  }, []);
+
   const assignedExams = useMemo(() => {
     const groups = (assignedData as any)?.data?.data;
     if (!groups) return [];
@@ -165,13 +170,14 @@ export function KidsTests() {
       submissionId: t.submission_id ?? null,
       assignmentId: t.assignment_id ?? null,
       isAssigned: true,
+      deadline: t.deadline ?? null,
     }));
     return [
       ...map(groups.pending, 'pending'),
       ...map(groups.in_progress, 'in_progress'),
       ...map(groups.completed, 'completed'),
-    ].filter((t: any) => !isAdult(t.title));
-  }, [assignedData]);
+    ].filter((t: any) => !isAdult(t.title) && !isPastDeadline(t.deadline));
+  }, [assignedData, isPastDeadline]);
 
   const source = tab === 'all' ? allExams : assignedExams;
   const isLoading = tab === 'all' ? browseLoading : assignedLoading;
@@ -193,26 +199,80 @@ export function KidsTests() {
     [visible, pageSafe]
   );
 
-  const assignedCount = allExams.filter((e: any) => e.isAssigned).length;
+  const assignedCount = useMemo(() => {
+    const groups = (assignedData as any)?.data?.data;
+    if (!groups) return 0;
+    return [
+      ...(groups.pending || []),
+      ...(groups.in_progress || []),
+      ...(groups.completed || []),
+    ].filter((t: any) => !isPastDeadline(t.deadline)).length;
+  }, [assignedData, isPastDeadline]);
 
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(160deg, #FFF1F2 0%, #FFF7ED 45%, #F0FDF4 100%)' }}>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 pb-10 space-y-5">
 
-        {/* ─── Header ──────────────────────────────────────────── */}
-        <header className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-md"
-            style={{ background: 'linear-gradient(135deg, #FB7185, #F97316)' }}>
-            <BookOpenCheck className="w-6 h-6 text-white" />
+        {/* ─── Header (tiêu đề + thanh tìm kiếm) ──────────────── */}
+        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-md"
+              style={{ background: 'linear-gradient(135deg, #FB7185, #F97316)' }}>
+              <BookOpenCheck className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight">Bài thi của em 🎒</h1>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Chọn một bài thi và bắt đầu khám phá nhé!</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight">Bài thi của em 🎒</h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Chọn một bài thi và bắt đầu khám phá nhé!</p>
+
+          {/* 🔎 Thanh tìm kiếm "kẹo ngọt" — gradient icon pill + glow khi focus */}
+          <div className="relative w-full sm:w-72 lg:w-80 group">
+            {/* Vầng sáng nhẹ phía sau khi focus */}
+            <div
+              className="absolute inset-0 rounded-2xl opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none -z-0"
+              style={{
+                background: 'linear-gradient(135deg, rgba(251,113,133,0.18), rgba(249,115,22,0.18))',
+                filter: 'blur(14px)',
+              }}
+            />
+            {/* Icon pill */}
+            <div
+              className="absolute left-1.5 top-1/2 -translate-y-1/2 w-9 h-9 rounded-xl flex items-center justify-center pointer-events-none transition-transform group-focus-within:scale-105"
+              style={{
+                background: 'linear-gradient(135deg, #FB7185, #F97316)',
+                boxShadow: '0 4px 10px rgba(251,113,133,0.35)',
+              }}
+            >
+              <Search className="w-4 h-4 text-white" strokeWidth={2.5} />
+            </div>
+            <input
+              type="text"
+              placeholder="Tìm bài thi…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="relative w-full pl-12 pr-4 py-3 rounded-2xl text-sm font-semibold outline-none transition-all focus:ring-4"
+              style={{
+                background: '#fff',
+                border: '2px solid #FFE4E6',
+                color: '#1E293B',
+                boxShadow: '0 4px 16px rgba(251,113,133,0.08)',
+                ['--tw-ring-color' as any]: 'rgba(251,113,133,0.18)',
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = '#FB7185';
+                e.currentTarget.style.boxShadow = '0 8px 24px rgba(251,113,133,0.18)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#FFE4E6';
+                e.currentTarget.style.boxShadow = '0 4px 16px rgba(251,113,133,0.08)';
+              }}
+            />
           </div>
         </header>
 
         {/* ─── Tabs ────────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex items-center">
           <div className="flex items-center gap-2 p-1 rounded-2xl bg-white/70 border-2 border-rose-100">
             <button
               onClick={() => setTab('all')}
@@ -238,18 +298,6 @@ export function KidsTests() {
                 </span>
               )}
             </button>
-          </div>
-
-          <div className="relative flex-1 sm:max-w-xs sm:ml-auto">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Tìm bài thi…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2.5 rounded-full text-sm outline-none focus:border-rose-300 transition-colors"
-              style={{ background: '#fff', border: '2px solid #FFE4E6', color: '#1E293B' }}
-            />
           </div>
         </div>
 
