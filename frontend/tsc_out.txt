@@ -1,4 +1,74 @@
 src/app/components/Layout.tsx(2,25): error TS2307: Cannot find module './Sidebar' or its corresponding type declarations.
+src/app/components/ui/badge.tsx(38,6): error TS2322: Type '{ ref?: Ref<HTMLSpanElement>; key?: Key; defaultChecked?: boolean; defaultValue?: string | number | readonly string[]; suppressContentEditableWarning?: boolean; suppressHydrationWarning?: boolean; ... 274 more ...; className: string; }' is not assignable to type 'RefAttributes<HTMLElement>'.
+  Types of property 'ref' are incompatible.
+    Type 'Ref<HTMLSpanElement>' is not assignable to type 'Ref<HTMLElement>'.
+      Type '(instance: HTMLSpanElement) => void | (() => VoidOrUndefinedOnly)' is not assignable to type 'Ref<HTMLElement>'.
+        Type '(instance: HTMLSpanElement) => void | (() => VoidOrUndefinedOnly)' is not assignable to type '(instance: HTMLElement) => void | (() => VoidOrUndefinedOnly)'.
+          Type 'void | (() => VoidOrUndefinedOnly)' is not assignable to type 'void | (() => VoidOrUndefinedOnly)'. Two different types with this name exist, but they are unrelated.
+            Type '() => VoidOrUndefinedOnly' is not assignable to type 'void | (() => VoidOrUndefinedOnly)'.
+              Type '() => VoidOrUndefinedOnly' is not assignable to type '() => VoidOrUndefinedOnly'. Two different types with this name exist, but they are unrelated.
+                Type 'VoidOrUndefinedOnly' is not assignable to type 'VoidOrUndefinedOnly'. Two different types with this name exist, but they are unrelated.
+                  Type '{ [UNDEFINED_VOID_ONLY]: never; }' is not assignable to type 'VoidOrUndefinedOnly'.
+src/app/components/ui/breadcrumb.tsx(44,6): error TS2322: Type '{ ref?: Ref<HTMLAnchorElement>; key?: Key; download?: any; href?: string; hrefLang?: string; media?: string; ping?: string; target?: HTMLAttributeAnchorTarget; ... 280 more ...; className: string; }' is not assignable to type 'RefAttributes<HTMLElement>'.
+  Types of property 'ref' are incompatible.
+    Type 'Ref<HTMLAnchorElement>' is not assignable to type 'Ref<HTMLElement>'.
+      Type '(instance: HTMLAnchorElement) => void | (() => VoidOrUndefinedOnly)' is not assignable to type 'Ref<HTMLElement>'.
+        Type '(instance: HTMLAnchorElement) => void | (() => VoidOrUndefinedOnly)' is not assignable to type '(instance: HTMLElement) => void | (() => VoidOrUndefinedOnly)'.
+          Type 'void | (() => VoidOrUndefinedOnly)' is not assignable to type 'void | (() => VoidOrUndefinedOnly)'. Two different types with this name exist, but they are unrelated.
+            Type '() => VoidOrUndefinedOnly' is not assignable to type 'void | (() => VoidOrUndefinedOnly)'.
+              Type '() => VoidOrUndefinedOnly' is not assignable to type '() => VoidOrUndefinedOnly'. Two different types with this name exist, but they are unrelated.
+                Type 'VoidOrUndefinedOnly' is not assignable to type 'VoidOrUndefinedOnly'. Two different types with this name exist, but they are unrelated.
+                  Type '{ [UNDEFINED_VOID_ONLY]: never; }' is not assignable to type 'VoidOrUndefinedOnly'.
+src/app/components/ui/sidebar.tsx(404,6): error TS2322: Type '{ ref?: Ref<HTMLDivElement>; key?: Key; defaultChecked?: boolean; defaultValue?: string | number | readonly string[]; suppressContentEditableWarning?: boolean; suppressHydrationWarning?: boolean; ... 275 more ...; className: string; }' is not assignable to type 'RefAttributes<HTMLElement>'.
+  Types of property 'ref' are incompatible.
+    Type 'Ref<HTMLDivElement>' is not assignable to type 'Ref<HTMLElement>'.
+      Type '(instance: HTMLDivElement) => void | (() => VoidOrUndefinedOnly)' is not assignable to type 'Ref<HTMLElement>'.
+        Type '(instance: HTMLDivElement) => void | (() => VoidOrUndefinedOnly)' is not assignable to type '(instance: HTMLElement) => void | (() => VoidOrUndefinedOnly)'.
+          Type 'void | (() => VoidOrUndefinedOnly)' is not assignable to type 'void | (() => VoidOrUndefinedOnly)'. Two different types with this name exist, but they are unrelated.
+            Type '() => VoidOrUndefinedOnly' is not assignable to type 'void | (() => VoidOrUndefinedOnly)'.
+              Type '() => VoidOrUndefinedOnly' is not assignable to type '() => VoidOrUndefinedOnly'. Two different types with this name exist, but they are unrelated.
+                Type 'VoidOrUndefinedOnly' is not assignable to type 'VoidOrUndefinedOnly'. Two different types with this name exist, but they are unrelated.
+                  Type '{ [UNDEFINED_VOID_ONLY]: never; }' is not assignable to type 'VoidOrUndefinedOnly'.
+src/app/components/ui/sidebar.tsx(425,6): error TS2322: Type '{ ref?: Ref<HTMLButtonElement>; key?: Key; disabled?: boolean; form?: string; formAction?: string | ((formData: FormData) => void | Promise<void>); ... 286 more ...; className: string; }' is not assignable to type 'RefAttributes<HTMLElement>'.
+  Types of property 'ref' are incompatible.
+    Type 'Ref<HTMLButtonElement>' is not assignable to type 'Ref<HTMLElement>'.
+      Type '(instance: HTMLButtonElement) => void | (() => VoidOrUndefinedOnly)' is not assignable to type 'Ref<HTMLElement>'.
+        Type '(instance: HTMLButtonElement) => void | (() => VoidOrUndefinedOnly)' is not assignable to type '(instance: HTMLElement) => void | (() => VoidOrUndefinedOnly)'.
+          Type 'void | (() => VoidOrUndefinedOnly)' is not assignable to type 'void | (() => VoidOrUndefinedOnly)'. Two different types with this name exist, but they are unrelated.
+            Type '() => VoidOrUndefinedOnly' is not assignable to type 'void | (() => VoidOrUndefinedOnly)'.
+              Type '() => VoidOrUndefinedOnly' is not assignable to type '() => VoidOrUndefinedOnly'. Two different types with this name exist, but they are unrelated.
+                Type 'VoidOrUndefinedOnly' is not assignable to type 'VoidOrUndefinedOnly'. Two different types with this name exist, but they are unrelated.
+                  Type '{ [UNDEFINED_VOID_ONLY]: never; }' is not assignable to type 'VoidOrUndefinedOnly'.
+src/app/components/ui/sidebar.tsx(515,6): error TS2322: Type '{ ref?: Ref<HTMLButtonElement>; key?: Key; disabled?: boolean; form?: string; formAction?: string | ((formData: FormData) => void | Promise<void>); ... 288 more ...; className: string; }' is not assignable to type 'RefAttributes<HTMLElement>'.
+  Types of property 'ref' are incompatible.
+    Type 'Ref<HTMLButtonElement>' is not assignable to type 'Ref<HTMLElement>'.
+      Type '(instance: HTMLButtonElement) => void | (() => VoidOrUndefinedOnly)' is not assignable to type 'Ref<HTMLElement>'.
+        Type '(instance: HTMLButtonElement) => void | (() => VoidOrUndefinedOnly)' is not assignable to type '(instance: HTMLElement) => void | (() => VoidOrUndefinedOnly)'.
+          Type 'void | (() => VoidOrUndefinedOnly)' is not assignable to type 'void | (() => VoidOrUndefinedOnly)'. Two different types with this name exist, but they are unrelated.
+            Type '() => VoidOrUndefinedOnly' is not assignable to type 'void | (() => VoidOrUndefinedOnly)'.
+              Type '() => VoidOrUndefinedOnly' is not assignable to type '() => VoidOrUndefinedOnly'. Two different types with this name exist, but they are unrelated.
+                Type 'VoidOrUndefinedOnly' is not assignable to type 'VoidOrUndefinedOnly'. Two different types with this name exist, but they are unrelated.
+                  Type '{ [UNDEFINED_VOID_ONLY]: never; }' is not assignable to type 'VoidOrUndefinedOnly'.
+src/app/components/ui/sidebar.tsx(560,6): error TS2322: Type '{ ref?: Ref<HTMLButtonElement>; key?: Key; disabled?: boolean; form?: string; formAction?: string | ((formData: FormData) => void | Promise<void>); ... 286 more ...; className: string; }' is not assignable to type 'RefAttributes<HTMLElement>'.
+  Types of property 'ref' are incompatible.
+    Type 'Ref<HTMLButtonElement>' is not assignable to type 'Ref<HTMLElement>'.
+      Type '(instance: HTMLButtonElement) => void | (() => VoidOrUndefinedOnly)' is not assignable to type 'Ref<HTMLElement>'.
+        Type '(instance: HTMLButtonElement) => void | (() => VoidOrUndefinedOnly)' is not assignable to type '(instance: HTMLElement) => void | (() => VoidOrUndefinedOnly)'.
+          Type 'void | (() => VoidOrUndefinedOnly)' is not assignable to type 'void | (() => VoidOrUndefinedOnly)'. Two different types with this name exist, but they are unrelated.
+            Type '() => VoidOrUndefinedOnly' is not assignable to type 'void | (() => VoidOrUndefinedOnly)'.
+              Type '() => VoidOrUndefinedOnly' is not assignable to type '() => VoidOrUndefinedOnly'. Two different types with this name exist, but they are unrelated.
+                Type 'VoidOrUndefinedOnly' is not assignable to type 'VoidOrUndefinedOnly'. Two different types with this name exist, but they are unrelated.
+                  Type '{ [UNDEFINED_VOID_ONLY]: never; }' is not assignable to type 'VoidOrUndefinedOnly'.
+src/app/components/ui/sidebar.tsx(683,6): error TS2322: Type '{ ref?: Ref<HTMLAnchorElement>; key?: Key; download?: any; href?: string; hrefLang?: string; media?: string; ping?: string; target?: HTMLAttributeAnchorTarget; ... 283 more ...; className: string; }' is not assignable to type 'RefAttributes<HTMLElement>'.
+  Types of property 'ref' are incompatible.
+    Type 'Ref<HTMLAnchorElement>' is not assignable to type 'Ref<HTMLElement>'.
+      Type '(instance: HTMLAnchorElement) => void | (() => VoidOrUndefinedOnly)' is not assignable to type 'Ref<HTMLElement>'.
+        Type '(instance: HTMLAnchorElement) => void | (() => VoidOrUndefinedOnly)' is not assignable to type '(instance: HTMLElement) => void | (() => VoidOrUndefinedOnly)'.
+          Type 'void | (() => VoidOrUndefinedOnly)' is not assignable to type 'void | (() => VoidOrUndefinedOnly)'. Two different types with this name exist, but they are unrelated.
+            Type '() => VoidOrUndefinedOnly' is not assignable to type 'void | (() => VoidOrUndefinedOnly)'.
+              Type '() => VoidOrUndefinedOnly' is not assignable to type '() => VoidOrUndefinedOnly'. Two different types with this name exist, but they are unrelated.
+                Type 'VoidOrUndefinedOnly' is not assignable to type 'VoidOrUndefinedOnly'. Two different types with this name exist, but they are unrelated.
+                  Type '{ [UNDEFINED_VOID_ONLY]: never; }' is not assignable to type 'VoidOrUndefinedOnly'.
 src/app/features/auth/index.ts(17,23): error TS2307: Cannot find module './Login' or its corresponding type declarations.
 src/app/features/auth/index.ts(18,26): error TS2307: Cannot find module './Register' or its corresponding type declarations.
 src/app/features/auth/shared/index.ts(5,32): error TS2307: Cannot find module './ForgotPassword' or its corresponding type declarations.
@@ -9,17 +79,6 @@ src/app/features/teacher/blog/Categories.tsx(389,84): error TS2322: Type '{ icon
   Property 'style' does not exist on type 'IntrinsicAttributes & { iconName: string; className?: string; }'.
 src/app/features/teacher/exams/CreateVSTEPExam.tsx(411,57): error TS2339: Property 'wordCount' does not exist on type '{ part: number; name: string; questions: number; description: string; }'.
 src/app/features/teacher/exams/CreateVSTEPExam.tsx(411,84): error TS2339: Property 'wordCount' does not exist on type '{ part: number; name: string; questions: number; description: string; }'.
-src/app/features/teacher/exams/kids/editors/ClozeTestEditor.tsx(67,73): error TS2362: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
-src/app/features/teacher/exams/kids/editors/ClozeTestEditor.tsx(67,77): error TS2363: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
-src/app/features/teacher/exams/kids/editors/ClozeTestEditor.tsx(75,17): error TS2345: Argument of type '{ gap_id: unknown; options: string[]; correct_answer: string; }[]' is not assignable to parameter of type 'SetStateAction<Gap[]>'.
-  Type '{ gap_id: unknown; options: string[]; correct_answer: string; }[]' is not assignable to type 'Gap[]'.
-    Type '{ gap_id: unknown; options: string[]; correct_answer: string; }' is not assignable to type 'Gap'.
-      Types of property 'gap_id' are incompatible.
-        Type 'unknown' is not assignable to type 'number'.
-src/app/features/teacher/exams/kids/editors/ObjectPlacementEditor.tsx(38,46): error TS2345: Argument of type 'number' is not assignable to parameter of type 'File'.
-src/app/features/teacher/exams/kids/editors/ObjectPlacementEditor.tsx(54,46): error TS2345: Argument of type 'number' is not assignable to parameter of type 'File'.
-src/app/features/teacher/exams/kids/editors/PictureSentenceWritingEditor.tsx(48,46): error TS2345: Argument of type 'number' is not assignable to parameter of type 'File'.
-src/app/features/teacher/exams/kids/editors/PictureStoryWritingEditor.tsx(33,46): error TS2345: Argument of type 'number' is not assignable to parameter of type 'File'.
 src/app/features/teacher/settings/PdfCutterTab.tsx(43,25): error TS2345: Argument of type '{ canvasContext: CanvasRenderingContext2D; viewport: PageViewport; }' is not assignable to parameter of type 'RenderParameters'.
   Property 'canvas' is missing in type '{ canvasContext: CanvasRenderingContext2D; viewport: PageViewport; }' but required in type 'RenderParameters'.
 src/app/features/teacher/settings/PdfCutterTab.tsx(75,30): error TS2322: Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'BlobPart'.
@@ -29,7 +88,18 @@ src/app/features/teacher/settings/PdfCutterTab.tsx(75,30): error TS2322: Type 'U
         Type 'SharedArrayBuffer' is not assignable to type 'ArrayBuffer'.
           Types of property '[Symbol.toStringTag]' are incompatible.
             Type '"SharedArrayBuffer"' is not assignable to type '"ArrayBuffer"'.
+src/app/layouts/AdultsLayout.tsx(150,34): error TS2339: Property 'cName' does not exist on type 'unknown'.
+src/app/layouts/AdultsLayout.tsx(150,56): error TS2339: Property 'name' does not exist on type 'unknown'.
+src/app/layouts/AdultsLayout.tsx(151,52): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'string'.
+src/app/layouts/AdultsLayout.tsx(239,19): error TS2322: Type 'unknown' is not assignable to type 'ReactNode'.
 src/components/shared/ErrorHandler.tsx(3,10): error TS2305: Module '"../../types/teacher"' has no exported member 'ValidationError'.
+src/lib/api.ts(1,1): error TS1344: 'A label is not allowed here.
+src/lib/api.ts(7,1): error TS1184: Modifiers cannot appear here.
+src/lib/api.ts(29,21): error TS2304: Cannot find name 'env'.
+src/lib/api.ts(64,48): error TS2304: Cannot find name 'env'.
+src/lib/api.ts(79,48): error TS2304: Cannot find name 'env'.
+src/lib/api.ts(95,48): error TS2304: Cannot find name 'env'.
+src/lib/api.ts(107,48): error TS2304: Cannot find name 'env'.
 src/services/teacherApi.test.ts(21,23): error TS2339: Property 'defaults' does not exist on type '{ client: AxiosInstance; dashboard: { getTestStatistics(examId: number): Promise<ApiResponse<TestStatistics>>; getActiveSessions(): Promise<...>; ... 4 more ...; getRecentActivities(): Promise<...>; }; ... 12 more ...; user: { ...; }; }'.
 src/services/teacherApi.test.ts(22,23): error TS2339: Property 'defaults' does not exist on type '{ client: AxiosInstance; dashboard: { getTestStatistics(examId: number): Promise<ApiResponse<TestStatistics>>; getActiveSessions(): Promise<...>; ... 4 more ...; getRecentActivities(): Promise<...>; }; ... 12 more ...; user: { ...; }; }'.
 src/services/teacherApi.test.ts(23,23): error TS2339: Property 'defaults' does not exist on type '{ client: AxiosInstance; dashboard: { getTestStatistics(examId: number): Promise<ApiResponse<TestStatistics>>; getActiveSessions(): Promise<...>; ... 4 more ...; getRecentActivities(): Promise<...>; }; ... 12 more ...; user: { ...; }; }'.
@@ -41,11 +111,11 @@ src/services/teacherApi.test.ts(67,22): error TS2339: Property 'get' does not ex
 src/services/teacherApi.test.ts(74,5): error TS2552: Cannot find name 'localStorageMock'. Did you mean 'localStorage'?
 src/services/teacherApi.test.ts(91,16): error TS2339: Property 'defaults' does not exist on type '{ client: AxiosInstance; dashboard: { getTestStatistics(examId: number): Promise<ApiResponse<TestStatistics>>; getActiveSessions(): Promise<...>; ... 4 more ...; getRecentActivities(): Promise<...>; }; ... 12 more ...; user: { ...; }; }'.
 src/services/teacherApi.test.ts(94,24): error TS2339: Property 'get' does not exist on type '{ client: AxiosInstance; dashboard: { getTestStatistics(examId: number): Promise<ApiResponse<TestStatistics>>; getActiveSessions(): Promise<...>; ... 4 more ...; getRecentActivities(): Promise<...>; }; ... 12 more ...; user: { ...; }; }'.
-src/services/teacherApi.test.ts(100,12): error TS2552: Cannot find name 'localStorageMock'. Did you mean 'localStorage'?
-src/services/teacherApi.test.ts(108,5): error TS2552: Cannot find name 'localStorageMock'. Did you mean 'localStorage'?
+src/services/teacherApi.test.ts(100,12): error TS2304: Cannot find name 'localStorageMock'.
+src/services/teacherApi.test.ts(108,5): error TS2304: Cannot find name 'localStorageMock'.
 src/services/teacherApi.test.ts(125,16): error TS2339: Property 'defaults' does not exist on type '{ client: AxiosInstance; dashboard: { getTestStatistics(examId: number): Promise<ApiResponse<TestStatistics>>; getActiveSessions(): Promise<...>; ... 4 more ...; getRecentActivities(): Promise<...>; }; ... 12 more ...; user: { ...; }; }'.
 src/services/teacherApi.test.ts(128,24): error TS2339: Property 'get' does not exist on type '{ client: AxiosInstance; dashboard: { getTestStatistics(examId: number): Promise<ApiResponse<TestStatistics>>; getActiveSessions(): Promise<...>; ... 4 more ...; getRecentActivities(): Promise<...>; }; ... 12 more ...; user: { ...; }; }'.
-src/services/teacherApi.test.ts(134,12): error TS2552: Cannot find name 'localStorageMock'. Did you mean 'localStorage'?
+src/services/teacherApi.test.ts(134,12): error TS2304: Cannot find name 'localStorageMock'.
 src/services/teacherApi.test.ts(162,16): error TS2339: Property 'defaults' does not exist on type '{ client: AxiosInstance; dashboard: { getTestStatistics(examId: number): Promise<ApiResponse<TestStatistics>>; getActiveSessions(): Promise<...>; ... 4 more ...; getRecentActivities(): Promise<...>; }; ... 12 more ...; user: { ...; }; }'.
 src/services/teacherApi.test.ts(164,22): error TS2339: Property 'get' does not exist on type '{ client: AxiosInstance; dashboard: { getTestStatistics(examId: number): Promise<ApiResponse<TestStatistics>>; getActiveSessions(): Promise<...>; ... 4 more ...; getRecentActivities(): Promise<...>; }; ... 12 more ...; user: { ...; }; }'.
 src/types/teacher.ts(232,3): error TS2687: All declarations of 'eSource_type' must have identical modifiers.
