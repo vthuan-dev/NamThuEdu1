@@ -56,7 +56,7 @@ export function IeltsQuestionRenderer({
         <div className="flex-shrink-0 w-7 h-7 rounded-md bg-gray-900 text-white flex items-center justify-center text-xs font-bold tabular-nums">
           {qNum}
         </div>
-        <div className="flex-1 text-sm text-gray-900 leading-relaxed">
+        <div className="flex-1 text-sm text-gray-900 leading-relaxed whitespace-pre-wrap">
           {question.questionText || <em className="text-gray-400">No prompt</em>}
         </div>
         <button

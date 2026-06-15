@@ -27,6 +27,8 @@ export type IeltsQuestionType =
   | "short_answer"
   | "diagram_labelling"
   | "plan_map_diagram"
+  | "image_completion"
+  | "image-completion"
   | "essay"
   | "speaking";
 

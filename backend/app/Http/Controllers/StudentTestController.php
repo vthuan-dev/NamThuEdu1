@@ -432,19 +432,7 @@ class StudentTestController extends Controller
             ], 403);
         }
 
-        // Check attempt limit
-        $attemptsUsed = Submission::where('user_id', $user->uId)
-                                 ->where('assignment_id', $id)
-                                 ->count();
-
-        if ($attemptsUsed >= $assignment->taMax_attempt) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Bạn đã hết số lần làm bài cho bài thi này.'
-            ], 403);
-        }
-
-        // Check if there's already an in_progress submission
+        // Check if there's already an in_progress submission (resume takes priority over attempt limit)
         $existingSubmission = Submission::where('user_id', $user->uId)
                                        ->where('assignment_id', $id)
                                        ->where('sStatus', 'in_progress')
@@ -469,6 +457,18 @@ class StudentTestController extends Controller
                     'canResume' => true
                 ]
             ], 200);
+        }
+
+        // Check attempt limit (only when starting a brand-new attempt)
+        $attemptsUsed = Submission::where('user_id', $user->uId)
+                                 ->where('assignment_id', $id)
+                                 ->count();
+
+        if ($attemptsUsed >= $assignment->taMax_attempt) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Bạn đã hết số lần làm bài cho bài thi này.'
+            ], 403);
         }
 
         // Create new submission
@@ -2693,7 +2693,9 @@ class StudentTestController extends Controller
             $qSection = strtolower($question->qSection ?? '');
 
             // Subjective check: skip grading for writing/speaking
+            $qSkill = strtolower($question->qSkill ?? '');
             $isSubjective = in_array($qType, $subjectiveTypes)
+                         || in_array($qSkill,    ['writing', 'speaking'])
                          || ($isVstep && in_array($qSection, ['writing', 'speaking']));
 
             if ($isSubjective) {
@@ -2787,6 +2789,22 @@ class StudentTestController extends Controller
         }
 
         return ['error' => null, 'scorePercentage' => $scorePercentage, 'vstepMeta' => $vstepMeta];
+    }
+
+    /**
+     * Ẩn đáp án đúng và thêm alias cho frontend trước khi trả dữ liệu đề thi.
+     */
+    private function prepareExamForFrontend(Exam $exam): Exam
+    {
+        $exam->questions->each(function ($question) {
+            $question->qPassage = $question->qPassage_text;
+            $question->qSkill   = $question->qSkill ?? $question->qSection;
+            $question->answers->each(function ($answer) {
+                unset($answer->aIs_correct);
+            });
+        });
+
+        return $exam;
     }
 
     /**
@@ -4016,14 +4034,7 @@ class StudentTestController extends Controller
             $savedAnswers  = collect();
         }
 
-        // Ẩn đáp án đúng + thêm alias cho frontend
-        $exam->questions->each(function ($question) {
-            $question->qPassage = $question->qPassage_text;
-            $question->qSkill   = $question->qSkill ?? $question->qSection;
-            $question->answers->each(function ($answer) {
-                unset($answer->aIs_correct);
-            });
-        });
+        $exam = $this->prepareExamForFrontend($exam);
 
         return response()->json([
             'status' => 'success',
@@ -4180,14 +4191,7 @@ class StudentTestController extends Controller
             $savedAnswers  = collect();
         }
 
-        // Ẩn đáp án đúng + thêm alias cho frontend
-        $exam->questions->each(function ($question) {
-            $question->qPassage = $question->qPassage_text;
-            $question->qSkill   = $question->qSkill ?? $question->qSection;
-            $question->answers->each(function ($answer) {
-                unset($answer->aIs_correct);
-            });
-        });
+        $exam = $this->prepareExamForFrontend($exam);
 
         return response()->json([
             'status' => 'success',

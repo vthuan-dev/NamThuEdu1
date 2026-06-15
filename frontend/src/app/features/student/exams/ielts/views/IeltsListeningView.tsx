@@ -296,10 +296,9 @@ function highlightQuestionRow(num: number): void {
  * Các segment giữ đúng thứ tự câu để không xáo trộn đề.
  */
 function FormContent({ section }: { section: IeltsListeningSection }) {
-  // Phân loại từng câu: matching (cần legend A/B/C) | mcq (trắc nghiệm có
-  // options nhưng KHÔNG phải blank-fill) | other (form/note/table/sentence…).
-  const classify = (q: IeltsQuestion): "matching" | "mcq" | "other" => {
+  const classify = (q: IeltsQuestion): "image" | "matching" | "mcq" | "other" => {
     const type = (q.questionType || "").toString();
+    if (type === "image-completion" || type === "image_completion") return "image";
     const hasOptions = !!q.options && Object.keys(q.options).length > 0;
     if (type.includes("matching") && hasOptions) return "matching";
     if (hasOptions && (type.includes("multiple") || type.includes("choice")))
@@ -307,8 +306,7 @@ function FormContent({ section }: { section: IeltsListeningSection }) {
     return "other";
   };
 
-  // Chia câu hỏi thành các segment liên tiếp cùng loại.
-  const segments: { kind: "matching" | "mcq" | "other"; questions: IeltsQuestion[] }[] = [];
+  const segments: { kind: "image" | "matching" | "mcq" | "other"; questions: IeltsQuestion[] }[] = [];
   section.questions.forEach((q) => {
     const kind = classify(q);
     const last = segments[segments.length - 1];
@@ -322,7 +320,9 @@ function FormContent({ section }: { section: IeltsListeningSection }) {
   return (
     <div className="space-y-4">
       {segments.map((seg, i) =>
-        seg.kind === "matching" ? (
+        seg.kind === "image" ? (
+          <ImageCompletionBlock key={`seg-i-${i}`} questions={seg.questions} />
+        ) : seg.kind === "matching" ? (
           <MatchingBlock key={`seg-m-${i}`} questions={seg.questions} section={section} />
         ) : seg.kind === "mcq" ? (
           <McqBlock key={`seg-q-${i}`} questions={seg.questions} section={section} />
@@ -334,6 +334,70 @@ function FormContent({ section }: { section: IeltsListeningSection }) {
           />
         )
       )}
+    </div>
+  );
+}
+
+/**
+ * Render nhóm câu IMAGE-COMPLETION: hiện ảnh đề + danh sách số câu bên trái.
+ * Học viên nhìn ảnh và điền đáp án vào ô bên phải (panel điều hướng).
+ */
+function ImageCompletionBlock({ questions }: { questions: IeltsQuestion[] }) {
+  const [zoomed, setZoomed] = useState(false);
+  const taskImage = (questions[0]?.data?.task_image as string) || (questions[0]?.data?.taskImage as string) || "";
+  const firstNum = questions[0]?.questionNumber;
+  const lastNum  = questions[questions.length - 1]?.questionNumber;
+  const range    = firstNum === lastNum ? `${firstNum}` : `${firstNum}–${lastNum}`;
+
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50/30 overflow-hidden shadow-sm">
+      <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200">
+        <span className="inline-flex items-center px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-xs font-bold">
+          Câu {range}
+        </span>
+        <span className="text-[11px] text-amber-700 font-medium">Xem ảnh đề và điền vào ô bên phải</span>
+      </div>
+      {taskImage ? (
+        <div className="p-3">
+          <img
+            src={taskImage}
+            alt="Question page"
+            className="w-full rounded-md border border-amber-200 cursor-zoom-in"
+            onClick={() => setZoomed(true)}
+            title="Nhấp để phóng to"
+          />
+          {zoomed && (
+            <div
+              className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4 cursor-zoom-out"
+              onClick={() => setZoomed(false)}
+            >
+              <img
+                src={taskImage}
+                alt="Question page zoomed"
+                className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="px-4 py-6 text-center text-sm text-amber-600 italic">
+          Giáo viên chưa upload ảnh đề cho phần này.
+        </div>
+      )}
+      <ul className="divide-y divide-amber-100 border-t border-amber-200">
+        {questions.map((q) => (
+          <li key={q.qId} id={`ielts-row-${q.questionNumber}`}
+            className="flex items-center gap-2 px-4 py-2">
+            <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded bg-amber-100 text-amber-800 font-bold text-xs border border-amber-200">
+              {q.questionNumber}
+            </span>
+            {q.questionText && (
+              <span className="text-[13px] text-gray-700 whitespace-pre-wrap">{q.questionText}</span>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -426,7 +490,7 @@ function MatchingBlock({
                   <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded bg-[#fff0eb] text-[#FF6B35] font-bold text-xs border border-[#ffc1ad]">
                     {q.questionNumber}
                   </span>
-                  <span className="text-[15px] leading-relaxed text-[#1a1a1a]">
+                  <span className="text-[15px] leading-relaxed text-[#1a1a1a] whitespace-pre-wrap">
                     {cleanQuestionText((q.questionText || "").trim(), q.questionNumber)}
                   </span>
                 </li>
@@ -480,12 +544,12 @@ function McqBlock({
             >
               {showTitle && (
                 <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
-                  <h3 className="text-sm font-bold text-gray-900">{title}</h3>
+                  <h3 className="text-sm font-bold text-gray-900 whitespace-pre-wrap">{title}</h3>
                 </div>
               )}
 
               {instruction && instruction !== section.instructions && (
-                <p className="px-4 pt-2.5 text-xs font-semibold text-[#FF6B35] italic">
+                <p className="px-4 pt-2.5 text-xs font-semibold text-[#FF6B35] italic whitespace-pre-wrap">
                   {instruction}
                 </p>
               )}
@@ -495,7 +559,7 @@ function McqBlock({
                 <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded bg-[#fff0eb] text-[#FF6B35] font-bold text-xs border border-[#ffc1ad]">
                   {q.questionNumber}
                 </span>
-                <span className="text-[15px] leading-relaxed text-[#1a1a1a] font-medium">
+                <span className="text-[15px] leading-relaxed text-[#1a1a1a] font-medium whitespace-pre-wrap">
                   {stem}
                 </span>
               </div>
@@ -653,7 +717,7 @@ function NonMatchingContent({
                 {/* Optional task title — chỉ hiện 1 lần cho nhóm cùng title */}
                 {showTitle && (
                   <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
-                    <h3 className="text-sm font-bold text-gray-900">{g.title}</h3>
+                    <h3 className="text-sm font-bold text-gray-900 whitespace-pre-wrap">{g.title}</h3>
                   </div>
                 )}
 
@@ -663,13 +727,13 @@ function NonMatchingContent({
                 {(g.prefix || g.subjectPlaceholder) && (
                   <div className="px-4 py-2.5 bg-orange-50/50 border-b border-orange-100/80">
                     {g.prefix ? (
-                      <span className="text-[15px] font-bold text-gray-900">
+                      <span className="text-[15px] font-bold text-gray-900 whitespace-pre-wrap">
                         {g.prefix}
                       </span>
                     ) : g.subjectPlaceholder ? (
                       <span
                         id={`ielts-row-${g.subjectPlaceholder.number}`}
-                        className="text-[15px] font-bold text-gray-900"
+                        className="text-[15px] font-bold text-gray-900 whitespace-pre-wrap"
                       >
                         {renderInlineBlanks(
                           g.subjectPlaceholder.text,
@@ -683,7 +747,7 @@ function NonMatchingContent({
 
                 {/* Optional task instruction */}
                 {g.instruction && g.instruction !== section.instructions && (
-                  <p className="px-4 pt-2 text-xs font-semibold text-[#FF6B35] italic">
+                  <p className="px-4 pt-2 text-xs font-semibold text-[#FF6B35] italic whitespace-pre-wrap">
                     {g.instruction}
                   </p>
                 )}
@@ -695,7 +759,7 @@ function NonMatchingContent({
                     <li
                       key={item.number}
                       id={`ielts-row-${item.number}`}
-                      className="px-4 py-2.5 text-[15px] leading-relaxed text-[#1a1a1a]"
+                      className="px-4 py-2.5 text-[15px] leading-relaxed text-[#1a1a1a] whitespace-pre-wrap"
                     >
                       {renderInlineBlanks(item.text, item.number, true)}
                     </li>
@@ -765,7 +829,7 @@ function NonMatchingContent({
               )}
 
               {g.instruction && g.instruction !== section.instructions && (
-                <p className="text-sm font-semibold text-[#FF6B35] italic">
+                <p className="text-sm font-semibold text-[#FF6B35] italic whitespace-pre-wrap">
                   {g.instruction}
                 </p>
               )}
@@ -781,7 +845,7 @@ function NonMatchingContent({
                 </div>
               )}
 
-              <div>{renderInlineBlanks(g.stem, first)}</div>
+              <div className="whitespace-pre-wrap">{renderInlineBlanks(g.stem, first)}</div>
 
               {isGroup && (
                 <p className="text-sm text-gray-500 italic">
@@ -812,8 +876,8 @@ function cleanQuestionText(text: string, questionNumber: number): string {
   // 2) Xoá số câu đứng đầu chuỗi: "31 ___ was..." đã xử lý ở trên;
   //    còn trường hợp "9 £ ___" → số 9 cách £ rồi mới tới blank
   out = out.replace(new RegExp(`(^|\\s)${questionNumber}\\s+(?=[£$€%]|\\b)`, "g"), "$1");
-  // 3) Gom khoảng trắng thừa
-  out = out.replace(/\s{2,}/g, " ").trim();
+  // 3) Gom space thừa (giữ nguyên xuống dòng để preserve format)
+  out = out.replace(/ {2,}/g, " ").trim();
   return out;
 }
 
@@ -888,7 +952,7 @@ function renderInlineBlanks(
     parts.push(text.slice(lastIndex));
   }
 
-  if (foundAny) return <span>{parts}</span>;
+  if (foundAny) return <span className="whitespace-pre-wrap">{parts}</span>;
 
   // Không có inline pattern
   if (noFallbackChip) {
@@ -896,7 +960,7 @@ function renderInlineBlanks(
     const trimmed = text.replace(/\s+$/, "");
     if (/[:：]$/.test(trimmed)) {
       return (
-        <span>
+        <span className="whitespace-pre-wrap">
           {trimmed}{" "}
           <span className="inline-flex items-center justify-center min-w-[32px] h-6 px-2 mx-1 rounded bg-[#fff0eb] text-[#FF6B35] font-semibold text-xs border border-[#ffc1ad]">
             {fallbackNum}
@@ -905,7 +969,7 @@ function renderInlineBlanks(
       );
     }
     // Còn lại: render text raw, student nhìn input bên phải để biết câu nào
-    return <span>{text}</span>;
+    return <span className="whitespace-pre-wrap">{text}</span>;
   }
 
   // Fallback (mode flat list cũ): chip + text
@@ -914,7 +978,7 @@ function renderInlineBlanks(
       <span className="inline-flex flex-shrink-0 w-6 h-6 rounded bg-[#fff0eb] text-[#FF6B35] font-semibold text-xs items-center justify-center mt-0.5 border border-[#ffc1ad]">
         {fallbackNum}
       </span>
-      <span>{text}</span>
+      <span className="whitespace-pre-wrap">{text}</span>
     </div>
   );
 }
@@ -1146,7 +1210,7 @@ function HighlightedInstructions({ text }: { text: string }) {
     /(NO MORE THAN [A-Z\-\s]+(?:WORDS?|NUMBERS?)(?:\s+AND(?:\/OR)?\s+A\s+NUMBER)?|ONE WORD ONLY|ONE WORD AND\/OR A NUMBER|TWO WORDS AND\/OR A NUMBER|THREE WORDS AND\/OR A NUMBER|TWO WORDS ONLY|THREE WORDS ONLY|A NUMBER ONLY)/g;
   const parts = text.split(pattern);
   return (
-    <p className="text-[15px] leading-[1.6] text-[#1F2937]">
+    <p className="text-[15px] leading-[1.6] text-[#1F2937] whitespace-pre-wrap">
       {parts.map((part, i) =>
         part && pattern.test(part) ? (
           <span

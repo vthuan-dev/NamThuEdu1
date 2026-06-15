@@ -38,7 +38,12 @@ const VSTEP_SPEAKING_PARTS = [
 // Default data generators
 const createDefaultPart1Data = (): Part1Topic[] => [
   {
-    id: `topic-${Date.now()}`,
+    id: `topic-${Date.now()}-1`,
+    topicName: "",
+    questions: ["", "", ""], // 3 empty questions
+  },
+  {
+    id: `topic-${Date.now()}-2`,
     topicName: "",
     questions: ["", "", ""], // 3 empty questions
   },
@@ -754,10 +759,8 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
 
   // Render Part 1: Social Interaction
   const renderPart1 = () => {
-    // Luôn dùng topic đầu tiên (mỗi đề chỉ có 1 topic)
     const topics = currentPartData.part1Data || [];
-    const topic = topics[0];
-    if (!topic) return null;
+    if (topics.length === 0) return null;
 
     return (
       <div className="space-y-6">
@@ -770,7 +773,7 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
             <div className="flex-1">
               <h3 className="font-semibold text-gray-800 mb-2">Part 1: Social Interaction</h3>
               <p className="text-sm text-gray-600 leading-relaxed">
-                Warm-up conversation with 1 topic and 3 short questions. Students answer naturally about familiar topics.
+                Warm-up conversation với 2 topics, mỗi topic có 3 câu hỏi. Học viên trả lời tự nhiên về các chủ đề quen thuộc.
               </p>
               <div className="flex items-center gap-5 mt-4 text-xs text-gray-500">
                 <span className="flex items-center gap-2">
@@ -779,77 +782,93 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
                 </span>
                 <span className="flex items-center gap-2">
                   <span className="w-1 h-1 bg-gray-400 rounded-full"></span>
-                  Format: 1 Topic + 3 Questions
+                  Format: 2 Topics × 3 Questions
                 </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Main Content Card */}
-        <div className="border border-gray-200 rounded-xl p-7 bg-white space-y-6">
-          {/* Topic Section */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              <span className="inline-flex items-center gap-2">
-                <span className="w-7 h-7 bg-gray-100 text-gray-600 rounded-lg flex items-center justify-center text-sm font-medium">
-                  1
+        {/* Topic cards */}
+        {topics.map((topic, topicIndex) => (
+          <div key={topic.id} className="border border-gray-200 rounded-xl p-7 bg-white space-y-6">
+            {/* Topic header */}
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-2 text-sm font-semibold text-blue-700">
+                <span className="w-7 h-7 bg-blue-100 text-blue-700 rounded-lg flex items-center justify-center text-sm font-bold">
+                  {topicIndex + 1}
                 </span>
-                Topic Name
+                Topic {topicIndex + 1}
               </span>
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                type="text"
-                value={topic.topicName}
-                onChange={(e) => updateTopicName(topic.id, e.target.value)}
-                placeholder="Let's talk about... (e.g., your hobbies, your hometown, your daily routine)"
-                className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400/30 focus:border-blue-400 text-gray-900 placeholder:text-gray-400 transition-all"
-              />
-              <button
-                onClick={() => handleGeneratePart1Questions(topic.id, topic.topicName)}
-                disabled={isGenerating || !topic.topicName.trim()}
-                className="flex items-center gap-2 px-4 py-3 text-sm bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-sm whitespace-nowrap"
-                title={topic.questions.some(q => q.trim()) ? "AI cải thiện câu hỏi" : "AI tạo câu hỏi"}
-              >
-                <Sparkles className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
-                {isGenerating ? "Đang tạo..." : topic.questions.some(q => q.trim()) ? "Cải thiện" : "AI Generate"}
-              </button>
+              {topics.length > 1 && (
+                <button
+                  onClick={() => removeTopic(topic.id)}
+                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Xoá topic này"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
-          </div>
 
-          {/* Questions Section */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-4">
-              <span className="inline-flex items-center gap-2">
-                <span className="w-7 h-7 bg-gray-100 text-gray-600 rounded-lg flex items-center justify-center text-sm font-medium">
-                  2
-                </span>
-                Questions
-              </span>
-            </label>
-            <div className="space-y-3">
-              {topic.questions.map((question, qIndex) => (
-                <div key={qIndex} className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-7 h-7 bg-gray-50 text-gray-500 rounded-lg flex items-center justify-center font-medium text-sm mt-1">
-                    {qIndex + 1}
-                  </span>
-                  <input
-                    type="text"
-                    value={question}
-                    onChange={(e) => updateTopicQuestion(topic.id, qIndex, e.target.value)}
-                    placeholder={
-                      qIndex === 0 ? "Question 1: e.g., What do you usually do in your free time?" :
-                      qIndex === 1 ? "Question 2: e.g., How often do you do this activity?" :
-                      "Question 3: e.g., Why do you enjoy it?"
-                    }
-                    className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400/30 focus:border-blue-400 text-gray-900 placeholder:text-gray-400 transition-all"
-                  />
-                </div>
-              ))}
+            {/* Topic Name */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Topic Name</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={topic.topicName}
+                  onChange={(e) => updateTopicName(topic.id, e.target.value)}
+                  placeholder="Let's talk about... (e.g., your hobbies, your hometown, your daily routine)"
+                  className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400/30 focus:border-blue-400 text-gray-900 placeholder:text-gray-400 transition-all"
+                />
+                <button
+                  onClick={() => handleGeneratePart1Questions(topic.id, topic.topicName)}
+                  disabled={isGenerating || !topic.topicName.trim()}
+                  className="flex items-center gap-2 px-4 py-3 text-sm bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl hover:from-blue-600 hover:to-indigo-600 transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-sm whitespace-nowrap"
+                  title={topic.questions.some(q => q.trim()) ? "AI cải thiện câu hỏi" : "AI tạo câu hỏi"}
+                >
+                  <Sparkles className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
+                  {isGenerating ? "Đang tạo..." : topic.questions.some(q => q.trim()) ? "Cải thiện" : "AI Generate"}
+                </button>
+              </div>
+            </div>
+
+            {/* Questions */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Questions</label>
+              <div className="space-y-3">
+                {topic.questions.map((question, qIndex) => (
+                  <div key={qIndex} className="flex items-start gap-3">
+                    <span className="flex-shrink-0 w-7 h-7 bg-gray-50 text-gray-500 rounded-lg flex items-center justify-center font-medium text-sm mt-1">
+                      {qIndex + 1}
+                    </span>
+                    <input
+                      type="text"
+                      value={question}
+                      onChange={(e) => updateTopicQuestion(topic.id, qIndex, e.target.value)}
+                      placeholder={
+                        qIndex === 0 ? "Question 1: e.g., What do you usually do in your free time?" :
+                        qIndex === 1 ? "Question 2: e.g., How often do you do this activity?" :
+                        "Question 3: e.g., Why do you enjoy it?"
+                      }
+                      className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400/30 focus:border-blue-400 text-gray-900 placeholder:text-gray-400 transition-all"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        ))}
+
+        {/* Add topic button */}
+        <button
+          onClick={addTopic}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-blue-200 text-blue-500 rounded-xl hover:border-blue-400 hover:bg-blue-50/50 transition-all text-sm font-medium"
+        >
+          <Plus className="w-4 h-4" />
+          Thêm Topic
+        </button>
       </div>
     );
   };

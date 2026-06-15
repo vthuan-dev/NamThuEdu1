@@ -219,6 +219,7 @@ export const IELTS_LISTENING_QUESTION_TYPES = [
   { value: "short-answer", label: "Short-answer" },
   { value: "matching", label: "Matching" },
   { value: "plan-map-diagram", label: "Plan / map / diagram labelling" },
+  { value: "image-completion", label: "🖼 Image / Table (upload ảnh đề)" },
 ] as const;
 
 // Speaking Part 2 — typical Cue Card prompt structure

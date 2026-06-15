@@ -306,6 +306,7 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         Route::post('/ielts/transcribe-audio', [GeminiPdfController::class, 'transcribeAudio']); // Groq Whisper STT (server-side, nhanh)
         Route::post('/ielts/suggest-answers', [GeminiPdfController::class, 'suggestIeltsAnswers']); // Groq gợi ý đáp án từ transcript/passage
         Route::post('/exams/{examId}/ielts/listening/sections/{sectionNumber}/audio', [ExamController::class, 'uploadIeltsListeningAudio']);
+        Route::post('/exams/{examId}/ielts/listening/sections/{sectionNumber}/question-image', [ExamController::class, 'uploadIeltsListeningQuestionImage']);
 
         // ── IELTS exam CRUD (NEW: 1 đề = 1 skill) ──────────────────────────────
         Route::post('/exams/ielts',                       [IeltsExamController::class, 'createDraft']);

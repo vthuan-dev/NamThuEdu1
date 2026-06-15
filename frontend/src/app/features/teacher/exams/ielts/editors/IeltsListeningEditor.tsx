@@ -7,8 +7,8 @@ import {
   Loader2,
   CheckCircle2,
   Wand2,
-  Sparkles,
-  AlertTriangle,
+  Image as ImageIcon,
+  ZoomIn,
 } from "lucide-react";
 import { IELTS_STRUCTURE, IELTS_LISTENING_QUESTION_TYPES, type IeltsTestType } from "../structure";
 import { api } from "../../../../../../services/api";
@@ -32,7 +32,12 @@ interface ListeningQuestion {
   wordLimit?: string;
   /** Completion: dùng word bank (chọn từ danh sách cho sẵn). Dùng chung cả nhóm. */
   useWordBank?: boolean;
+  /** Image-completion: URL ảnh đề thi (dùng chung cả nhóm). */
+  taskImage?: string;
+  taskImageFileName?: string;
 }
+
+const isImageCompletion = (t: string) => t === "image-completion";
 
 // Các dạng điền từ trong Listening — có giới hạn từ + word bank.
 const LISTENING_COMPLETION_TYPES = [
@@ -112,17 +117,19 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
         audioFileName: incoming.audioFileName ?? "",
         transcript: incoming.transcript ?? "",
         questions: (incoming.questions ?? emptySec.questions).map((q: any) => {
-          const isMcq = (q.questionType ?? "multiple-choice") === "multiple-choice";
-          // MCQ mà chưa có đáp án → mặc định chọn "A" để phòng giáo viên quên chọn.
-          const correctAnswer =
-            q.correctAnswer ?? (isMcq ? "A" : "");
+          const qType = q.questionType ?? "multiple-choice";
+          const isMcq = qType === "multiple-choice";
+          const imgComp = isImageCompletion(qType);
+          const correctAnswer = q.correctAnswer ?? (isMcq ? "A" : "");
           return {
             ...q,
             questionText: q.questionText ?? "",
             taskTitle: q.taskTitle ?? "",
             taskInstruction: q.taskInstruction ?? "",
+            taskImage: q.taskImage ?? "",
+            taskImageFileName: q.taskImageFileName ?? "",
             correctAnswer: isMcq && !correctAnswer.trim() ? "A" : correctAnswer,
-            options: q.options ?? { A: "", B: "", C: "", D: "" },
+            options: imgComp ? undefined : (q.options ?? { A: "", B: "", C: "", D: "" }),
           };
         }),
       };
@@ -145,11 +152,6 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
     });
   }, []);
 
-  // AI suggest đáp án (Groq) — track per section
-  const [suggestingSection, setSuggestingSection] = useState<number | null>(null);
-  const [suggestError, setSuggestError] = useState<string | null>(null);
-  // Bộ section đã có suggestion từ AI → hiện banner cảnh báo
-  const [aiSuggestedSections, setAiSuggestedSections] = useState<Set<number>>(new Set());
 
   const current = sections.find((s) => s.sectionNumber === activeSection)!;
   const partInfo = IELTS_STRUCTURE.listening.parts[activeSection - 1];
@@ -319,17 +321,6 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
       }
 
       updateSection(sectionNum, { transcript: finalText });
-
-      // Auto: nếu section có câu hỏi mà chưa có đáp án → tự gợi ý 1 lượt từ
-      // transcript vừa tạo. Silent = không spam lỗi nếu AI không tìm được.
-      const secNow = sections.find((s) => s.sectionNumber === sectionNum);
-      const hasQuestions = secNow?.questions.some((q) => q.questionText?.trim());
-      const missingAnswers = secNow?.questions.some(
-        (q) => q.questionText?.trim() && !q.correctAnswer?.trim()
-      );
-      if (hasQuestions && missingAnswers) {
-        void suggestAnswersForSection(sectionNum, finalText, true);
-      }
     } catch (err: any) {
       console.error("Transcribe failed:", err);
       setModelLoadingPct(null);
@@ -363,138 +354,6 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
     }
   };
 
-  /**
-   * Core: gợi ý đáp án bằng Groq cho 1 section cụ thể.
-   * Dùng được cả khi user bấm nút lẫn auto sau khi transcribe xong.
-   * @param sectionNum section cần điền
-   * @param transcript transcript để AI suy đáp án (truyền explicit để dùng ngay
-   *        sau transcribe, không phải chờ setState)
-   * @param silent true = không set error khi không tìm được (dùng cho auto-flow)
-   */
-  const suggestAnswersForSection = async (
-    sectionNum: 1 | 2 | 3 | 4,
-    transcript: string,
-    silent = false
-  ) => {
-    const sec = sections.find((s) => s.sectionNumber === sectionNum);
-    if (!sec) return;
-    if (!transcript?.trim()) {
-      if (!silent) setSuggestError("Cần có transcript trước khi AI gợi ý đáp án.");
-      return;
-    }
-    const questionsWithText = sec.questions.filter((q) => q.questionText?.trim());
-    if (questionsWithText.length === 0) {
-      if (!silent)
-        setSuggestError("Cần có nội dung câu hỏi trước khi AI gợi ý đáp án.");
-      return;
-    }
-
-    setSuggestingSection(sectionNum);
-    setSuggestError(null);
-    try {
-      const payload = {
-        skill: "listening",
-        context: transcript,
-        questions: questionsWithText.map((q) => ({
-          number: q.questionNumber,
-          text: q.questionText,
-          type: q.questionType,
-          options: q.options,
-        })),
-      };
-      const res = await api.post("/teacher/ielts/suggest-answers", payload);
-      const answers = res.data?.data?.answers || [];
-      // eslint-disable-next-line no-console
-      console.log(`[AI Suggest] section ${sectionNum} →`, answers);
-      if (!Array.isArray(answers) || answers.length === 0) {
-        throw new Error("AI không trả về đáp án nào.");
-      }
-
-      const emptyCount = answers.filter((a: any) => {
-        const v = a?.answer;
-        return v == null || String(v).trim() === "";
-      }).length;
-
-      const byNumber = new Map<number, string>();
-      answers.forEach((a: any) => {
-        const n = Number(a?.number);
-        if (Number.isFinite(n) && a?.answer != null && String(a.answer).trim() !== "") {
-          byNumber.set(n, String(a.answer).trim());
-        }
-      });
-
-      let appliedCount = 0;
-      setSections((prev) =>
-        prev.map((s) => {
-          if (s.sectionNumber !== sectionNum) return s;
-          const askedQs = s.questions.filter((q) => q.questionText?.trim());
-          const useIndexFallback =
-            byNumber.size === 0 && answers.length === askedQs.length;
-          const updatedQuestions = s.questions.map((q) => {
-            const ansByNum = byNumber.get(q.questionNumber);
-            if (ansByNum) {
-              appliedCount++;
-              return { ...q, correctAnswer: ansByNum };
-            }
-            if (useIndexFallback) {
-              const idx = askedQs.findIndex((x) => x.id === q.id);
-              const a = answers[idx];
-              if (a?.answer && String(a.answer).trim() !== "") {
-                appliedCount++;
-                return { ...q, correctAnswer: String(a.answer).trim() };
-              }
-            }
-            return q;
-          });
-          return { ...s, questions: updatedQuestions };
-        })
-      );
-
-      if (appliedCount === 0) {
-        if (!silent) {
-          if (emptyCount === answers.length) {
-            setSuggestError(
-              "AI không tìm thấy đáp án nào trong transcript. " +
-                "Transcript hiện tại có thể không đúng audio gốc của đề (vd: dùng audio test)."
-            );
-          } else {
-            setSuggestError(
-              `AI trả về ${answers.length} đáp án nhưng không match được câu hỏi nào. ` +
-                `Kiểm tra Console để xem chi tiết.`
-            );
-          }
-        }
-      } else {
-        setAiSuggestedSections((prev) => {
-          const next = new Set(prev);
-          next.add(sectionNum);
-          return next;
-        });
-        if (emptyCount > 0 && !silent) {
-          setSuggestError(
-            `Đã điền ${appliedCount}/${answers.length} câu. ` +
-              `${emptyCount} câu AI không xác định được — bạn cần điền thủ công.`
-          );
-        }
-      }
-    } catch (err: any) {
-      if (!silent) {
-        setSuggestError(
-          err?.response?.data?.message ||
-            err?.message ||
-            "Không thể gợi ý đáp án. Vui lòng thử lại."
-        );
-      } else {
-        console.warn("Auto-suggest failed:", err?.message);
-      }
-    } finally {
-      setSuggestingSection(null);
-    }
-  };
-
-  /** Nút bấm tay: gợi ý cho section hiện tại từ transcript đã có. */
-  const handleSuggestAnswers = () =>
-    suggestAnswersForSection(activeSection, current.transcript || "");
 
   const completedSections = sections.filter(
     (s) => s.audioUrl && s.questions.some((q) => q.questionText.trim())
@@ -528,7 +387,11 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
           {sections.map((s) => {
             const isActive = s.sectionNumber === activeSection;
             const hasAudio = !!s.audioUrl;
-            const filledQs = s.questions.filter((q) => q.questionText.trim()).length;
+            const filledQs = s.questions.filter((q) =>
+              q.questionType === "image-completion"
+                ? (q.correctAnswer ?? "").trim() !== ""
+                : q.questionText.trim()
+            ).length;
             const isSecTranscribing = transcribingSections.has(s.sectionNumber);
             return (
               <button
@@ -593,21 +456,45 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
           </div>
         </div>
 
-        {/* Tiêu đề part (chủ đề) */}
-        <div className="mb-4">
-          <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1.5">
-            Tiêu đề part (chủ đề)
+        {/* Toggle tiêu đề part tùy chỉnh — tách riêng */}
+        <div className="flex items-center gap-2 mb-3">
+          <label className="flex items-center gap-1.5 text-[11px] text-gray-500 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={!!current.sectionTitle}
+              onChange={(e) => {
+                const on = e.target.checked;
+                updateSection(activeSection, { sectionTitle: on ? (partInfo?.name ?? "") : "" });
+              }}
+              className="w-3.5 h-3.5 accent-blue-500"
+            />
+            <span className={current.sectionTitle ? "text-blue-600 font-medium" : ""}>
+              {current.sectionTitle ? "Hiển thị tiêu đề part tùy chỉnh" : "Hiển thị tiêu đề part tùy chỉnh"}
+            </span>
           </label>
-          <input
-            type="text"
-            value={current.sectionTitle || ""}
-            onChange={(e) =>
-              updateSection(activeSection, { sectionTitle: e.target.value })
-            }
-            placeholder="VD: Restaurant recommendations, Pottery class..."
-            className="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
-          />
         </div>
+
+        {/* Tiêu đề part (chủ đề) — chỉ hiện khi bật toggle */}
+        {!!current.sectionTitle && (
+          <div className="mb-4 rounded-xl border border-gray-200 bg-white overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-100">
+              <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                Tiêu đề part (chủ đề)
+              </span>
+            </div>
+            <div className="p-3">
+              <input
+                type="text"
+                value={current.sectionTitle || ""}
+                onChange={(e) =>
+                  updateSection(activeSection, { sectionTitle: e.target.value })
+                }
+                placeholder="VD: Restaurant recommendations, Pottery class..."
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition-all"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Yêu cầu đề (instruction) */}
         <div className="mb-4">
@@ -802,60 +689,9 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
           <h4 className="text-sm font-bold text-gray-900">
             Câu hỏi {(activeSection - 1) * 10 + 1} – {activeSection * 10}
           </h4>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">10 câu / section</span>
-            <button
-              type="button"
-              onClick={handleSuggestAnswers}
-              disabled={
-                suggestingSection === activeSection ||
-                !current.transcript?.trim()
-              }
-              title={
-                !current.transcript?.trim()
-                  ? "Cần có transcript trước khi AI gợi ý"
-                  : "Dùng AI để tự động điền đáp án tham khảo từ transcript"
-              }
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold bg-violet-50 text-violet-700 hover:bg-violet-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer border border-violet-200"
-            >
-              {suggestingSection === activeSection ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  AI đang gợi ý...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-3.5 h-3.5" />
-                  AI gợi ý đáp án
-                </>
-              )}
-            </button>
-          </div>
+          <span className="text-xs text-gray-500">10 câu / section</span>
         </div>
 
-        {suggestError && (
-          <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-[12px]">
-            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-            <span className="flex-1">{suggestError}</span>
-            <button
-              type="button"
-              onClick={() => setSuggestError(null)}
-              className="text-rose-600 hover:text-rose-800 font-semibold cursor-pointer"
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        {aiSuggestedSections.has(activeSection) && (
-          <div className="mb-3 flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[12px] leading-relaxed">
-            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-            <span className="flex-1">
-              <span className="font-semibold">Đáp án do AI gợi ý — có thể sai.</span>{" "}
-              Vui lòng đối chiếu với transcript và sửa lại nếu cần trước khi xuất bản.
-            </span>
-          </div>
-        )}
 
         <div className="space-y-3">
           {current.questions.map((q, idx) => {
@@ -873,17 +709,31 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
                 groupSize++;
               }
             }
+            const isImgCompStart = isGroupStart && isImageCompletion(q.questionType);
             return (
-              <ListeningQuestionRow
-                key={q.id}
-                question={q}
-                sectionNumber={activeSection}
-                index={idx}
-                isGroupStart={isGroupStart}
-                groupSize={groupSize}
-                onPatch={updateQuestion}
-                onPatchGroup={patchGroupAt}
-              />
+              <>
+                {isImgCompStart && (
+                  <ImageTaskBlock
+                    key={`img-${q.id}`}
+                    question={q}
+                    groupSize={groupSize}
+                    sectionNumber={activeSection}
+                    examId={examId}
+                    onPatchGroup={patchGroupAt}
+                  />
+                )}
+                <ListeningQuestionRow
+                  key={q.id}
+                  question={q}
+                  sectionNumber={activeSection}
+                  index={idx}
+                  isGroupStart={isGroupStart}
+                  groupSize={groupSize}
+                  examId={examId}
+                  onPatch={updateQuestion}
+                  onPatchGroup={patchGroupAt}
+                />
+              </>
             );
           })}
         </div>
@@ -895,7 +745,9 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
           <div className="flex -space-x-1">
             {sections.map((s) => {
               const done =
-                !!s.audioUrl && s.questions.every((q) => q.questionText.trim());
+                !!s.audioUrl && s.questions.every((q) =>
+                  isImageCompletion(q.questionType) ? !!q.correctAnswer.trim() : !!q.questionText.trim()
+                );
               return (
                 <div
                   key={s.sectionNumber}
@@ -936,6 +788,7 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
   index,
   isGroupStart = false,
   groupSize = 1,
+  examId,
   onPatch,
   onPatchGroup,
 }: {
@@ -946,19 +799,21 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
   isGroupStart?: boolean;
   /** Số câu trong nhóm (để hiển thị "Câu N–M"). */
   groupSize?: number;
+  examId?: string;
   onPatch: (secNum: number, qIdx: number, patch: Partial<ListeningQuestion>) => void;
   onPatchGroup?: (secNum: number, qIdx: number, patch: Partial<ListeningQuestion>) => void;
 }) {
   const isMcq = question.questionType === "multiple-choice";
   const isMatching = isListeningMatching(question.questionType);
   const completion = isListeningCompletion(question.questionType);
+  const isImgCompletion = isImageCompletion(question.questionType);
   const wordBank = completion && !!question.useWordBank;
   const selectCount = question.selectCount ?? 1;
   const isMultiMcq = isMcq && selectCount > 1;
   const handleChange = (patch: Partial<ListeningQuestion>) => onPatch(sectionNumber, index, patch);
-  /** Patch dùng chung cho cả nhóm (instruction, options, wordLimit, selectCount, useWordBank). */
   const handleGroup = (patch: Partial<ListeningQuestion>) =>
     (onPatchGroup ?? ((s, _i, p) => onPatch(s, index, p)))(sectionNumber, index, patch);
+
   const optionKeys = Object.keys(question.options || {})
     .filter((k) => /^[A-Za-z]+$/.test(k))
     .sort();
@@ -984,33 +839,31 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
         </div>
 
         <div className="flex-1 min-w-0 space-y-2">
+          {/* ── Question type selector + group controls ── */}
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={question.questionType}
               onChange={(e) => {
                 const newType = e.target.value;
-                // Đổi dạng → áp cho cả nhóm + reset cài đặt đặc thù để tránh lệch.
-                const patch: Partial<ListeningQuestion> = {
+                handleChange({
                   questionType: newType,
                   selectCount: undefined,
                   wordLimit: undefined,
                   useWordBank: undefined,
+                  taskImage: isImageCompletion(newType) ? question.taskImage : undefined,
+                  taskImageFileName: isImageCompletion(newType) ? question.taskImageFileName : undefined,
                   correctAnswer:
                     newType === "multiple-choice" && !question.correctAnswer?.trim()
                       ? "A"
                       : "",
-                };
-                if (isListeningMatching(newType)) {
-                  patch.options =
-                    question.options && Object.keys(question.options).length
-                      ? question.options
-                      : { A: "", B: "", C: "" };
-                } else if (newType === "multiple-choice") {
-                  patch.options = question.options ?? { A: "", B: "", C: "", D: "" };
-                } else {
-                  patch.options = undefined;
-                }
-                handleGroup(patch);
+                  options: isListeningMatching(newType)
+                    ? (question.options && Object.keys(question.options).length
+                        ? question.options
+                        : { A: "", B: "", C: "" })
+                    : newType === "multiple-choice"
+                    ? (question.options ?? { A: "", B: "", C: "", D: "" })
+                    : undefined,
+                });
               }}
               className="text-xs font-medium px-2 py-1 border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
@@ -1087,16 +940,18 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
             )}
           </div>
 
-          <input
-            type="text"
-            value={question.questionText}
-            onChange={(e) => handleChange({ questionText: e.target.value })}
-            placeholder={isMatching ? "Tên mục cần ghép (vd: kettle, alarm clock...)" : "Nội dung câu hỏi..."}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
+          {!isImgCompletion && (
+            <input
+              type="text"
+              value={question.questionText}
+              onChange={(e) => handleChange({ questionText: e.target.value })}
+              placeholder={isMatching ? "Tên mục cần ghép (vd: kettle, alarm clock...)" : "Nội dung câu hỏi..."}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          )}
 
-          {/* Chỉ dẫn chung của nhóm — hiện 1 lần ở câu đầu nhóm, áp cho mọi dạng */}
-          {isGroupStart && (
+          {/* Chỉ dẫn chung của nhóm — hiện 1 lần ở câu đầu nhóm, áp cho mọi dạng (trừ image-completion tự có zone riêng phía trên) */}
+          {isGroupStart && !isImgCompletion && (
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-wide text-indigo-700 mb-1">
                 Chỉ dẫn chung của nhóm (áp dụng cho cả nhóm)
@@ -1111,7 +966,21 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
             </div>
           )}
 
-          {isMatching || wordBank ? (
+          {/* Image-completion: chỉ cần ô đáp án đúng, đơn giản */}
+          {isImgCompletion && (
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] font-semibold text-amber-700 flex-shrink-0">Đáp án đúng:</span>
+              <input
+                type="text"
+                value={question.correctAnswer}
+                onChange={(e) => handleChange({ correctAnswer: e.target.value })}
+                placeholder="Nhập đáp án đúng..."
+                className="flex-1 px-3 py-2 text-sm border border-amber-200 bg-amber-50/40 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+          )}
+
+          {!isImgCompletion && (isMatching || wordBank) ? (
             <div className="space-y-2">
               {/* Bảng lựa chọn / word bank dùng chung — chỉ hiện ở câu đầu nhóm */}
               {isGroupStart && (
@@ -1263,7 +1132,7 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
                 ))}
               </div>
             )
-          ) : (
+          ) : !isImgCompletion ? (
             <div className="space-y-1">
               {question.wordLimit && (
                 <p className="text-[11px] text-gray-500 italic">{question.wordLimit}</p>
@@ -1276,9 +1145,149 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
                 className="w-full px-3 py-2 text-sm border border-emerald-200 bg-emerald-50/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
-          )}
+          ) : null}
         </div>
       </div>
+    </div>
+  );
+});
+
+// ─── Image task block (standalone, above the question rows) ───────────────
+// Rendered separately at group-start so teachers understand the image is
+// shared across the whole image-completion group, not just question 1.
+const ImageTaskBlock = memo(function ImageTaskBlock({
+  question,
+  groupSize = 1,
+  sectionNumber,
+  examId,
+  onPatchGroup,
+}: {
+  question: ListeningQuestion;
+  groupSize?: number;
+  sectionNumber: number;
+  examId?: string;
+  onPatchGroup: (secNum: number, qIdx: number, patch: Partial<ListeningQuestion>) => void;
+}) {
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageZoomed, setImageZoomed] = useState(false);
+  const handleGroup = (patch: Partial<ListeningQuestion>) =>
+    onPatchGroup(sectionNumber, (question.questionNumber - 1) % 10, patch);
+
+  const handleImageUpload = async (file: File) => {
+    if (!examId) {
+      alert("Vui lòng đợi exam được tạo trước khi upload ảnh");
+      return;
+    }
+    setImageUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      fd.append("section", String(sectionNumber));
+      const res = await api.post(
+        `/teacher/exams/${examId}/ielts/listening/sections/${sectionNumber}/question-image`,
+        fd,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+      const url = res.data?.image_url || res.data?.data?.image_url || URL.createObjectURL(file);
+      handleGroup({ taskImage: url, taskImageFileName: file.name });
+    } catch {
+      const url = URL.createObjectURL(file);
+      handleGroup({ taskImage: url, taskImageFileName: file.name });
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const firstNum = question.questionNumber;
+  const lastNum = firstNum + groupSize - 1;
+  const rangeLabel = groupSize > 1 ? `${firstNum}–${lastNum}` : `${firstNum}`;
+
+  return (
+    <div
+      className="rounded-xl border-2 border-dashed border-amber-400 bg-amber-50/50 p-4 space-y-3 outline-none focus:border-amber-500 focus:bg-amber-50/70"
+      tabIndex={0}
+      onPaste={(e) => {
+        e.preventDefault();
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.startsWith('image/')) {
+            const blob = items[i].getAsFile();
+            if (blob) handleImageUpload(blob);
+            return;
+          }
+        }
+      }}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs font-bold text-amber-800 uppercase tracking-wide">
+          <ImageIcon className="w-4 h-4" />
+          Ảnh đề chung — Câu {rangeLabel}
+        </div>
+        {groupSize > 1 && (
+          <span className="text-[11px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+            Nhóm {groupSize} câu
+          </span>
+        )}
+      </div>
+
+      {question.taskImage ? (
+        <div className="space-y-2">
+          <div className="relative group">
+            <img
+              src={question.taskImage}
+              alt="Question image"
+              className="max-w-full max-h-[320px] w-auto object-contain mx-auto rounded-lg border border-amber-200 cursor-zoom-in"
+              onClick={() => setImageZoomed(true)}
+            />
+            <button
+              type="button"
+              onClick={() => setImageZoomed(true)}
+              className="absolute top-2 right-2 p-1.5 rounded-md bg-white/80 text-amber-700 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              title="Phóng to"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-gray-500 truncate flex-1">{question.taskImageFileName}</span>
+            <button
+              type="button"
+              onClick={() => handleGroup({ taskImage: "", taskImageFileName: "" })}
+              className="text-[11px] font-semibold text-rose-500 hover:text-rose-700 cursor-pointer whitespace-nowrap"
+            >
+              Đổi ảnh
+            </button>
+          </div>
+        </div>
+      ) : (
+        <label className="flex items-center justify-center gap-2 py-5 cursor-pointer hover:bg-amber-50 rounded-lg transition-all">
+          {imageUploading ? (
+            <><Loader2 className="w-4 h-4 animate-spin text-amber-600" /><span className="text-sm text-amber-700">Đang upload...</span></>
+          ) : (
+            <><Upload className="w-4 h-4 text-amber-400" /><span className="text-sm font-medium text-amber-700">Upload ảnh đề (jpg, png, pdf...) hoặc paste (Ctrl+V)</span></>
+          )}
+          <input
+            type="file"
+            accept="image/*,.pdf"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); }}
+          />
+        </label>
+      )}
+      {imageZoomed && question.taskImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setImageZoomed(false)}
+        >
+          <img
+            src={question.taskImage}
+            alt="Question image zoomed"
+            className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 });

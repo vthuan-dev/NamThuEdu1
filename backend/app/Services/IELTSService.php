@@ -835,6 +835,9 @@ class IELTSService
             $wordLimit = (string) ($qVal['wordLimit'] ?? '');
             $selectCount = (int) ($qVal['selectCount'] ?? 1);
             $useWordBank = (bool) ($qVal['useWordBank'] ?? false);
+            // Image-completion: shared group image URL
+            $taskImage = (string) ($qVal['taskImage'] ?? '');
+            $taskImageFileName = (string) ($qVal['taskImageFileName'] ?? '');
 
             $question = Question::create([
                 'exam_id'          => $exam->eId,
@@ -847,15 +850,17 @@ class IELTSService
                 'qSection_order'   => $qNum,
                 'qPoints'          => 1,
                 'qData'            => array_filter([
-                    'question_number'  => $qNum,
-                    'options'          => $options,
-                    'correct_answer'   => $correctAnswer,
-                    'section_title'    => $sectionTitle !== '' ? $sectionTitle : null,
-                    'task_title'       => $taskTitle !== '' ? $taskTitle : null,
-                    'task_instruction' => $taskInstruction !== '' ? $taskInstruction : null,
-                    'word_limit'       => $wordLimit !== '' ? $wordLimit : null,
-                    'select_count'     => $selectCount > 1 ? $selectCount : null,
-                    'use_word_bank'    => $useWordBank ? true : null,
+                    'question_number'     => $qNum,
+                    'options'             => $options,
+                    'correct_answer'      => $correctAnswer,
+                    'section_title'       => $sectionTitle !== '' ? $sectionTitle : null,
+                    'task_title'          => $taskTitle !== '' ? $taskTitle : null,
+                    'task_instruction'    => $taskInstruction !== '' ? $taskInstruction : null,
+                    'word_limit'          => $wordLimit !== '' ? $wordLimit : null,
+                    'select_count'        => $selectCount > 1 ? $selectCount : null,
+                    'use_word_bank'       => $useWordBank ? true : null,
+                    'task_image'          => $taskImage !== '' ? $taskImage : null,
+                    'task_image_file_name'=> $taskImageFileName !== '' ? $taskImageFileName : null,
                 ], fn ($v) => $v !== null),
             ]);
 

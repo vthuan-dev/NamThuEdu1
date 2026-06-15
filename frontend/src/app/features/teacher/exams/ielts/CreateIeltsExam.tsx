@@ -31,7 +31,6 @@ import {
   Edit3,
   Eye,
   Save as SaveIcon,
-  Upload,
   AlertTriangle,
   AlertCircle,
   ChevronRight,
@@ -49,8 +48,6 @@ import { IeltsWritingEditor } from "./editors/IeltsWritingEditor";
 import { IeltsSpeakingEditor } from "./editors/IeltsSpeakingEditor";
 import { IeltsExamStudentPreview } from "./IeltsExamStudentPreview";
 import { type PlayModeConfig } from "./components/IeltsPlayModeConfig";
-import { IeltsImportModal } from "./components/IeltsImportModal";
-import type { IeltsSkillImport } from "../../../../../services/groqApi";
 
 // ─── Theme ────────────────────────────────────────────────────────────────
 const IELTS_PRIMARY = "#0F4C81";
@@ -108,14 +105,13 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
   const [isPublishing, setIsPublishing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
   // Bump version để force remount editor mỗi khi skillData được thay nguyên cục
-  // (sau khi import / load draft). Editor dùng `useState(() => initialData)` nên
+  // (sau khi load draft). Editor dùng `useState(() => initialData)` nên
   // không tự sync khi prop initialData đổi → cần key để remount.
   const [editorVersion, setEditorVersion] = useState(0);
   const [showWarnings, setShowWarnings] = useState(true);
   /**
-   * Validation chỉ bật sau khi user IMPORT (PDF/JSON) hoặc LOAD DRAFT.
+   * Validation chỉ bật sau khi user LOAD DRAFT.
    * Khi user tự nhập thủ công từ đầu thì không spam cảnh báo trong lúc đang nhập.
    * Vẫn block xuất bản nếu thiếu dữ liệu (validate ngay khi click Publish).
    */
@@ -204,17 +200,6 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
   const handleSaveSkill = (data: any) => {
     setSkillData(data);
     setHasUnsavedChanges(true);
-  };
-
-  // ── Import từ PDF/JSON ────────────────────────────────────────────────
-  // Modal trả về data đúng shape mà editor expect, ta merge vào skillData.
-  const handleImported = (imported: IeltsSkillImport) => {
-    setSkillData(normalizeImportedForEditor(imported, skill));
-    setEditorVersion((v) => v + 1); // force remount editor để áp data mới vào form
-    setHasUnsavedChanges(true);
-    setValidationEnabled(true); // sau khi import → bật cảnh báo để teacher review
-    setShowWarnings(true);
-    success(`Đã import ${meta.label} từ file. Hãy kiểm tra và lưu nháp.`);
   };
 
   // ── Save draft to backend ──────────────────────────────────────────────
@@ -409,16 +394,6 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
               </button>
             ))}
           </div>
-
-          <button
-            type="button"
-            onClick={() => setImportOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-semibold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-all cursor-pointer text-sm"
-            title="Import nội dung từ file PDF (AI tự phân tích) hoặc JSON"
-          >
-            <Upload className="w-4 h-4" />
-            <span className="hidden sm:inline">Import PDF</span>
-          </button>
 
           <button
             type="button"
@@ -617,14 +592,6 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
         </div>
       </div>
 
-      {/* ─── Import PDF / JSON modal ─────────────────────────────────── */}
-      <IeltsImportModal
-        open={importOpen}
-        skill={skill}
-        testType={testType}
-        onClose={() => setImportOpen(false)}
-        onImported={handleImported}
-      />
     </div>
   );
 }
@@ -669,139 +636,6 @@ function extractSkillItems(skill: IeltsSkill, data: any): any[] {
     if (Array.isArray(v)) return v;
   }
   return [];
-}
-
-/**
- * Chuẩn hoá data từ import (lib hoặc Gemini AI) sang shape editor cần.
- *
- * Editors mong đợi:
- * - `id` cho mỗi câu hỏi (để dùng làm React key)
- * - `options` luôn tồn tại với A/B/C/D cho MCQ (kể cả khi AI trả về 3 options)
- * - `correctAnswer` mặc định nếu rỗng
- *
- * Gemini AI thường:
- * - KHÔNG trả `id`
- * - Trả `options` chỉ với key có giá trị (A/B/C hoặc A-E)
- * - Có thể không có `correctAnswer`
- */
-function normalizeImportedForEditor(imported: any, skill: IeltsSkill): any {
-  if (!imported) return imported;
-
-  if (skill === "listening" && Array.isArray(imported.sections)) {
-    return {
-      ...imported,
-      sections: imported.sections.map((sec: any, sIdx: number) => ({
-        sectionNumber: sec.sectionNumber || sIdx + 1,
-        sectionTitle: sec.sectionTitle || sec.sectionName || "",
-        sectionInstruction: sec.sectionInstruction || sec.instructions || "",
-        audioUrl: sec.audioUrl || "",
-        audioFileName: sec.audioFileName || "",
-        transcript: sec.transcript || "",
-        questions: (sec.questions || []).map((q: any, qIdx: number) =>
-          normalizeQuestion(q, `s${sec.sectionNumber || sIdx + 1}-q${q.questionNumber || qIdx + 1}`)
-        ),
-      })),
-    };
-  }
-
-  if (skill === "reading" && Array.isArray(imported.passages)) {
-    return {
-      ...imported,
-      passages: imported.passages.map((p: any, pIdx: number) => ({
-        passageNumber: p.passageNumber || pIdx + 1,
-        title: p.title || "",
-        body: p.body || "",
-        wordCount: p.wordCount || (p.body ? p.body.trim().split(/\s+/).filter(Boolean).length : 0),
-        questions: (p.questions || []).map((q: any, qIdx: number) =>
-          normalizeQuestion(q, `p${p.passageNumber || pIdx + 1}-q${q.questionNumber || qIdx + 1}`)
-        ),
-      })),
-    };
-  }
-
-  if (skill === "writing" && Array.isArray(imported.tasks)) {
-    return {
-      ...imported,
-      tasks: imported.tasks.map((t: any, idx: number) => ({
-        taskNumber: t.taskNumber || idx + 1,
-        prompt: t.prompt || "",
-        imageUrl: t.imageUrl || "",
-        imageFileName: t.imageFileName || "",
-        tone: t.tone,
-        chartType: t.chartType,
-        essayType: t.essayType,
-        modelAnswer: t.modelAnswer || "",
-      })),
-    };
-  }
-
-  if (skill === "speaking" && Array.isArray(imported.parts)) {
-    return {
-      ...imported,
-      parts: imported.parts.map((p: any, idx: number) => {
-        const partNum = p.partNumber || idx + 1;
-        const base: any = { partNumber: partNum };
-        if (partNum === 2) {
-          base.cueCard = {
-            topic: p.cueCard?.topic || "",
-            bullets: Array.isArray(p.cueCard?.bullets) ? p.cueCard.bullets : [],
-            followUp: p.cueCard?.followUp || "",
-          };
-        } else {
-          base.questions = (p.questions || []).map((q: any, qIdx: number) => ({
-            id: q.id || `p${partNum}-q${qIdx + 1}`,
-            topic: q.topic,
-            text: q.text || q.questionText || "",
-          }));
-        }
-        return base;
-      }),
-    };
-  }
-
-  return imported;
-}
-
-/** Chuẩn hoá 1 question (Listening/Reading): đảm bảo có `id` + giữ nguyên options. */
-function normalizeQuestion(q: any, fallbackId: string): any {
-  const opts = q.options || null;
-  // Giữ nguyên options từ AI (có thể chỉ A-C hoặc A-E cho Choose TWO)
-  // KHÔNG fill A/B/C/D rỗng vì làm rối UI cho note/form/sentence completion
-  const isMcq = q.questionType === "multiple-choice";
-  // Các dạng matching dùng danh sách lựa chọn chung (A/B/C…) → cần options.
-  const isMatching = [
-    "matching-headings",
-    "matching-information",
-    "matching-features",
-    "matching-sentence-endings",
-  ].includes(q.questionType);
-
-  let normalizedOpts: Record<string, string> | undefined;
-  if (opts && typeof opts === "object") {
-    normalizedOpts = {};
-    Object.keys(opts).forEach((k) => {
-      if (typeof opts[k] === "string") (normalizedOpts as any)[k] = opts[k];
-    });
-  } else if (isMcq) {
-    // MCQ mà thiếu options → tạo A-D rỗng để teacher điền
-    normalizedOpts = { A: "", B: "", C: "", D: "" };
-  } else if (isMatching) {
-    // Matching mà thiếu options → tạo A/B/C rỗng cho danh sách lựa chọn chung
-    normalizedOpts = { A: "", B: "", C: "" };
-  }
-
-  return {
-    id: q.id || fallbackId,
-    questionNumber: q.questionNumber || 0,
-    questionType: q.questionType || "multiple-choice",
-    questionText: q.questionText || "",
-    ...(q.taskTitle ? { taskTitle: q.taskTitle } : {}),
-    ...(q.taskInstruction ? { taskInstruction: q.taskInstruction } : {}),
-    ...(normalizedOpts ? { options: normalizedOpts } : {}),
-    ...(q.wordLimit ? { wordLimit: q.wordLimit } : {}),
-    ...(q.selectCount && q.selectCount > 1 ? { selectCount: q.selectCount } : {}),
-    correctAnswer: q.correctAnswer || "",
-  };
 }
 
 // ─── Validation ────────────────────────────────────────────────────────────

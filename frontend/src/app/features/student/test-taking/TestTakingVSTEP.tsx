@@ -204,6 +204,12 @@ export function TestTakingVSTEP() {
   const [showSubmit, setShowSubmit] = useState(false);
   const [started, setStarted] = useState(false);
   const [autoSaving, setAutoSaving] = useState(false);
+  const [speakingMediaMap, setSpeakingMediaMap] = useState<Record<string, { url?: string; recording: boolean }>>({});
+  const [recordingQuestionId, setRecordingQuestionId] = useState<string | null>(null);
+  const [speakingUploadStatus, setSpeakingUploadStatus] = useState<Record<string, 'idle' | 'uploading' | 'uploaded' | 'error'>>({});
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const mediaChunksRef = useRef<Blob[]>([]);
 
   const questions = exam?.questions ?? [];
 
@@ -261,6 +267,99 @@ export function TestTakingVSTEP() {
   const goToSkillPart = (skill: SkillType, part: number) => {
     setCurrentSkill(skill);
     setCurrentPart(part);
+  };
+
+  // Cleanup media on unmount
+  useEffect(() => {
+    return () => {
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+      Object.values(speakingMediaMap).forEach((media) => {
+        if (media.url && media.url.startsWith('blob:')) URL.revokeObjectURL(media.url);
+      });
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const startSpeakingRecording = async (partNumber: number, partQuestions: any[]) => {
+    const partKey = `speaking-part-${partNumber}`;
+    if (recordingQuestionId) return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      mediaChunksRef.current = [];
+
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          mediaChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        const blob = new Blob(mediaChunksRef.current, { type: "audio/webm" });
+        const localUrl = URL.createObjectURL(blob);
+
+        setSpeakingMediaMap((prev) => {
+          const old = prev[partKey]?.url;
+          if (old && old.startsWith('blob:')) URL.revokeObjectURL(old);
+          return { ...prev, [partKey]: { url: localUrl, recording: false } };
+        });
+        setRecordingQuestionId(null);
+        setSpeakingUploadStatus((prev) => ({ ...prev, [partKey]: 'uploading' }));
+
+        if (mediaStreamRef.current) {
+          mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+          mediaStreamRef.current = null;
+        }
+
+        if (!submissionId) {
+          setSpeakingUploadStatus((prev) => ({ ...prev, [partKey]: 'error' }));
+          return;
+        }
+
+        try {
+          const res: any = await studentApi.uploadSpeakingAudio(submissionId, partNumber, blob);
+          const publicUrl: string = res?.data?.data?.url ?? '';
+          if (!publicUrl) throw new Error('No URL returned');
+          URL.revokeObjectURL(localUrl);
+          setSpeakingMediaMap((prev) => ({ ...prev, [partKey]: { url: publicUrl, recording: false } }));
+          setSpeakingUploadStatus((prev) => ({ ...prev, [partKey]: 'uploaded' }));
+          // Mark all questions in this part as answered
+          setAnswers((prev) => {
+            const updated = { ...prev };
+            partQuestions.forEach((q: any) => { updated[getQuestionId(q)] = '[recorded]'; });
+            return updated;
+          });
+        } catch {
+          setSpeakingUploadStatus((prev) => ({ ...prev, [partKey]: 'error' }));
+        }
+      };
+
+      setSpeakingMediaMap((prev) => ({ ...prev, [partKey]: { ...prev[partKey], recording: true } }));
+      setRecordingQuestionId(partKey);
+      recorder.start();
+    } catch {
+      alert("Vui lòng cho phép quyền truy cập microphone để ghi âm.");
+    }
+  };
+
+  const stopSpeakingRecording = (partKey: string) => {
+    if (recordingQuestionId !== partKey) return;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const playSpeakingAudio = (qid: string) => {
+    const url = speakingMediaMap[qid]?.url;
+    if (!url) return;
+    const a = new Audio(url);
+    a.play().catch(() => undefined);
   };
 
   // Submit mutation
@@ -469,6 +568,72 @@ export function TestTakingVSTEP() {
                   </div>
                 </div>
 
+                {/* Speaking: combined part-level recording block */}
+                {currentSkill === "speaking" && currentPartQuestions.length > 0 && (() => {
+                  const partKey = `speaking-part-${currentPart}`;
+                  const isRecording = recordingQuestionId === partKey;
+                  const uploadStatus = speakingUploadStatus[partKey];
+                  return (
+                    <div className="border border-gray-200 rounded-xl p-6 bg-white space-y-5 mb-6">
+                      <div>
+                        <h3 className="text-base font-bold text-gray-800 mb-1">Part {currentPart} — Câu hỏi</h3>
+                        <p className="text-xs text-gray-500 mb-4">Đọc kỹ các câu hỏi, sau đó ghi âm một lần cho toàn bộ phần này.</p>
+                        <div className="space-y-2 pl-2 border-l-2 border-purple-200">
+                          {currentPartQuestions.map((q: any, i: number) => (
+                            <p key={getQuestionId(q)} className="text-sm text-gray-700">
+                              <span className="font-semibold text-purple-600 mr-2">{i + 1}.</span>
+                              <span dangerouslySetInnerHTML={{ __html: q.qContent ?? '' }} />
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-lg flex-wrap">
+                        {isRecording ? (
+                          <button
+                            onClick={() => stopSpeakingRecording(partKey)}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700 transition font-semibold"
+                          >
+                            <Square className="w-4 h-4" /> Dừng ghi âm
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => startSpeakingRecording(currentPart, currentPartQuestions)}
+                            disabled={!!recordingQuestionId || uploadStatus === 'uploading'}
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white bg-purple-600 hover:bg-purple-700 transition font-semibold disabled:opacity-50"
+                          >
+                            <Mic className="w-4 h-4" /> {uploadStatus === 'uploaded' ? 'Ghi âm lại' : 'Bắt đầu ghi âm'}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => playSpeakingAudio(partKey)}
+                          disabled={!speakingMediaMap[partKey]?.url || uploadStatus === 'uploading'}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white bg-slate-700 hover:bg-slate-800 transition font-semibold disabled:opacity-50"
+                        >
+                          <Play className="w-4 h-4" /> Nghe lại
+                        </button>
+                        <p className="w-full text-xs mt-1" style={{
+                          color: uploadStatus === 'uploaded' ? '#16A34A'
+                            : uploadStatus === 'error' ? '#DC2626'
+                            : '#6B7280'
+                        }}>
+                          {isRecording
+                            ? '🔴 Đang ghi âm...'
+                            : uploadStatus === 'uploading'
+                            ? '⏳ Đang tải lên máy chủ...'
+                            : uploadStatus === 'uploaded'
+                            ? '✓ Đã tải lên. Bài nói sẽ được AI chấm điểm sau khi nộp.'
+                            : uploadStatus === 'error'
+                            ? '⚠ Lỗi tải lên. Hãy ghi âm lại.'
+                            : speakingMediaMap[partKey]?.url
+                            ? 'Bạn có thể ghi âm lại.'
+                            : 'Nhấn để bắt đầu ghi âm.'}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Questions */}
                 <div className="space-y-6">
                   {currentPartQuestions.length === 0 ? (
@@ -567,37 +732,9 @@ export function TestTakingVSTEP() {
                       }
 
                       if (currentSkill === "speaking") {
-                        return (
-                          <div key={qKey || index} className="border border-gray-200 rounded-lg p-5">
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex-1">
-                                <h3 className="text-base font-bold text-gray-800 mb-2">
-                                  Part {currentPart}
-                                </h3>
-                                <p className="text-sm text-gray-600" dangerouslySetInnerHTML={{ __html: question.qContent }} />
-                              </div>
-                              <button
-                                onClick={() => toggleBookmark(qKey)}
-                                className="ml-3 p-1.5 rounded hover:bg-gray-100 transition"
-                              >
-                                {isBookmarked ? (
-                                  <BookmarkCheck className="w-5 h-5 text-amber-500" />
-                                ) : (
-                                  <Bookmark className="w-5 h-5 text-gray-400" />
-                                )}
-                              </button>
-                            </div>
-                            <div className="flex items-center gap-3 p-4 bg-purple-50 rounded-lg">
-                              <button className="p-3 rounded-full bg-purple-600 text-white hover:bg-purple-700 transition">
-                                <Mic className="w-5 h-5" />
-                              </button>
-                              <div className="flex-1">
-                                <p className="text-sm font-semibold text-gray-800">Nhấn để ghi âm</p>
-                                <p className="text-xs text-gray-500">Bạn có thể ghi âm nhiều lần</p>
-                              </div>
-                            </div>
-                          </div>
-                        );
+                        // Speaking renders as a single part-level block — skip individual question cards
+                        // (the combined view is rendered before this map, see below)
+                        return null;
                       }
 
                       return null;

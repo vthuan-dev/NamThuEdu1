@@ -9,7 +9,7 @@
  *
  * Triết lý UI: chữ to, thẻ màu thân thiện, ít chữ, dễ bấm cho trẻ 6-12.
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { CheckCircle2, Volume2 } from 'lucide-react';
 import type { KidsAnswerMap } from './kidsAnswer';
 
@@ -501,6 +501,178 @@ function ListeningLetterMatchTask({ taskData, answer, onChange }: RendererProps)
   );
 }
 
+// ─── G. Listen and draw lines (kéo tên vào đúng vị trí trên hình — kiểu Flyer) ──────
+function ListenAndDrawLinesTask({ taskData, answer, onChange }: RendererProps) {
+  const [dragOverHotspot, setDragOverHotspot] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(null);
+
+  const audioUrl: string = taskData?.audioUrl ?? taskData?.audio_url ?? '';
+  const imageUrl: string = taskData?.imageUrl ?? taskData?.image_url ?? '';
+  const items: any[] = taskData?.items ?? [];
+
+  // answer[String(labelIdx)] = String(hotspotIdx)
+  const getPlacedLabelAt = (hotspotIdx: number): number | null => {
+    const key = Object.keys(answer).find((k) => answer[k] === String(hotspotIdx));
+    return key != null ? parseInt(key) : null;
+  };
+
+  const placeLabel = (labelIdx: number, hotspotIdx: number) => {
+    const next = { ...answer };
+    const prevKey = Object.keys(next).find((k) => parseInt(k) === labelIdx);
+    if (prevKey !== undefined) delete next[prevKey];
+    const evictKey = Object.keys(next).find((k) => next[k] === String(hotspotIdx));
+    if (evictKey !== undefined) delete next[evictKey];
+    next[String(labelIdx)] = String(hotspotIdx);
+    onChange(next);
+    setSelected(null);
+  };
+
+  const unplaceLabel = (labelIdx: number) => {
+    const next = { ...answer };
+    delete next[String(labelIdx)];
+    onChange(next);
+    setSelected(null);
+  };
+
+  const handleChipClick = (idx: number) =>
+    setSelected((prev) => (prev === idx ? null : idx));
+
+  const handleHotspotClick = (hotspotIdx: number) => {
+    const item = items[hotspotIdx];
+    if (!item || item.isExample || item.is_example) return;
+    const placedLabel = getPlacedLabelAt(hotspotIdx);
+    if (selected !== null) {
+      placeLabel(selected, hotspotIdx);
+    } else if (placedLabel !== null) {
+      unplaceLabel(placedLabel);
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent, idx: number) => {
+    e.dataTransfer.setData('ldl-label', String(idx));
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, hotspotIdx: number) => {
+    const item = items[hotspotIdx];
+    if (!item || item.isExample || item.is_example) return;
+    e.preventDefault();
+    setDragOverHotspot(hotspotIdx);
+  };
+
+  const handleDrop = (e: React.DragEvent, hotspotIdx: number) => {
+    e.preventDefault();
+    setDragOverHotspot(null);
+    const item = items[hotspotIdx];
+    if (!item || item.isExample || item.is_example) return;
+    const labelIdx = parseInt(e.dataTransfer.getData('ldl-label'));
+    if (!isNaN(labelIdx)) placeLabel(labelIdx, hotspotIdx);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Audio */}
+      {audioUrl && (
+        <div className="flex items-center gap-3 rounded-2xl border-2 border-blue-200 bg-blue-50 p-3">
+          <Volume2 className="h-5 w-5 flex-shrink-0 text-blue-600" />
+          <audio controls className="flex-1" src={audioUrl} />
+        </div>
+      )}
+
+      {/* Name chip bank */}
+      <div className="flex min-h-[52px] flex-wrap items-center gap-2 rounded-2xl border-2 border-indigo-100 bg-indigo-50 px-4 py-3">
+        {items.map((item, i) => {
+          if (item.isExample || item.is_example) return null;
+          const isPlaced = answer[String(i)] !== undefined;
+          const isSel = selected === i;
+          return (
+            <div
+              key={i}
+              draggable={!isPlaced}
+              onDragStart={!isPlaced ? (e) => handleDragStart(e, i) : undefined}
+              onClick={!isPlaced ? () => handleChipClick(i) : undefined}
+              className={`select-none rounded-full border-2 px-3 py-1 text-[15px] font-bold transition-all ${
+                isPlaced
+                  ? 'cursor-default border-dashed border-indigo-200 text-indigo-200'
+                  : isSel
+                  ? 'scale-105 cursor-pointer border-rose-500 bg-rose-500 text-white shadow-lg'
+                  : 'cursor-grab border-indigo-300 bg-white text-slate-700 shadow hover:border-indigo-500 active:scale-95'
+              }`}
+            >
+              {item.name}
+            </div>
+          );
+        })}
+      </div>
+
+      {selected !== null && (
+        <p className="animate-pulse text-center text-sm font-bold text-rose-500">
+          👆 Nhấn vào ô trên hình để đặt tên &ldquo;{items[selected]?.name}&rdquo;
+        </p>
+      )}
+
+      {/* Image with hotspot drop zones */}
+      {imageUrl ? (
+        <div
+          className="relative select-none overflow-hidden rounded-2xl border-2 border-slate-200"
+          onDragLeave={() => setDragOverHotspot(null)}
+        >
+          <img
+            src={imageUrl}
+            alt="Scene"
+            className="block h-auto w-full pointer-events-none"
+            draggable={false}
+          />
+          {items.map((item, i) => {
+            if (!item.hotspot) return null;
+            const isExample = item.isExample || item.is_example;
+            const placedLabelIdx = isExample ? i : getPlacedLabelAt(i);
+            const placedName = placedLabelIdx !== null ? (items[placedLabelIdx]?.name ?? '') : null;
+            const isDragTarget = dragOverHotspot === i;
+            return (
+              <div
+                key={i}
+                className="absolute -translate-x-1/2"
+                style={{ left: `${item.hotspot.x}%`, top: `${item.hotspot.y}%` }}
+                onDragOver={!isExample ? (e) => handleDragOver(e, i) : undefined}
+                onDrop={!isExample ? (e) => handleDrop(e, i) : undefined}
+                onClick={() => handleHotspotClick(i)}
+              >
+                {placedName ? (
+                  <div
+                    className={`whitespace-nowrap rounded-xl border-2 px-3 py-1 text-sm font-bold shadow-md transition-all ${
+                      isExample
+                        ? 'border-sky-600 bg-sky-500 text-white'
+                        : 'cursor-pointer border-green-600 bg-green-500 text-white hover:border-red-400 hover:bg-red-400'
+                    }`}
+                    title={isExample ? '' : 'Nhấn để bỏ'}
+                  >
+                    {placedName}
+                  </div>
+                ) : (
+                  <div
+                    className={`min-w-[52px] whitespace-nowrap rounded-xl border-2 border-dashed px-3 py-1 text-center text-sm font-bold shadow transition-all ${
+                      isDragTarget
+                        ? 'scale-110 border-rose-500 bg-rose-100 text-rose-500'
+                        : selected !== null
+                        ? 'border-indigo-400 bg-white/90 text-indigo-300'
+                        : 'border-slate-400 bg-white/70 text-slate-300'
+                    }`}
+                  >
+                    ?
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-center text-sm italic text-slate-400">Chưa có hình ảnh cho câu này.</p>
+      )}
+    </div>
+  );
+}
+
 // ─── F. Speaking / interactive (chấm trực tiếp — ghi chú thân thiện) ─────────
 function SpeakingTask({ taskData }: RendererProps) {
   const items: any[] = taskData?.questions ?? taskData?.cards ?? [];
@@ -540,6 +712,7 @@ function GenericWritingFallback({ answer, onChange }: RendererProps) {
 
 // ─── Switcher ─────────────────────────────────────────────────────────────
 const RENDERERS: Record<string, React.FC<RendererProps>> = {
+  listen_and_draw_lines: ListenAndDrawLinesTask,
   odd_one_out: OddOneOutTask,
   word_definition_matching: WordDefinitionTask,
   dialogue_matching: DialogueMatchingTask,

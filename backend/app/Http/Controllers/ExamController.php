@@ -2143,6 +2143,48 @@ class ExamController extends Controller
     }
 
     /**
+     * POST /api/teacher/exams/{examId}/ielts/listening/sections/{sectionNumber}/question-image
+     * Upload a question page image (table / form / diagram) for an image-completion group.
+     */
+    public function uploadIeltsListeningQuestionImage(Request $request, $examId, $sectionNumber)
+    {
+        $user = $request->user();
+        $sectionNumber = (int) $sectionNumber;
+
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
+        }
+
+        $exam = Exam::where('eId', $examId)->where('eTeacher_id', $user->uId)->first();
+        if (!$exam) {
+            return response()->json(['status' => 'error', 'message' => 'Không tìm thấy bài thi.'], 404);
+        }
+
+        $validator = \Validator::make($request->all(), [
+            'image' => 'required|file|mimes:jpg,jpeg,png,gif,webp,pdf|max:20480',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['status' => 'error', 'message' => 'File ảnh không hợp lệ.', 'errors' => $validator->errors()], 400);
+        }
+
+        try {
+            $file      = $request->file('image');
+            $ext       = $file->getClientOriginalExtension() ?: 'jpg';
+            $filename  = 'ielts_q_img_' . $examId . '_sec' . $sectionNumber . '_' . time() . '_' . \Illuminate\Support\Str::random(8) . '.' . $ext;
+            $path      = $file->storeAs('exam_images', $filename, 'public');
+            $imageUrl  = \Storage::disk('public')->url($path);
+
+            return response()->json([
+                'status'    => 'success',
+                'image_url' => $imageUrl,
+                'data'      => ['image_url' => $imageUrl, 'filename' => $filename],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['status' => 'error', 'message' => 'Lỗi upload ảnh: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * POST /api/teacher/exams/{examId}/vstep/listening/parts/{partNumber}/sections/{sectionNumber}/audio
      * Auto-save audio + transcript của 1 section (không đụng questions).
      */

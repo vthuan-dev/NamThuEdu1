@@ -379,9 +379,11 @@ class IeltsExamController extends Controller
                     ->values()
                     ->map(function ($q) {
                         $data = $q->qData ?? [];
+                        $rawType = str_replace('_', '-', (string) ($q->qType ?? 'multiple-choice'));
+                        $isImgCompletion = $rawType === 'image-completion';
                         $options = $data['options'] ?? null;
                         // Fallback build options từ answers nếu qData không có
-                        if (!$options && $q->relationLoaded('answers') && $q->answers->count() >= 2) {
+                        if (!$isImgCompletion && !$options && $q->relationLoaded('answers') && $q->answers->count() >= 2) {
                             $options = [];
                             $letters = ['A', 'B', 'C', 'D', 'E', 'F'];
                             $sorted = $q->answers->sortBy(fn($a) => $a->aOrder ?? $a->aId)->values();
@@ -391,17 +393,19 @@ class IeltsExamController extends Controller
                             }
                         }
                         return [
-                            'id'             => 's' . ($q->qPart ?? 1) . '-q' . ($data['question_number'] ?? $q->qSection_order),
-                            'questionNumber' => $data['question_number'] ?? $q->qSection_order,
+                            'id'                => 's' . ($q->qPart ?? 1) . '-q' . ($data['question_number'] ?? $q->qSection_order),
+                            'questionNumber'    => $data['question_number'] ?? $q->qSection_order,
                             // Normalize underscore→hyphen để match dropdown options frontend
-                            'questionType'   => str_replace('_', '-', (string) ($q->qType ?? 'multiple-choice')),
-                            'questionText'   => $q->qContent ?? '',
-                            'options'        => $options ?: ['A' => '', 'B' => '', 'C' => '', 'D' => ''],
-                            'correctAnswer'  => $data['correct_answer'] ?? '',
-                            'taskInstruction'=> $data['task_instruction'] ?? '',
-                            'wordLimit'      => $data['word_limit'] ?? '',
-                            'selectCount'    => $data['select_count'] ?? 1,
-                            'useWordBank'    => $data['use_word_bank'] ?? false,
+                            'questionType'      => $rawType,
+                            'questionText'      => $q->qContent ?? '',
+                            'options'           => $isImgCompletion ? null : ($options ?: ['A' => '', 'B' => '', 'C' => '', 'D' => '']),
+                            'correctAnswer'     => $data['correct_answer'] ?? '',
+                            'taskInstruction'   => $data['task_instruction'] ?? '',
+                            'wordLimit'         => $data['word_limit'] ?? '',
+                            'selectCount'       => $data['select_count'] ?? 1,
+                            'useWordBank'       => $data['use_word_bank'] ?? false,
+                            'taskImage'         => $data['task_image'] ?? '',
+                            'taskImageFileName' => $data['task_image_file_name'] ?? '',
                         ];
                     })
                     ->toArray();

@@ -46,6 +46,8 @@ const ListenDrawLinesEditor: React.FC<ListenDrawLinesEditorProps> = ({
   const [draggedLabel, setDraggedLabel] = useState<number | null>(null);
   const [showLabelPositioning, setShowLabelPositioning] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [imageSize, setImageSize] = useState<'sm' | 'md' | 'lg'>('md');
+  const imageSizeClass: Record<string, string> = { sm: 'max-w-[340px]', md: 'max-w-[520px]', lg: 'max-w-[760px]' };
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(initialData?.config?.audioUrl || null);
@@ -409,7 +411,7 @@ const ListenDrawLinesEditor: React.FC<ListenDrawLinesEditorProps> = ({
     items.every((item) => {
       if (matchingMode === 'drag-to-image') {
         // For drag-to-image, name, hotspot, and labelPosition are required
-        return item.name.trim() !== '' && item.hotspot !== undefined && item.labelPosition !== undefined;
+        return item.name.trim() !== '' && item.hotspot !== undefined;
       } else {
         // For drag-to-list, both name and targetLabel are required
         return item.name.trim() !== '' && item.targetLabel && item.targetLabel.trim() !== '';
@@ -593,9 +595,27 @@ const ListenDrawLinesEditor: React.FC<ListenDrawLinesEditorProps> = ({
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Preview Toggle Button */}
-            {matchingMode === 'drag-to-image' && items.some(item => item.hotspot && item.labelPosition) && (
-              <div className="flex justify-end">
+            {/* Preview Toggle + Image Size Controls */}
+            {matchingMode === 'drag-to-image' && items.some(item => item.hotspot) && (
+              <div className="flex items-center justify-between gap-3">
+                {/* Size buttons */}
+                <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
+                  <span className="mr-1 text-xs font-medium text-slate-400">Cỡ ảnh:</span>
+                  {(['sm', 'md', 'lg'] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setImageSize(s)}
+                      className={`rounded px-2.5 py-1 text-xs font-bold transition-colors ${
+                        imageSize === s
+                          ? 'bg-orange-500 text-white'
+                          : 'text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      {s.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowPreview(!showPreview)}
@@ -610,193 +630,147 @@ const ListenDrawLinesEditor: React.FC<ListenDrawLinesEditorProps> = ({
               </div>
             )}
             
-            <div 
-              ref={containerRef}
-              className="relative rounded-lg border border-slate-200 bg-slate-50 p-16"
-              style={{ minHeight: '600px' }}
-            >
-              {/* Image wrapper */}
-              <div className="relative inline-block">
-                <img 
-                  ref={imageRef}
-                  src={imagePreview} 
-                  alt="Base scene" 
-                  className={`block ${matchingMode === 'drag-to-image' && selectedItemForHotspot !== null ? 'cursor-crosshair' : ''}`}
-                  onClick={handleImageClick}
-                />
-                
-                {/* Delete button inside image */}
-                <button
-                  type="button"
-                  onClick={handleRemoveImage}
-                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-2 hover:bg-red-600 transition-colors shadow-lg z-20"
-                  title="Xóa ảnh"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-            
-                {/* Render hotspot markers - inside image */}
-                {matchingMode === 'drag-to-image' && items.map((item, index) => 
-                  item.hotspot && (
-                    <div
-                      key={`hotspot-${index}`}
-                      className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-                      style={{
-                        left: `${item.hotspot.x}%`,
-                        top: `${item.hotspot.y}%`,
-                      }}
-                    >
-                      <div className="w-8 h-8 bg-red-500 rounded-full border-4 border-white shadow-lg flex items-center justify-center animate-pulse">
-                        <span className="text-white font-bold text-sm">{index + 1}</span>
-                      </div>
-                    </div>
-                  )
-                )}
-                
-                {/* Show instruction when selecting hotspot */}
-                {matchingMode === 'drag-to-image' && selectedItemForHotspot !== null && (
-                  <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-orange-600 text-white px-4 py-2 rounded-lg shadow-lg z-10">
-                    👆 Click vào ảnh để đánh dấu vị trí cho "{items[selectedItemForHotspot]?.name}"
-                  </div>
-                )}
-              </div>
-              
-              {/* Render draggable name labels - OUTSIDE image, in container */}
-              {matchingMode === 'drag-to-image' && items.map((item, index) => 
-                item.labelPosition && (
-                  <div
-                    key={`label-${index}`}
-                    draggable
-                    onDragStart={() => handleLabelDragStart(index)}
-                    onDrag={(e) => handleLabelDrag(e, index)}
-                    onDragEnd={(e) => handleLabelDragEnd(e, index)}
-                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 cursor-move ${
-                      draggedLabel === index ? 'opacity-50' : ''
-                    }`}
-                    style={{
-                      left: `${item.labelPosition.x}%`,
-                      top: `${item.labelPosition.y}%`,
-                    }}
-                  >
-                    <div className="bg-white border border-slate-300 rounded-lg px-3 py-1.5 shadow-md hover:shadow-lg transition-shadow">
-                      <div className="flex items-center space-x-1.5">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-white font-bold text-xs">
-                          {index + 1}
-                        </span>
-                        <span className="font-semibold text-slate-800 text-sm whitespace-nowrap">{item.name}</span>
-                      </div>
-                    </div>
-                  </div>
-                )
-              )}
-              
-              {/* SVG Lines - Show correct answer connections when preview is enabled */}
-              {showPreview && matchingMode === 'drag-to-image' && containerRef.current && imageRef.current && (
-                <svg
-                  className="absolute top-0 left-0 w-full h-full pointer-events-none"
-                  style={{ zIndex: 5 }}
-                >
-                  <defs>
-                    <marker
-                      id="arrowhead"
-                      markerWidth="10"
-                      markerHeight="10"
-                      refX="9"
-                      refY="3"
-                      orient="auto"
-                    >
-                      <polygon points="0 0, 10 3, 0 6" fill="#22c55e" />
-                    </marker>
-                  </defs>
-                  {items.map((item, index) => {
-                    if (!item.hotspot || !item.labelPosition) return null;
-                    
-                    const containerRect = containerRef.current?.getBoundingClientRect();
-                    const imageRect = imageRef.current?.getBoundingClientRect();
-                    if (!containerRect || !imageRect) return null;
-                    
-                    // Calculate label position relative to container
-                    const labelX = (item.labelPosition.x / 100) * containerRect.width;
-                    const labelY = (item.labelPosition.y / 100) * containerRect.height;
-                    
-                    // Calculate hotspot position relative to IMAGE, then offset by image position in container
-                    const imageOffsetX = imageRect.left - containerRect.left;
-                    const imageOffsetY = imageRect.top - containerRect.top;
-                    const hotspotX = imageOffsetX + (item.hotspot.x / 100) * imageRect.width;
-                    const hotspotY = imageOffsetY + (item.hotspot.y / 100) * imageRect.height;
-                    
-                    // Calculate midpoint for label
-                    const midX = (labelX + hotspotX) / 2;
-                    const midY = (labelY + hotspotY) / 2;
-                    
+            {showPreview && matchingMode === 'drag-to-image' ? (
+              /* ── Flyer-style preview: name bank + tags on image ── */
+              <div className="space-y-3">
+                {/* Name bank — all chips shown as "placed" (ghost) */}
+                <div className="flex min-h-[48px] flex-wrap items-center gap-2 rounded-2xl border-2 border-indigo-100 bg-indigo-50 px-4 py-3">
+                  <span className="w-full text-xs font-bold text-indigo-400">Tên học sinh kéo thả:</span>
+                  {items.map((item, i) => {
+                    if (item.isExample) return null;
                     return (
-                      <g key={`line-${index}`}>
-                        {/* Outer glow line */}
-                        <line
-                          x1={labelX}
-                          y1={labelY}
-                          x2={hotspotX}
-                          y2={hotspotY}
-                          stroke="#86efac"
-                          strokeWidth="8"
-                          opacity="0.4"
-                        />
-                        {/* Main line */}
-                        <line
-                          x1={labelX}
-                          y1={labelY}
-                          x2={hotspotX}
-                          y2={hotspotY}
-                          stroke="#22c55e"
-                          strokeWidth="4"
-                          markerEnd="url(#arrowhead)"
-                        />
-                        {/* Checkmark badge at midpoint */}
-                        <circle
-                          cx={midX}
-                          cy={midY}
-                          r="12"
-                          fill="#22c55e"
-                          stroke="white"
-                          strokeWidth="2"
-                        />
-                        <text
-                          x={midX}
-                          y={midY}
-                          textAnchor="middle"
-                          dominantBaseline="central"
-                          fill="white"
-                          fontSize="14"
-                          fontWeight="bold"
-                        >
-                          ✓
-                        </text>
-                      </g>
+                      <div key={i} className="rounded-2xl border-2 border-dashed border-indigo-200 px-4 py-1.5 text-[15px] font-bold text-indigo-300">
+                        {item.name}
+                      </div>
                     );
                   })}
-                </svg>
-              )}
-              
-              {/* Image info card */}
-              <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
-                <div className="flex min-w-0 items-center gap-2">
-                  <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-orange-50">
-                    <ImageIcon className="h-3.5 w-3.5 text-orange-600" />
+                </div>
+                {/* Image with correct-answer tags at hotspot positions */}
+                <div className="relative select-none overflow-hidden rounded-2xl border-2 border-slate-200">
+                  <img src={imagePreview} alt="Scene" className="block h-auto w-full pointer-events-none" draggable={false} />
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="absolute right-2 top-2 z-20 rounded-full bg-red-500 p-2 text-white shadow-lg transition-colors hover:bg-red-600"
+                    title="Xóa ảnh"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                  {items.map((item, i) => {
+                    if (!item.hotspot) return null;
+                    const isEx = item.isExample || false;
+                    return (
+                      <div
+                        key={i}
+                        className="absolute -translate-x-1/2"
+                        style={{ left: `${item.hotspot.x}%`, top: `${item.hotspot.y}%` }}
+                      >
+                        <div className={`whitespace-nowrap rounded-xl border-2 px-3 py-1 text-sm font-bold shadow-md ${
+                          isEx
+                            ? 'border-sky-600 bg-sky-500 text-white'
+                            : 'border-green-600 bg-green-500 text-white'
+                        }`}>
+                          {item.name}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              /* ── Edit mode: hotspot setup UI ── */
+              <div className="space-y-3">
+                {/* Fixed name chip row above image */}
+                {matchingMode === 'drag-to-image' && items.some((it) => it.name.trim()) && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-2xl border-2 border-orange-200 bg-orange-50 px-4 py-3">
+                    <span className="w-full text-xs font-bold text-orange-400">Tên học sinh sẽ kéo thả:</span>
+                    {items.map((item, index) => {
+                      if (!item.name.trim()) return null;
+                      return (
+                        <div
+                          key={index}
+                          className="flex items-center gap-2 rounded-full border-2 border-orange-200 bg-white px-3 py-1 shadow-sm"
+                        >
+                          <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-orange-500 text-xs font-bold text-white">
+                            {index + 1}
+                          </span>
+                          <span className="whitespace-nowrap pr-1 text-[15px] font-bold text-slate-700">{item.name}</span>
+                          {item.isExample && <span className="text-xs">📌</span>}
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="flex min-w-0 items-baseline gap-1.5">
-                    <span className="flex-shrink-0 text-[11px] font-medium text-slate-400">Hình ảnh nền</span>
-                    <span className="truncate text-xs font-semibold text-slate-700" title={imageFile?.name}>
-                      {imageFile?.name}
-                    </span>
+                )}
+
+                {/* Image + hotspot markers */}
+                <div
+                  ref={containerRef}
+                  className="relative overflow-hidden rounded-xl border-2 border-slate-200 bg-slate-100 p-3"
+                >
+                  <div className={`relative mx-auto w-full overflow-hidden rounded-lg shadow transition-all ${imageSizeClass[imageSize]}`}>
+                    <img
+                      ref={imageRef}
+                      src={imagePreview}
+                      alt="Base scene"
+                      className={`block h-auto w-full ${matchingMode === 'drag-to-image' && selectedItemForHotspot !== null ? 'cursor-crosshair' : ''}`}
+                      onClick={handleImageClick}
+                    />
+
+                    {/* Delete button */}
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="absolute right-2 top-2 z-20 rounded-full bg-red-500 p-2 text-white shadow-lg transition-colors hover:bg-red-600"
+                      title="Xóa ảnh"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+
+                    {/* Hotspot markers */}
+                    {matchingMode === 'drag-to-image' && items.map((item, index) =>
+                      item.hotspot && (
+                        <div
+                          key={`hotspot-${index}`}
+                          className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+                          style={{ left: `${item.hotspot.x}%`, top: `${item.hotspot.y}%` }}
+                        >
+                          <div className="flex h-8 w-8 animate-pulse items-center justify-center rounded-full border-4 border-white bg-red-500 shadow-lg">
+                            <span className="text-sm font-bold text-white">{index + 1}</span>
+                          </div>
+                        </div>
+                      )
+                    )}
+
+                    {/* Instruction overlay when selecting hotspot */}
+                    {matchingMode === 'drag-to-image' && selectedItemForHotspot !== null && (
+                      <div className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded-lg bg-orange-600 px-4 py-2 text-white shadow-lg">
+                        👆 Click vào ảnh để đánh dấu vị trí cho &ldquo;{items[selectedItemForHotspot]?.name}&rdquo;
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Image info card */}
+                  <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-white px-3 py-1.5">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-orange-50">
+                        <ImageIcon className="h-3.5 w-3.5 text-orange-600" />
+                      </div>
+                      <div className="flex min-w-0 items-baseline gap-1.5">
+                        <span className="flex-shrink-0 text-[11px] font-medium text-slate-400">Hình ảnh nền</span>
+                        <span className="truncate text-xs font-semibold text-slate-700" title={imageFile?.name}>
+                          {imageFile?.name}
+                        </span>
+                      </div>
+                    </div>
+                    {imageRef.current && (
+                      <span className="flex-shrink-0 text-[11px] font-semibold text-orange-600">
+                        {imageRef.current.naturalWidth} × {imageRef.current.naturalHeight}px
+                      </span>
+                    )}
                   </div>
                 </div>
-                {imageRef.current && (
-                  <span className="flex-shrink-0 text-[11px] font-semibold text-orange-600">
-                    {imageRef.current.naturalWidth} × {imageRef.current.naturalHeight}px
-                  </span>
-                )}
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>

@@ -21,7 +21,7 @@
  *   • Parsing prefix/rest, tabular detection, cleanQuestionText, splitEntryPrefix
  *   • Audio component, navigator, submit dialog (dùng cùng IeltsAudioOnce)
  */
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { ArrowRight, Headphones, Lightbulb } from "lucide-react";
 import type {
   IeltsListeningPayload,
@@ -318,15 +318,141 @@ function SectionBody({
   isCorrectMap?: Record<number, boolean>;
   reviewMode?: boolean;
 }) {
-  const allMcq = section.questions.every(
+  const allImgCompletion = section.questions.every(
+    (q) => q.questionType === "image-completion" || q.questionType === "image_completion"
+  );
+  const hasImgCompletion = section.questions.some(
+    (q) => q.questionType === "image-completion" || q.questionType === "image_completion"
+  );
+  const allMcq = !hasImgCompletion && section.questions.every(
     (q) => q.options && Object.keys(q.options).length > 0
   );
 
+  if (allImgCompletion) {
+    return <ImageCompletionBody section={section} answers={answers} onAnswer={onAnswer} correctAnswers={correctAnswers} isCorrectMap={isCorrectMap} reviewMode={reviewMode} />;
+  }
   if (allMcq) {
     return <McqBody section={section} answers={answers} onAnswer={onAnswer} correctAnswers={correctAnswers} isCorrectMap={isCorrectMap} reviewMode={reviewMode} />;
   }
-
   return <CompletionBody section={section} answers={answers} onAnswer={onAnswer} correctAnswers={correctAnswers} isCorrectMap={isCorrectMap} reviewMode={reviewMode} />;
+}
+
+// ─── Image-completion body ─────────────────────────────────────────────────
+function ImageCompletionBody({
+  section,
+  answers,
+  onAnswer,
+  correctAnswers = {},
+  isCorrectMap = {},
+  reviewMode = false,
+}: {
+  section: IeltsListeningSection;
+  answers: AnswerMap;
+  onAnswer: (qId: number, value: any) => void;
+  correctAnswers?: Record<number, string>;
+  isCorrectMap?: Record<number, boolean>;
+  reviewMode?: boolean;
+}) {
+  const [zoomed, setZoomed] = useState(false);
+  const taskImage = (section.questions[0]?.data?.task_image as string)
+    || (section.questions[0]?.data?.taskImage as string) || "";
+
+  const handleZoom = useCallback(() => setZoomed(true), []);
+  const handleUnzoom = useCallback(() => setZoomed(false), []);
+
+  return (
+    <div className="space-y-4">
+      {/* ── Image ── */}
+      {taskImage ? (
+        <div className="rounded-xl border-2 border-amber-200 bg-amber-50/30 overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200">
+            <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wide">
+              Xem ảnh đề bên dưới rồi điền đáp án vào các ô
+            </span>
+          </div>
+          <div className="p-3">
+            <img
+              src={taskImage}
+              alt="Question page"
+              className="w-full rounded-lg border border-amber-200 cursor-zoom-in"
+              onClick={handleZoom}
+              title="Nhấp để phóng to"
+            />
+          </div>
+          {zoomed && (
+            <div
+              className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4 cursor-zoom-out"
+              onClick={handleUnzoom}
+            >
+              <img
+                src={taskImage}
+                alt="Question page zoomed"
+                className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/40 px-4 py-5 text-center text-sm text-amber-700 italic">
+          Giáo viên chưa upload ảnh đề cho phần này.
+        </div>
+      )}
+
+      {/* ── Numbered answer inputs ── */}
+      <div className="space-y-2">
+        {section.questions.map((q) => {
+          const value = (answers[q.qId] ?? "") as string;
+          const answered = value.trim().length > 0;
+          const isCorrect = reviewMode && answered && (
+            q.qId in isCorrectMap
+              ? isCorrectMap[q.qId]
+              : value.trim().toLowerCase() === (correctAnswers[q.qId] ?? "").trim().toLowerCase()
+          );
+          const isWrong = reviewMode && answered && !isCorrect;
+          return (
+            <div
+              key={q.qId}
+              id={`ielts-ft-q-${q.qId}`}
+              className={`flex items-center gap-3 p-3 rounded-lg border ${
+                isCorrect ? "border-emerald-300 bg-emerald-50/40" :
+                isWrong   ? "border-red-300 bg-red-50/40" :
+                "border-gray-200 bg-white shadow-sm"
+              }`}
+            >
+              <span className={`flex-shrink-0 w-8 h-8 rounded-md text-white text-sm font-bold flex items-center justify-center ${
+                isCorrect ? "bg-emerald-500" : isWrong ? "bg-red-500" : "bg-orange-500"
+              }`}>
+                {q.questionNumber}
+              </span>
+              {q.questionText && (
+                <span className="text-[14px] text-gray-700 flex-shrink-0 whitespace-pre-wrap">{q.questionText}</span>
+              )}
+              <input
+                type="text"
+                value={value}
+                onChange={(e) => !reviewMode && onAnswer(q.qId, e.target.value)}
+                placeholder={`Câu ${q.questionNumber}`}
+                disabled={reviewMode}
+                className={`flex-1 px-3 py-1.5 text-[14px] rounded-md border outline-none transition-colors ${
+                  reviewMode
+                    ? isCorrect ? "border-emerald-300 bg-emerald-50 text-emerald-700 font-semibold"
+                      : isWrong  ? "border-red-300 bg-red-50 text-red-700 font-semibold"
+                      : "border-gray-200 bg-gray-50 text-gray-500"
+                    : "border-orange-300 bg-orange-50/60 text-orange-800 focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                }`}
+              />
+              {isWrong && correctAnswers[q.qId] && (
+                <span className="flex-shrink-0 text-[12px] font-bold text-emerald-700 whitespace-nowrap">
+                  ✓ {correctAnswers[q.qId]}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 // ─── MCQ body ────────────────────────────────────────────────────────────
@@ -372,7 +498,7 @@ function McqBody({
               }`}>
                 {q.questionNumber}
               </span>
-              <p className="flex-1 text-[15px] leading-relaxed text-gray-900">
+              <p className="flex-1 text-[15px] leading-relaxed text-gray-900 whitespace-pre-wrap">
                 {cleanQuestionText(q.questionText, q.questionNumber)}
               </p>
             </div>
@@ -519,12 +645,12 @@ function CompletionBody({
           >
             {g.title && (
               <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
-                <h3 className="text-sm font-bold text-gray-900">{g.title}</h3>
+                <h3 className="text-sm font-bold text-gray-900 whitespace-pre-wrap">{g.title}</h3>
               </div>
             )}
             {g.prefix && (
               <div className="px-4 py-2.5 bg-orange-50/40 border-b border-orange-100/60">
-                <span className="text-[15px] font-bold text-gray-900">{g.prefix}</span>
+                <span className="text-[15px] font-bold text-gray-900 whitespace-pre-wrap">{g.prefix}</span>
               </div>
             )}
             <ul className="divide-y divide-gray-100">
@@ -537,7 +663,7 @@ function CompletionBody({
                   <span className="flex-shrink-0 mt-0.5 w-7 h-7 rounded-md bg-orange-500 text-white text-xs font-bold flex items-center justify-center">
                     {item.number}
                   </span>
-                  <div className="flex-1 text-[15px] leading-[1.7] text-gray-900">
+                  <div className="flex-1 text-[15px] leading-[1.7] text-gray-900 whitespace-pre-wrap">
                     {renderInlineInput(
                       item.text,
                       item.qId,
@@ -570,7 +696,7 @@ function CompletionBody({
           <span className="flex-shrink-0 mt-0.5 w-7 h-7 rounded-md bg-orange-500 text-white text-xs font-bold flex items-center justify-center">
             {p.questionNumber}
           </span>
-          <div className="flex-1 text-[15px] leading-[1.7] text-gray-900">
+          <div className="flex-1 text-[15px] leading-[1.7] text-gray-900 whitespace-pre-wrap">
             {renderInlineInput(
               p.prefix ? `${p.prefix} — ${p.rest}` : p.rest,
               p.qId,
@@ -638,7 +764,7 @@ function renderInlineInput(
 
   while ((m = regex.exec(text)) !== null) {
     if (m.index > lastIndex) {
-      parts.push(<span key={`t-${m.index}`}>{text.slice(lastIndex, m.index)}</span>);
+      parts.push(<span key={`t-${m.index}`} className="whitespace-pre-wrap">{text.slice(lastIndex, m.index)}</span>);
     }
     if (!inputPlaced) {
       parts.push(
@@ -675,7 +801,7 @@ function renderInlineInput(
   }
 
   if (lastIndex < text.length) {
-    parts.push(<span key="tail">{text.slice(lastIndex)}</span>);
+    parts.push(<span key="tail" className="whitespace-pre-wrap">{text.slice(lastIndex)}</span>);
   }
 
   if (!inputPlaced) {
@@ -699,7 +825,7 @@ function renderInlineInput(
     }
   }
 
-  return <span>{parts}</span>;
+  return <span className="whitespace-pre-wrap">{parts}</span>;
 }
 
 // ─── Helpers (copy từ IeltsListeningView để tự chứa) ─────────────────────
@@ -708,7 +834,7 @@ function cleanQuestionText(text: string, questionNumber: number): string {
   let out = text;
   out = out.replace(/(^|\s)\d{1,3}\s+(_{2,})/g, "$1$2");
   out = out.replace(new RegExp(`(^|\\s)${questionNumber}\\s+(?=[£$€%]|\\b)`, "g"), "$1");
-  out = out.replace(/\s{2,}/g, " ").trim();
+  out = out.replace(/ {2,}/g, " ").trim();
   return out;
 }
 
@@ -729,7 +855,7 @@ function HighlightedInstructions({ text }: { text: string }) {
     /(NO MORE THAN [A-Z\-\s]+(?:WORDS?|NUMBERS?)(?:\s+AND(?:\/OR)?\s+A\s+NUMBER)?|ONE WORD ONLY|ONE WORD AND\/OR A NUMBER|TWO WORDS AND\/OR A NUMBER|THREE WORDS AND\/OR A NUMBER|TWO WORDS ONLY|THREE WORDS ONLY|A NUMBER ONLY)/g;
   const parts = text.split(pattern);
   return (
-    <p className="text-[14px] leading-[1.6] text-gray-800">
+    <p className="text-[14px] leading-[1.6] text-gray-800 whitespace-pre-wrap">
       {parts.map((part, i) =>
         part && pattern.test(part) ? (
           <span key={i} className="font-bold text-orange-700 bg-orange-100/60 px-1 rounded">

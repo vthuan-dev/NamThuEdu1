@@ -173,7 +173,14 @@ export function KidsTestTaking() {
       setTimeLeft((mins > 0 ? mins : dur) * 60);
       setStarted(true);
     },
-    onError: () => setLoadError('Không kết nối được. Em tải lại trang nhé!'),
+    onError: (err: any) => {
+      const msg: string = err?.response?.data?.message ?? '';
+      if (msg.includes('hết số lần')) {
+        setLoadError('Bạn đã hết số lần làm bài cho bài thi này.');
+      } else {
+        setLoadError('Không kết nối được. Em tải lại trang nhé!');
+      }
+    },
   });
 
   const saveAnswerMutation = useMutation({
@@ -192,9 +199,10 @@ export function KidsTestTaking() {
 
   // Auto-start when arriving from lobby
   useEffect(() => {
-    if (!autoStart || started || startMutation.isPending) return;
+    if (!autoStart || started || startMutation.isPending || startMutation.isError) return;
     startMutation.mutate();
-  }, [autoStart, started, startMutation]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, started, startMutation.isPending, startMutation.isError]);
 
   // Countdown — auto submit at 0
   useEffect(() => {
@@ -246,11 +254,19 @@ export function KidsTestTaking() {
                 <AlertTriangle className="w-7 h-7 text-red-500" />
               </div>
               <p className="text-base font-bold text-slate-700">{loadError}</p>
-              <button onClick={() => { setLoadError(null); startMutation.mutate(); }}
-                className="px-6 py-3 rounded-2xl font-extrabold text-white"
-                style={{ background: 'linear-gradient(135deg, #FB7185 0%, #F97316 100%)' }}>
-                Thử lại
-              </button>
+              {loadError.includes('hết số lần') ? (
+                <button onClick={() => navigate(-1)}
+                  className="px-6 py-3 rounded-2xl font-extrabold text-white"
+                  style={{ background: 'linear-gradient(135deg, #FB7185 0%, #F97316 100%)' }}>
+                  Quay lại
+                </button>
+              ) : (
+                <button onClick={() => { setLoadError(null); startMutation.mutate(); }}
+                  className="px-6 py-3 rounded-2xl font-extrabold text-white"
+                  style={{ background: 'linear-gradient(135deg, #FB7185 0%, #F97316 100%)' }}>
+                  Thử lại
+                </button>
+              )}
             </>
           ) : (
             <>
@@ -288,8 +304,8 @@ export function KidsTestTaking() {
         </div>
       </header>
 
-      <main className={`${wrap} mx-auto px-4 sm:px-6 pt-6`}>
-        <section className="rounded-3xl p-6 sm:p-8"
+      <main className={`${wrap} mx-auto px-4 sm:px-6 pt-3 pb-24`}>
+        <section className="rounded-3xl p-4 sm:p-5"
           style={{ background: 'rgba(255,255,255,0.9)', boxShadow: '0 8px 32px rgba(251,113,133,0.12)', border: '2px solid rgba(255,255,255,0.9)' }}>
 
           {/* Audio (listening) */}
@@ -303,7 +319,7 @@ export function KidsTestTaking() {
 
           {/* Optional image */}
           {q?.qImage_url && (
-            <img src={q.qImage_url} alt="" className="w-full max-h-72 object-contain rounded-2xl mb-5 bg-slate-50" />
+            <img src={q.qImage_url} alt="" className="w-full max-h-52 object-contain rounded-2xl mb-4 bg-slate-50" />
           )}
 
           {/* Reading passage */}

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Volume2 } from 'lucide-react';
 import { QuestionRendererProps } from '../../../types/exam';
 import { extractTaskData } from '../../../utils/examDataExtractor';
@@ -8,279 +9,211 @@ export function ListenAndDrawLines({
   mode,
   answer = {},
   onAnswer,
-  imageRefs,
-  labelRefs,
-  onSetImageRef,
-  onSetLabelRef,
-  onResetQuestion
 }: QuestionRendererProps) {
+  const [dragOverHotspot, setDragOverHotspot] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(null);
+
   const taskData = extractTaskData(question);
-  const { instructions, imageUrl, audioUrl, items = [] } = taskData;
+  const { instructions, imageUrl: rawImageUrl, audioUrl: rawAudioUrl, items = [] } = taskData;
+  const imageUrl = rawImageUrl ? getFullMediaUrl(rawImageUrl) : '';
+  const audioUrl = rawAudioUrl ? getFullMediaUrl(rawAudioUrl) : '';
   const isInteractive = mode === 'student';
-  const imageRef = imageRefs?.[question.qId];
   const matchingMode: string =
     (taskData as any).matchingMode ||
     taskData.config?.matchingMode ||
     (items[0]?.hotspot ? 'drag-to-image' : items[0]?.targetLabel ? 'drag-to-list' : 'drag-to-image');
 
-  const handleDragStart = (e: React.DragEvent, itemIndex: number) => {
-    e.dataTransfer.setData('questionId', question.qId.toString());
-    e.dataTransfer.setData('itemIndex', itemIndex.toString());
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  // answer[String(labelIdx)] = String(hotspotIdx)
+  const getPlacedLabelAt = (hotspotIdx: number): number | null => {
+    const key = Object.keys(answer).find((k) => String(answer[k]) === String(hotspotIdx));
+    return key != null ? parseInt(key) : null;
+  };
+
+  const placeLabel = (labelIdx: number, hotspotIdx: number) => {
+    if (!onAnswer) return;
+    const next = { ...answer };
+    const prevKey = Object.keys(next).find((k) => parseInt(k) === labelIdx);
+    if (prevKey !== undefined) delete next[prevKey];
+    const evictKey = Object.keys(next).find((k) => String(next[k]) === String(hotspotIdx));
+    if (evictKey !== undefined) delete next[evictKey];
+    next[String(labelIdx)] = String(hotspotIdx);
+    onAnswer(next);
+    setSelected(null);
+  };
+
+  const unplaceLabel = (labelIdx: number) => {
+    if (!onAnswer) return;
+    const next = { ...answer };
+    delete next[String(labelIdx)];
+    onAnswer(next);
+    setSelected(null);
+  };
+
+  const handleChipClick = (idx: number) => {
+    if (!isInteractive) return;
+    setSelected((prev) => (prev === idx ? null : idx));
+  };
+
+  const handleHotspotClick = (hotspotIdx: number) => {
+    if (!isInteractive) return;
+    const item = items[hotspotIdx];
+    if (!item || item.isExample || item.is_example) return;
+    const placedLabel = getPlacedLabelAt(hotspotIdx);
+    if (selected !== null) {
+      placeLabel(selected, hotspotIdx);
+    } else if (placedLabel !== null) {
+      unplaceLabel(placedLabel);
+    }
+  };
+
+  const handleDragStart = (e: React.DragEvent, idx: number) => {
+    e.dataTransfer.setData('ldl-label', String(idx));
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: React.DragEvent, hotspotIdx: number) => {
+    const item = items[hotspotIdx];
+    if (!item || item.isExample || item.is_example) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    setDragOverHotspot(hotspotIdx);
   };
 
-  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+  const handleDrop = (e: React.DragEvent, hotspotIdx: number) => {
     e.preventDefault();
-    const draggedQuestionId = parseInt(e.dataTransfer.getData('questionId'));
-    const draggedItemIndex = parseInt(e.dataTransfer.getData('itemIndex'));
-
-    if (draggedQuestionId === question.qId && onAnswer) {
-      onAnswer({
-        ...answer,
-        [draggedItemIndex]: targetIndex
-      });
-    }
+    setDragOverHotspot(null);
+    const item = items[hotspotIdx];
+    if (!item || item.isExample || item.is_example) return;
+    const labelIdx = parseInt(e.dataTransfer.getData('ldl-label'));
+    if (!isNaN(labelIdx)) placeLabel(labelIdx, hotspotIdx);
   };
 
-  const handleHotspotClick = (hotspotIndex: number) => {
-    if (!isInteractive || !onAnswer) return;
-
-    // Find which label is connected to this hotspot
-    const labelIndex = Object.keys(answer).find(
-      key => answer[parseInt(key)] === hotspotIndex
-    );
-
-    if (labelIndex) {
-      // Remove the connection
-      const newAnswers = { ...answer };
-      delete newAnswers[parseInt(labelIndex)];
-      onAnswer(newAnswers);
-    }
-  };
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
       {/* Instructions */}
       {instructions && (
-        <div className="p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
-          <p className="text-blue-900 font-medium text-lg">{instructions}</p>
+        <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
+          <p className="font-medium text-blue-900">{instructions}</p>
         </div>
       )}
-      
+
       {/* Audio */}
       {audioUrl && (
-        <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
-          <Volume2 className="w-6 h-6 text-blue-600" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-blue-900">🎧 Audio Instructions</p>
-            <audio controls className="w-full mt-2">
-              <source src={getFullMediaUrl(audioUrl)} type="audio/mpeg" />
-            </audio>
-          </div>
+        <div className="flex items-center gap-3 rounded-2xl border-2 border-blue-200 bg-blue-50 p-3">
+          <Volume2 className="h-5 w-5 flex-shrink-0 text-blue-600" />
+          <audio controls className="flex-1" src={audioUrl} />
         </div>
       )}
-      
-      {/* Interactive Mode Toggle */}
-      {isInteractive && onResetQuestion && (
-        <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border-2 border-green-300">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🎮</span>
-            <span className="font-bold text-green-800">Chế độ tương tác - Kéo thả để làm bài!</span>
-          </div>
-          <button
-            onClick={() => onResetQuestion(question.qId)}
-            className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium"
-          >
-            🔄 Reset câu này
-          </button>
-        </div>
-      )}
-      
-      {/* Draw lines interactive area */}
-      {items && Array.isArray(items) && items.length > 0 && items[0]?.hotspot && (
-        <div 
-          className="rounded-lg border-2 border-indigo-200 bg-gray-50 p-8 relative" 
-          style={{ minHeight: '600px' }}
-        >
-          <div className="relative p-16" style={{ display: 'inline-block', minWidth: '100%' }}>
-            {/* Image with hotspots */}
-            <div className="relative inline-block" style={{ marginLeft: '-40px', zIndex: 2 }}>
-              {imageUrl && (
-                <img 
-                  ref={(el) => {
-                    if (el && onSetImageRef && imageRefs?.[question.qId] !== el) {
-                      onSetImageRef(question.qId, el);
-                    }
-                  }}
-                  src={getFullMediaUrl(imageUrl)} 
-                  alt="Question" 
-                  className="block max-w-full h-auto"
-                />
-              )}
-              
-              {/* SVG for drawing lines */}
-              {imageRef && (
-                <svg 
-                  className="absolute pointer-events-none" 
-                  style={{ 
-                    width: '100%', 
-                    height: '100%', 
-                    zIndex: 10,
-                    top: 0,
-                    left: 0
-                  }}
+
+      {/* ── drag-to-image mode ── */}
+      {matchingMode === 'drag-to-image' && items.length > 0 && (
+        <>
+          {/* Name chip bank */}
+          <div className="flex min-h-[52px] flex-wrap items-center gap-2 rounded-2xl border-2 border-indigo-100 bg-indigo-50 px-4 py-3">
+            {items.map((item: any, i: number) => {
+              if (item.isExample || item.is_example) return null;
+              const isPlaced = answer[String(i)] !== undefined;
+              const isSel = selected === i;
+              return (
+                <div
+                  key={i}
+                  draggable={isInteractive && !isPlaced}
+                  onDragStart={isInteractive && !isPlaced ? (e) => handleDragStart(e, i) : undefined}
+                  onClick={() => handleChipClick(i)}
+                  className={`select-none rounded-full border-2 px-3 py-1 text-[15px] font-bold transition-all ${
+                    isPlaced
+                      ? 'cursor-default border-dashed border-indigo-200 text-indigo-200'
+                      : isSel
+                      ? 'scale-105 cursor-pointer border-rose-500 bg-rose-500 text-white shadow-lg'
+                      : isInteractive
+                      ? 'cursor-grab border-indigo-300 bg-white text-slate-700 shadow hover:border-indigo-500 active:scale-95'
+                      : 'border-indigo-300 bg-white text-slate-700'
+                  }`}
                 >
-                  <defs>
-                    <marker
-                      id={`arrowhead-${question.qId}`}
-                      markerWidth="10"
-                      markerHeight="10"
-                      refX="9"
-                      refY="3"
-                      orient="auto"
-                    >
-                      <polygon points="0 0, 10 3, 0 6" fill="#22c55e" />
-                    </marker>
-                  </defs>
-                  {/* Draw lines for matched items */}
-                  {Object.entries(answer).map(([labelIdx, hotspotIdx]) => {
-                    const labelItem = items[parseInt(labelIdx)];
-                    const hotspotItem = items[hotspotIdx as number];
-                    
-                    if (!labelItem?.labelPosition || !hotspotItem?.hotspot) return null;
-                    
-                    const imgRect = imageRef.getBoundingClientRect();
-                    const labelKey = `${question.qId}-${labelIdx}`;
-                    const labelElement = labelRefs?.[labelKey];
-                    
-                    if (!labelElement) return null;
-                    
-                    const labelRect = labelElement.getBoundingClientRect();
-                    const labelCenterX = labelRect.left + labelRect.width / 2 - imgRect.left;
-                    const labelCenterY = labelRect.top + labelRect.height / 2 - imgRect.top;
-                    const hotspotX = (hotspotItem.hotspot.x / 100) * imgRect.width;
-                    const hotspotY = (hotspotItem.hotspot.y / 100) * imgRect.height;
-                    
-                    return (
-                      <line
-                        key={`line-${labelIdx}-${hotspotIdx}`}
-                        x1={labelCenterX}
-                        y1={labelCenterY}
-                        x2={hotspotX}
-                        y2={hotspotY}
-                        stroke="#22c55e"
-                        strokeWidth="4"
-                        markerEnd={`url(#arrowhead-${question.qId})`}
-                      />
-                    );
-                  })}
-                </svg>
-              )}
-              
-              {/* Hotspot markers */}
-              {items.map((item: any, idx: number) => {
-                const isMatched = Object.values(answer).includes(idx);
-                const matchedItemIndex = Object.keys(answer).find(
-                  key => answer[parseInt(key)] === idx
-                );
-                
-                return item.hotspot && (
+                  {item.name}
+                </div>
+              );
+            })}
+          </div>
+
+          {isInteractive && selected !== null && (
+            <p className="animate-pulse text-center text-sm font-bold text-rose-500">
+              👆 Nhấn vào ô trên hình để đặt tên &ldquo;{items[selected]?.name}&rdquo;
+            </p>
+          )}
+
+          {/* Image with hotspot drop zones */}
+          {imageUrl ? (
+            <div
+              className="relative select-none overflow-hidden rounded-2xl border-2 border-slate-200 max-w-[520px] mx-auto"
+              onDragLeave={() => setDragOverHotspot(null)}
+            >
+              <img
+                src={imageUrl}
+                alt="Scene"
+                className="block h-auto w-full pointer-events-none"
+                draggable={false}
+              />
+              {items.map((item: any, i: number) => {
+                if (!item.hotspot) return null;
+                const isExample = item.isExample || item.is_example;
+                const placedLabelIdx = isExample ? i : getPlacedLabelAt(i);
+                const placedName = placedLabelIdx !== null ? (items[placedLabelIdx]?.name ?? '') : null;
+                const isDragTarget = dragOverHotspot === i;
+                return (
                   <div
-                    key={`hotspot-${idx}`}
-                    className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${isInteractive ? 'cursor-pointer hover:scale-110' : 'pointer-events-none'} transition-all`}
-                    style={{
-                      left: `${item.hotspot.x}%`,
-                      top: `${item.hotspot.y}%`,
-                      zIndex: 20,
-                    }}
-                    onDragOver={isInteractive ? handleDragOver : undefined}
-                    onDrop={isInteractive ? (e) => handleDrop(e, idx) : undefined}
-                    onClick={isInteractive ? () => handleHotspotClick(idx) : undefined}
+                    key={i}
+                    className="absolute -translate-x-1/2"
+                    style={{ left: `${item.hotspot.x}%`, top: `${item.hotspot.y}%` }}
+                    onDragOver={isInteractive && !isExample ? (e) => handleDragOver(e, i) : undefined}
+                    onDrop={isInteractive && !isExample ? (e) => handleDrop(e, i) : undefined}
+                    onClick={() => handleHotspotClick(i)}
                   >
-                    <div className={`w-10 h-10 rounded-full border-4 border-white shadow-lg flex items-center justify-center transition-all ${
-                      isMatched 
-                        ? 'bg-green-500 animate-bounce' 
-                        : 'bg-red-500 animate-pulse'
-                    }`}>
-                      <span className="text-white font-bold text-sm">
-                        {isMatched && matchedItemIndex ? parseInt(matchedItemIndex) + 1 : idx + 1}
-                      </span>
-                    </div>
-                    {isMatched && matchedItemIndex && (
-                      <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-2 py-1 rounded text-xs font-bold whitespace-nowrap">
-                        ✓ {items[parseInt(matchedItemIndex)].name}
+                    {placedName ? (
+                      <div
+                        className={`whitespace-nowrap rounded-xl border-2 px-3 py-1 text-sm font-bold shadow-md transition-all ${
+                          isExample
+                            ? 'border-sky-600 bg-sky-500 text-white'
+                            : isInteractive
+                            ? 'cursor-pointer border-green-600 bg-green-500 text-white hover:border-red-400 hover:bg-red-400'
+                            : 'border-green-600 bg-green-500 text-white'
+                        }`}
+                        title={!isExample && isInteractive ? 'Nhấn để bỏ' : ''}
+                      >
+                        {placedName}
+                      </div>
+                    ) : (
+                      <div
+                        className={`min-w-[52px] whitespace-nowrap rounded-xl border-2 border-dashed px-3 py-1 text-center text-sm font-bold shadow transition-all ${
+                          isDragTarget
+                            ? 'scale-110 border-rose-500 bg-rose-100 text-rose-600'
+                            : selected !== null
+                            ? 'border-indigo-500 bg-indigo-50 text-indigo-500'
+                            : 'border-slate-600 bg-white/95 text-slate-500'
+                        }`}
+                      >
+                        ?
                       </div>
                     )}
                   </div>
                 );
               })}
             </div>
-            
-            {/* Draggable labels */}
-            {items.map((item: any, idx: number) => {
-              const isUsed = answer[idx] !== undefined;
-              const labelKey = `${question.qId}-${idx}`;
-
-              return item.labelPosition && (
-                <div
-                  key={`label-${idx}`}
-                  ref={(el) => {
-                    if (el && onSetLabelRef && labelRefs?.[labelKey] !== el) {
-                      onSetLabelRef(labelKey, el);
-                    }
-                  }}
-                  className={`absolute transform -translate-x-1/2 -translate-y-1/2 ${
-                    isInteractive ? 'cursor-move hover:scale-110' : ''
-                  } transition-all`}
-                  style={{
-                    left: `${item.labelPosition.x}%`,
-                    top: `${item.labelPosition.y}%`,
-                    opacity: isUsed ? 0.5 : 1,
-                    zIndex: 20,
-                  }}
-                  draggable={isInteractive}
-                  onDragStart={isInteractive ? (e) => handleDragStart(e, idx) : undefined}
-                >
-                  <div className={`border-3 rounded-lg px-3 py-2 shadow-lg ${
-                    isUsed 
-                      ? 'bg-gray-300 border-gray-400' 
-                      : 'bg-white border-indigo-400'
-                  }`}>
-                    <div className="flex items-center space-x-2">
-                      <span className={`flex h-6 w-6 items-center justify-center rounded-full font-bold text-xs ${
-                        isUsed 
-                          ? 'bg-gray-500 text-white' 
-                          : 'bg-indigo-500 text-white'
-                      }`}>
-                        {idx + 1}
-                      </span>
-                      <span className={`font-bold text-base whitespace-nowrap ${
-                        isUsed ? 'text-gray-600' : 'text-gray-900'
-                      }`}>
-                        {item.name}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+          ) : (
+            <p className="text-center text-sm italic text-slate-400">Chưa có hình ảnh cho câu này.</p>
+          )}
+        </>
       )}
 
-      {/* Drag-to-list mode: match each name with its description (2-column) */}
-      {matchingMode === 'drag-to-list' && items && Array.isArray(items) && items.length > 0 && (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3">
+      {/* ── drag-to-list mode (fallback) ── */}
+      {matchingMode === 'drag-to-list' && items.length > 0 && (
+        <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
           {items.map((item: any, idx: number) => {
-            const selected = answer[idx];
+            const sel = answer[String(idx)];
             return (
               <div
-                key={`match-${idx}`}
+                key={idx}
                 className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:flex-row sm:items-center"
               >
                 <div className="flex items-center gap-2 sm:w-1/2">
@@ -291,24 +224,21 @@ export function ListenAndDrawLines({
                 </div>
                 <div className="sm:w-1/2">
                   <select
-                    value={selected ?? ''}
+                    value={sel ?? ''}
                     disabled={!isInteractive}
                     onChange={(e) => {
                       if (!onAnswer) return;
                       const val = e.target.value;
                       const next = { ...answer };
-                      if (val === '') {
-                        delete next[idx];
-                      } else {
-                        next[idx] = parseInt(val);
-                      }
+                      if (val === '') delete next[String(idx)];
+                      else next[String(idx)] = val;
                       onAnswer(next);
                     }}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:cursor-not-allowed disabled:bg-slate-100"
                   >
                     <option value="">— Chọn đáp án —</option>
                     {items.map((opt: any, optIdx: number) => (
-                      <option key={optIdx} value={optIdx}>
+                      <option key={optIdx} value={String(optIdx)}>
                         {opt.targetLabel || opt.targetId || `Lựa chọn ${optIdx + 1}`}
                       </option>
                     ))}

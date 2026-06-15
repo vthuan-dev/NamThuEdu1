@@ -242,6 +242,7 @@ export function TestTaking() {
   const [listeningPlayedSections, setListeningPlayedSections] = useState<Record<string, boolean>>({});
   const [speakingMediaMap, setSpeakingMediaMap] = useState<Record<string, SpeakingMediaState>>({});
   const [recordingQuestionId, setRecordingQuestionId] = useState<string | null>(null);
+  const [speakingUploadStatus, setSpeakingUploadStatus] = useState<Record<string, 'idle' | 'uploading' | 'uploaded' | 'error'>>({});
   const autoSaveRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -458,7 +459,7 @@ export function TestTaking() {
         mediaStreamRef.current.getTracks().forEach((t) => t.stop());
       }
       Object.values(speakingMediaMap).forEach((media) => {
-        if (media.url) URL.revokeObjectURL(media.url);
+        if (media.url && media.url.startsWith('blob:')) URL.revokeObjectURL(media.url);
       });
     };
   }, [speakingMediaMap]);
@@ -529,22 +530,39 @@ export function TestTaking() {
         }
       };
 
-      recorder.onstop = () => {
+      recorder.onstop = async () => {
         const blob = new Blob(mediaChunksRef.current, { type: "audio/webm" });
-        const nextUrl = URL.createObjectURL(blob);
+        const localUrl = URL.createObjectURL(blob);
 
         setSpeakingMediaMap((prev) => {
           const old = prev[qid]?.url;
-          if (old) URL.revokeObjectURL(old);
-          return { ...prev, [qid]: { url: nextUrl, recording: false } };
+          if (old && old.startsWith('blob:')) URL.revokeObjectURL(old);
+          return { ...prev, [qid]: { url: localUrl, recording: false } };
         });
-
         setRecordingQuestionId(null);
-        handleAnswerChange(question, nextUrl);
+        setSpeakingUploadStatus((prev) => ({ ...prev, [qid]: 'uploading' }));
 
         if (mediaStreamRef.current) {
           mediaStreamRef.current.getTracks().forEach((t) => t.stop());
           mediaStreamRef.current = null;
+        }
+
+        if (!submissionId) {
+          setSpeakingUploadStatus((prev) => ({ ...prev, [qid]: 'error' }));
+          return;
+        }
+
+        try {
+          const partNumber = getQuestionPart(question);
+          const res: any = await studentApi.uploadSpeakingAudio(submissionId, partNumber, blob);
+          const publicUrl: string = res?.data?.data?.url ?? '';
+          if (!publicUrl) throw new Error('No URL returned');
+          URL.revokeObjectURL(localUrl);
+          setSpeakingMediaMap((prev) => ({ ...prev, [qid]: { url: publicUrl, recording: false } }));
+          setSpeakingUploadStatus((prev) => ({ ...prev, [qid]: 'uploaded' }));
+          setAnswers((prev) => ({ ...prev, [qid]: '[recorded]' }));
+        } catch {
+          setSpeakingUploadStatus((prev) => ({ ...prev, [qid]: 'error' }));
         }
       };
 
@@ -801,15 +819,15 @@ export function TestTaking() {
                         ) : (
                           <button
                             onClick={() => startSpeakingRecording(question)}
-                            disabled={recordingQuestionId !== null}
+                            disabled={recordingQuestionId !== null || speakingUploadStatus[qKey] === 'uploading'}
                             className="inline-flex items-center gap-2 px-3 py-2 rounded-md text-white bg-red-500 hover:bg-red-600 transition-colors disabled:opacity-50"
                           >
-                            <Mic className="w-4 h-4" /> {t("student.examTaking.record")}
+                            <Mic className="w-4 h-4" /> {speakingUploadStatus[qKey] === 'uploaded' ? t("student.examTaking.record") + ' lại' : t("student.examTaking.record")}
                           </button>
                         )}
                         <button
                           onClick={() => playSpeakingAudio(qKey)}
-                          disabled={!speakingMediaMap[qKey]?.url}
+                          disabled={!speakingMediaMap[qKey]?.url || speakingUploadStatus[qKey] === 'uploading'}
                           className="inline-flex items-center gap-2 px-3 py-2 rounded-md text-white bg-slate-700 hover:bg-slate-800 transition-colors disabled:opacity-50"
                         >
                           <Play className="w-4 h-4" /> {t("student.examTaking.play")}
@@ -818,6 +836,12 @@ export function TestTaking() {
                       <p className="text-xs text-slate-500">
                         {recordingQuestionId === qKey
                           ? t("student.examTaking.recording")
+                          : speakingUploadStatus[qKey] === 'uploading'
+                          ? "⏳ Đang tải lên máy chủ..."
+                          : speakingUploadStatus[qKey] === 'uploaded'
+                          ? "✓ Đã tải lên. Bài nói sẽ được AI chấm điểm sau khi nộp."
+                          : speakingUploadStatus[qKey] === 'error'
+                          ? "⚠ Lỗi tải lên. Hãy ghi âm lại."
                           : speakingMediaMap[qKey]?.url
                           ? t("student.examTaking.recorded")
                           : t("student.examTaking.notRecorded")}
