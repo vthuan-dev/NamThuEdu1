@@ -18,6 +18,7 @@ import {
   OfflineBanner,
   MultiTabWarning,
   ResumeExamModal,
+  TimeWarningBanner,
 } from '../../../../components/exam';
 import { examDraftStorage } from '../../../../lib/exam/examDraftStorage';
 
@@ -304,6 +305,11 @@ export function KidsTestTaking() {
     <div className="min-h-screen pb-28" style={{ background: 'linear-gradient(160deg, #FFF1F2 0%, #FFF7ED 50%, #F0FDF4 100%)' }}>
       {/* Top bar */}
       <OfflineBanner online={session.online} pendingCount={session.pendingCount} variant="kids" />
+      <TimeWarningBanner
+        level={session.warningLevel}
+        onDismiss={session.dismissWarning}
+        timeRemaining={session.timeRemaining}
+      />
       <header className="sticky top-0 z-30" style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(14px)', borderBottom: '1.5px solid #FFE4E6' }}>
         <div className={`${wrap} mx-auto px-4 sm:px-6 h-16 flex items-center gap-3`}>
           <span className="text-sm font-extrabold flex-shrink-0" style={{ color: '#9F1239' }}>

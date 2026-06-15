@@ -9,6 +9,7 @@ import {
   OfflineBanner,
   MultiTabWarning,
   ResumeExamModal,
+  TimeWarningBanner,
 } from '../../../../../components/exam';
 import { examDraftStorage } from '../../../../../lib/exam/examDraftStorage';
 import type { ThptAnswers, ThptConfig } from './types';
@@ -199,6 +200,11 @@ export function StudentThptExamPage() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       <OfflineBanner online={session.online} pendingCount={session.pendingCount} />
+      <TimeWarningBanner
+        level={session.warningLevel}
+        onDismiss={session.dismissWarning}
+        timeRemaining={session.timeRemaining}
+      />
       <ThptTopBar examTitle={examTitle} totalSeconds={remainingSec} totalDurationSec={totalDurationSec} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">

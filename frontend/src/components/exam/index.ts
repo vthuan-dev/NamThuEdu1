@@ -14,3 +14,4 @@ export {
   MultiTabWarning,
   type MultiTabWarningProps,
 } from './MultiTabWarning';
+export { TimeWarningBanner } from './TimeWarningBanner';

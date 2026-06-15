@@ -34,6 +34,7 @@ const LOCAL_DEBOUNCE_MS = 200;
 const TIME_DRIFT_THRESHOLD_SEC = 5;
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+export type TimeWarningLevel = null | '5min' | '1min' | '10sec';
 
 export interface UseExamSessionOptions {
   submissionId: number | null;
@@ -86,6 +87,10 @@ export interface UseExamSessionReturn {
   hasOtherTab: boolean;
   /** Số câu đang chờ flush lên server. */
   pendingCount: number;
+  /** Mức cảnh báo thời gian còn lại: 5min → dismissable, 1min/10sec → bắt buộc. */
+  warningLevel: TimeWarningLevel;
+  /** Tắt cảnh báo 5min (1min/10sec không cho tắt). */
+  dismissWarning: () => void;
 }
 
 // ─────────────────────────────────────────── default serializer
@@ -161,6 +166,7 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
   const [timeRemaining, setTimeRemaining] = useState<number>(durationMinutes * 60);
   const [hasOtherTab, setHasOtherTab] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [warningLevel, setWarningLevel] = useState<TimeWarningLevel>(null);
 
   // ─── Refs (không trigger re-render)
   const answersRef = useRef(answers);
@@ -177,6 +183,7 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
   const submittedRef = useRef(false);
   const onlineRef = useRef(online);
   onlineRef.current = online;
+  const warningLevelRef = useRef<TimeWarningLevel>(null);
 
   // Cập nhật pendingCount mỗi khi queue đổi (utility nhỏ)
   const syncPendingCount = useCallback(() => {
@@ -209,6 +216,8 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
     startedAtMsRef.current = Number.isFinite(parsed) ? parsed : Date.now();
     totalDurationSecRef.current = durationMinutes * 60;
     submittedRef.current = false;
+    warningLevelRef.current = null;
+    setWarningLevel(null);
     setTimeRemaining(durationMinutes * 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submissionId, startedAtServer, durationMinutes]);
@@ -363,13 +372,34 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
     setAnswers((prev) => ({ ...prev, ...draft.answers }));
   }, []);
 
-  // ─── Time tick (mỗi giây, server-derived)
+  // ─── Dismiss warning (chỉ 5min cho dismiss; 1min/10sec bắt buộc)
+  const dismissWarning = useCallback(() => {
+    if (warningLevelRef.current === '5min') {
+      warningLevelRef.current = null;
+      setWarningLevel(null);
+    }
+  }, []);
+
+  // ─── Time tick (mỗi giây, server-derived) + warning thresholds
   useEffect(() => {
     if (!submissionId) return;
     const tick = () => {
       const elapsed = (Date.now() - startedAtMsRef.current) / 1000;
       const remaining = Math.max(0, Math.floor(totalDurationSecRef.current - elapsed));
       setTimeRemaining(remaining);
+
+      // Warning thresholds — chỉ escalate, không downgrade
+      if (remaining <= 10 && warningLevelRef.current !== '10sec') {
+        warningLevelRef.current = '10sec';
+        setWarningLevel('10sec');
+      } else if (remaining <= 60 && !warningLevelRef.current) {
+        warningLevelRef.current = '1min';
+        setWarningLevel('1min');
+      } else if (remaining <= 300 && !warningLevelRef.current) {
+        warningLevelRef.current = '5min';
+        setWarningLevel('5min');
+      }
+
       if (remaining <= 0 && !submittedRef.current) {
         submittedRef.current = true;
         void doSubmit('timeout');
@@ -484,6 +514,23 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
     };
   }, [submissionId]);
 
+  // ─── beforeunload confirm (giống Google Forms / trang luyện thi)
+  useEffect(() => {
+    if (!submissionId) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (submittedRef.current) return;
+      const hasAnswers = Object.keys(answersRef.current).length > 0;
+      const hasPending = pendingQueueRef.current.size > 0;
+      if (hasAnswers || hasPending) {
+        e.preventDefault();
+        // Modern browsers ignore custom message; just need non-empty returnValue
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [submissionId]);
+
   // ─── Cleanup chung
   useEffect(() => {
     return () => {
@@ -504,6 +551,8 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
     resume,
     hasOtherTab,
     pendingCount,
+    warningLevel,
+    dismissWarning,
   };
 }
 

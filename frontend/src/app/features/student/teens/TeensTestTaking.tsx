@@ -27,6 +27,7 @@ import {
   OfflineBanner,
   MultiTabWarning,
   ResumeExamModal,
+  TimeWarningBanner,
 } from '../../../../components/exam';
 import { examDraftStorage } from '../../../../lib/exam/examDraftStorage';
 
@@ -593,6 +594,11 @@ export function TeensTestTaking() {
   return (
     <div className="pb-28 lg:pb-8">
       <OfflineBanner online={session.online} pendingCount={session.pendingCount} />
+      <TimeWarningBanner
+        level={session.warningLevel}
+        onDismiss={session.dismissWarning}
+        timeRemaining={session.timeRemaining}
+      />
       {/* Header */}
       <div className="sticky top-16 z-30 -mx-4 sm:-mx-8 px-4 sm:px-8 py-3 bg-white/90 backdrop-blur-md border-b border-slate-200">
         <div className="flex items-center gap-4">

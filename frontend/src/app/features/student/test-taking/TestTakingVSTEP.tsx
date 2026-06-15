@@ -14,6 +14,7 @@ import {
   OfflineBanner,
   MultiTabWarning,
   ResumeExamModal,
+  TimeWarningBanner,
 } from "../../../../components/exam";
 import { examDraftStorage } from "../../../../lib/exam/examDraftStorage";
 
@@ -471,6 +472,11 @@ export function TestTakingVSTEP() {
   return (
     <div className="min-h-screen bg-gray-100">
       <OfflineBanner online={session.online} pendingCount={session.pendingCount} />
+      <TimeWarningBanner
+        level={session.warningLevel}
+        onDismiss={session.dismissWarning}
+        timeRemaining={session.timeRemaining}
+      />
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-40 h-16 bg-white border-b border-gray-200 px-4 lg:px-6 shadow-sm">
         <div className="h-full max-w-[1600px] mx-auto flex items-center justify-between gap-4">

@@ -13,6 +13,7 @@ import {
   OfflineBanner,
   MultiTabWarning,
   ResumeExamModal,
+  TimeWarningBanner,
 } from "../../../../components/exam";
 import { examDraftStorage } from "../../../../lib/exam/examDraftStorage";
 import { useTranslation } from "react-i18next";
@@ -636,6 +637,11 @@ export function TestTaking() {
   return (
     <div className="min-h-screen" style={{ background: PAGE_BG }}>
       <OfflineBanner online={session.online} pendingCount={session.pendingCount} />
+      <TimeWarningBanner
+        level={session.warningLevel}
+        onDismiss={session.dismissWarning}
+        timeRemaining={session.timeRemaining}
+      />
       <header className="fixed top-0 left-0 right-0 z-40 h-[64px] bg-[#CBD5E1] border-b border-slate-300 px-4 lg:px-6">
         <div className="h-full max-w-[1600px] mx-auto grid grid-cols-3 items-center gap-3">
           <div className="flex items-center gap-2 text-slate-800 text-sm font-semibold">

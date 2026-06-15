@@ -27,6 +27,7 @@ import {
   OfflineBanner,
   MultiTabWarning,
   ResumeExamModal,
+  TimeWarningBanner,
 } from "../../../../../components/exam";
 import { examDraftStorage } from "../../../../../lib/exam/examDraftStorage";
 
@@ -517,6 +518,13 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
   return (
     <div className="min-h-screen bg-[#F5F5F5]">
       <OfflineBanner online={session.online} pendingCount={session.pendingCount} />
+      {!reviewMode && (
+        <TimeWarningBanner
+          level={session.warningLevel}
+          onDismiss={session.dismissWarning}
+          timeRemaining={session.timeRemaining}
+        />
+      )}
       <IeltsTopBar
         candidateName={(user?.uName as string) ?? "Candidate"}
         testId={`#${examId}`}
