@@ -24,6 +24,7 @@ import {
 import { studentApi } from "../../../../services/studentApi";
 import { api } from "../../../../services/api";
 import { usePageTitle } from "../../../../hooks/usePageTitle";
+import { useExamSession } from "../../../../hooks/exam/useExamSession";
 
 /* ============================================================
  *  TYPES (identical to VstepExamPreview)
@@ -190,6 +191,23 @@ export function StudentVstepExamPage() {
   const [starting, setStarting] = useState(true);
   const [startError, setStartError] = useState<string | null>(null);
   const [submissionId, setSubmissionId] = useState<number | null>(null);
+  const [startedAtServer, setStartedAtServer] = useState('');
+
+  /* ── useExamSession hook (handles timer + auto-save + auto-submit) ── */
+  const session = useExamSession({
+    submissionId: reviewMode ? null : submissionId,
+    examId: examId ? parseInt(examId) : 0,
+    durationMinutes: TOTAL_MINUTES,
+    startedAtServer,
+    examType: 'VSTEP',
+    role: 'adults',
+    enableAutoSubmitOnUnload: !reviewMode,
+    onAutoSubmitted: () => {
+      if (!reviewMode && submissionId) {
+        navigate(`${STUDENT_BASE_PATH}/lam-bai-vstep/${examId}?review=${submissionId}`);
+      }
+    },
+  });
 
   /* ── Exam data ──────────────────────────────────────────── */
   const [loading, setLoading] = useState(false);
@@ -224,14 +242,10 @@ export function StudentVstepExamPage() {
   const [speakingDone, setSpeakingDone] = useState<Record<number, boolean>>({});
   const [flagged, setFlagged] = useState<Record<number, boolean>>({});
 
-  /* ── Timer (global fallback for auto-submit) ────────────── */
-  // ✅ useExamSession đã handle timer. Giữ timeLeft state cho UI hiển thị.
-  const [timeLeft, setTimeLeft] = useState(TOTAL_MINUTES * 60);
-  const [timerStarted, setTimerStarted] = useState(false);
+  /* ── Timer handled by useExamSession (removed duplicate local state) ── */
   const submittedRef = useRef(false);
 
   /* ── Per-skill timer ─────────────────────────────────────── */
-  // ✅ Dùng session.timeRemaining từ hook thay vì local state
   const [skillTimeLeft, setSkillTimeLeft] = useState(() => SKILL_TIME["listening"] * 60);
 
   /* ── UI ─────────────────────────────────────────────────── */
@@ -507,9 +521,15 @@ export function StudentVstepExamPage() {
         const data = res?.data?.data;
         if (data?.submissionId) {
           setSubmissionId(data.submissionId);
-          const remaining = data.timeRemaining;
-          if (remaining && remaining > 0) {
-            setTimeLeft(remaining * 60);
+          // Calculate startedAtServer from timeRemaining if available
+          const remaining = data.timeRemaining; // minutes from server
+          if (typeof remaining === 'number' && remaining >= 0) {
+            const elapsedMin = TOTAL_MINUTES - remaining;
+            const startMs = Date.now() - (elapsedMin * 60 * 1000);
+            setStartedAtServer(new Date(startMs).toISOString());
+          } else {
+            // Fallback: assume just started
+            setStartedAtServer(new Date().toISOString());
           }
         } else {
           setStartError("Không thể khởi tạo bài thi. Vui lòng thử lại.");
@@ -553,7 +573,6 @@ export function StudentVstepExamPage() {
       if (S.status === "fulfilled") {
         setSpeakingParts(((S.value as any)?.data?.data ?? (S.value as any)?.data)?.parts || []);
       }
-      if (!reviewMode) setTimerStarted(true);
     })
     .catch((e) => setError(e?.message || "Không thể tải đề thi"))
     .finally(() => setLoading(false));
@@ -566,7 +585,6 @@ export function StudentVstepExamPage() {
 
   /* ── Per-skill countdown ─────────────────────────────────── */
   useEffect(() => {
-    if (!timerStarted) return;
     const id = setInterval(() => {
       setSkillTimeLeft((t) => {
         if (t <= 1) { clearInterval(id); return 0; }
@@ -574,11 +592,11 @@ export function StudentVstepExamPage() {
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [timerStarted, current.skill]);
+  }, [current.skill]);
 
   /* ── Auto-advance skill when per-skill timer hits 0 ──────── */
   useEffect(() => {
-    if (!timerStarted || skillTimeLeft > 0) return;
+    if (skillTimeLeft > 0) return;
     const skillIdx = SKILL_ORDER.indexOf(current.skill);
     if (skillIdx < SKILL_ORDER.length - 1) {
       const nextSkill = SKILL_ORDER[skillIdx + 1];
@@ -587,31 +605,7 @@ export function StudentVstepExamPage() {
       handleAutoSubmit();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [skillTimeLeft, timerStarted]);
-
-  /* ── Heartbeat sync với server (optional drift reconcile) ───── */
-  useEffect(() => {
-    if (!submissionId || !timerStarted) return;
-    const DRIFT_SEC = 5;
-    const HEARTBEAT_MS = 30_000;
-    const doHeartbeat = async () => {
-      if (submittedRef.current || !navigator.onLine) return;
-      try {
-        const res: any = await studentApi.heartbeat(submissionId);
-        const serverRemaining = res?.data?.timeRemaining ?? res?.data?.time_remaining_seconds;
-        if (typeof serverRemaining === 'number') {
-          setTimeLeft((prev) => (Math.abs(prev - serverRemaining) > DRIFT_SEC ? Math.floor(serverRemaining) : prev));
-        }
-      } catch { /* network jitter — bỏ qua */ }
-    };
-    const id = window.setInterval(doHeartbeat, HEARTBEAT_MS);
-    const onVisible = () => { if (!document.hidden) void doHeartbeat(); };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => {
-      window.clearInterval(id);
-      document.removeEventListener('visibilitychange', onVisible);
-    };
-  }, [submissionId, timerStarted]);
+  }, [skillTimeLeft]);
 
   /* ── Auto-submit on timeout ─────────────────────────────── */
   const handleAutoSubmit = useCallback(() => {
