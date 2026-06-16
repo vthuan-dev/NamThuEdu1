@@ -383,6 +383,7 @@ export function TestTakingVSTEP() {
     mutationFn: () => session.submit(),
     onSuccess: (res: any) => {
       const sid = res?.data?.data?.submissionId ?? submissionId;
+      sessionStorage.removeItem(`vstep_test_remaining_${assignmentId}`);
       navigate(`${STUDENT_BASE_PATH}/ket-qua/${sid}`);
     },
     onError: () => {
@@ -416,7 +417,10 @@ export function TestTakingVSTEP() {
       const sid = data?.submissionId ?? querySubmissionId ?? null;
       const remainingSec = Number(data?.timeRemaining ?? 0);
       const durSec = Number(rawExam?.eDuration_minutes ?? 179) * 60;
-      setStartedAtServer(new Date(Date.now() - (durSec - remainingSec) * 1000).toISOString());
+      // Nếu F5/reload: kiểm tra sessionStorage để giữ timer chạy liên tục
+      const savedRemaining = sessionStorage.getItem(`vstep_test_remaining_${assignmentId}`);
+      const effectiveRemaining = savedRemaining ? Number(savedRemaining) : remainingSec;
+      setStartedAtServer(new Date(Date.now() - (durSec - effectiveRemaining) * 1000).toISOString());
       setExam(rawExam);
       setSubmissionId(sid);
       if (sid) {
@@ -440,6 +444,20 @@ export function TestTakingVSTEP() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Lưu timeRemaining vào sessionStorage trước khi F5/refresh
+  useEffect(() => {
+    if (!assignmentId) return;
+    const save = () => {
+      sessionStorage.setItem(`vstep_test_remaining_${assignmentId}`, String(session.timeRemaining));
+    };
+    window.addEventListener('beforeunload', save);
+    window.addEventListener('pagehide', save);
+    return () => {
+      window.removeEventListener('beforeunload', save);
+      window.removeEventListener('pagehide', save);
+    };
+  }, [assignmentId, session.timeRemaining]);
 
   if (!started) {
     return (

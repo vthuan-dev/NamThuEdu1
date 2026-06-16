@@ -37,7 +37,10 @@ export function StudentThptExamPage() {
   const [resumeDraft, setResumeDraft] = useState<any>(null);
   const [startedAtServer, setStartedAtServer] = useState('');
   const [totalDurationSec, setTotalDurationSec] = useState(0);
-  const [remainingSec, setRemainingSec] = useState(0);
+  const [remainingSec, setRemainingSec] = useState(() => {
+    const saved = sessionStorage.getItem(`thpt_remaining_${examId}`);
+    return saved ? Number(saved) : 0;
+  });
 
   // useExamSession: localStorage layer (layer 2) + online/hasOtherTab UI only.
   // Server save (layer 3) uses the manual saveDraft interval below because
@@ -79,8 +82,14 @@ export function StudentThptExamPage() {
         const startedAt = startData.sStart_time ? new Date(startData.sStart_time).getTime() : Date.now();
         setStartedAtServer(new Date(startedAt).toISOString());
         setSubmissionId(sid);
-        const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-        setRemainingSec(Math.max(0, durationMin * 60 - elapsed));
+        // Nếu đã có giá trị lưu từ sessionStorage (F5), giữ nguyên
+        const savedRemaining = sessionStorage.getItem(`thpt_remaining_${examId}`);
+        if (savedRemaining) {
+          setRemainingSec(Number(savedRemaining));
+        } else {
+          const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+          setRemainingSec(Math.max(0, durationMin * 60 - elapsed));
+        }
         const restored = startData.submission_payload?.answers || {};
         Object.entries(restored).forEach(([k, v]) => session.setAnswer(k, v));
         if (sid) {
@@ -160,6 +169,28 @@ export function StudentThptExamPage() {
     window.addEventListener('beforeunload', onHide);
     return () => window.removeEventListener('beforeunload', onHide);
   }, [saveDraft]);
+
+  // Lưu remainingSec vào sessionStorage trước khi F5/refresh
+  useEffect(() => {
+    if (!examId) return;
+    const save = () => {
+      sessionStorage.setItem(`thpt_remaining_${examId}`, String(remainingSec));
+    };
+    window.addEventListener('beforeunload', save);
+    window.addEventListener('pagehide', save);
+    return () => {
+      window.removeEventListener('beforeunload', save);
+      window.removeEventListener('pagehide', save);
+    };
+  }, [examId, remainingSec]);
+
+  // Xoá sessionStorage khi nộp bài
+  useEffect(() => {
+    if (!examId) return;
+    if (isSubmitting) {
+      sessionStorage.removeItem(`thpt_remaining_${examId}`);
+    }
+  }, [examId, isSubmitting]);
 
   const onAnswerChange = (key: string, value: boolean | string) => {
     session.setAnswer(key, value);
