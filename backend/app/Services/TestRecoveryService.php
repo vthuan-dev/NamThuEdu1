@@ -28,10 +28,13 @@ class TestRecoveryService
     {
         $threshold = ExamAutoSubmitService::INACTIVITY_THRESHOLD_MIN;
 
+        // Use UTC_TIMESTAMP() to match Laravel's UTC timestamps (avoid timezone drift)
+        $utcNow = now()->utc()->toDateTimeString();
+
         // 1) Hết giờ thi (sStart_time + eDuration_minutes < now)
         $timeoutSubs = Submission::with(['exam.questions.answers', 'answers.question'])
             ->where('sStatus', 'in_progress')
-            ->whereRaw('TIMESTAMPDIFF(MINUTE, sStart_time, NOW()) > (SELECT eDuration_minutes FROM exams WHERE eId = submissions.exam_id)')
+            ->whereRaw('TIMESTAMPDIFF(MINUTE, sStart_time, ?) > (SELECT eDuration_minutes FROM exams WHERE eId = submissions.exam_id)', [$utcNow])
             ->get();
 
         // 2) Câm quá ngưỡng (last_activity_at IS NOT NULL AND > threshold)
@@ -40,7 +43,7 @@ class TestRecoveryService
         $inactiveSubs = Submission::with(['exam.questions.answers', 'answers.question'])
             ->where('sStatus', 'in_progress')
             ->whereNotNull('last_activity_at')
-            ->whereRaw('TIMESTAMPDIFF(MINUTE, last_activity_at, NOW()) > ?', [$threshold])
+            ->whereRaw('TIMESTAMPDIFF(MINUTE, last_activity_at, ?) > ?', [$utcNow, $threshold])
             ->when(!empty($timeoutIds), fn($q) => $q->whereNotIn('sId', $timeoutIds))
             ->get();
 
