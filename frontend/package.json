@@ -16,7 +16,6 @@
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:ai": "npx playwright test e2e/specs/midscene-demo.spec.ts --project=desktop-chromium",
     "prepare": "husky install"
   },
   "dependencies": {
@@ -100,7 +99,6 @@
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
     "@floating-ui/react-dom": "^2.1.6",
-    "@midscene/web": "^1.9.6",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4.1.12",
     "@testing-library/jest-dom": "^6.9.1",
