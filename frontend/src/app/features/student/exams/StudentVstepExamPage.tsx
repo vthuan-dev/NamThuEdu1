@@ -235,6 +235,7 @@ export function StudentVstepExamPage() {
   /* ── localStorage keys (per submission, NOT per exam) ──── */
   const LS_ANSWERS  = submissionId ? `svstep_answers_sid_${submissionId}` : null;
   const LS_WRITING  = submissionId ? `svstep_writing_sid_${submissionId}` : null;
+  const LS_NAV_STATE = submissionId ? `svstep_nav_sid_${submissionId}` : null;
 
   /* ── Answers state — start EMPTY, restored after submissionId is set ── */
   const [answers, setAnswers] = useState<Record<string, "A" | "B" | "C" | "D">>({});
@@ -527,6 +528,30 @@ export function StudentVstepExamPage() {
           } else {
             // Fallback: assume just started
             setStartedAtServer(new Date().toISOString());
+          }
+          
+          // ✅ NEW: Restore saved answers from backend (F5 case)
+          if (data.savedAnswers) {
+            const mcqAnswers: Record<string, "A" | "B" | "C" | "D"> = {};
+            const writingMap: Record<number, string> = {};
+            
+            for (const [qId, answerText] of Object.entries(data.savedAnswers)) {
+              const text = String(answerText);
+              // MCQ answers are single letters A/B/C/D
+              if (["A", "B", "C", "D"].includes(text)) {
+                mcqAnswers[qId] = text as "A" | "B" | "C" | "D";
+              } else if (text.length > 4) {
+                // Writing answers are longer text (assume questionId is writing task number)
+                writingMap[parseInt(qId)] = text;
+              }
+            }
+            
+            if (Object.keys(mcqAnswers).length > 0) {
+              setAnswers(mcqAnswers);
+            }
+            if (Object.keys(writingMap).length > 0) {
+              setWritingDrafts(writingMap);
+            }
           }
         } else {
           setStartError("Không thể khởi tạo bài thi. Vui lòng thử lại.");

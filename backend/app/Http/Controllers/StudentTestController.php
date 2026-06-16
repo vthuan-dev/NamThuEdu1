@@ -2976,6 +2976,14 @@ class StudentTestController extends Controller
             $startTime = $existing->sStart_time ?? now();
             $elapsed   = max(0, \Carbon\Carbon::parse($startTime)->diffInSeconds(now(), false));
             $remaining = max(0, $totalSeconds - $elapsed);
+            
+            // ✅ Load saved answers so frontend can restore them after F5
+            $savedAnswers = SubmissionAnswer::where('submission_id', $existing->sId)
+                ->get()
+                ->mapWithKeys(function ($a) {
+                    return [$a->question_id => $a->saAnswer_text];
+                });
+            
             return response()->json([
                 'status' => 'success',
                 'data'   => [
@@ -2983,6 +2991,7 @@ class StudentTestController extends Controller
                     'started_at'     => $startTime,
                     'total_duration' => $totalSeconds,
                     'time_remaining' => $remaining,
+                    'savedAnswers'   => $savedAnswers, // ← NEW: return saved answers
                     // backward-compat (phút)
                     'timeRemaining'  => round($remaining / 60),
                 ],

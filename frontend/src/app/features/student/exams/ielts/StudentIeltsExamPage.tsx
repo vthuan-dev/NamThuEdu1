@@ -166,7 +166,19 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
           // Fallback if backend doesn't return started_at (shouldn't happen)
           setStartedAtServer(new Date().toISOString());
         }
-        // Kiểm tra draft localStorage
+        
+        // ✅ NEW: Restore saved answers from backend (F5 case)
+        if (res.data?.data?.savedAnswers) {
+          const restored: AnswerMap = {};
+          for (const [qId, answerText] of Object.entries(res.data.data.savedAnswers)) {
+            restored[parseInt(qId)] = String(answerText);
+          }
+          if (Object.keys(restored).length > 0) {
+            setAnswers(restored);
+          }
+        }
+        
+        // Kiểm tra draft localStorage (fallback if savedAnswers not returned)
         const draft = examDraftStorage.load(sId);
         if (draft && Object.keys(draft.answers).length > 0) setResumeDraft(draft);
         setSessionLoading(false);
