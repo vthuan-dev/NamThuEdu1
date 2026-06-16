@@ -1,21 +1,19 @@
-import { test } from '@playwright/test';
+import { test as base } from '@playwright/test';
+import { PlaywrightAiFixture } from '@midscene/web/playwright';
 
-// @ts-ignore — CJS require in ESM test file
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { PlaywrightAgent } = require('@midscene/web');
+const test = base.extend(PlaywrightAiFixture());
 
 test.describe('Midscene AI — Demo', () => {
-  test('AI tự tìm và click phần tử', async ({ page }) => {
-    const agent = new PlaywrightAgent(page);
+  test('AI tự tìm và click phần tử', async ({ page, ai }) => {
 
     await page.goto('https://namthuedu.vn/dang-nhap');
 
     // AI tự nhận diện field nhập liệu
-    await agent.aiAction('điền số điện thoại 0904521297 vào ô đầu tiên');
-    await agent.aiAction('điền mật khẩu vào ô tiếp theo');
-    await agent.aiAction('click nút đăng nhập màu xanh');
+    await ai('điền số điện thoại 0904521297 vào ô đầu tiên');
+    await ai('điền mật khẩu vào ô tiếp theo');
+    await ai('click nút đăng nhập màu xanh');
 
     // Assert bằng AI — kiểm tra UI thực tế
-    await agent.aiAssert('trang đã chuyển sang dashboard học viên, có sidebar bên trái');
+    await ai('assert: trang đã chuyển sang dashboard học viên, có sidebar bên trái');
   });
 });
