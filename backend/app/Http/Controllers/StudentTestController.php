@@ -2958,41 +2958,36 @@ class StudentTestController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Không tìm thấy đề thi hoặc đề thi chưa công khai.'], 404);
         }
 
-        $resume = $request->boolean('resume');
         $totalSeconds = ($exam->eDuration_minutes ?? 179) * 60;
 
-        if ($resume) {
-            // F5/reload — resume existing in_progress if any
-            $existing = Submission::where('exam_id', $examId)
-                ->where('user_id', $user->uId)
-                ->whereNull('sSubmit_time')
-                ->whereIn('sStatus', ['draft', 'in_progress'])
-                ->orderByDesc('sId')
-                ->first();
-            if ($existing) {
-                $startTime = $existing->sStart_time ?? now();
-                $elapsed   = max(0, \Carbon\Carbon::parse($startTime)->diffInSeconds(now(), false));
-                $remaining = max(0, $totalSeconds - $elapsed);
-                return response()->json([
-                    'status' => 'success',
-                    'data'   => [
-                        'submissionId'   => $existing->sId,
-                        'started_at'     => $startTime,
-                        'total_duration' => $totalSeconds,
-                        'time_remaining' => $remaining,
-                        // backward-compat (phút)
-                        'timeRemaining'  => round($remaining / 60),
-                    ],
-                ]);
-            }
-        }
-
-        // Fresh start: delete any existing in_progress submission (and its answers via FK cascade)
-        Submission::where('exam_id', $examId)
+        // ✅ FIX: ALWAYS check for existing in_progress submission first (idempotent)
+        // This handles F5/reload, back-forward navigation, and accidental double-start.
+        $existing = Submission::where('exam_id', $examId)
             ->where('user_id', $user->uId)
             ->whereNull('sSubmit_time')
-            ->where('sStatus', 'in_progress')
-            ->delete();
+            ->whereIn('sStatus', ['draft', 'in_progress'])
+            ->orderByDesc('sId')
+            ->first();
+
+        if ($existing) {
+            // Resume existing submission (F5/reload case)
+            $startTime = $existing->sStart_time ?? now();
+            $elapsed   = max(0, \Carbon\Carbon::parse($startTime)->diffInSeconds(now(), false));
+            $remaining = max(0, $totalSeconds - $elapsed);
+            return response()->json([
+                'status' => 'success',
+                'data'   => [
+                    'submissionId'   => $existing->sId,
+                    'started_at'     => $startTime,
+                    'total_duration' => $totalSeconds,
+                    'time_remaining' => $remaining,
+                    // backward-compat (phút)
+                    'timeRemaining'  => round($remaining / 60),
+                ],
+            ]);
+        }
+
+        // Fresh start: No existing in_progress submission found
 
         $submission = Submission::create([
             'exam_id'      => $examId,
