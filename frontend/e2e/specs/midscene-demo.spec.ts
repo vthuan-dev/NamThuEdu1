@@ -1,15 +1,9 @@
 import { test } from '@playwright/test';
-
-// Dynamic import to handle CJS/ESM compatibility
-const getAgent = async (page: any) => {
-  const mod = await import('@midscene/web');
-  const AgentClass = (mod as any).Agent || (mod as any).MidsceneAgent || (mod as any).default;
-  return new AgentClass(page);
-};
+import { PlaywrightAgent } from '@midscene/web';
 
 test.describe('Midscene AI — Demo', () => {
   test('AI tự tìm và click phần tử', async ({ page }) => {
-    const agent = await getAgent(page);
+    const agent = new PlaywrightAgent(page);
 
     await page.goto('https://namthuedu.vn/dang-nhap');
 
