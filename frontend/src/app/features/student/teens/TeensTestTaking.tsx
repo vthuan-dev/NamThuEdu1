@@ -474,7 +474,11 @@ export function TeensTestTaking() {
       const sid = data?.submissionId ?? querySubmissionId ?? null;
       const mins = Number(data?.timeRemaining ?? 0);
       const dur = Number(fetchedExam?.eDuration_minutes ?? fetchedExam?.exam_duration ?? 30);
-      setStartedAtServer(new Date(Date.now() - (dur - mins) * 60_000).toISOString());
+      // Nếu F5/reload: kiểm tra sessionStorage để giữ timer chạy liên tục
+      const examKey = fetchedExam?.id ?? fetchedExam?.eId ?? assignmentId;
+      const savedRemaining = sessionStorage.getItem(`teens_remaining_${examKey}`);
+      const effectiveMins = savedRemaining ? Number(savedRemaining) / 60 : mins;
+      setStartedAtServer(new Date(Date.now() - (dur - effectiveMins) * 60_000).toISOString());
       setSubmissionId(sid);
       setExam(fetchedExam);
       if (sid) {
@@ -494,6 +498,30 @@ export function TeensTestTaking() {
     mutationFn: () => session.submit(),
     onError: () => setLoadError('Chưa nộp được bài. Vui lòng thử lại.'),
   });
+
+  // Lưu timeRemaining vào sessionStorage trước khi F5/refresh
+  useEffect(() => {
+    const examKey = exam?.id ?? exam?.eId ?? assignmentId;
+    if (!examKey) return;
+    const save = () => {
+      sessionStorage.setItem(`teens_remaining_${examKey}`, String(session.timeRemaining));
+    };
+    window.addEventListener('beforeunload', save);
+    window.addEventListener('pagehide', save);
+    return () => {
+      window.removeEventListener('beforeunload', save);
+      window.removeEventListener('pagehide', save);
+    };
+  }, [exam, assignmentId, session.timeRemaining]);
+
+  // Xoá sessionStorage khi nộp bài
+  useEffect(() => {
+    const examKey = exam?.id ?? exam?.eId ?? assignmentId;
+    if (!examKey) return;
+    if (submitMutation.isSuccess) {
+      sessionStorage.removeItem(`teens_remaining_${examKey}`);
+    }
+  }, [exam, assignmentId, submitMutation.isSuccess]);
 
   useEffect(() => {
     if (!autoStart || started || startMutation.isPending) return;
