@@ -15,7 +15,7 @@ vi.mock('../../services/studentApi', () => ({
 
 describe('useExamSession', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'setInterval', 'Date'] });
     localStorage.clear();
     vi.clearAllMocks();
   });
@@ -56,8 +56,7 @@ describe('useExamSession', () => {
     act(() => result.current.setAnswer('101', 'A'));
     expect(result.current.pendingCount).toBe(1);
 
-    act(() => vi.advanceTimersByTime(2_000));
-    await act(async () => {}); // flush microtasks cho mock promise
+    await act(async () => vi.advanceTimersByTimeAsync(2_000));
 
     expect(studentApi.saveDraft).toHaveBeenCalledTimes(1);
     expect(result.current.saveStatus).toBe('saved');
@@ -70,7 +69,7 @@ describe('useExamSession', () => {
 
     const { result } = renderHook(() => useExamSession(defaultOpts));
     act(() => result.current.setAnswer('101', 'X'));
-    await act(async () => result.current.flushNow());
+    await act(async () => { await result.current.flushNow(); });
 
     expect(studentApi.saveDraft).toHaveBeenCalledTimes(1);
     expect(result.current.saveStatus).toBe('saved');
@@ -84,7 +83,7 @@ describe('useExamSession', () => {
     const { result } = renderHook(() => useExamSession({ ...defaultOpts, onSubmitted }));
 
     act(() => result.current.setAnswer('101', 'Y'));
-    await act(async () => result.current.submit());
+    await act(async () => { await result.current.submit(); });
 
     expect(studentApi.submitTest).toHaveBeenCalledWith(1);
     expect(onSubmitted).toHaveBeenCalled();
@@ -103,8 +102,7 @@ describe('useExamSession', () => {
       useExamSession({ ...defaultOpts, startedAtServer: started, onAutoSubmitted }),
     );
 
-    act(() => vi.advanceTimersByTime(3_000));
-    await act(async () => {});
+    await act(async () => vi.advanceTimersByTimeAsync(3_000));
 
     expect(studentApi.submitTest).toHaveBeenCalled();
   });

@@ -18,10 +18,10 @@ describe('teacherApi Configuration', () => {
   });
 
   it('should have correct base configuration', () => {
-    expect(teacherApi.defaults.baseURL).toBeDefined();
-    expect(teacherApi.defaults.headers['Content-Type']).toBe('application/json');
-    expect(teacherApi.defaults.headers['Accept']).toBe('application/json');
-    expect(teacherApi.defaults.timeout).toBe(30000);
+    expect(teacherApi.client.defaults.baseURL).toBeDefined();
+    expect(teacherApi.client.defaults.headers['Content-Type']).toBe('application/json');
+    expect(teacherApi.client.defaults.headers['Accept']).toBe('application/json');
+    expect(teacherApi.client.defaults.timeout).toBe(30000);
   });
 
   it('should attach Bearer token from localStorage in request interceptor', async () => {
@@ -40,9 +40,9 @@ describe('teacherApi Configuration', () => {
       });
     });
 
-    teacherApi.defaults.adapter = mockAdapter;
+    teacherApi.client.defaults.adapter = mockAdapter;
 
-    await teacherApi.get('/test-endpoint');
+    await teacherApi.client.get('/test-endpoint');
 
     expect(mockAdapter).toHaveBeenCalled();
   });
@@ -62,20 +62,19 @@ describe('teacherApi Configuration', () => {
       });
     });
 
-    teacherApi.defaults.adapter = mockAdapter;
+    teacherApi.client.defaults.adapter = mockAdapter;
 
-    await teacherApi.get('/test-endpoint');
+    await teacherApi.client.get('/test-endpoint');
 
     expect(mockAdapter).toHaveBeenCalled();
   });
 
   it('should clear token and redirect on 401 error', async () => {
     const testToken = 'test-token-123';
-    localStorageMock.setItem('auth_token', testToken);
+    localStorage.setItem('auth_token', testToken);
 
-    // Mock window.location.href
-    delete (window as any).location;
-    window.location = { href: '' } as any;
+    // Mock window.location
+    const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({ href: '', pathname: '/hoc-vien/test' } as any);
 
     const mockAdapter = vi.fn(() => {
       return Promise.reject({
@@ -88,28 +87,29 @@ describe('teacherApi Configuration', () => {
       });
     });
 
-    teacherApi.defaults.adapter = mockAdapter;
+    teacherApi.client.defaults.adapter = mockAdapter;
 
     try {
-      await teacherApi.get('/test-endpoint');
+      await teacherApi.client.get('/test-endpoint');
     } catch (error) {
       // Expected to throw
     }
 
     // Verify token was cleared
-    expect(localStorageMock.getItem('auth_token')).toBeNull();
+    expect(localStorage.getItem('auth_token')).toBeNull();
 
     // Verify redirect to login page
     expect(window.location.href).toBe('/dang-nhap');
+
+    locationSpy.mockRestore();
   });
 
   it('should not redirect on non-401 errors', async () => {
     const testToken = 'test-token-123';
-    localStorageMock.setItem('auth_token', testToken);
+    localStorage.setItem('auth_token', testToken);
 
-    // Mock window.location.href
-    delete (window as any).location;
-    window.location = { href: '' } as any;
+    // Mock window.location
+    const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({ href: '', pathname: '/hoc-vien/test' } as any);
 
     const mockAdapter = vi.fn(() => {
       return Promise.reject({
@@ -122,19 +122,21 @@ describe('teacherApi Configuration', () => {
       });
     });
 
-    teacherApi.defaults.adapter = mockAdapter;
+    teacherApi.client.defaults.adapter = mockAdapter;
 
     try {
-      await teacherApi.get('/test-endpoint');
+      await teacherApi.client.get('/test-endpoint');
     } catch (error) {
       // Expected to throw
     }
 
     // Verify token was NOT cleared
-    expect(localStorageMock.getItem('auth_token')).toBe(testToken);
+    expect(localStorage.getItem('auth_token')).toBe(testToken);
 
     // Verify NO redirect
     expect(window.location.href).toBe('');
+
+    locationSpy.mockRestore();
   });
 });
 
@@ -159,9 +161,9 @@ describe('teacherApi Development Mode Logging', () => {
       });
     });
 
-    teacherApi.defaults.adapter = mockAdapter;
+    teacherApi.client.defaults.adapter = mockAdapter;
 
-    await teacherApi.get('/test-endpoint');
+    await teacherApi.client.get('/test-endpoint');
 
     // In development mode, console.group should be called
     if (import.meta.env.DEV) {
