@@ -225,12 +225,19 @@ export function StudentVstepExamPage() {
   const [flagged, setFlagged] = useState<Record<number, boolean>>({});
 
   /* ── Timer (global fallback for auto-submit) ────────────── */
-  const [timeLeft, setTimeLeft] = useState(TOTAL_MINUTES * 60);
+  // Khôi phục timeLeft từ sessionStorage nếu F5/reload
+  const [timeLeft, setTimeLeft] = useState(() => {
+    const saved = sessionStorage.getItem(`vstep_timeleft_${examId}`);
+    return saved ? Number(saved) : TOTAL_MINUTES * 60;
+  });
   const [timerStarted, setTimerStarted] = useState(false);
   const submittedRef = useRef(false);
 
   /* ── Per-skill timer ─────────────────────────────────────── */
-  const [skillTimeLeft, setSkillTimeLeft] = useState(() => SKILL_TIME["listening"] * 60);
+  const [skillTimeLeft, setSkillTimeLeft] = useState(() => {
+    const saved = sessionStorage.getItem(`vstep_skilltime_${examId}`);
+    return saved ? Number(saved) : SKILL_TIME["listening"] * 60;
+  });
 
   /* ── UI ─────────────────────────────────────────────────── */
   const [bottomVisible, setBottomVisible] = useState(true);
@@ -603,6 +610,31 @@ export function StudentVstepExamPage() {
     }, 1000);
     return () => clearInterval(id);
   }, [timerStarted]);
+
+  /* ── Lưu timeLeft + skillTimeLeft vào sessionStorage trước khi unload/F5 ── */
+  useEffect(() => {
+    if (!examId) return;
+    const save = () => {
+      sessionStorage.setItem(`vstep_timeleft_${examId}`, String(timeLeft));
+      sessionStorage.setItem(`vstep_skilltime_${examId}`, String(skillTimeLeft));
+    };
+    window.addEventListener('beforeunload', save);
+    window.addEventListener('pagehide', save);
+    return () => {
+      window.removeEventListener('beforeunload', save);
+      window.removeEventListener('pagehide', save);
+    };
+  }, [examId, timeLeft, skillTimeLeft]);
+
+  /* ── Xoá sessionStorage timer khi nộp bài ── */
+  useEffect(() => {
+    if (!examId) return;
+    if (submittedRef.current) {
+      sessionStorage.removeItem(`vstep_timeleft_${examId}`);
+      sessionStorage.removeItem(`vstep_skilltime_${examId}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [examId]);
 
   /* ── Pagehide: auto-submit via sendBeacon khi đóng tab/trình duyệt ── */
   useEffect(() => {
