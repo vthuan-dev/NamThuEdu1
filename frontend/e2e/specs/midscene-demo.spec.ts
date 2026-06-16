@@ -1,8 +1,8 @@
 import { test } from '@playwright/test';
-import { PlaywrightAgent } from '@midscene/web';
 
 test.describe('Midscene AI — Demo', () => {
   test('AI tự tìm và click phần tử', async ({ page }) => {
+    const { PlaywrightAgent } = await import('@midscene/web');
     const agent = new PlaywrightAgent(page);
 
     await page.goto('https://namthuedu.vn/dang-nhap');
