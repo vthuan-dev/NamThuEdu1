@@ -589,16 +589,11 @@ export function StudentVstepExamPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [skillTimeLeft, timerStarted]);
 
-  /* ── Global countdown (silent safety fallback) ────────────── */
-  // ✅ Không cần nữa - useExamSession đã handle
-  // useEffect(() => {
-  //   if (!timerStarted || timeLeft <= 0) return;
-  //   ...
-  // }, [timerStarted]);
-
-  /* ── Xoá các effect lưu/xoá sessionStorage (dư thừa) ────── */
-  // useExamSession đã tự động sync qua localStorage + heartbeat_000;
+  /* ── Heartbeat sync với server (optional drift reconcile) ───── */
+  useEffect(() => {
+    if (!submissionId || !timerStarted) return;
     const DRIFT_SEC = 5;
+    const HEARTBEAT_MS = 30_000;
     const doHeartbeat = async () => {
       if (submittedRef.current || !navigator.onLine) return;
       try {
