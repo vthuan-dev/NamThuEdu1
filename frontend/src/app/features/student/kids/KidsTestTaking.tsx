@@ -193,14 +193,14 @@ export function KidsTestTaking() {
         return;
       }
       const sid = data?.submissionId ?? querySubmissionId ?? null;
-      const mins = Number(data?.timeRemaining ?? 0);
-      const dur = Number(fetchedExam?.eDuration_minutes ?? fetchedExam?.exam_duration ?? 30);
-      // Nếu F5/reload: kiểm tra sessionStorage để giữ timer chạy liên tục
-      const examKey = fetchedExam?.id ?? fetchedExam?.eId ?? assignmentId;
-      const savedRemaining = sessionStorage.getItem(`kids_remaining_${examKey}`);
-      const effectiveMins = savedRemaining ? Number(savedRemaining) / 60 : mins;
-      const startedAt = new Date(Date.now() - (dur - effectiveMins) * 60_000).toISOString();
-      setStartedAtServer(startedAt);
+      // ✅ FIX: Use direct timestamp from backend, NOT calculated from timeRemaining
+      // Backend returns started_at (or sStart_time) as absolute timestamp
+      if (data?.started_at || data?.sStart_time) {
+        setStartedAtServer(data.started_at || data.sStart_time);
+      } else {
+        // Fallback: use current time as start (shouldn't happen in normal flow)
+        setStartedAtServer(new Date().toISOString());
+      }
       setSubmissionId(sid);
       setExam(fetchedExam);
       if (sid) {
@@ -229,30 +229,6 @@ export function KidsTestTaking() {
     mutationFn: () => session.submit(),
     onError: () => setLoadError('Chưa nộp được bài. Em thử lại nhé!'),
   });
-
-  // Lưu timeRemaining vào sessionStorage trước khi F5/refresh
-  useEffect(() => {
-    const examKey = exam?.id ?? exam?.eId ?? assignmentId;
-    if (!examKey) return;
-    const save = () => {
-      sessionStorage.setItem(`kids_remaining_${examKey}`, String(session.timeRemaining));
-    };
-    window.addEventListener('beforeunload', save);
-    window.addEventListener('pagehide', save);
-    return () => {
-      window.removeEventListener('beforeunload', save);
-      window.removeEventListener('pagehide', save);
-    };
-  }, [exam, assignmentId, session.timeRemaining]);
-
-  // Xoá sessionStorage khi nộp bài
-  useEffect(() => {
-    const examKey = exam?.id ?? exam?.eId ?? assignmentId;
-    if (!examKey) return;
-    if (submitMutation.isSuccess) {
-      sessionStorage.removeItem(`kids_remaining_${examKey}`);
-    }
-  }, [exam, assignmentId, submitMutation.isSuccess]);
 
   // ✅ FIX: Auto-submit khi hết giờ (KIDS-friendly với emoji động viên)
   useEffect(() => {

@@ -521,12 +521,9 @@ export function StudentVstepExamPage() {
         const data = res?.data?.data;
         if (data?.submissionId) {
           setSubmissionId(data.submissionId);
-          // Calculate startedAtServer from timeRemaining if available
-          const remaining = data.timeRemaining; // minutes from server
-          if (typeof remaining === 'number' && remaining >= 0) {
-            const elapsedMin = TOTAL_MINUTES - remaining;
-            const startMs = Date.now() - (elapsedMin * 60 * 1000);
-            setStartedAtServer(new Date(startMs).toISOString());
+          // ✅ FIX: Use direct timestamp from backend, NOT calculated from timeRemaining
+          if (data.started_at) {
+            setStartedAtServer(data.started_at);
           } else {
             // Fallback: assume just started
             setStartedAtServer(new Date().toISOString());

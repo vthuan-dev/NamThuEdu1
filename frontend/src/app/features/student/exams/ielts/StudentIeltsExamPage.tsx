@@ -159,10 +159,13 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
         if (typeof remainingSec === "number" && remainingSec >= 0) {
           serverRemainingRef.current = remainingSec;
         }
-        // Tính startedAtServer để useExamSession dùng cho draft/sendBeacon
-        const skillDurationSec = (TIMES[currentSkill] ?? 60) * 60;
-        const elapsed = skillDurationSec - (typeof remainingSec === 'number' ? remainingSec : skillDurationSec);
-        setStartedAtServer(new Date(Date.now() - elapsed * 1000).toISOString());
+        // ✅ FIX: Use direct timestamp from backend, NOT calculated from time_remaining
+        if (res.data?.data?.started_at) {
+          setStartedAtServer(res.data.data.started_at);
+        } else {
+          // Fallback if backend doesn't return started_at (shouldn't happen)
+          setStartedAtServer(new Date().toISOString());
+        }
         // Kiểm tra draft localStorage
         const draft = examDraftStorage.load(sId);
         if (draft && Object.keys(draft.answers).length > 0) setResumeDraft(draft);
