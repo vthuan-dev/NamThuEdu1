@@ -43,13 +43,13 @@ jobs:
       - name: Build (mode production)
         working-directory: frontend
         env:
-          VITE_API_URL: https://api.namthuedu.vn/api
-          VITE_API_BASE_URL: https://api.namthuedu.vn
+          VITE_API_URL: https://namthuedu.vn/api
+          VITE_API_BASE_URL: https://namthuedu.vn
           VITE_API_TIMEOUT: '30000'
-          VITE_ADDRESS_API: https://api.namthuedu.vn/api/address
+          VITE_ADDRESS_API: https://namthuedu.vn/api/address
           VITE_APP_NAME: NamThu Education
           VITE_APP_ENV: production
-          VITE_WS_URL: wss://api.namthuedu.vn
+          VITE_WS_URL: wss://namthuedu.vn
           VITE_WS_KEY: namthuedu
           VITE_ENABLE_MONITORING: 'true'
           VITE_ENABLE_ANALYTICS: 'true'
