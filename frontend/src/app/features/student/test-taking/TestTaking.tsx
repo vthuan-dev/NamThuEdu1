@@ -363,9 +363,9 @@ export function TestTaking() {
       }
       setSubmissionId(data?.submissionId ?? querySubmissionId ?? null);
       const sid = data?.submissionId ?? querySubmissionId ?? null;
-      const remainingMinutes = Number(data?.timeRemaining ?? 0);
-      const durationMinutes = Number(fetchedExam?.eDuration_minutes ?? fetchedExam?.exam_duration ?? 120);
-      setStartedAtServer(new Date(Date.now() - (durationMinutes - remainingMinutes) * 60_000).toISOString());
+      const remainingSec = Number(data?.timeRemaining ?? 0);
+      const durationSec = Number(fetchedExam?.eDuration_minutes ?? fetchedExam?.exam_duration ?? 120) * 60;
+      setStartedAtServer(new Date(Date.now() - (durationSec - remainingSec) * 1000).toISOString());
       setSubmissionId(sid);
       setExam(fetchedExam);
       if (sid) {

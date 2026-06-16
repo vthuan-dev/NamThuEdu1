@@ -154,6 +154,7 @@ test.describe('Auto-save / auto-submit — UI features', () => {
     await gotoApp(page, `/hoc-vien/lam-bai/${MOCK_EXAM_ID}`);
     // Chờ trang tải xong (loading spinner hoặc error state cũng OK)
     await page.waitForTimeout(3000);
+    console.log('TEST09 URL:', page.url());
     // Xác nhận trang không trống (root có nội dung)
     const root = page.locator('#root');
     await expect(root).not.toBeEmpty();

@@ -414,9 +414,9 @@ export function TestTakingVSTEP() {
         return;
       }
       const sid = data?.submissionId ?? querySubmissionId ?? null;
-      const remaining = Number(data?.timeRemaining ?? 0);
-      const dur = Number(rawExam?.eDuration_minutes ?? 179);
-      setStartedAtServer(new Date(Date.now() - (dur - remaining) * 60_000).toISOString());
+      const remainingSec = Number(data?.timeRemaining ?? 0);
+      const durSec = Number(rawExam?.eDuration_minutes ?? 179) * 60;
+      setStartedAtServer(new Date(Date.now() - (durSec - remainingSec) * 1000).toISOString());
       setExam(rawExam);
       setSubmissionId(sid);
       if (sid) {

@@ -590,10 +590,15 @@ export function StudentVstepExamPage() {
   /* ── Global countdown (silent safety fallback) ────────────── */
   useEffect(() => {
     if (!timerStarted || timeLeft <= 0) return;
+    let lastTick = Date.now();
     const id = setInterval(() => {
+      const now = Date.now();
+      const deltaSec = Math.floor((now - lastTick) / 1000);
+      lastTick = now;
       setTimeLeft((t) => {
-        if (t <= 1) { clearInterval(id); handleAutoSubmit(); return 0; }
-        return t - 1;
+        const next = Math.max(0, t - deltaSec);
+        if (next <= 0) { clearInterval(id); handleAutoSubmit(); }
+        return next;
       });
     }, 1000);
     return () => clearInterval(id);
@@ -615,7 +620,7 @@ export function StudentVstepExamPage() {
     if (!submissionId || !timerStarted) return;
     const HEARTBEAT_MS = 30_000;
     const DRIFT_SEC = 5;
-    const id = window.setInterval(async () => {
+    const doHeartbeat = async () => {
       if (submittedRef.current || !navigator.onLine) return;
       try {
         const res: any = await studentApi.heartbeat(submissionId);
@@ -624,8 +629,14 @@ export function StudentVstepExamPage() {
           setTimeLeft((prev) => (Math.abs(prev - serverRemaining) > DRIFT_SEC ? Math.floor(serverRemaining) : prev));
         }
       } catch { /* network jitter — bỏ qua */ }
-    }, HEARTBEAT_MS);
-    return () => window.clearInterval(id);
+    };
+    const id = window.setInterval(doHeartbeat, HEARTBEAT_MS);
+    const onVisible = () => { if (!document.hidden) void doHeartbeat(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [submissionId, timerStarted]);
 
   /* ── Auto-submit on timeout ─────────────────────────────── */
