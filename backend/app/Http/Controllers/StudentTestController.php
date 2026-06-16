@@ -2962,6 +2962,8 @@ class StudentTestController extends Controller
 
         // ✅ FIX: ALWAYS check for existing in_progress submission first (idempotent)
         // This handles F5/reload, back-forward navigation, and accidental double-start.
+        // Makes API safe to call multiple times - will return the same submission.
+        // Timer in frontend uses 'started_at' timestamp from backend to calculate elapsed time.
         $existing = Submission::where('exam_id', $examId)
             ->where('user_id', $user->uId)
             ->whereNull('sSubmit_time')
