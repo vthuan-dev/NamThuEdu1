@@ -184,6 +184,7 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
   const onlineRef = useRef(online);
   onlineRef.current = online;
   const warningLevelRef = useRef<TimeWarningLevel>(null);
+  const dismissed5minRef = useRef(false);
 
   // Cập nhật pendingCount mỗi khi queue đổi (utility nhỏ)
   const syncPendingCount = useCallback(() => {
@@ -217,6 +218,7 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
     totalDurationSecRef.current = durationMinutes * 60;
     submittedRef.current = false;
     warningLevelRef.current = null;
+    dismissed5minRef.current = false;
     setWarningLevel(null);
     setTimeRemaining(durationMinutes * 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -242,17 +244,18 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
       const res = customSaveDraft
         ? await customSaveDraft(submissionId, pending)
         : await studentApi.saveDraft(submissionId, pending);
-      const data = (res as { data?: { timeRemaining?: number } }).data;
-      if (data && typeof data.timeRemaining === 'number') {
+      const data = (res as { data?: { timeRemaining?: number; time_remaining_seconds?: number } }).data;
+      const serverRemaining = data?.timeRemaining ?? data?.time_remaining_seconds;
+      if (data && typeof serverRemaining === 'number') {
         // Server-truth time → reconcile drift
         const localRemaining = Math.max(
           0,
           totalDurationSecRef.current - (Date.now() - startedAtMsRef.current) / 1000,
         );
-        if (Math.abs(localRemaining - data.timeRemaining) > TIME_DRIFT_THRESHOLD_SEC) {
-          totalDurationSecRef.current = data.timeRemaining;
+        if (Math.abs(localRemaining - serverRemaining) > TIME_DRIFT_THRESHOLD_SEC) {
+          totalDurationSecRef.current = serverRemaining;
           startedAtMsRef.current = Date.now();
-          setTimeRemaining(Math.floor(data.timeRemaining));
+          setTimeRemaining(Math.floor(serverRemaining));
         }
       }
       examDraftStorage.markSynced(submissionId);
@@ -375,6 +378,7 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
   // ─── Dismiss warning (chỉ 5min cho dismiss; 1min/10sec bắt buộc)
   const dismissWarning = useCallback(() => {
     if (warningLevelRef.current === '5min') {
+      dismissed5minRef.current = true;
       warningLevelRef.current = null;
       setWarningLevel(null);
     }
@@ -395,7 +399,7 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
       } else if (remaining <= 60 && !warningLevelRef.current) {
         warningLevelRef.current = '1min';
         setWarningLevel('1min');
-      } else if (remaining <= 300 && !warningLevelRef.current) {
+      } else if (remaining <= 300 && !warningLevelRef.current && !dismissed5minRef.current) {
         warningLevelRef.current = '5min';
         setWarningLevel('5min');
       }
@@ -421,16 +425,17 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
         const res = customHeartbeat
           ? await customHeartbeat(submissionId)
           : await studentApi.heartbeat(submissionId);
-        const data = (res as { data?: { timeRemaining?: number } }).data;
-        if (data && typeof data.timeRemaining === 'number') {
+        const data = (res as { data?: { timeRemaining?: number; time_remaining_seconds?: number } }).data;
+        const serverRemaining = data?.timeRemaining ?? data?.time_remaining_seconds;
+        if (data && typeof serverRemaining === 'number') {
           const local = Math.max(
             0,
             totalDurationSecRef.current - (Date.now() - startedAtMsRef.current) / 1000,
           );
-          if (Math.abs(local - data.timeRemaining) > TIME_DRIFT_THRESHOLD_SEC) {
-            totalDurationSecRef.current = data.timeRemaining;
+          if (Math.abs(local - serverRemaining) > TIME_DRIFT_THRESHOLD_SEC) {
+            totalDurationSecRef.current = serverRemaining;
             startedAtMsRef.current = Date.now();
-            setTimeRemaining(Math.floor(data.timeRemaining));
+            setTimeRemaining(Math.floor(serverRemaining));
           }
         }
       } catch {

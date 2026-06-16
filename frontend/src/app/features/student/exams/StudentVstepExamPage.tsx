@@ -227,6 +227,7 @@ export function StudentVstepExamPage() {
   /* ── Timer (global fallback for auto-submit) ────────────── */
   const [timeLeft, setTimeLeft] = useState(TOTAL_MINUTES * 60);
   const [timerStarted, setTimerStarted] = useState(false);
+  const submittedRef = useRef(false);
 
   /* ── Per-skill timer ─────────────────────────────────────── */
   const [skillTimeLeft, setSkillTimeLeft] = useState(() => SKILL_TIME["listening"] * 60);
@@ -598,9 +599,39 @@ export function StudentVstepExamPage() {
     return () => clearInterval(id);
   }, [timerStarted]);
 
+  /* ── Pagehide: auto-submit via sendBeacon khi đóng tab/trình duyệt ── */
+  useEffect(() => {
+    if (!submissionId) return;
+    const onPagehide = () => {
+      if (submittedRef.current) return;
+      studentApi.autoSubmitOnUnload(submissionId, { reason: 'unload' });
+    };
+    window.addEventListener('pagehide', onPagehide);
+    return () => window.removeEventListener('pagehide', onPagehide);
+  }, [submissionId]);
+
+  /* ── Heartbeat mỗi 30s: sync timeLeft với server-truth ──── */
+  useEffect(() => {
+    if (!submissionId || !timerStarted) return;
+    const HEARTBEAT_MS = 30_000;
+    const DRIFT_SEC = 5;
+    const id = window.setInterval(async () => {
+      if (submittedRef.current || !navigator.onLine) return;
+      try {
+        const res: any = await studentApi.heartbeat(submissionId);
+        const serverRemaining = res?.data?.timeRemaining ?? res?.data?.time_remaining_seconds;
+        if (typeof serverRemaining === 'number') {
+          setTimeLeft((prev) => (Math.abs(prev - serverRemaining) > DRIFT_SEC ? Math.floor(serverRemaining) : prev));
+        }
+      } catch { /* network jitter — bỏ qua */ }
+    }, HEARTBEAT_MS);
+    return () => window.clearInterval(id);
+  }, [submissionId, timerStarted]);
+
   /* ── Auto-submit on timeout ─────────────────────────────── */
   const handleAutoSubmit = useCallback(() => {
-    if (!submissionId) return;
+    if (!submissionId || submittedRef.current) return;
+    submittedRef.current = true;
     studentApi.submitTest(submissionId)
       .then((res: any) => {
         const sid = res?.data?.data?.submissionId ?? submissionId;
@@ -638,6 +669,7 @@ export function StudentVstepExamPage() {
   /* ── Submit ─────────────────────────────────────────────── */
   const handleSubmit = async () => {
     if (!submissionId) return;
+    submittedRef.current = true;
     setSubmitting(true);
     try {
       // Flush all writing drafts to DB before submitting (in case textarea was never blurred)
