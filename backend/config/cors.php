@@ -19,7 +19,10 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'], // config('namthuedu.security.cors_allowed_origins', ['*']),
+    'allowed_origins' => [
+        'https://namthuedu.vn',
+        'https://www.namthuedu.vn',
+    ],
 
     'allowed_origins_patterns' => [],
 
