@@ -21,6 +21,7 @@ import {
   TimeWarningBanner,
 } from '../../../../components/exam';
 import { examDraftStorage } from '../../../../lib/exam/examDraftStorage';
+import { useToast } from '../../../../hooks/useToast';
 
 const BASE = '/hoc-vien';
 
@@ -119,6 +120,7 @@ export function KidsTestTaking() {
   const location = useLocation();
   const navigate = useNavigate();
   const assignmentId = Number(id);
+  const toast = useToast();
 
   const autoStart = useMemo(() => new URLSearchParams(location.search).get('autostart') === '1', [location.search]);
   // direct=1 → `id` là examId, bắt đầu trực tiếp không cần assignment (đề chưa được giao)
@@ -251,6 +253,19 @@ export function KidsTestTaking() {
       sessionStorage.removeItem(`kids_remaining_${examKey}`);
     }
   }, [exam, assignmentId, submitMutation.isSuccess]);
+
+  // ✅ FIX: Auto-submit khi hết giờ (KIDS-friendly với emoji động viên)
+  useEffect(() => {
+    if (session.timeRemaining <= 0 && submissionId && !submitMutation.isPending && started) {
+      console.log('[Kids] ⏰ Hết giờ! Auto-submitting...');
+      
+      // Toast động viên kid-friendly
+      toast?.success?.('Hết giờ rồi bạn! Bài thi đã được nộp tự động. Bạn làm rất tốt! 🎉', 5000);
+      
+      // Gọi submit
+      submitMutation.mutate();
+    }
+  }, [session.timeRemaining, submissionId, submitMutation.isPending, started, submitMutation]);
 
   // Auto-start when arriving from lobby
   useEffect(() => {

@@ -163,7 +163,12 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
   const [online, setOnline] = useState<boolean>(
     typeof navigator !== 'undefined' ? navigator.onLine : true,
   );
-  const [timeRemaining, setTimeRemaining] = useState<number>(durationMinutes * 60);
+  // ✅ FIX: Tính timeRemaining từ startedAtServer, KHÔNG phải durationMinutes
+  const [timeRemaining, setTimeRemaining] = useState<number>(() => {
+    const startMs = new Date(startedAtServer).getTime();
+    const elapsed = (Date.now() - startMs) / 1000;
+    return Math.max(0, Math.floor(durationMinutes * 60 - elapsed));
+  });
   const [hasOtherTab, setHasOtherTab] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [warningLevel, setWarningLevel] = useState<TimeWarningLevel>(null);
@@ -220,7 +225,9 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
     warningLevelRef.current = null;
     dismissed5minRef.current = false;
     setWarningLevel(null);
-    setTimeRemaining(durationMinutes * 60);
+    // ✅ FIX: Tính lại timeRemaining từ startedAtServer
+    const elapsed = (Date.now() - startedAtMsRef.current) / 1000;
+    setTimeRemaining(Math.max(0, Math.floor(totalDurationSecRef.current - elapsed)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submissionId, startedAtServer, durationMinutes]);
 

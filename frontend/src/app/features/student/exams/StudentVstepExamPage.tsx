@@ -225,19 +225,14 @@ export function StudentVstepExamPage() {
   const [flagged, setFlagged] = useState<Record<number, boolean>>({});
 
   /* ── Timer (global fallback for auto-submit) ────────────── */
-  // Khôi phục timeLeft từ sessionStorage nếu F5/reload
-  const [timeLeft, setTimeLeft] = useState(() => {
-    const saved = sessionStorage.getItem(`vstep_timeleft_${examId}`);
-    return saved ? Number(saved) : TOTAL_MINUTES * 60;
-  });
+  // ✅ useExamSession đã handle timer. Giữ timeLeft state cho UI hiển thị.
+  const [timeLeft, setTimeLeft] = useState(TOTAL_MINUTES * 60);
   const [timerStarted, setTimerStarted] = useState(false);
   const submittedRef = useRef(false);
 
   /* ── Per-skill timer ─────────────────────────────────────── */
-  const [skillTimeLeft, setSkillTimeLeft] = useState(() => {
-    const saved = sessionStorage.getItem(`vstep_skilltime_${examId}`);
-    return saved ? Number(saved) : SKILL_TIME["listening"] * 60;
-  });
+  // ✅ Dùng session.timeRemaining từ hook thay vì local state
+  const [skillTimeLeft, setSkillTimeLeft] = useState(() => SKILL_TIME["listening"] * 60);
 
   /* ── UI ─────────────────────────────────────────────────── */
   const [bottomVisible, setBottomVisible] = useState(true);
@@ -595,62 +590,14 @@ export function StudentVstepExamPage() {
   }, [skillTimeLeft, timerStarted]);
 
   /* ── Global countdown (silent safety fallback) ────────────── */
-  useEffect(() => {
-    if (!timerStarted || timeLeft <= 0) return;
-    let lastTick = Date.now();
-    const id = setInterval(() => {
-      const now = Date.now();
-      const deltaSec = Math.floor((now - lastTick) / 1000);
-      lastTick = now;
-      setTimeLeft((t) => {
-        const next = Math.max(0, t - deltaSec);
-        if (next <= 0) { clearInterval(id); handleAutoSubmit(); }
-        return next;
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, [timerStarted]);
+  // ✅ Không cần nữa - useExamSession đã handle
+  // useEffect(() => {
+  //   if (!timerStarted || timeLeft <= 0) return;
+  //   ...
+  // }, [timerStarted]);
 
-  /* ── Lưu timeLeft + skillTimeLeft vào sessionStorage trước khi unload/F5 ── */
-  useEffect(() => {
-    if (!examId) return;
-    const save = () => {
-      sessionStorage.setItem(`vstep_timeleft_${examId}`, String(timeLeft));
-      sessionStorage.setItem(`vstep_skilltime_${examId}`, String(skillTimeLeft));
-    };
-    window.addEventListener('beforeunload', save);
-    window.addEventListener('pagehide', save);
-    return () => {
-      window.removeEventListener('beforeunload', save);
-      window.removeEventListener('pagehide', save);
-    };
-  }, [examId, timeLeft, skillTimeLeft]);
-
-  /* ── Xoá sessionStorage timer khi nộp bài ── */
-  useEffect(() => {
-    if (!examId) return;
-    if (submittedRef.current) {
-      sessionStorage.removeItem(`vstep_timeleft_${examId}`);
-      sessionStorage.removeItem(`vstep_skilltime_${examId}`);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [examId]);
-
-  /* ── Pagehide: auto-submit via sendBeacon khi đóng tab/trình duyệt ── */
-  useEffect(() => {
-    if (!submissionId) return;
-    const onPagehide = () => {
-      if (submittedRef.current) return;
-      studentApi.autoSubmitOnUnload(submissionId, { reason: 'unload' });
-    };
-    window.addEventListener('pagehide', onPagehide);
-    return () => window.removeEventListener('pagehide', onPagehide);
-  }, [submissionId]);
-
-  /* ── Heartbeat mỗi 30s: sync timeLeft với server-truth ──── */
-  useEffect(() => {
-    if (!submissionId || !timerStarted) return;
-    const HEARTBEAT_MS = 30_000;
+  /* ── Xoá các effect lưu/xoá sessionStorage (dư thừa) ────── */
+  // useExamSession đã tự động sync qua localStorage + heartbeat_000;
     const DRIFT_SEC = 5;
     const doHeartbeat = async () => {
       if (submittedRef.current || !navigator.onLine) return;
