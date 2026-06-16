@@ -99,7 +99,8 @@ class TestRecoveryService
             return ['status' => 'no_active_test'];
         }
 
-        $timeElapsed = now()->diffInMinutes($submission->sStart_time);
+        $utcNow = now()->utc();
+        $timeElapsed = (int) $utcNow->diffInMinutes($submission->sStart_time->copy()->utc(), false);
         $timeRemaining = (int) $submission->exam->eDuration_minutes - $timeElapsed;
 
         if ($timeRemaining <= 0) {

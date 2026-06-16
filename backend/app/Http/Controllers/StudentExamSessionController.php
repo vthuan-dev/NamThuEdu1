@@ -168,14 +168,14 @@ class StudentExamSessionController extends Controller
             ], 200);
         }
 
-        $now = now();
+        $now = now()->utc();
         $submission->update(['last_activity_at' => $now]);
 
-        // Tính time remaining (server-truth)
+        // Tính time remaining (server-truth) — UTC-safe to avoid timezone drift
         $timeRemainingSeconds = null;
         if ($submission->exam && $submission->sStart_time) {
             $duration = (int) ($submission->exam->eDuration_minutes ?? 0) * 60;
-            $elapsed  = $now->diffInSeconds($submission->sStart_time);
+            $elapsed  = (int) $now->diffInSeconds($submission->sStart_time->copy()->utc(), false);
             $timeRemainingSeconds = max(0, $duration - $elapsed);
         }
 
