@@ -1,8 +1,11 @@
 import { test } from '@playwright/test';
 
+// @ts-ignore — CJS require in ESM test file
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { PlaywrightAgent } = require('@midscene/web');
+
 test.describe('Midscene AI — Demo', () => {
   test('AI tự tìm và click phần tử', async ({ page }) => {
-    const { PlaywrightAgent } = await import('@midscene/web');
     const agent = new PlaywrightAgent(page);
 
     await page.goto('https://namthuedu.vn/dang-nhap');
