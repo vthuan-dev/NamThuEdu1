@@ -588,6 +588,68 @@ function CompletionBody({
   isCorrectMap?: Record<number, boolean>;
   reviewMode?: boolean;
 }) {
+  const hasFormCompletion = section.questions.some((q) => isFormCompletionType(q.questionType));
+  if (hasFormCompletion) {
+    return (
+      <div className="space-y-5">
+        {splitQuestionRuns(section.questions).map((run) => {
+          const subSection = { ...section, questions: run.questions };
+          if (run.kind === "form") {
+            return (
+              <FormCompletionTwoColumn
+                key={run.key}
+                section={subSection}
+                answers={answers}
+                onAnswer={onAnswer}
+                correctAnswers={correctAnswers}
+                isCorrectMap={isCorrectMap}
+                reviewMode={reviewMode}
+              />
+            );
+          }
+          return (
+            <CompletionListBody
+              key={run.key}
+              section={subSection}
+              answers={answers}
+              onAnswer={onAnswer}
+              correctAnswers={correctAnswers}
+              isCorrectMap={isCorrectMap}
+              reviewMode={reviewMode}
+            />
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <CompletionListBody
+      section={section}
+      answers={answers}
+      onAnswer={onAnswer}
+      correctAnswers={correctAnswers}
+      isCorrectMap={isCorrectMap}
+      reviewMode={reviewMode}
+    />
+  );
+}
+
+function CompletionListBody({
+  section,
+  answers,
+  onAnswer,
+  correctAnswers = {},
+  isCorrectMap = {},
+  reviewMode = false,
+}: {
+  section: IeltsListeningSection;
+  answers: AnswerMap;
+  onAnswer: (qId: number, value: any) => void;
+  correctAnswers?: Record<number, string>;
+  isCorrectMap?: Record<number, boolean>;
+  reviewMode?: boolean;
+}) {
   // Parse từng câu thành { prefix, rest } để có thể group entry
   const parsed = useMemo(() => {
     return section.questions.map((q) => {
@@ -601,6 +663,10 @@ function CompletionBody({
         title:
           (q.data?.taskTitle as string) ||
           (q.data?.task_title as string) ||
+          undefined,
+        instruction:
+          (q.data?.taskInstruction as string) ||
+          (q.data?.task_instruction as string) ||
           undefined,
       };
     });
@@ -619,18 +685,20 @@ function CompletionBody({
       key: string;
       prefix: string | null;
       title?: string;
+      instruction?: string;
       items: { qId: number; number: number; text: string }[];
     };
     const groups: Group[] = [];
     parsed.forEach((p) => {
       const last = groups[groups.length - 1];
-      if (last && last.prefix === p.prefix && last.title === p.title && p.prefix !== null) {
+      if (last && last.prefix === p.prefix && last.title === p.title && last.instruction === p.instruction && p.prefix !== null) {
         last.items.push({ qId: p.qId, number: p.questionNumber, text: p.rest });
       } else {
         groups.push({
           key: `g-${p.qId}`,
           prefix: p.prefix,
           title: p.title,
+          instruction: p.instruction,
           items: [{ qId: p.qId, number: p.questionNumber, text: p.rest }],
         });
       }
@@ -651,6 +719,11 @@ function CompletionBody({
             {g.prefix && (
               <div className="px-4 py-2.5 bg-orange-50/40 border-b border-orange-100/60">
                 <span className="text-[15px] font-bold text-gray-900 whitespace-pre-wrap">{g.prefix}</span>
+              </div>
+            )}
+            {g.instruction && g.instruction !== section.instructions && (
+              <div className="px-4 py-2.5 bg-blue-50/50 border-b border-blue-100">
+                <p className="text-[14px] leading-[1.6] text-gray-800 whitespace-pre-wrap">{g.instruction}</p>
               </div>
             )}
             <ul className="divide-y divide-gray-100">
@@ -685,8 +758,15 @@ function CompletionBody({
   }
 
   // ─── Flat list — mỗi câu là 1 dòng ───────────────────────────────────
+  const flatInstruction = parsed.find((p) => p.instruction && p.instruction !== section.instructions)?.instruction;
+
   return (
     <div className="space-y-3">
+      {flatInstruction && (
+        <div className="px-4 py-3 rounded-lg border border-blue-100 bg-blue-50/50">
+          <p className="text-[14px] leading-[1.6] text-gray-800 whitespace-pre-wrap">{flatInstruction}</p>
+        </div>
+      )}
       {parsed.map((p) => (
         <div
           key={p.qId}
@@ -710,6 +790,217 @@ function CompletionBody({
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function FormCompletionTwoColumn({
+  section,
+  answers,
+  onAnswer,
+  correctAnswers = {},
+  isCorrectMap = {},
+  reviewMode = false,
+}: {
+  section: IeltsListeningSection;
+  answers: AnswerMap;
+  onAnswer: (qId: number, value: any) => void;
+  correctAnswers?: Record<number, string>;
+  isCorrectMap?: Record<number, boolean>;
+  reviewMode?: boolean;
+}) {
+  const context = getGroupInstruction(section.questions) || section.instructions || "";
+  const first = section.questions[0]?.questionNumber;
+  const last = section.questions[section.questions.length - 1]?.questionNumber;
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+        <p className="text-[11px] uppercase tracking-wide text-orange-700 font-bold">
+          Questions {first}{first !== last ? `–${last}` : ""}
+        </p>
+        <p className="text-sm font-bold text-gray-900">Complete the form below.</p>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.85fr)] p-4">
+        <div className="rounded-lg border border-orange-100 bg-orange-50/30 p-4">
+          {context && (
+            <div className="mb-4 text-[15px] leading-[1.8] text-gray-900 whitespace-pre-wrap font-medium">
+              {context}
+            </div>
+          )}
+          <div className="space-y-3">
+            {section.questions.map((q) => (
+              <div
+                key={q.qId}
+                className="text-[15px] leading-[1.8] text-gray-900 whitespace-pre-wrap"
+              >
+                {renderFormLine(q.questionText || "", q.questionNumber)}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-600">Your answers</p>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {section.questions.map((q) => (
+              <div
+                key={q.qId}
+                id={`ielts-ft-q-${q.qId}`}
+                className="p-3"
+              >
+                <label className="flex items-start gap-3">
+                  <span className="mt-1 flex-shrink-0 w-7 h-7 rounded-md bg-orange-500 text-white text-xs font-bold flex items-center justify-center">
+                    {q.questionNumber}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="mb-1.5 text-[12px] leading-snug text-gray-500 line-clamp-2">
+                      {labelFromFormLine(q.questionText || "", q.questionNumber)}
+                    </p>
+                    {renderAnswerInput(
+                      q.qId,
+                      q.questionNumber,
+                      answers[q.qId] as string,
+                      (v) => onAnswer(q.qId, v),
+                      reviewMode,
+                      correctAnswers[q.qId],
+                      isCorrectMap
+                    )}
+                  </div>
+                </label>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function isFormCompletionType(type: unknown): boolean {
+  const normalized = String(type || "").replace(/-/g, "_");
+  return normalized === "form_completion";
+}
+
+function splitQuestionRuns(questions: IeltsListeningSection["questions"]) {
+  const runs: Array<{
+    key: string;
+    kind: "form" | "completion";
+    questions: IeltsListeningSection["questions"];
+  }> = [];
+
+  questions.forEach((q) => {
+    const kind: "form" | "completion" = isFormCompletionType(q.questionType) ? "form" : "completion";
+    const last = runs[runs.length - 1];
+    if (last && last.kind === kind) {
+      last.questions.push(q);
+    } else {
+      runs.push({ key: `${kind}-${q.qId}`, kind, questions: [q] });
+    }
+  });
+
+  return runs;
+}
+
+function getGroupInstruction(questions: IeltsListeningSection["questions"]): string {
+  return (
+    questions.find((q) => q.data?.taskInstruction || q.data?.task_instruction)?.data?.taskInstruction ||
+    questions.find((q) => q.data?.taskInstruction || q.data?.task_instruction)?.data?.task_instruction ||
+    ""
+  ) as string;
+}
+
+function renderFormLine(text: string, questionNumber: number) {
+  const parts: React.ReactNode[] = [];
+  const regex = /_{2,}\s*(\d+)?\s*_{2,}|_{2,}/g;
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+  let placed = false;
+
+  while ((m = regex.exec(text)) !== null) {
+    if (m.index > lastIndex) {
+      parts.push(<span key={`t-${m.index}`}>{text.slice(lastIndex, m.index)}</span>);
+    }
+    const num = m[1] ? Number(m[1]) : questionNumber;
+    parts.push(
+      <span
+        key={`b-${m.index}`}
+        className="inline-flex items-center justify-center min-w-[42px] h-7 px-2 mx-1 rounded-md bg-white text-orange-700 font-bold text-xs border-2 border-orange-300 align-middle"
+      >
+        {num}
+      </span>
+    );
+    placed = true;
+    lastIndex = m.index + m[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(<span key="tail">{text.slice(lastIndex)}</span>);
+  }
+
+  if (!placed) {
+    parts.push(
+      <span
+        key="fallback"
+        className="inline-flex items-center justify-center min-w-[42px] h-7 px-2 mx-1 rounded-md bg-white text-orange-700 font-bold text-xs border-2 border-orange-300 align-middle"
+      >
+        {questionNumber}
+      </span>
+    );
+  }
+
+  return <span>{parts}</span>;
+}
+
+function labelFromFormLine(text: string, questionNumber: number): string {
+  const withoutBlank = text
+    .replace(/_{2,}\s*\d*\s*_{2,}|_{2,}/g, `(${questionNumber})`)
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return withoutBlank || `Question ${questionNumber}`;
+}
+
+function renderAnswerInput(
+  qId: number,
+  questionNumber: number,
+  value: string | undefined,
+  onChange: (v: string) => void,
+  reviewMode: boolean = false,
+  correctAnswer: string = "",
+  isCorrectMap: Record<number, boolean> = {}
+) {
+  const answered = value != null && value.trim() !== "";
+  const isCorrect = reviewMode && answered && (
+    qId in isCorrectMap
+      ? isCorrectMap[qId]
+      : correctAnswer !== "" && value!.trim().toLowerCase() === correctAnswer.trim().toLowerCase()
+  );
+  const isWrong = reviewMode && answered && !isCorrect;
+
+  const cls = reviewMode
+    ? isCorrect
+      ? "w-full px-3 py-2 text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-300 rounded-md outline-none"
+      : isWrong
+        ? "w-full px-3 py-2 text-sm font-semibold text-red-700 bg-red-50 border border-red-300 rounded-md outline-none"
+        : "w-full px-3 py-2 text-sm font-semibold text-gray-500 bg-gray-50 border border-gray-300 rounded-md outline-none"
+    : "w-full px-3 py-2 text-sm font-semibold text-orange-700 placeholder:text-orange-400/60 bg-orange-50/70 border border-orange-300 rounded-md focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition-colors";
+
+  return (
+    <div>
+      <input
+        type="text"
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={`Answer ${questionNumber}`}
+        disabled={reviewMode}
+        className={cls}
+      />
+      {isWrong && correctAnswer && (
+        <p className="mt-1 text-[12px] font-bold text-emerald-700">✓ {correctAnswer}</p>
+      )}
     </div>
   );
 }

@@ -25,6 +25,7 @@ import { studentApi } from "../../../../services/studentApi";
 import { api } from "../../../../services/api";
 import { usePageTitle } from "../../../../hooks/usePageTitle";
 import { useExamSession } from "../../../../hooks/exam/useExamSession";
+import { PassageSplitLayout } from "../components/PassageSplitLayout";
 
 /* ============================================================
  *  TYPES (identical to VstepExamPreview)
@@ -366,7 +367,7 @@ export function StudentVstepExamPage() {
         for (const [key, val] of Object.entries(feedback.speaking_results ?? {})) {
           const partNum = parseInt(key.replace('part_', ''));
           if (!isNaN(partNum)) {
-            spResults[partNum] = { ...val };
+            spResults[partNum] = val && typeof val === "object" ? { ...val } : {};
           }
         }
 
@@ -1588,16 +1589,15 @@ function ReadingView({
   if (!part || !part.questions?.length) return <EmptyState skill="reading" />;
 
   return (
-    <div className="h-full grid grid-cols-1 md:grid-cols-[45%_55%] gap-4 p-4 overflow-hidden">
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden min-h-0">
-        <div className="px-5 py-3 bg-emerald-50 border-b border-emerald-200 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-emerald-600" />
-            <h3 className="font-semibold text-emerald-900">Reading Passage — Part {partNumber}</h3>
-          </div>
-          {part.partName && <span className="text-xs text-emerald-700">{part.partName}</span>}
-        </div>
-        {examId ? (
+    <PassageSplitLayout
+      className="h-full p-4 overflow-hidden"
+      gridClassName="grid-cols-1 md:grid-cols-[45%_55%]"
+      heightClassName="h-full"
+      tone="emerald"
+      passageTitle={`Reading Passage - Part ${partNumber}`}
+      passageSubtitle={part.partName}
+      passageContent={
+        examId ? (
           <HighlightablePassage
             html={part.passage || ""}
             examId={examId}
@@ -1611,23 +1611,23 @@ function ReadingView({
               dangerouslySetInnerHTML={{ __html: part.passage || "" }}
             />
           </div>
-        )}
-      </div>
-
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden min-h-0">
-        <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-          <h3 className="font-semibold text-slate-900">Questions ({part.questions.length})</h3>
-          <span className="text-xs text-slate-500">
-            {part.questions[0]?.questionNumber}–{part.questions[part.questions.length - 1]?.questionNumber}
-          </span>
-        </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+        )
+      }
+      questionsTitle={`Questions (${part.questions.length})`}
+      questionsHeaderExtra={
+        <span className="text-xs text-slate-500">
+          {part.questions[0]?.questionNumber}-{part.questions[part.questions.length - 1]?.questionNumber}
+        </span>
+      }
+      questionsBodyClassName="space-y-5"
+      questionsContent={
+        <>
           {part.questions.map((q) => (
             <QuestionCard key={q.qId} q={q} selected={answers[q.qId]} onSelect={(l) => onAnswer(q.questionNumber, q.qId, l)} flagged={!!flagged[q.qId]} onToggleFlag={reviewMode ? undefined : () => onFlag(q.qId)} reviewMode={reviewMode} correctAnswer={correctAnswersMap?.[q.qId] as any} />
           ))}
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    />
   );
 }
 

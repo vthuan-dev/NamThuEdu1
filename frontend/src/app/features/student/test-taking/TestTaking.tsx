@@ -17,6 +17,7 @@ import {
 } from "../../../../components/exam";
 import { examDraftStorage } from "../../../../lib/exam/examDraftStorage";
 import { useTranslation } from "react-i18next";
+import { PassageSplitLayout } from "../components/PassageSplitLayout";
 
 // VSTEP Structure - 4 Skills, 7 Parts
 const VSTEP_STRUCTURE = {
@@ -775,11 +776,16 @@ export function TestTaking() {
             )}
 
             {activeSkill === "reading" && (
-              <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                <div className="rounded-lg border border-slate-200 p-5 text-[15px] leading-7 text-slate-700 max-h-[62vh] overflow-y-auto">
-                  <div dangerouslySetInnerHTML={{ __html: currentPartQuestions[0]?.qPassage ?? "<p>Reading passage se hien thi o day.</p>" }} />
-                </div>
-                <div className="rounded-lg border border-slate-200 p-5 max-h-[62vh] overflow-y-auto space-y-5">
+              <PassageSplitLayout
+                heightClassName="min-h-[62vh] xl:h-[62vh]"
+                gridClassName="grid-cols-1 xl:grid-cols-2"
+                tone="emerald"
+                passageTitle="Reading passage"
+                passageHtml={currentPartQuestions[0]?.qPassage ?? "<p>Reading passage se hien thi o day.</p>"}
+                questionsTitle={`${t("student.examTaking.questions")} (${currentPartQuestions.length})`}
+                questionsBodyClassName="space-y-5"
+                questionsContent={
+                  <>
                   {currentPartQuestions.map((question: any, index: number) => {
                     const qKey = getQuestionId(question);
                     const selected = String(session.answers[qKey] ?? "");
@@ -808,8 +814,9 @@ export function TestTaking() {
                       </article>
                     );
                   })}
-                </div>
-              </section>
+                  </>
+                }
+              />
             )}
 
             {activeSkill === "writing" && (

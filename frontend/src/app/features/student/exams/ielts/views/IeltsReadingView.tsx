@@ -7,7 +7,8 @@
  *  • 60 minutes total, no automatic skill end (managed by parent timer)
  */
 import { useMemo, useState } from "react";
-import { BookOpen, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
+import { PassageSplitLayout } from "../../../components/PassageSplitLayout";
 import type { IeltsReadingPayload, AnswerMap } from "../types";
 import { IeltsQuestionRenderer } from "../components/IeltsQuestionRenderer";
 import { type QuestionMeta } from "../components/IeltsBottomNav";
@@ -125,39 +126,19 @@ export function IeltsReadingView({
 
       {/* 2-col split: passage | questions */}
       <div className="flex-1 px-4 py-4 max-w-7xl w-full mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[calc(100vh-12rem)]">
-          {/* Passage panel */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
-            <div className="px-5 py-3 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-              <div className="flex items-center gap-2 mb-0.5">
-                <BookOpen className="w-4 h-4 text-blue-600" />
-                <h2 className="text-sm font-bold text-gray-900">
-                  {currentPassage.passageName}
-                </h2>
-              </div>
-              {currentPassage.title && (
-                <p className="text-xs text-gray-700 italic">{currentPassage.title}</p>
-              )}
-            </div>
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              <div
-                className="prose prose-sm max-w-none text-gray-800 leading-relaxed [&>p]:mb-4"
-                dangerouslySetInnerHTML={{ __html: currentPassage.body || "<p><em>No passage</em></p>" }}
-              />
-            </div>
-          </div>
-
-          {/* Questions panel */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
-            <div className="px-5 py-3 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between">
-              <h3 className="text-sm font-bold text-gray-900">
-                Questions {currentPassage.questionStart}–{currentPassage.questionEnd}
-              </h3>
-              <div className="text-xs text-gray-500">
+        <PassageSplitLayout
+          passageTitle={currentPassage.passageName}
+          passageSubtitle={currentPassage.title ? <span className="italic">{currentPassage.title}</span> : undefined}
+          passageHtml={currentPassage.body}
+          questionsTitle={`Questions ${currentPassage.questionStart}-${currentPassage.questionEnd}`}
+          questionsHeaderExtra={
+            <div className="text-xs text-gray-500">
                 {currentAnswered} / {currentPassage.questions.length} answered
-              </div>
             </div>
-            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+          }
+          questionsBodyClassName="space-y-3"
+          questionsContent={
+            <>
               {currentPassage.questions.map((q, idx) => {
                 const instr = (q as any).data?.task_instruction || "";
                 const prevInstr =
@@ -183,9 +164,10 @@ export function IeltsReadingView({
                   </div>
                 );
               })}
-            </div>
-          </div>
-        </div>
+            </>
+          }
+          tone="blue"
+        />
       </div>
 
       <IeltsQuestionNavigator

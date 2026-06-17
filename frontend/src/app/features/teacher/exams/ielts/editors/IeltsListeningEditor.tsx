@@ -24,6 +24,8 @@ interface ListeningQuestion {
   taskTitle?: string;
   /** Câu hỏi/chỉ dẫn dùng chung của nhóm (vd "Where does the speaker decide to put items in? Write A, B or C."). */
   taskInstruction?: string;
+  /** Form-completion editor: raw free-form text typed by teacher. */
+  formText?: string;
   options?: Record<string, string>;
   correctAnswer: string;
   /** MCQ: số đáp án cần chọn (1 = chọn 1; 2 = "Choose TWO letters"…). Dùng chung cả nhóm. */
@@ -38,6 +40,7 @@ interface ListeningQuestion {
 }
 
 const isImageCompletion = (t: string) => t === "image-completion";
+const isFormCompletion = (t: string) => t === "form-completion";
 
 // Các dạng điền từ trong Listening — có giới hạn từ + word bank.
 const LISTENING_COMPLETION_TYPES = [
@@ -59,6 +62,56 @@ const WORD_LIMIT_OPTS = [
   "NO MORE THAN TWO WORDS AND/OR A NUMBER",
   "NO MORE THAN THREE WORDS",
 ];
+
+type ParsedInlineForm = {
+  title?: string;
+  context: string;
+  questions: Array<{
+    questionNumber: number;
+    questionText: string;
+  }>;
+};
+
+function parseInlineFormText(text: string, startQuestionNumber: number): ParsedInlineForm {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const questions: ParsedInlineForm["questions"] = [];
+  const questionLineSet = new Set<number>();
+
+  lines.forEach((line, index) => {
+    const blankMatches = line.match(/_{3,}/g) ?? [];
+    if (blankMatches.length === 0) return;
+    questionLineSet.add(index);
+    blankMatches.forEach(() => {
+      questions.push({
+        questionNumber: startQuestionNumber + questions.length,
+        questionText: line,
+      });
+    });
+  });
+
+  const contextLines = lines.filter((_, index) => !questionLineSet.has(index));
+  const title = contextLines[0];
+  const context = contextLines.join("\n");
+
+  return { title, context, questions };
+}
+
+function buildInlineFormText(questions: ListeningQuestion[], fallbackTitle = ""): string {
+  const rawFormText = questions.find((q) => q.formText != null)?.formText;
+  if (rawFormText != null) return rawFormText;
+
+  const firstContext = questions.find((q) => q.taskInstruction?.trim())?.taskInstruction?.trim();
+  const lines: string[] = [];
+  if (firstContext) lines.push(firstContext);
+  else if (fallbackTitle.trim()) lines.push(fallbackTitle.trim());
+
+  questions.forEach((q) => {
+    if (!q.questionText.trim()) return;
+    lines.push(q.questionText);
+  });
+
+  return lines.join("\n");
+}
 
 interface ListeningSection {
   sectionNumber: 1 | 2 | 3 | 4;
@@ -152,7 +205,6 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
     });
   }, []);
 
-
   const current = sections.find((s) => s.sectionNumber === activeSection)!;
   const partInfo = IELTS_STRUCTURE.listening.parts[activeSection - 1];
 
@@ -213,6 +265,101 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
       );
     },
     [groupRangeOf]
+  );
+
+  const applyInlineFormText = useCallback(
+    (secNum: number, qIdx: number, formText: string) => {
+      setSections((prev) =>
+        prev.map((s) => {
+          if (s.sectionNumber !== secNum) return s;
+
+          const sectionStart = (secNum - 1) * 10 + 1;
+          const sectionEnd = sectionStart + 9;
+          const [currentGroupStart, currentGroupEnd] = groupRangeOf(s.questions, qIdx);
+          const startQuestionNumber = s.questions[currentGroupStart]?.questionNumber ?? sectionStart;
+          const parsed = parseInlineFormText(formText, startQuestionNumber);
+          const parsedByNumber = new Map(parsed.questions.map((q) => [q.questionNumber, q]));
+          const start = currentGroupStart;
+          const end = Math.min(
+            sectionEnd - sectionStart,
+            parsed.questions.length > 0 ? start + parsed.questions.length - 1 : start
+          );
+
+          return {
+            ...s,
+            sectionTitle: s.sectionTitle || parsed.title || "",
+            questions: s.questions.map((q, i) => {
+              if (i < start) return q;
+              if (i > end && i <= currentGroupEnd) {
+                return {
+                  ...q,
+                  questionType: "multiple-choice",
+                  questionText: "",
+                  taskInstruction: "",
+                  formText: undefined,
+                  wordLimit: undefined,
+                  useWordBank: undefined,
+                  correctAnswer: "A",
+                  options: { A: "", B: "", C: "", D: "" },
+                };
+              }
+              if (i > end) return q;
+              const item = parsedByNumber.get(q.questionNumber);
+              return {
+                ...q,
+                questionType: "form-completion",
+                questionText: item ? item.questionText : "",
+                taskInstruction: parsed.context || q.taskInstruction || "",
+                formText,
+                wordLimit: q.wordLimit || "ONE WORD AND/OR A NUMBER",
+                options: undefined,
+              };
+            }),
+          };
+        })
+      );
+    },
+    [groupRangeOf]
+  );
+
+  const changeQuestionType = useCallback(
+    (secNum: number, qIdx: number, newType: string) => {
+      setSections((prev) =>
+        prev.map((s) => {
+          if (s.sectionNumber !== secNum) return s;
+
+          const normalizeForType = (q: ListeningQuestion): ListeningQuestion => ({
+            ...q,
+            questionType: newType,
+            selectCount: undefined,
+            wordLimit: newType === "form-completion" ? "ONE WORD AND/OR A NUMBER" : undefined,
+            useWordBank: undefined,
+            taskImage: isImageCompletion(newType) ? q.taskImage : undefined,
+            taskImageFileName: isImageCompletion(newType) ? q.taskImageFileName : undefined,
+            correctAnswer:
+              newType === "multiple-choice" && !q.correctAnswer?.trim()
+                ? "A"
+                : "",
+            options: isListeningMatching(newType)
+              ? (q.options && Object.keys(q.options).length ? q.options : { A: "", B: "", C: "" })
+              : newType === "multiple-choice"
+                ? (q.options ?? { A: "", B: "", C: "", D: "" })
+                : undefined,
+          });
+
+          return {
+            ...s,
+            questions: s.questions.map((q, i) => {
+              if (newType === "form-completion") {
+                return i <= qIdx ? normalizeForType(q) : q;
+              }
+              return i === qIdx ? normalizeForType(q) : q;
+            }),
+          };
+        })
+      );
+    },
+    []
   );
 
   const handleAudioUpload = async (file: File) => {
@@ -692,23 +839,25 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
           <span className="text-xs text-gray-500">10 câu / section</span>
         </div>
 
-
         <div className="space-y-3">
           {current.questions.map((q, idx) => {
-            const prevType = idx > 0 ? current.questions[idx - 1].questionType : null;
-            const isGroupStart = q.questionType !== prevType;
-            // Đếm số câu trong nhóm (dải liền nhau cùng dạng) bắt đầu từ đây.
-            let groupSize = 1;
-            if (isGroupStart) {
-              for (
-                let j = idx + 1;
-                j < current.questions.length &&
-                current.questions[j].questionType === q.questionType;
-                j++
-              ) {
-                groupSize++;
-              }
+            let groupStart = idx;
+            let groupEnd = idx;
+            while (
+              groupStart - 1 >= 0 &&
+              current.questions[groupStart - 1].questionType === q.questionType
+            ) {
+              groupStart--;
             }
+            while (
+              groupEnd + 1 < current.questions.length &&
+              current.questions[groupEnd + 1].questionType === q.questionType
+            ) {
+              groupEnd++;
+            }
+            const isGroupStart = idx === groupStart;
+            const groupSize = groupEnd - groupStart + 1;
+            const groupQuestions = current.questions.slice(groupStart, groupEnd + 1);
             const isImgCompStart = isGroupStart && isImageCompletion(q.questionType);
             return (
               <>
@@ -729,9 +878,23 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
                   index={idx}
                   isGroupStart={isGroupStart}
                   groupSize={groupSize}
+                  groupStartNumber={current.questions[groupStart].questionNumber}
+                  groupEndNumber={current.questions[groupEnd].questionNumber}
+                  groupPosition={
+                    groupSize <= 1
+                      ? "single"
+                      : idx === groupStart
+                        ? "start"
+                        : idx === groupEnd
+                          ? "end"
+                          : "middle"
+                  }
                   examId={examId}
                   onPatch={updateQuestion}
                   onPatchGroup={patchGroupAt}
+                  onApplyInlineFormText={applyInlineFormText}
+                  onChangeQuestionType={changeQuestionType}
+                  groupQuestions={groupQuestions}
                 />
               </>
             );
@@ -775,6 +938,7 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
           <span className="font-semibold text-gray-600">Xuất bản</span> ở thanh trên cùng để lưu.
         </p>
       </div>
+
     </div>
   );
 }
@@ -788,9 +952,15 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
   index,
   isGroupStart = false,
   groupSize = 1,
+  groupStartNumber,
+  groupEndNumber,
+  groupPosition = "single",
+  groupQuestions = [],
   examId,
   onPatch,
   onPatchGroup,
+  onApplyInlineFormText,
+  onChangeQuestionType,
 }: {
   question: ListeningQuestion;
   sectionNumber: number;
@@ -799,20 +969,49 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
   isGroupStart?: boolean;
   /** Số câu trong nhóm (để hiển thị "Câu N–M"). */
   groupSize?: number;
+  groupStartNumber?: number;
+  groupEndNumber?: number;
+  groupPosition?: "single" | "start" | "middle" | "end";
+  groupQuestions?: ListeningQuestion[];
   examId?: string;
   onPatch: (secNum: number, qIdx: number, patch: Partial<ListeningQuestion>) => void;
   onPatchGroup?: (secNum: number, qIdx: number, patch: Partial<ListeningQuestion>) => void;
+  onApplyInlineFormText: (secNum: number, qIdx: number, formText: string) => void;
+  onChangeQuestionType: (secNum: number, qIdx: number, newType: string) => void;
 }) {
   const isMcq = question.questionType === "multiple-choice";
   const isMatching = isListeningMatching(question.questionType);
   const completion = isListeningCompletion(question.questionType);
   const isImgCompletion = isImageCompletion(question.questionType);
+  const isInlineForm = isFormCompletion(question.questionType);
+  const isGrouped = groupSize > 1;
+  const groupLabel = isGrouped
+    ? `Nhóm ${groupStartNumber ?? question.questionNumber}–${groupEndNumber ?? question.questionNumber}`
+    : "";
+  const groupAccent = isInlineForm
+    ? {
+        border: "#93C5FD",
+        bg: "#EFF6FF",
+        softBg: "#DBEAFE",
+        text: "#1D4ED8",
+      }
+    : {
+        border: "#C7D2FE",
+        bg: "#F5F3FF",
+        softBg: "#EDE9FE",
+        text: "#5B21B6",
+      };
   const wordBank = completion && !!question.useWordBank;
   const selectCount = question.selectCount ?? 1;
   const isMultiMcq = isMcq && selectCount > 1;
   const handleChange = (patch: Partial<ListeningQuestion>) => onPatch(sectionNumber, index, patch);
   const handleGroup = (patch: Partial<ListeningQuestion>) =>
     (onPatchGroup ?? ((s, _i, p) => onPatch(s, index, p)))(sectionNumber, index, patch);
+  const formText = buildInlineFormText(
+    groupQuestions.length ? groupQuestions : [question],
+    question.taskTitle || question.taskInstruction || ""
+  );
+  const formBlankCount = (formText.match(/_{3,}/g) ?? []).length;
 
   const optionKeys = Object.keys(question.options || {})
     .filter((k) => /^[A-Za-z]+$/.test(k))
@@ -832,7 +1031,21 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
     handleChange({ correctAnswer: Array.from(next).sort().join(",") });
   };
   return (
-    <div className="rounded-xl border border-gray-200 p-3 hover:border-blue-300 transition-all">
+    <div
+      className={[
+        "rounded-xl border p-3 transition-all relative",
+        isGrouped ? "hover:shadow-sm" : "border-gray-200 hover:border-blue-300",
+      ].join(" ")}
+      style={
+        isGrouped
+          ? {
+              borderColor: groupAccent.border,
+              background: groupAccent.bg,
+              boxShadow: isGroupStart ? `inset 4px 0 0 ${groupAccent.border}` : undefined,
+            }
+          : undefined
+      }
+    >
       <div className="flex items-start gap-3">
         <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-sm flex-shrink-0">
           {question.questionNumber}
@@ -841,29 +1054,28 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
         <div className="flex-1 min-w-0 space-y-2">
           {/* ── Question type selector + group controls ── */}
           <div className="flex flex-wrap items-center gap-2">
+            {isGrouped && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold"
+                style={{ background: groupAccent.softBg, color: groupAccent.text }}
+                title={
+                  isGroupStart
+                    ? "Câu đầu nhóm: chỉnh cài đặt áp dụng cho cả nhóm"
+                    : `Câu này thuộc ${groupLabel}; cài đặt chung nằm ở câu ${groupStartNumber}`
+                }
+              >
+                {groupPosition === "start"
+                  ? `${groupLabel} · đầu nhóm`
+                  : groupPosition === "end"
+                    ? `${groupLabel} · cuối nhóm`
+                    : groupLabel}
+              </span>
+            )}
             <select
               value={question.questionType}
               onChange={(e) => {
                 const newType = e.target.value;
-                handleChange({
-                  questionType: newType,
-                  selectCount: undefined,
-                  wordLimit: undefined,
-                  useWordBank: undefined,
-                  taskImage: isImageCompletion(newType) ? question.taskImage : undefined,
-                  taskImageFileName: isImageCompletion(newType) ? question.taskImageFileName : undefined,
-                  correctAnswer:
-                    newType === "multiple-choice" && !question.correctAnswer?.trim()
-                      ? "A"
-                      : "",
-                  options: isListeningMatching(newType)
-                    ? (question.options && Object.keys(question.options).length
-                        ? question.options
-                        : { A: "", B: "", C: "" })
-                    : newType === "multiple-choice"
-                    ? (question.options ?? { A: "", B: "", C: "", D: "" })
-                    : undefined,
-                });
+                onChangeQuestionType(sectionNumber, index, newType);
               }}
               className="text-xs font-medium px-2 py-1 border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
@@ -933,21 +1145,48 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
                 </label>
               </>
             )}
-            {isGroupStart && groupSize > 1 && (
-              <span className="text-[11px] text-gray-400">
-                Nhóm {question.questionNumber}–{question.questionNumber + groupSize - 1}
+            {isGrouped && !isGroupStart && (
+              <span className="text-[11px] text-gray-500">
+                Dùng cài đặt chung ở câu {groupStartNumber}
               </span>
             )}
           </div>
 
           {!isImgCompletion && (
-            <input
-              type="text"
-              value={question.questionText}
-              onChange={(e) => handleChange({ questionText: e.target.value })}
-              placeholder={isMatching ? "Tên mục cần ghép (vd: kettle, alarm clock...)" : "Nội dung câu hỏi..."}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
+            !isInlineForm && (
+              <input
+                type="text"
+                value={question.questionText}
+                onChange={(e) => handleChange({ questionText: e.target.value })}
+                placeholder={isMatching ? "Tên mục cần ghép (vd: kettle, alarm clock...)" : "Nội dung câu hỏi..."}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            )
+          )}
+
+          {isGroupStart && isInlineForm && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50/40 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <label className="block text-[11px] font-bold uppercase tracking-wide text-blue-700">
+                  Nội dung form - mỗi ___ là một câu
+                </label>
+                <span className="text-[11px] text-blue-600 font-semibold">
+                  {formBlankCount > 0
+                    ? `${formBlankCount} chỗ trống → câu ${question.questionNumber}–${question.questionNumber + formBlankCount - 1}`
+                    : "Chưa có chỗ trống ___"}
+                </span>
+              </div>
+              <textarea
+                value={formText}
+                onChange={(e) => onApplyInlineFormText(sectionNumber, index, e.target.value)}
+                rows={Math.min(10, Math.max(5, formText.split(/\r?\n/).length + 1))}
+                placeholder={`Enquiry about joining Youth Council\n\nAge: 18\nCurrently staying in a ___ during the week\nPostal address: 217, ___ Street, Stamford, Lincs\nPostcode: ___`}
+                className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg bg-white font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+              />
+              <p className="text-[11px] text-blue-700">
+                Giáo viên nhập/xóa tự do tại đây. Hệ thống chỉ nhận dạng mỗi ___ là một câu; chữ trước/sau ___ được giữ làm label cho học viên.
+              </p>
+            </div>
           )}
 
           {/* Chỉ dẫn chung của nhóm — hiện 1 lần ở câu đầu nhóm, áp cho mọi dạng (trừ image-completion tự có zone riêng phía trên) */}

@@ -30,6 +30,7 @@ import {
   TimeWarningBanner,
 } from '../../../../components/exam';
 import { examDraftStorage } from '../../../../lib/exam/examDraftStorage';
+import { PassageSplitLayout } from '../components/PassageSplitLayout';
 
 const BASE = '/hoc-vien';
 const TEAL = '#0D9488';
@@ -652,94 +653,92 @@ export function TeensTestTaking() {
         </div>
       </div>
 
-      <div className={`mt-5 grid grid-cols-1 gap-5 ${isReading ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_240px]' : 'lg:grid-cols-[1fr_260px]'}`}>
-        {/* Cột bài đọc — cố định bên trái (chế độ đọc hiểu) */}
-        {isReading && (
-          <aside className="order-first">
-            <div className="lg:sticky lg:top-36 rounded-2xl bg-white border border-slate-200 p-5 sm:p-6 lg:max-h-[calc(100vh-11rem)] lg:overflow-y-auto">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold mb-3"
-                style={{ background: '#F0FDFA', color: TEAL }}>
-                Đọc hiểu
-              </span>
-              <div className="text-[15px] leading-7 text-slate-700"
-                dangerouslySetInnerHTML={{ __html: passage }} />
-            </div>
-          </aside>
-        )}
-
+      <div className={`mt-5 grid grid-cols-1 gap-5 ${isReading ? 'lg:grid-cols-[minmax(0,1fr)_240px]' : 'lg:grid-cols-[1fr_260px]'}`}>
         {/* Cột nội dung câu hỏi */}
         <main>
           {isReading ? (
             /* Danh sách câu cùng đoạn đọc — cuộn lên xuống */
-            <div className="space-y-4">
-              {groupIndices.map((idx) => {
-                const gq = questions[idx];
-                const gid = getQuestionId(gq);
-                const gSelected = String(session.answers[gid] ?? '');
-                const gFlagged = !!flagged[gid];
-                const isCur = idx === current;
-                return (
-                  <section
-                    key={gid || idx}
-                    ref={(el) => { cardRefs.current[idx] = el; }}
-                    onMouseDown={() => setCurrent(idx)}
-                    className="rounded-2xl bg-white border p-5 sm:p-6 transition-shadow scroll-mt-36"
-                    style={{ borderColor: isCur ? TEAL : '#E2E8F0', boxShadow: isCur ? '0 0 0 3px #CCFBF1' : undefined }}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-lg text-sm font-bold text-white"
-                        style={{ background: TEAL }}>
-                        Câu {idx + 1}
-                      </span>
-                      <button onClick={(e) => { e.stopPropagation(); toggleFlagFor(gq); }}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors"
-                        style={{ background: gFlagged ? '#FEF3C7' : '#F8FAFC', color: gFlagged ? '#B45309' : '#94A3B8' }}>
-                        <Flag className="w-3.5 h-3.5" style={gFlagged ? { fill: '#B45309' } : undefined} />
-                        {gFlagged ? 'Đã đánh dấu' : 'Đánh dấu'}
-                      </button>
-                    </div>
+            <PassageSplitLayout
+              heightClassName="min-h-[calc(100vh-11rem)] lg:h-[calc(100vh-11rem)]"
+              gridClassName="grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]"
+              tone="teal"
+              passageTitle="Đọc hiểu"
+              passageHtml={passage}
+              questionsTitle={`Câu ${groupIndices[0] + 1}-${groupIndices[groupIndices.length - 1] + 1}`}
+              questionsSubtitle={`${groupIndices.length} câu dùng chung đoạn đọc`}
+              questionsBodyClassName="space-y-4"
+              questionsContent={
+                <>
+                  {groupIndices.map((idx) => {
+                    const gq = questions[idx];
+                    const gid = getQuestionId(gq);
+                    const gSelected = String(session.answers[gid] ?? '');
+                    const gFlagged = !!flagged[gid];
+                    const isCur = idx === current;
+                    return (
+                      <section
+                        key={gid || idx}
+                        ref={(el) => { cardRefs.current[idx] = el; }}
+                        onMouseDown={() => setCurrent(idx)}
+                        className="rounded-2xl bg-white border p-5 sm:p-6 transition-shadow scroll-mt-36"
+                        style={{ borderColor: isCur ? TEAL : '#E2E8F0', boxShadow: isCur ? '0 0 0 3px #CCFBF1' : undefined }}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-lg text-sm font-bold text-white"
+                            style={{ background: TEAL }}>
+                            Câu {idx + 1}
+                          </span>
+                          <button onClick={(e) => { e.stopPropagation(); toggleFlagFor(gq); }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors"
+                            style={{ background: gFlagged ? '#FEF3C7' : '#F8FAFC', color: gFlagged ? '#B45309' : '#94A3B8' }}>
+                            <Flag className="w-3.5 h-3.5" style={gFlagged ? { fill: '#B45309' } : undefined} />
+                            {gFlagged ? 'Đã đánh dấu' : 'Đánh dấu'}
+                          </button>
+                        </div>
 
-                    {gq?.qMedia_url && (
-                      <button onClick={(e) => { e.stopPropagation(); const a = new Audio(gq.qMedia_url); a.play().catch(() => undefined); }}
-                        className="mb-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-white font-semibold text-sm"
+                        {gq?.qMedia_url && (
+                          <button onClick={(e) => { e.stopPropagation(); const a = new Audio(gq.qMedia_url); a.play().catch(() => undefined); }}
+                            className="mb-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-white font-semibold text-sm"
+                            style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
+                            <Volume2 className="w-4 h-4" /> Nghe đoạn ghi âm
+                          </button>
+                        )}
+
+                        {gq?.qImage_url && (
+                          <img src={gq.qImage_url} alt="" className="w-full max-h-72 object-contain rounded-xl mb-4 bg-slate-50" />
+                        )}
+
+                        <h2 className="text-base font-bold leading-snug text-slate-900"
+                          dangerouslySetInnerHTML={{ __html: gq?.qContent ?? `Câu ${idx + 1}` }} />
+
+                        <QuestionRenderer q={gq} value={gSelected} onChange={(v) => setAnswerFor(gq, v)} />
+                      </section>
+                    );
+                  })}
+
+                  {/* Điều hướng dưới (desktop) */}
+                  <div className="hidden lg:flex items-center gap-3 pt-1">
+                    <button onClick={() => setCurrent(c => Math.max(0, c - 1))} disabled={current === 0}
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors disabled:opacity-40">
+                      <ArrowLeft className="w-4 h-4" /> Câu trước
+                    </button>
+                    {isLast ? (
+                      <button onClick={() => setShowSubmit(true)}
+                        className="ml-auto inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-white transition-transform hover:scale-[1.02] active:scale-95"
                         style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
-                        <Volume2 className="w-4 h-4" /> Nghe đoạn ghi âm
+                        <Send className="w-4 h-4" /> Nộp bài
+                      </button>
+                    ) : (
+                      <button onClick={() => setCurrent(c => Math.min(total - 1, c + 1))}
+                        className="ml-auto inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-white transition-transform hover:scale-[1.02] active:scale-95"
+                        style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
+                        Câu tiếp <ArrowRight className="w-4 h-4" />
                       </button>
                     )}
-
-                    {gq?.qImage_url && (
-                      <img src={gq.qImage_url} alt="" className="w-full max-h-72 object-contain rounded-xl mb-4 bg-slate-50" />
-                    )}
-
-                    <h2 className="text-base font-bold leading-snug text-slate-900"
-                      dangerouslySetInnerHTML={{ __html: gq?.qContent ?? `Câu ${idx + 1}` }} />
-
-                    <QuestionRenderer q={gq} value={gSelected} onChange={(v) => setAnswerFor(gq, v)} />
-                  </section>
-                );
-              })}
-
-              {/* Điều hướng dưới (desktop) */}
-              <div className="hidden lg:flex items-center gap-3 pt-1">
-                <button onClick={() => setCurrent(c => Math.max(0, c - 1))} disabled={current === 0}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors disabled:opacity-40">
-                  <ArrowLeft className="w-4 h-4" /> Câu trước
-                </button>
-                {isLast ? (
-                  <button onClick={() => setShowSubmit(true)}
-                    className="ml-auto inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-white transition-transform hover:scale-[1.02] active:scale-95"
-                    style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
-                    <Send className="w-4 h-4" /> Nộp bài
-                  </button>
-                ) : (
-                  <button onClick={() => setCurrent(c => Math.min(total - 1, c + 1))}
-                    className="ml-auto inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-white transition-transform hover:scale-[1.02] active:scale-95"
-                    style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
-                    Câu tiếp <ArrowRight className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
+                  </div>
+                </>
+              }
+            />
           ) : (
           <>
           <section className="rounded-2xl bg-white border border-slate-200 p-5 sm:p-7">
