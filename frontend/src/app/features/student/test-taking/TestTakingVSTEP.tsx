@@ -216,7 +216,7 @@ export function TestTakingVSTEP() {
     role: 'adults',
     onSubmitted: (res: any) => {
       const sid = res?.data?.data?.submissionId ?? submissionId;
-      navigate(`${STUDENT_BASE_PATH}/ket-qua/${sid}`);
+      navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${sid}`);
     },
   });
   const { setAnswer: setSessionAnswer } = session;
@@ -384,11 +384,11 @@ export function TestTakingVSTEP() {
     onSuccess: (res: any) => {
       const sid = res?.data?.data?.submissionId ?? submissionId;
       sessionStorage.removeItem(`vstep_test_remaining_${assignmentId}`);
-      navigate(`${STUDENT_BASE_PATH}/ket-qua/${sid}`);
+      navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${sid}`);
     },
     onError: () => {
       alert("Lỗi nộp bài. Đang chuyển đến trang kết quả...");
-      navigate(`${STUDENT_BASE_PATH}/ket-qua/${submissionId ?? 999}`);
+      navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${submissionId ?? 999}`);
     },
   });
 

@@ -20,6 +20,19 @@ import { SectionView } from './views/SectionView';
 
 const AUTOSAVE_INTERVAL_MS = 30_000;
 
+function thptDeadlineKey(examId?: string, submissionId?: number | null) {
+  return submissionId ? `thpt_deadline_${submissionId}` : `thpt_deadline_exam_${examId ?? 'unknown'}`;
+}
+
+function readThptDeadline(key: string): number | null {
+  try {
+    const value = Number(localStorage.getItem(key));
+    return Number.isFinite(value) && value > Date.now() ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 export function StudentThptExamPage() {
   const { examId } = useParams<{ examId: string }>();
   const [searchParams] = useSearchParams();
@@ -37,10 +50,7 @@ export function StudentThptExamPage() {
   const [resumeDraft, setResumeDraft] = useState<any>(null);
   const [startedAtServer, setStartedAtServer] = useState('');
   const [totalDurationSec, setTotalDurationSec] = useState(0);
-  const [remainingSec, setRemainingSec] = useState(() => {
-    const saved = sessionStorage.getItem(`thpt_remaining_${examId}`);
-    return saved ? Number(saved) : 0;
-  });
+  const [remainingSec, setRemainingSec] = useState(0);
 
   // useExamSession: localStorage layer (layer 2) + online/hasOtherTab UI only.
   // Server save (layer 3) uses the manual saveDraft interval below because
@@ -82,14 +92,10 @@ export function StudentThptExamPage() {
         const startedAt = startData.sStart_time ? new Date(startData.sStart_time).getTime() : Date.now();
         setStartedAtServer(new Date(startedAt).toISOString());
         setSubmissionId(sid);
-        // Nếu đã có giá trị lưu từ sessionStorage (F5), giữ nguyên
-        const savedRemaining = sessionStorage.getItem(`thpt_remaining_${examId}`);
-        if (savedRemaining) {
-          setRemainingSec(Number(savedRemaining));
-        } else {
-          const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-          setRemainingSec(Math.max(0, durationMin * 60 - elapsed));
-        }
+        const key = thptDeadlineKey(examId, sid);
+        const deadline = readThptDeadline(key) ?? startedAt + durationMin * 60_000;
+        localStorage.setItem(key, String(deadline));
+        setRemainingSec(Math.max(0, Math.floor((deadline - Date.now()) / 1000)));
         const restored = startData.submission_payload?.answers || {};
         Object.entries(restored).forEach(([k, v]) => session.setAnswer(k, v));
         if (sid) {
@@ -120,6 +126,7 @@ export function StudentThptExamPage() {
         final: true,
       });
       examDraftStorage.clear(submissionId);
+      localStorage.removeItem(thptDeadlineKey(examId, submissionId));
       toast.success('Đã nộp bài thành công!');
       navigate(`/hoc-vien/ket-qua-thpt/${submissionId}`, { replace: true });
     } catch (err: any) {
@@ -130,19 +137,19 @@ export function StudentThptExamPage() {
 
   // Manual countdown (THPT-specific; session.timeRemaining not used here)
   useEffect(() => {
-    if (loading || !config) return;
+    if (loading || !config || !submissionId) return;
+    const key = thptDeadlineKey(examId, submissionId);
     const t = window.setInterval(() => {
-      setRemainingSec((prev) => {
-        if (prev <= 1) {
-          window.clearInterval(t);
-          handleSubmit(true).catch(() => {});
-          return 0;
-        }
-        return prev - 1;
-      });
+      const deadline = Number(localStorage.getItem(key));
+      const next = Number.isFinite(deadline) ? Math.max(0, Math.floor((deadline - Date.now()) / 1000)) : 0;
+      setRemainingSec(next);
+      if (next <= 0) {
+        window.clearInterval(t);
+        handleSubmit(true).catch(() => {});
+      }
     }, 1000);
     return () => window.clearInterval(t);
-  }, [loading, config, handleSubmit]);
+  }, [loading, config, submissionId, examId, handleSubmit]);
 
   // Manual server auto-save every 30s via THPT-specific endpoint
   const saveDraft = useCallback(async () => {
@@ -169,28 +176,6 @@ export function StudentThptExamPage() {
     window.addEventListener('beforeunload', onHide);
     return () => window.removeEventListener('beforeunload', onHide);
   }, [saveDraft]);
-
-  // Lưu remainingSec vào sessionStorage trước khi F5/refresh
-  useEffect(() => {
-    if (!examId) return;
-    const save = () => {
-      sessionStorage.setItem(`thpt_remaining_${examId}`, String(remainingSec));
-    };
-    window.addEventListener('beforeunload', save);
-    window.addEventListener('pagehide', save);
-    return () => {
-      window.removeEventListener('beforeunload', save);
-      window.removeEventListener('pagehide', save);
-    };
-  }, [examId, remainingSec]);
-
-  // Xoá sessionStorage khi nộp bài
-  useEffect(() => {
-    if (!examId) return;
-    if (isSubmitting) {
-      sessionStorage.removeItem(`thpt_remaining_${examId}`);
-    }
-  }, [examId, isSubmitting]);
 
   const onAnswerChange = (key: string, value: boolean | string) => {
     session.setAnswer(key, value);

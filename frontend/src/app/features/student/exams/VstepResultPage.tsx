@@ -186,20 +186,38 @@ export function VstepResultPage() {
           raw?.exam?.eDuration_minutes ?? raw?.exam?.eDuration ?? null
         )
       : null;
+  const answers = (raw?.answers ?? []) as any[];
+  const answeredCount = answers.filter((answer) => {
+    const text = answer?.saAnswer_text;
+    return text != null && String(text).trim() !== "";
+  }).length;
+  const submittedStatuses = new Set(["submitted", "graded", "partially_graded", "grading_subjective"]);
+  const hasSubmitted =
+    !!raw?.sSubmit_time ||
+    submittedStatuses.has(String(submissionStatus ?? "").toLowerCase()) ||
+    totalMcq > 0 ||
+    answers.length > 0;
+  const hasSubmittedSubjective = !!vstepMeta?.writing_submitted || !!vstepMeta?.speaking_submitted;
+  const hasPendingSubjective =
+    pendingSkills.some((skill) => skill === "writing" || skill === "speaking") ||
+    (isGradingSubjective && hasSubmittedSubjective);
+  const objectiveOnlyNoScore = hasSubmitted && !hasPendingSubjective && overallAvg === null;
+  const displayOverall = overallAvg ?? (objectiveOnlyNoScore ? 0 : null);
+  const showScorePending = displayOverall === null && hasPendingSubjective;
+  const blankSubmission = hasSubmitted && answeredCount === 0;
 
   const statsItems: StatItem[] = [];
   if (totalMcq > 0) {
     statsItems.push({ label: "Câu đúng", value: `${correctMcq}/${totalMcq}` });
     if (accuracy !== null) statsItems.push({ label: "Độ chính xác", value: `${accuracy}%` });
   }
-  if (overallAvg !== null && !isGradingSubjective) {
-    statsItems.push({ label: "Điểm số", value: overallAvg.toFixed(1), sub: "/10" });
+  if (displayOverall !== null && !showScorePending) {
+    statsItems.push({ label: "Điểm số", value: displayOverall.toFixed(1), sub: "/10" });
   }
   if (durationText) {
     statsItems.push({ label: "Thời gian", value: durationText });
   }
 
-  const answers = (raw?.answers ?? []) as any[];
   const listeningAnswers = answers
     .filter((a) => (a.question?.qSection ?? "").toLowerCase() === "listening")
     .sort((a, b) => (a.question?.qNumber ?? 0) - (b.question?.qNumber ?? 0));
@@ -228,7 +246,13 @@ export function VstepResultPage() {
     if (avg >= 4) return { text: "text-amber-600", chip: "bg-amber-50 text-amber-700" };
     return { text: "text-rose-600", chip: "bg-rose-50 text-rose-700" };
   };
-  const tone = scoreTone(overallAvg);
+  const tone = scoreTone(displayOverall);
+  const formatSkillScore = (skill: SkillKey) => {
+    const score = scores[skill];
+    if (typeof score === "number" && !isNaN(score)) return `Điểm: ${score.toFixed(1)}/10`;
+    if (blankSubmission) return "Không có câu trả lời";
+    return "Chưa có điểm";
+  };
 
   // ── Loading / error ────────────────────────────────────────────────────────
   if (isLoading) {
@@ -289,11 +313,11 @@ export function VstepResultPage() {
 
         {/* Score */}
         <div className="px-6 py-7 text-center">
-          {!isGradingSubjective && overallAvg !== null ? (
+          {!showScorePending && displayOverall !== null ? (
             <>
               <div className="flex items-end justify-center gap-1">
                 <span className={`text-6xl font-bold tabular-nums leading-none ${tone.text}`}>
-                  {overallAvg.toFixed(1)}
+                  {displayOverall.toFixed(1)}
                 </span>
                 <span className="text-xl font-medium text-slate-300 mb-1.5">/10</span>
               </div>
@@ -303,14 +327,14 @@ export function VstepResultPage() {
               <span
                 className={`mt-3 inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${tone.chip}`}
               >
-                {bandLabel(overallAvg)}
+                {blankSubmission ? "Không có câu trả lời" : bandLabel(displayOverall)}
               </span>
             </>
           ) : (
             <div className="flex items-center justify-center gap-2.5 py-4 text-slate-500">
               <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
               <span className="text-sm font-medium">
-                {isGradingSubjective ? "Đang chấm Writing & Speaking…" : "Đang tính điểm…"}
+                {hasPendingSubjective ? "Đang chấm Writing & Speaking…" : "Đang tính điểm…"}
               </span>
             </div>
           )}
@@ -424,13 +448,24 @@ export function VstepResultPage() {
       {/* ── Skill scores ────────────────────────────────────────────────────── */}
       <div className="rounded-xl border border-slate-200 bg-white divide-y divide-slate-100">
         {visibleSkills.map(({ key, label, Icon, iconBg, iconText }) => {
-          const score = scores[key] ?? null;
           const stats = skillStats[key] ?? null;
           const isSubjective = key === "writing" || key === "speaking";
-          const isPending = score === null;
           const submitted =
             key === "writing" ? vstepMeta?.writing_submitted :
             key === "speaking" ? vstepMeta?.speaking_submitted : false;
+          const rawScore = scores[key];
+          const hasScore = typeof rawScore === "number" && !isNaN(rawScore);
+          const skillPending =
+            pendingSkills.includes(key) ||
+            (isGradingSubjective && (key === "writing" || key === "speaking") && submitted);
+          const resolvedZero =
+            !hasScore &&
+            !skillPending &&
+            hasSubmitted &&
+            (!isSubjective || submitted || blankSubmission);
+          const score = hasScore ? rawScore : resolvedZero ? 0 : null;
+          const isPending = score === null && skillPending;
+          const hasDisplayScore = score !== null;
 
           return (
             <div key={key} className="flex items-center justify-between px-5 py-4">
@@ -448,13 +483,16 @@ export function VstepResultPage() {
                       {submitted ? "AI đang chấm…" : "Chưa có bài nộp"}
                     </p>
                   )}
+                  {blankSubmission && score === 0 && (
+                    <p className="text-xs text-slate-400">Không có câu trả lời</p>
+                  )}
                 </div>
               </div>
 
-              {isPending ? (
+              {!hasDisplayScore ? (
                 <span className="flex items-center gap-1.5 text-slate-400 text-sm">
-                  <Clock className="w-4 h-4" />
-                  Chờ chấm
+                  {isPending ? <Clock className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                  {isPending ? "Chờ chấm" : "Chưa có điểm"}
                 </span>
               ) : (
                 <div className="flex items-baseline gap-1">
@@ -502,7 +540,7 @@ export function VstepResultPage() {
               label: "Chấm Writing (AI)",
               sub: pendingSkills.includes("writing")
                 ? (vstepMeta?.writing_submitted ? "Bài viết đã nộp · AI đang chấm…" : "Chưa có bài nộp")
-                : `Điểm: ${scores.writing?.toFixed(1)}/10`,
+                : formatSkillScore("writing"),
             },
             {
               show: examSections.includes("speaking"),
@@ -510,7 +548,7 @@ export function VstepResultPage() {
               label: "Chấm Speaking (AI)",
               sub: pendingSkills.includes("speaking")
                 ? (vstepMeta?.speaking_submitted ? "Audio đã upload · AI đang chấm…" : "Chưa có audio")
-                : `Điểm: ${scores.speaking?.toFixed(1)}/10`,
+                : formatSkillScore("speaking"),
             },
           ].filter((s) => s.show).map((step, i) => (
             <div key={i} className="flex items-start gap-3">
@@ -608,8 +646,17 @@ export function VstepResultPage() {
           // (filter A/B/C/D drop hết text → hiển thị "Bỏ trống").
           const isIelts = String(raw?.exam?.eType ?? "").toUpperCase() === "IELTS";
           const skill = String(raw?.exam?.eSkill ?? "listening").toLowerCase();
+          const examFormat = String(raw?.exam?.eFormat ?? raw?.exam?.exam_format ?? "").toUpperCase();
+          const ieltsSections = Array.isArray(vstepMeta?.exam_sections) ? vstepMeta.exam_sections : [];
+          const isIeltsFullReview =
+            isIelts &&
+            (skill === "full" ||
+              examFormat.includes("FULL") ||
+              ieltsSections.filter(Boolean).length > 1);
           const reviewUrl = isIelts
-            ? `${STUDENT_BASE}/lam-bai-ielts/${raw.exam_id}/${skill}?review=${submissionId}`
+            ? isIeltsFullReview
+              ? `${STUDENT_BASE}/lam-bai-ielts/${raw.exam_id}?review=${submissionId}`
+              : `${STUDENT_BASE}/lam-bai-ielts/${raw.exam_id}/${skill}?review=${submissionId}`
             : `${STUDENT_BASE}/lam-bai-vstep/${raw.exam_id}?review=${submissionId}`;
           return (
             <Link

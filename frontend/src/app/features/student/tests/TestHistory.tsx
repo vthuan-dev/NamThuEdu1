@@ -477,7 +477,10 @@ export function TestHistory() {
                       const status    = getStatusChip(s.sStatus);
                       const skillMeta = getSkillMeta(s.exam?.eSkill, s.exam?.eType);
                       const SkillIcon = skillMeta.icon;
-                      const isVstep   = s.exam?.eType?.toUpperCase() === "VSTEP";
+                      const examType  = s.exam?.eType?.toUpperCase();
+                      const isVstep   = examType === "VSTEP";
+                      const isIelts   = examType === "IELTS";
+                      const isThpt    = examType === "THPT";
                       const isPending = s.sStatus === "grading_subjective";
                       const isInProg  = s.sStatus === "in_progress";
                       const timeDiff  = getTimeDiff(s.sStart_time, s.sSubmit_time);
@@ -486,8 +489,12 @@ export function TestHistory() {
                         ? Math.min(Math.round(toNum(s.sTime_taken) / durationSec * 100), 99)
                         : null;
 
-                      const resultUrl = isVstep
+                      const resultUrl = isThpt
+                        ? `${BASE}/ket-qua-thpt/${s.sId}`
+                        : isVstep
                         ? `${BASE}/ket-qua-vstep/${s.sId}`
+                        : isIelts
+                        ? `${BASE}/ket-qua-ielts/${s.sId}`
                         : `${BASE}/ket-qua/${s.sId}`;
                       const resumeUrl = isVstep
                         ? `${BASE}/lam-bai-vstep/${s.exam?.eId}?submissionId=${s.sId}`

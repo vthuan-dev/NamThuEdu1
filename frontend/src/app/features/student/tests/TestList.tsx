@@ -107,6 +107,14 @@ export function TestList() {
 
   // URL base — kids dùng chung namespace /hoc-vien như các nhóm khác
   const BASE = STUDENT_BASE_PATH;
+  const resultUrlFor = (test: any) => {
+    const examType = String(test?.exam_type ?? "").toUpperCase();
+    const submissionId = test?.submission_id;
+    if (examType === "THPT") return `${BASE}/ket-qua-thpt/${submissionId}`;
+    if (examType === "VSTEP") return `${BASE}/ket-qua-vstep/${submissionId}`;
+    if (examType === "IELTS") return `${BASE}/ket-qua-ielts/${submissionId}`;
+    return `${BASE}/ket-qua/${submissionId}`;
+  };
 
   const isAdultLevelExam = (t: any) => {
     const s = String(t.exam_type || '').toLowerCase() + ' ' + String(t.exam_title || '').toLowerCase();
@@ -427,7 +435,7 @@ export function TestList() {
                     <div className="mt-auto pt-2">
                       {isCompleted ? (
                         <Link
-                          to={`${BASE}/ket-qua/${test.submission_id}`}
+                          to={resultUrlFor(test)}
                           className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-green-500 text-green-600 text-sm font-semibold hover:bg-green-50 transition-colors"
                         >
                           <CheckCircle className="w-4 h-4" />
@@ -545,7 +553,7 @@ export function TestList() {
                     {/* Action Button */}
                     <div className="flex-shrink-0">
                       {isCompleted ? (
-                        <Link to={`${BASE}/ket-qua/${test.submission_id}`}
+                        <Link to={resultUrlFor(test)}
                               className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all hover:scale-105"
                               style={{ background: "#F0FDF4", color: "#16A34A" }}>
                            <CheckCircle className="w-5 h-5" />

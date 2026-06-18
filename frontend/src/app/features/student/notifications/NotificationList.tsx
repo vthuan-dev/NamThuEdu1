@@ -254,13 +254,13 @@ export function NotificationList() {
 
                         {notif.action_url && (() => {
                           const url = resolveStudentActionUrl(notif.action_url);
-                          const isResultUrl = url?.includes("/ket-qua/");
+                          const opensResultModal = url?.includes("/ket-qua/");
                           
                           const handleActionClick = (e: React.MouseEvent) => {
                             if (isUnread) {
                               markAsReadMutation.mutate(notif.id as any);
                             }
-                            if (isResultUrl) {
+                            if (opensResultModal) {
                               e.preventDefault();
                               const parts = url.split("/");
                               const subId = Number(parts[parts.length - 1]);
@@ -270,7 +270,7 @@ export function NotificationList() {
                             }
                           };
 
-                          return isResultUrl ? (
+                          return opensResultModal ? (
                             <button
                               onClick={handleActionClick}
                               className="px-3 py-1.5 rounded-lg transition-all hover:opacity-90 text-white font-semibold text-xs text-center"

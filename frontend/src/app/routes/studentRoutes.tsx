@@ -8,6 +8,7 @@ import { UnderConstruction } from '../components/shared';
 import { StudentProtectedRoute } from './StudentProtectedRoute';
 import { refreshAuthUserFromServer } from '../../utils/authStorage';
 import { WaitingForClass } from '../features/student/WaitingForClass';
+import { studentApi } from '../../services/studentApi';
 
 // ─── Age Group Dashboards ─────────────────────────────────────────────────────
 const KidsDashboard = lazy(() =>
@@ -230,6 +231,40 @@ function AdaptiveTestTaking() {
 
 // Xem điểm: kids dùng bản vui vẻ, còn lại dùng ResultDetail chung.
 function AdaptiveResult() {
+  const { id } = useParams<{ id: string }>();
+  const [targetPath, setTargetPath] = useState<string | null>(null);
+  const [checking, setChecking] = useState(!isKidsUser());
+
+  useEffect(() => {
+    if (isKidsUser()) return;
+    const submissionId = Number(id);
+    if (!submissionId) {
+      setChecking(false);
+      return;
+    }
+    let cancelled = false;
+    setChecking(true);
+    studentApi.getSubmissionDetail(submissionId)
+      .then((res: any) => {
+        if (cancelled) return;
+        const raw = res?.data?.data ?? res?.data;
+        const examType = String(raw?.exam?.eType ?? "").toUpperCase();
+        if (examType === "THPT") setTargetPath(`/hoc-vien/ket-qua-thpt/${submissionId}`);
+        else if (examType === "VSTEP") setTargetPath(`/hoc-vien/ket-qua-vstep/${submissionId}`);
+        else if (examType === "IELTS") setTargetPath(`/hoc-vien/ket-qua-ielts/${submissionId}`);
+        setChecking(false);
+      })
+      .catch(() => {
+        if (!cancelled) setChecking(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  if (targetPath) return <Navigate to={targetPath} replace />;
+  if (checking) return <LoadingFallback />;
+
   return (
     <Suspense fallback={<LoadingFallback />}>
       {isKidsUser() ? <KidsResult /> : <ResultDetail />}
@@ -440,6 +475,10 @@ export const studentRoutes: RouteObject = {
     },
     {
       path: 'ket-qua-vstep/:id',
+      element: <Suspense fallback={<LoadingFallback />}><VstepResultPage /></Suspense>,
+    },
+    {
+      path: 'ket-qua-ielts/:id',
       element: <Suspense fallback={<LoadingFallback />}><VstepResultPage /></Suspense>,
     },
     {

@@ -16,6 +16,7 @@ interface IeltsWritingViewProps {
   answers: AnswerMap;
   onAnswer: (qId: number, value: string) => void;
   onSubmit: () => void;
+  reviewMode?: boolean;
 }
 
 function countWords(text: string): number {
@@ -28,6 +29,7 @@ export function IeltsWritingView({
   answers,
   onAnswer,
   onSubmit,
+  reviewMode = false,
 }: IeltsWritingViewProps) {
   const tasks = payload.tasks ?? [];
   const [activeIdx, setActiveIdx] = useState(0);
@@ -172,7 +174,10 @@ export function IeltsWritingView({
               value={currentText}
               onChange={(e) => onAnswer(currentTask.questionId, e.target.value)}
               placeholder={`Start writing your ${currentTask.taskName.toLowerCase()} here…`}
-              className="flex-1 px-5 py-4 text-sm text-gray-900 leading-relaxed resize-none focus:outline-none placeholder:text-gray-400 font-serif"
+              readOnly={reviewMode}
+              className={`flex-1 px-5 py-4 text-sm text-gray-900 leading-relaxed resize-none focus:outline-none placeholder:text-gray-400 font-serif ${
+                reviewMode ? "bg-slate-50" : ""
+              }`}
               spellCheck={false}
               autoComplete="off"
               autoCorrect="off"
@@ -221,13 +226,15 @@ export function IeltsWritingView({
                 Sang {tasks[activeIdx + 1]?.taskName}
               </button>
             )}
-            <button
-              type="button"
-              onClick={onSubmit}
-              className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#FF8C42] to-[#FF6B35] hover:opacity-90 transition-opacity cursor-pointer shadow-md shadow-orange-200"
-            >
-              Nộp bài Writing
-            </button>
+            {!reviewMode && (
+              <button
+                type="button"
+                onClick={onSubmit}
+                className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#FF8C42] to-[#FF6B35] hover:opacity-90 transition-opacity cursor-pointer shadow-md shadow-orange-200"
+              >
+                Nộp bài Writing
+              </button>
+            )}
           </div>
         </div>
       </footer>

@@ -25,6 +25,7 @@ interface IeltsReadingViewProps {
   showTimer?: boolean;
   /** Preview mode: navigator có thể kéo được */
   draggableNavigator?: boolean;
+  reviewMode?: boolean;
 }
 
 export function IeltsReadingView({
@@ -37,6 +38,7 @@ export function IeltsReadingView({
   timeLeft,
   showTimer,
   draggableNavigator = false,
+  reviewMode = false,
 }: IeltsReadingViewProps) {
   const passages = payload.passages ?? [];
   const [activeIdx, setActiveIdx] = useState(0);
@@ -176,10 +178,10 @@ export function IeltsReadingView({
         flagged={flagged}
         activeGroupIndex={activeIdx}
         onJump={jumpToQuestion}
-        timeLeft={timeLeft}
-        showTimer={showTimer}
+        timeLeft={reviewMode ? undefined : timeLeft}
+        showTimer={reviewMode ? false : showTimer}
         onSubmit={onSubmit}
-        hideSubmit={draggableNavigator}
+        hideSubmit={draggableNavigator || reviewMode}
       />
     </div>
   );

@@ -637,9 +637,9 @@ export function StudentVstepExamPage() {
     studentApi.submitTest(submissionId)
       .then((res: any) => {
         const sid = res?.data?.data?.submissionId ?? submissionId;
-        navigate(`${STUDENT_BASE_PATH}/lam-bai-vstep/${examId}?review=${sid}`);
+        navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${sid}`);
       })
-      .catch(() => navigate(`${STUDENT_BASE_PATH}/lam-bai-vstep/${examId}?review=${submissionId}`));
+      .catch(() => navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${submissionId}`));
   }, [submissionId, examId, navigate]);
 
   /* ── Navigate ───────────────────────────────────────────── */
@@ -688,9 +688,9 @@ export function StudentVstepExamPage() {
       const sid = res?.data?.data?.submissionId ?? submissionId;
       localStorage.removeItem(LS_ANSWERS);
       localStorage.removeItem(LS_WRITING);
-      navigate(`${STUDENT_BASE_PATH}/lam-bai-vstep/${examId}?review=${sid}`);
+      navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${sid}`);
     } catch {
-      navigate(`${STUDENT_BASE_PATH}/lam-bai-vstep/${examId}?review=${submissionId}`);
+      navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${submissionId}`);
     } finally {
       setSubmitting(false);
     }
@@ -964,7 +964,7 @@ export function StudentVstepExamPage() {
               </Link>
             ) : reviewMode ? (
               <button
-                onClick={() => navigate(`${STUDENT_BASE_PATH}/ket-qua/${reviewSubmissionId}`)}
+                onClick={() => navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${reviewSubmissionId}`)}
                 className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-slate-600 text-white text-sm font-semibold rounded-lg hover:bg-slate-700 active:scale-[0.97] transition-all"
               >
                 <ArrowLeft className="w-4 h-4" />

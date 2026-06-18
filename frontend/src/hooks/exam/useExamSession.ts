@@ -32,6 +32,36 @@ const DEFAULT_DRAFT_DEBOUNCE_MS = 1500;
 const DEFAULT_HEARTBEAT_MS = 30_000;
 const LOCAL_DEBOUNCE_MS = 200;
 const TIME_DRIFT_THRESHOLD_SEC = 5;
+const TIMER_STORAGE_PREFIX = 'exam_timer_deadline';
+
+function timerStorageKey(role: ExamRole, examType: string, submissionId: number): string {
+  return `${TIMER_STORAGE_PREFIX}_${role}_${examType}_${submissionId}`;
+}
+
+function readStoredDeadline(key: string): number | null {
+  try {
+    const value = Number(localStorage.getItem(key));
+    return Number.isFinite(value) && value > Date.now() ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredDeadline(key: string, deadlineMs: number): void {
+  try {
+    localStorage.setItem(key, String(deadlineMs));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+function clearStoredDeadline(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* storage unavailable */
+  }
+}
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 export type TimeWarningLevel = null | '5min' | '1min' | '10sec';
@@ -185,6 +215,8 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
   const tabIdRef = useRef<string>(examDraftStorage.generateTabId());
   const startedAtMsRef = useRef<number>(new Date(startedAtServer).getTime() || Date.now());
   const totalDurationSecRef = useRef<number>(durationMinutes * 60);
+  const deadlineMsRef = useRef<number | null>(null);
+  const timerStorageKeyRef = useRef<string | null>(null);
   const submittedRef = useRef(false);
   const onlineRef = useRef(online);
   onlineRef.current = online;
@@ -217,19 +249,28 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
       durationMinutes,
       answers: { ...(initialAnswers ?? {}) },
     });
-    // Cập nhật reference time mỗi khi submissionId / startedAtServer đổi
+    // Cập nhật reference time mỗi khi submissionId / startedAtServer đổi.
+    // Deadline tuyệt đối được lưu theo submissionId để F5/đóng mở tab không reset giờ.
+    const durationSec = durationMinutes * 60;
+    const key = timerStorageKey(role, examType, submissionId);
+    timerStorageKeyRef.current = key;
     const parsed = new Date(startedAtServer).getTime();
-    startedAtMsRef.current = Number.isFinite(parsed) ? parsed : Date.now();
-    totalDurationSecRef.current = durationMinutes * 60;
+    const now = Date.now();
+    const storedDeadline = readStoredDeadline(key);
+    const fallbackStartedAt = Number.isFinite(parsed) ? parsed : now;
+    const deadlineMs = storedDeadline ?? fallbackStartedAt + durationSec * 1000;
+
+    deadlineMsRef.current = deadlineMs;
+    startedAtMsRef.current = deadlineMs - durationSec * 1000;
+    totalDurationSecRef.current = durationSec;
+    writeStoredDeadline(key, deadlineMs);
     submittedRef.current = false;
     warningLevelRef.current = null;
     dismissed5minRef.current = false;
     setWarningLevel(null);
-    // ✅ FIX: Tính lại timeRemaining từ startedAtServer
-    const elapsed = (Date.now() - startedAtMsRef.current) / 1000;
-    setTimeRemaining(Math.max(0, Math.floor(totalDurationSecRef.current - elapsed)));
+    setTimeRemaining(Math.max(0, Math.floor((deadlineMs - now) / 1000)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submissionId, startedAtServer, durationMinutes]);
+  }, [submissionId, startedAtServer, durationMinutes, role, examType]);
 
   // ─── Flush queue → BE (idempotent)
   const flushQueue = useCallback(async (): Promise<void> => {
@@ -259,9 +300,12 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
           0,
           totalDurationSecRef.current - (Date.now() - startedAtMsRef.current) / 1000,
         );
-        if (Math.abs(localRemaining - serverRemaining) > TIME_DRIFT_THRESHOLD_SEC) {
+        if (serverRemaining < localRemaining - TIME_DRIFT_THRESHOLD_SEC) {
+          const nextDeadline = Date.now() + serverRemaining * 1000;
           totalDurationSecRef.current = serverRemaining;
           startedAtMsRef.current = Date.now();
+          deadlineMsRef.current = nextDeadline;
+          if (timerStorageKeyRef.current) writeStoredDeadline(timerStorageKeyRef.current, nextDeadline);
           setTimeRemaining(Math.floor(serverRemaining));
         }
       }
@@ -358,6 +402,7 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
           ? await customSubmit(submissionId)
           : await studentApi.submitTest(submissionId);
         examDraftStorage.clear(submissionId);
+        if (timerStorageKeyRef.current) clearStoredDeadline(timerStorageKeyRef.current);
         examDraftStorage.broadcast({
           type: 'release',
           submissionId,
@@ -395,8 +440,9 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
   useEffect(() => {
     if (!submissionId) return;
     const tick = () => {
-      const elapsed = (Date.now() - startedAtMsRef.current) / 1000;
-      const remaining = Math.max(0, Math.floor(totalDurationSecRef.current - elapsed));
+      const remaining = deadlineMsRef.current != null
+        ? Math.max(0, Math.floor((deadlineMsRef.current - Date.now()) / 1000))
+        : Math.max(0, Math.floor(totalDurationSecRef.current - (Date.now() - startedAtMsRef.current) / 1000));
       setTimeRemaining(remaining);
 
       // Warning thresholds — chỉ escalate, không downgrade
@@ -439,9 +485,12 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
             0,
             totalDurationSecRef.current - (Date.now() - startedAtMsRef.current) / 1000,
           );
-          if (Math.abs(local - serverRemaining) > TIME_DRIFT_THRESHOLD_SEC) {
+          if (serverRemaining < local - TIME_DRIFT_THRESHOLD_SEC) {
+            const nextDeadline = Date.now() + serverRemaining * 1000;
             totalDurationSecRef.current = serverRemaining;
             startedAtMsRef.current = Date.now();
+            deadlineMsRef.current = nextDeadline;
+            if (timerStorageKeyRef.current) writeStoredDeadline(timerStorageKeyRef.current, nextDeadline);
             setTimeRemaining(Math.floor(serverRemaining));
           }
         }

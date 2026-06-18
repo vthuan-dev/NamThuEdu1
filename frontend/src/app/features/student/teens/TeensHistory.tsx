@@ -240,8 +240,10 @@ export function TeensHistory() {
                     const score = toNum(s.sScore);
                     const max = toNum(s.exam?.eMax_score ?? 100);
                     const pct = max > 0 ? Math.round((score / max) * 100) : 0;
-                    const isVstep = String(s.exam?.eType ?? '').toUpperCase() === 'VSTEP';
-                    const isThpt = String(s.exam?.eType ?? '').toUpperCase() === 'THPT';
+                    const examType = String(s.exam?.eType ?? '').toUpperCase();
+                    const isVstep = examType === 'VSTEP';
+                    const isIelts = examType === 'IELTS';
+                    const isThpt = examType === 'THPT';
                     const isPending = s.sStatus === 'grading_subjective';
                     const isInProg = s.sStatus === 'in_progress';
                     const isPass = !isInProg && !isPending && max > 0 && score / max >= PASS_THRESHOLD;
@@ -263,6 +265,8 @@ export function TeensHistory() {
                           ? `${BASE}/ket-qua-thpt/${s.sId}`
                           : isVstep
                           ? `${BASE}/ket-qua-vstep/${s.sId}`
+                          : isIelts
+                          ? `${BASE}/ket-qua-ielts/${s.sId}`
                           : `${BASE}/ket-qua/${s.sId}`
                       );
                     };

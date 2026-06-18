@@ -70,6 +70,7 @@ export function IeltsListeningFullTestView({
   isCorrectMap = {} as Record<number, boolean>,
 }: Props) {
   const sections = payload.sections ?? [];
+  const totalSectionCount = Number((payload as any).totalParts ?? sections.length);
   // Review mode: mở khóa tất cả sections ngay từ đầu
   const [sectionIdx, setSectionIdx] = useState(() => reviewMode ? Math.max(0, (payload.sections ?? []).length - 1) : 0);
   const [audioStartedAt, setAudioStartedAt] = useState<number | null>(null);
@@ -143,7 +144,7 @@ export function IeltsListeningFullTestView({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[11px] uppercase tracking-wide text-gray-500 font-semibold">
-                Part {currentSection.sectionNumber} of {sections.length}
+                Part {currentSection.sectionNumber} of {totalSectionCount}
               </p>
               <p className="text-sm font-bold text-gray-900 truncate">
                 {currentSection.sectionName}
@@ -318,6 +319,9 @@ function SectionBody({
   isCorrectMap?: Record<number, boolean>;
   reviewMode?: boolean;
 }) {
+  const hasMixedQuestionTypes = new Set(
+    section.questions.map((q) => questionRenderKind(q))
+  ).size > 1;
   const allImgCompletion = section.questions.every(
     (q) => q.questionType === "image-completion" || q.questionType === "image_completion"
   );
@@ -325,7 +329,7 @@ function SectionBody({
     (q) => q.questionType === "image-completion" || q.questionType === "image_completion"
   );
   const allMcq = !hasImgCompletion && section.questions.every(
-    (q) => q.options && Object.keys(q.options).length > 0
+    (q) => hasRealOptions(q)
   );
 
   if (allImgCompletion) {
@@ -334,7 +338,81 @@ function SectionBody({
   if (allMcq) {
     return <McqBody section={section} answers={answers} onAnswer={onAnswer} correctAnswers={correctAnswers} isCorrectMap={isCorrectMap} reviewMode={reviewMode} />;
   }
+  if (hasMixedQuestionTypes) {
+    return <MixedQuestionBody section={section} answers={answers} onAnswer={onAnswer} correctAnswers={correctAnswers} isCorrectMap={isCorrectMap} reviewMode={reviewMode} />;
+  }
   return <CompletionBody section={section} answers={answers} onAnswer={onAnswer} correctAnswers={correctAnswers} isCorrectMap={isCorrectMap} reviewMode={reviewMode} />;
+}
+
+function hasRealOptions(q: IeltsListeningSection["questions"][number]): boolean {
+  return !!q.options && Object.values(q.options).some((value) => String(value ?? "").trim() !== "");
+}
+
+function questionRenderKind(q: IeltsListeningSection["questions"][number]): "form" | "choice" | "completion" {
+  if (isFormCompletionType(q.questionType)) return "form";
+  if (hasRealOptions(q)) return "choice";
+  return "completion";
+}
+
+function MixedQuestionBody({
+  section,
+  answers,
+  onAnswer,
+  correctAnswers = {},
+  isCorrectMap = {},
+  reviewMode = false,
+}: {
+  section: IeltsListeningSection;
+  answers: AnswerMap;
+  onAnswer: (qId: number, value: any) => void;
+  correctAnswers?: Record<number, string>;
+  isCorrectMap?: Record<number, boolean>;
+  reviewMode?: boolean;
+}) {
+  return (
+    <div className="space-y-5">
+      {splitQuestionRuns(section.questions).map((run) => {
+        const subSection = { ...section, questions: run.questions };
+        if (run.kind === "form") {
+          return (
+            <FormCompletionTwoColumn
+              key={run.key}
+              section={subSection}
+              answers={answers}
+              onAnswer={onAnswer}
+              correctAnswers={correctAnswers}
+              isCorrectMap={isCorrectMap}
+              reviewMode={reviewMode}
+            />
+          );
+        }
+        if (run.kind === "choice") {
+          return (
+            <McqBody
+              key={run.key}
+              section={subSection}
+              answers={answers}
+              onAnswer={onAnswer}
+              correctAnswers={correctAnswers}
+              isCorrectMap={isCorrectMap}
+              reviewMode={reviewMode}
+            />
+          );
+        }
+        return (
+          <CompletionListBody
+            key={run.key}
+            section={subSection}
+            answers={answers}
+            onAnswer={onAnswer}
+            correctAnswers={correctAnswers}
+            isCorrectMap={isCorrectMap}
+            reviewMode={reviewMode}
+          />
+        );
+      })}
+    </div>
+  );
 }
 
 // ─── Image-completion body ─────────────────────────────────────────────────
@@ -588,39 +666,8 @@ function CompletionBody({
   isCorrectMap?: Record<number, boolean>;
   reviewMode?: boolean;
 }) {
-  const hasFormCompletion = section.questions.some((q) => isFormCompletionType(q.questionType));
-  if (hasFormCompletion) {
-    return (
-      <div className="space-y-5">
-        {splitQuestionRuns(section.questions).map((run) => {
-          const subSection = { ...section, questions: run.questions };
-          if (run.kind === "form") {
-            return (
-              <FormCompletionTwoColumn
-                key={run.key}
-                section={subSection}
-                answers={answers}
-                onAnswer={onAnswer}
-                correctAnswers={correctAnswers}
-                isCorrectMap={isCorrectMap}
-                reviewMode={reviewMode}
-              />
-            );
-          }
-          return (
-            <CompletionListBody
-              key={run.key}
-              section={subSection}
-              answers={answers}
-              onAnswer={onAnswer}
-              correctAnswers={correctAnswers}
-              isCorrectMap={isCorrectMap}
-              reviewMode={reviewMode}
-            />
-          );
-        })}
-      </div>
-    );
+  if (section.questions.some((q) => isFormCompletionType(q.questionType))) {
+    return <MixedQuestionBody section={section} answers={answers} onAnswer={onAnswer} correctAnswers={correctAnswers} isCorrectMap={isCorrectMap} reviewMode={reviewMode} />;
   }
 
   return (
@@ -822,8 +869,8 @@ function FormCompletionTwoColumn({
         <p className="text-sm font-bold text-gray-900">Complete the form below.</p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.85fr)] p-4">
-        <div className="rounded-lg border border-orange-100 bg-orange-50/30 p-4">
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.85fr)] p-4">
+        <div className="h-fit rounded-lg border border-orange-100 bg-orange-50/30 p-4">
           {context && (
             <div className="mb-4 text-[15px] leading-[1.8] text-gray-900 whitespace-pre-wrap font-medium">
               {context}
@@ -841,7 +888,7 @@ function FormCompletionTwoColumn({
           </div>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+        <div className="h-fit rounded-lg border border-gray-200 bg-white overflow-hidden">
           <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
             <p className="text-xs font-bold uppercase tracking-wide text-gray-600">Your answers</p>
           </div>
@@ -881,19 +928,19 @@ function FormCompletionTwoColumn({
 }
 
 function isFormCompletionType(type: unknown): boolean {
-  const normalized = String(type || "").replace(/-/g, "_");
+  const normalized = String(type || "").toLowerCase().replace(/-/g, "_");
   return normalized === "form_completion";
 }
 
 function splitQuestionRuns(questions: IeltsListeningSection["questions"]) {
   const runs: Array<{
     key: string;
-    kind: "form" | "completion";
+    kind: "form" | "choice" | "completion";
     questions: IeltsListeningSection["questions"];
   }> = [];
 
   questions.forEach((q) => {
-    const kind: "form" | "completion" = isFormCompletionType(q.questionType) ? "form" : "completion";
+    const kind = questionRenderKind(q);
     const last = runs[runs.length - 1];
     if (last && last.kind === kind) {
       last.questions.push(q);

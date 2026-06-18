@@ -57,6 +57,115 @@ interface StudentIeltsExamPageProps {
   fullTest?: boolean;
 }
 
+function applyPracticeScope(
+  rawPayload: any,
+  skill: IeltsSkill,
+  sectionNumbers: Set<number> | null,
+  practiceTimeMinutes: number | null
+) {
+  if (!rawPayload) return rawPayload;
+  const scoped = { ...rawPayload };
+
+  if (practiceTimeMinutes) {
+    scoped.duration = practiceTimeMinutes;
+  }
+
+  if (!sectionNumbers) return scoped;
+
+  if (skill === "listening" && Array.isArray(scoped.sections)) {
+    const originalTotalParts = scoped.sections.length;
+    const sections = scoped.sections.filter((section: IeltsListeningPayload["sections"][number]) =>
+      sectionNumbers.has(Number(section.sectionNumber))
+    );
+    if (sections.length > 0) {
+      scoped.sections = sections;
+      scoped.totalParts = originalTotalParts;
+      scoped.totalQuestions = sections.reduce(
+        (sum: number, section: IeltsListeningPayload["sections"][number]) => sum + (section.questions?.length ?? 0),
+        0
+      );
+    }
+  }
+
+  if (skill === "reading" && Array.isArray(scoped.passages)) {
+    const originalTotalParts = scoped.passages.length;
+    const passages = scoped.passages.filter((passage: IeltsReadingPayload["passages"][number]) =>
+      sectionNumbers.has(Number(passage.passageNumber))
+    );
+    if (passages.length > 0) {
+      scoped.passages = passages;
+      scoped.totalParts = originalTotalParts;
+      scoped.totalQuestions = passages.reduce(
+        (sum: number, passage: IeltsReadingPayload["passages"][number]) => sum + (passage.questions?.length ?? 0),
+        0
+      );
+    }
+  }
+
+  if (skill === "writing" && Array.isArray(scoped.tasks)) {
+    const originalTotalParts = scoped.tasks.length;
+    const tasks = scoped.tasks.filter((task: IeltsWritingPayload["tasks"][number]) =>
+      sectionNumbers.has(Number(task.taskNumber))
+    );
+    if (tasks.length > 0) {
+      scoped.tasks = tasks;
+      scoped.totalParts = originalTotalParts;
+    }
+  }
+
+  if (skill === "speaking" && Array.isArray(scoped.parts)) {
+    const originalTotalParts = scoped.parts.length;
+    const parts = scoped.parts.filter((part: IeltsSpeakingPayload["parts"][number]) =>
+      sectionNumbers.has(Number(part.partNumber))
+    );
+    if (parts.length > 0) {
+      scoped.parts = parts;
+      scoped.totalParts = originalTotalParts;
+    }
+  }
+
+  return scoped;
+}
+
+function buildIeltsDeadlineKey(
+  examId: number,
+  skill: IeltsSkill,
+  isPracticeMode: boolean,
+  sectionNumbers: Set<number> | null
+): string {
+  if (!isPracticeMode) return `ielts_deadline_${examId}_${skill}`;
+  const scope = sectionNumbers
+    ? Array.from(sectionNumbers).sort((a, b) => a - b).join("-")
+    : "all";
+  return `ielts_deadline_${examId}_${skill}_practice_${scope}`;
+}
+
+function readDeadline(key: string): number | null {
+  try {
+    const value = Number(localStorage.getItem(key));
+    return Number.isFinite(value) && value > Date.now() ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDeadline(key: string, deadline: number) {
+  try {
+    localStorage.setItem(key, String(deadline));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+function clearDeadline(key: string | null) {
+  if (!key) return;
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsExamPageProps) {
   const { examId: examIdParam } = useParams<{ examId: string }>();
   const examId = Number(examIdParam);
@@ -68,6 +177,21 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
 
   // Mode CBT thật (full test) vs PRACTICE (luyện tập).
   const isFullTest = fullTest || searchParams.get("mode") === "full_test";
+  const isPracticeMode = searchParams.get("mode") === "practice" && !isFullTest;
+  const practiceSectionNumbers = useMemo(() => {
+    if (!isPracticeMode) return null;
+    const raw = searchParams.get("sections") ?? "";
+    const values = raw
+      .split(",")
+      .map((v) => Number(v.trim()))
+      .filter((v) => Number.isFinite(v) && v > 0);
+    return values.length ? new Set(values) : null;
+  }, [isPracticeMode, searchParams]);
+  const practiceTimeMinutes = useMemo(() => {
+    if (!isPracticeMode) return null;
+    const value = Number(searchParams.get("time") ?? 0);
+    return Number.isFinite(value) && value > 0 ? value : null;
+  }, [isPracticeMode, searchParams]);
 
   // ─── Review mode (?review=submissionId) ─────────────────────────────
   const reviewSubmissionId = useMemo(() => {
@@ -83,10 +207,10 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
 
   // Resolve effective skill ordering for full test
   const skillSequence: IeltsSkill[] = useMemo(() => {
+    if (isFullTest) return ["listening", "reading", "writing", "speaking"];
     if (skill) return [skill];
-    if (fullTest) return ["listening", "reading", "writing", "speaking"];
     return ["listening"]; // default fallback
-  }, [skill, fullTest]);
+  }, [skill, isFullTest]);
 
   const [skillIdx, setSkillIdx] = useState(0);
   const currentSkill = skillSequence[skillIdx];
@@ -121,6 +245,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
   const [timeLeft, setTimeLeft] = useState(0);
   const timerRef = useRef<number | null>(null);
   const deadlineRef = useRef<number | null>(null); // epoch ms khi hết giờ
+  const deadlineKeyRef = useRef<string | null>(null);
   const serverRemainingRef = useRef<number | null>(null); // giây còn lại từ server lúc start
 
   // Submit
@@ -151,26 +276,27 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
       try {
         const res = await studentApi.startDirectVstepExam(examId, true);
         if (cancelled) return;
-        const sId = res.data?.data?.submissionId;
+        const startData: any = res.data?.data;
+        const sId = startData?.submissionId;
         if (!sId) throw new Error("No submission ID returned.");
         setSubmissionId(sId);
         // Neo deadline theo thời gian còn lại thật từ server (giây)
-        const remainingSec = res.data?.data?.time_remaining;
+        const remainingSec = startData?.time_remaining;
         if (typeof remainingSec === "number" && remainingSec >= 0) {
           serverRemainingRef.current = remainingSec;
         }
         // ✅ FIX: Use direct timestamp from backend, NOT calculated from time_remaining
-        if (res.data?.data?.started_at) {
-          setStartedAtServer(res.data.data.started_at);
+        if (startData?.started_at) {
+          setStartedAtServer(startData.started_at);
         } else {
           // Fallback if backend doesn't return started_at (shouldn't happen)
           setStartedAtServer(new Date().toISOString());
         }
         
         // ✅ NEW: Restore saved answers from backend (F5 case)
-        if (res.data?.data?.savedAnswers) {
+        if (startData?.savedAnswers) {
           const restored: AnswerMap = {};
-          for (const [qId, answerText] of Object.entries(res.data.data.savedAnswers)) {
+          for (const [qId, answerText] of Object.entries(startData.savedAnswers)) {
             restored[parseInt(qId)] = String(answerText);
           }
           if (Object.keys(restored).length > 0) {
@@ -259,7 +385,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
     loaders[currentSkill](examId)
       .then((res: any) => {
         if (cancelled) return;
-        const data = res.data?.data;
+        const data = applyPracticeScope(res.data?.data, currentSkill, practiceSectionNumbers, practiceTimeMinutes);
         setPayload(data);
 
         // Review mode: không cần neo deadline / timer — chỉ load câu hỏi
@@ -271,19 +397,20 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
 
         // ─── Neo deadline tuyệt đối (bền vững qua F5/đóng tab) ───
         // Key riêng theo exam + skill để mỗi skill có deadline riêng.
-        const dlKey = `ielts_deadline_${examId}_${currentSkill}`;
+        const dlKey = buildIeltsDeadlineKey(examId, currentSkill, isPracticeMode, practiceSectionNumbers);
+        deadlineKeyRef.current = dlKey;
         const totalSec = (data?.duration ?? TIMES[currentSkill]) * 60;
         const now = Date.now();
 
         let deadline: number | null = null;
-        const stored = Number(localStorage.getItem(dlKey));
-        if (stored && stored > now) {
+        const stored = readDeadline(dlKey);
+        if (stored) {
           // Đã có deadline lưu trước đó và còn hạn → tiếp tục đếm từ đó
           deadline = stored;
-        } else if (serverRemainingRef.current != null && serverRemainingRef.current > 0) {
+        } else if (!isPracticeMode && serverRemainingRef.current != null && serverRemainingRef.current > 0) {
           // Lần đầu / resume: dùng thời gian còn lại thật từ server
           deadline = now + serverRemainingRef.current * 1000;
-        } else if (!stored) {
+        } else if (localStorage.getItem(dlKey) == null) {
           // Fallback: chưa có gì → đặt theo duration đầy đủ
           deadline = now + totalSec * 1000;
         } else {
@@ -292,7 +419,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
         }
 
         deadlineRef.current = deadline;
-        localStorage.setItem(dlKey, String(deadline));
+        writeDeadline(dlKey, deadline);
         setTimeLeft(Math.max(0, Math.round((deadline - now) / 1000)));
       })
       .catch((e: any) => {
@@ -302,7 +429,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
       .finally(() => !cancelled && setPayloadLoading(false));
 
     return () => { cancelled = true; };
-  }, [submissionId, currentSkill, examId]);
+  }, [submissionId, currentSkill, examId, isPracticeMode, practiceSectionNumbers, practiceTimeMinutes]);
 
   // ─── 3) Timer tick ────────────────────────────────────────────────────
   // Tính theo deadline tuyệt đối (wall-clock) → reload/đóng-mở tab vẫn đúng.
@@ -382,7 +509,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
     setTimeUp(true);
 
     // Dọn deadline đã lưu
-    localStorage.removeItem(`ielts_deadline_${examId}_${currentSkill}`);
+    clearDeadline(deadlineKeyRef.current ?? buildIeltsDeadlineKey(examId, currentSkill, isPracticeMode, practiceSectionNumbers));
     deadlineRef.current = null;
 
     try {
@@ -394,14 +521,14 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
       // Vẫn tiếp tục điều hướng dù submit lỗi — bài đã auto-save từng câu
     }
 
-    const isLastSkill = !fullTest || skillIdx >= skillSequence.length - 1;
+    const isLastSkill = !isFullTest || skillIdx >= skillSequence.length - 1;
 
     if (isLastSkill) {
       toast.warning("Đã hết thời gian làm bài. Bài thi của bạn đã được nộp tự động.", 5000);
       // Rời trang làm bài, chuyển sang trang kết quả
       setTimeout(() => {
         if (submissionId) {
-          navigate(`/hoc-vien/ket-qua-vstep/${submissionId}`, { replace: true });
+          navigate(`/hoc-vien/ket-qua-ielts/${submissionId}`, { replace: true });
         } else {
           navigate("/hoc-vien/de-thi", { replace: true });
         }
@@ -416,7 +543,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
       setAnswers({});
       setFlagged({});
     }
-  }, [examId, currentSkill, submissionId, fullTest, skillIdx, skillSequence.length, navigate, toast]);
+  }, [examId, currentSkill, submissionId, isFullTest, skillIdx, skillSequence.length, navigate, toast, isPracticeMode, practiceSectionNumbers, session]);
 
   const handleConfirmSubmit = async () => {
     if (!submissionId) return;
@@ -426,11 +553,11 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
       await api.post(`/student/tests/${submissionId}/submit`, {});
 
       // Xoá deadline của skill vừa nộp để lần làm mới không dính giờ cũ
-      localStorage.removeItem(`ielts_deadline_${examId}_${currentSkill}`);
+      clearDeadline(deadlineKeyRef.current ?? buildIeltsDeadlineKey(examId, currentSkill, isPracticeMode, practiceSectionNumbers));
       deadlineRef.current = null;
 
       // If this is part of a full test, advance to next skill instead of leaving
-      if (fullTest && skillIdx < skillSequence.length - 1) {
+      if (isFullTest && skillIdx < skillSequence.length - 1) {
         serverRemainingRef.current = null; // skill kế tiếp sẽ neo deadline riêng
         setSkillIdx((i) => i + 1);
         setAnswers({});
@@ -443,7 +570,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
       }
 
       // Single-skill: navigate to results
-      navigate(`/hoc-vien/ket-qua-vstep/${submissionId}`);
+      navigate(`/hoc-vien/ket-qua-ielts/${submissionId}`);
     } catch (e: any) {
       alert(e?.response?.data?.message ?? "Submit failed. Please try again.");
     } finally {
@@ -584,9 +711,10 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
           flagged={flagged}
           onAnswer={handleAnswer}
           onToggleFlag={handleToggleFlag}
-          onSubmit={handleRequestSubmit}
-          timeLeft={timeLeft}
-          showTimer
+          onSubmit={reviewMode ? () => {} : handleRequestSubmit}
+          timeLeft={reviewMode ? undefined : timeLeft}
+          showTimer={!reviewMode}
+          reviewMode={reviewMode}
         />
       )}
       {currentSkill === "writing" && (
@@ -594,14 +722,16 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
           payload={payload as IeltsWritingPayload}
           answers={answers}
           onAnswer={handleAnswer}
-          onSubmit={handleRequestSubmit}
+          onSubmit={reviewMode ? () => {} : handleRequestSubmit}
+          reviewMode={reviewMode}
         />
       )}
       {currentSkill === "speaking" && (
         <IeltsSpeakingView
           payload={payload as IeltsSpeakingPayload}
           submissionId={submissionId}
-          onSubmit={handleRequestSubmit}
+          onSubmit={reviewMode ? () => {} : handleRequestSubmit}
+          reviewMode={reviewMode}
         />
       )}
 

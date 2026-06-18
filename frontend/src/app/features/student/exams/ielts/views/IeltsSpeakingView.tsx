@@ -18,6 +18,7 @@ interface IeltsSpeakingViewProps {
   /** Current submission ID (for uploading audio) */
   submissionId: number | null;
   onSubmit: () => void;
+  reviewMode?: boolean;
 }
 
 /**
@@ -37,7 +38,7 @@ function buildIeltsSpeakingAnnounce(part: IeltsSpeakingPart): string {
   return `${name}.${mins ? ` You have about ${mins} minutes.` : ""} Please read the question on the screen, then start speaking.`;
 }
 
-export function IeltsSpeakingView({ payload, submissionId, onSubmit }: IeltsSpeakingViewProps) {
+export function IeltsSpeakingView({ payload, submissionId, onSubmit, reviewMode = false }: IeltsSpeakingViewProps) {
   const parts = payload.parts ?? [];
   const [activePartIdx, setActivePartIdx] = useState(0);
   const [activeQuestionIdx, setActiveQuestionIdx] = useState(0);
@@ -133,7 +134,28 @@ export function IeltsSpeakingView({ payload, submissionId, onSubmit }: IeltsSpea
 
       <div className="flex-1 px-4 py-6 max-w-3xl w-full mx-auto">
         {/* Part 2: Cue Card */}
-        {currentPart.partNumber === 2 && currentPart.cueCard ? (
+        {reviewMode && currentPart.partNumber === 2 && currentPart.cueCard ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Cue card</p>
+            <h2 className="text-lg font-bold text-slate-900">{currentPart.cueCard.topic}</h2>
+            {currentPart.cueCard.bullets?.length ? (
+              <ul className="mt-4 space-y-2 text-sm text-slate-700 list-disc pl-5">
+                {currentPart.cueCard.bullets.map((bullet, idx) => (
+                  <li key={idx}>{bullet}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : reviewMode && currentPart.questions && currentPart.questions[activeQuestionIdx] ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+              Question {activeQuestionIdx + 1} of {currentPart.questions.length}
+            </p>
+            <h2 className="text-lg font-bold text-slate-900">
+              {currentPart.questions[activeQuestionIdx].text}
+            </h2>
+          </div>
+        ) : currentPart.partNumber === 2 && currentPart.cueCard ? (
           <IeltsSpeakingRecorder
             key={`p2`}
             partNumber={2}
@@ -204,7 +226,7 @@ export function IeltsSpeakingView({ payload, submissionId, onSubmit }: IeltsSpea
                 Tiếp: {parts[activePartIdx + 1]?.partName} →
               </button>
             )}
-            {activePartIdx === parts.length - 1 && completedParts.size === parts.length && (
+            {!reviewMode && activePartIdx === parts.length - 1 && completedParts.size === parts.length && (
               <button
                 type="button"
                 onClick={onSubmit}
