@@ -296,9 +296,10 @@ function highlightQuestionRow(num: number): void {
  * Các segment giữ đúng thứ tự câu để không xáo trộn đề.
  */
 function FormContent({ section }: { section: IeltsListeningSection }) {
-  const classify = (q: IeltsQuestion): "image" | "matching" | "mcq" | "other" => {
-    const type = (q.questionType || "").toString();
-    if (type === "image-completion" || type === "image_completion") return "image";
+  const classify = (q: IeltsQuestion): "image" | "form" | "matching" | "mcq" | "other" => {
+    const type = normalizeQuestionType(q.questionType);
+    if (type === "image_completion") return "image";
+    if (type === "form_completion") return "form";
     const hasOptions = !!q.options && Object.keys(q.options).length > 0;
     if (type.includes("matching") && hasOptions) return "matching";
     if (hasOptions && (type.includes("multiple") || type.includes("choice")))
@@ -306,7 +307,7 @@ function FormContent({ section }: { section: IeltsListeningSection }) {
     return "other";
   };
 
-  const segments: { kind: "image" | "matching" | "mcq" | "other"; questions: IeltsQuestion[] }[] = [];
+  const segments: { kind: "image" | "form" | "matching" | "mcq" | "other"; questions: IeltsQuestion[] }[] = [];
   section.questions.forEach((q) => {
     const kind = classify(q);
     const last = segments[segments.length - 1];
@@ -322,6 +323,8 @@ function FormContent({ section }: { section: IeltsListeningSection }) {
       {segments.map((seg, i) =>
         seg.kind === "image" ? (
           <ImageCompletionBlock key={`seg-i-${i}`} questions={seg.questions} />
+        ) : seg.kind === "form" ? (
+          <FormCompletionBlock key={`seg-f-${i}`} questions={seg.questions} section={section} />
         ) : seg.kind === "matching" ? (
           <MatchingBlock key={`seg-m-${i}`} questions={seg.questions} section={section} />
         ) : seg.kind === "mcq" ? (
@@ -334,6 +337,73 @@ function FormContent({ section }: { section: IeltsListeningSection }) {
           />
         )
       )}
+    </div>
+  );
+}
+
+/**
+ * Render nhóm câu FORM-COMPLETION đúng dạng biểu mẫu: giữ tiêu đề/ngữ cảnh,
+ * label theo từng dòng và chip số câu ngay vị trí blank. Ô nhập vẫn nằm ở
+ * panel bên phải để không phá layout làm bài hiện tại.
+ */
+function FormCompletionBlock({
+  questions,
+  section,
+}: {
+  questions: IeltsQuestion[];
+  section: IeltsListeningSection;
+}) {
+  const first = questions[0]?.questionNumber;
+  const last = questions[questions.length - 1]?.questionNumber;
+  const range = first === last ? `${first}` : `${first}–${last}`;
+  const title =
+    (questions[0]?.data?.taskTitle as string) ||
+    (questions[0]?.data?.task_title as string) ||
+    "";
+  const instruction =
+    (questions[0]?.data?.taskInstruction as string) ||
+    (questions[0]?.data?.task_instruction as string) ||
+    "";
+  const context = section.context || "";
+
+  return (
+    <div className="rounded-xl border border-orange-200 bg-white shadow-sm overflow-hidden">
+      <div className="flex items-baseline gap-2 px-4 py-2.5 bg-orange-50/70 border-b border-orange-100">
+        <span className="inline-flex items-center px-2 py-0.5 rounded bg-orange-100 text-[#FF6B35] text-xs font-bold">
+          Câu {range}
+        </span>
+        <h3 className="text-sm font-bold text-gray-900">
+          {title || "Complete the form below"}
+        </h3>
+      </div>
+
+      <div className="p-4 space-y-3">
+        {instruction && instruction !== section.instructions && (
+          <p className="text-sm font-semibold text-[#FF6B35] italic whitespace-pre-wrap">
+            {instruction}
+          </p>
+        )}
+        {context && (
+          <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-[14px] leading-[1.6] text-gray-800 whitespace-pre-wrap">
+            {context}
+          </div>
+        )}
+
+        <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+          {questions.map((q) => {
+            const text = cleanQuestionText(q.questionText || "", q.questionNumber);
+            return (
+              <div
+                key={q.qId}
+                id={`ielts-row-${q.questionNumber}`}
+                className="px-4 py-3 border-b border-gray-100 last:border-b-0 text-[15px] leading-[1.8] text-[#1a1a1a] whitespace-pre-wrap"
+              >
+                {renderInlineBlanks(text, q.questionNumber, true)}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1203,6 +1273,10 @@ const QUESTION_TYPE_META: Record<
   },
 };
 
+function normalizeQuestionType(type: unknown): string {
+  return String(type || "").toLowerCase().replace(/-/g, "_");
+}
+
 /** Highlight từ-khóa-quan-trọng trong instruction text (NO MORE THAN, ONE WORD ONLY...) */
 function HighlightedInstructions({ text }: { text: string }) {
   // Pattern: "NO MORE THAN N WORDS", "ONE WORD ONLY", "TWO WORDS AND/OR A NUMBER"...
@@ -1228,7 +1302,7 @@ function HighlightedInstructions({ text }: { text: string }) {
 }
 
 function SectionInstructions({ section }: { section: IeltsListeningSection }) {
-  const qType = section.questionType ?? "";
+  const qType = normalizeQuestionType(section.questionType);
   const meta = QUESTION_TYPE_META[qType];
   const startQ = section.questionStart;
   const endQ = startQ + section.questionsPerSection - 1;

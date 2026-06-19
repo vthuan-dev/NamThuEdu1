@@ -534,6 +534,8 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
           reason: 'unload',
           answers: pending.length ? pending : undefined,
         });
+      } else if (pending.length) {
+        studentApi.saveDraftOnUnload(submissionId, pending);
       }
     };
     const onVisibility = () => {

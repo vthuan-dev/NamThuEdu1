@@ -464,6 +464,7 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         Route::get('/dashboard/recent-activities', [App\Http\Controllers\TeacherDashboardController::class, 'getRecentActivities']);
         Route::get('/dashboard/top-students', [App\Http\Controllers\TeacherDashboardController::class, 'getTopStudents']);
         Route::get('/dashboard/activity-chart', [App\Http\Controllers\TeacherDashboardController::class, 'getActivityChart']);
+        Route::get('/dashboard/today-submissions-by-type', [App\Http\Controllers\TeacherDashboardController::class, 'getTodaySubmissionsByType']);
 
         // Teacher activity log (FE-driven audit feed)
         Route::get('/activity-log',  [App\Http\Controllers\TeacherActivityLogController::class, 'index']);
@@ -505,6 +506,7 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         Route::post('/exams/{examId}/start-teens', [StudentTestController::class, 'startTeensExamDirect']);
 
         // VSTEP direct exam (start by exam ID without assignment)
+        Route::post('/exams/{examId}/discard-active-session', [StudentTestController::class, 'discardActiveDirectExamSession']);
         Route::post('/exams/{examId}/start-direct',   [StudentTestController::class, 'startDirectExam']);
         Route::get('/exams/{examId}/vstep/listening', [StudentTestController::class, 'loadVstepListening']);
         Route::get('/exams/{examId}/vstep/reading',   [StudentTestController::class, 'loadVstepReading']);

@@ -52,6 +52,7 @@ class StudentExamSessionController extends Controller
             'answers'                  => 'required|array|min:1|max:200',
             'answers.*.question_id'    => 'required|integer',
             'answers.*.saAnswer_text'  => 'nullable|string|max:50000',
+            'answers.*.answer_text'    => 'nullable|string|max:50000',
         ]);
         if ($validator->fails()) {
             return response()->json([
@@ -98,7 +99,7 @@ class StudentExamSessionController extends Controller
                             'question_id'   => (int) $ans['question_id'],
                         ],
                         [
-                            'saAnswer_text' => (string) ($ans['saAnswer_text'] ?? ''),
+                            'saAnswer_text' => (string) ($ans['saAnswer_text'] ?? $ans['answer_text'] ?? ''),
                         ]
                     );
                     $savedCount++;

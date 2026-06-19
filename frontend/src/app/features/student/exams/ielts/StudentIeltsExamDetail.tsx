@@ -63,6 +63,15 @@ interface IeltsExamDetailData {
     full_test_enabled: boolean;
     time_limit_options: (number | null)[];
   };
+  activeSession?: {
+    submissionId: number;
+    started_at: string;
+    deadline_at?: string;
+    server_time?: string;
+    time_remaining_seconds: number;
+    duration_seconds: number;
+    answered_count: number;
+  } | null;
 }
 
 const SKILL_META: Record<IeltsSkill, { label: string; icon: any; color: string; bg: string }> = {
@@ -241,6 +250,21 @@ function DetailContent({
   const navigate = useNavigate();
   const meta = SKILL_META[data.skill];
   const SkillIcon = meta.icon;
+  const [activeSession, setActiveSession] = useState(data.activeSession ?? null);
+  const [discardingSession, setDiscardingSession] = useState(false);
+
+  const continueUrl = `/hoc-vien/lam-bai-ielts/${data.examId}/${data.skill}?mode=full_test`;
+  const hasBlockingSession = !!activeSession;
+  const handleDiscardSession = async () => {
+    try {
+      setDiscardingSession(true);
+      await api.post(`/student/exams/${data.examId}/discard-active-session`);
+      clearIeltsLocalDeadlines(data.examId, data.skill);
+      setActiveSession(null);
+    } finally {
+      setDiscardingSession(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -319,6 +343,16 @@ function DetailContent({
             IELTS), vui lòng chọn chế độ làm <b>FULL TEST</b>.
           </p>
 
+          {activeSession && (
+            <ActiveSessionChoice
+              session={activeSession}
+              totalQuestions={data.totalQuestions}
+              onContinue={() => navigate(continueUrl)}
+              onDiscardSession={handleDiscardSession}
+              discardLoading={discardingSession}
+            />
+          )}
+
           {/* Mode tabs */}
           <div className="flex items-center gap-6 border-b border-gray-200 mb-5">
             <ModeTabBtn
@@ -345,11 +379,11 @@ function DetailContent({
 
           {/* Mode content */}
           {activeMode === "practice" && (
-            <PracticeMode data={data} />
+            <PracticeMode data={data} blockedByActiveSession={hasBlockingSession} />
           )}
 
           {activeMode === "full_test" && (
-            <FullTestMode data={data} />
+            <FullTestMode data={data} blockedByActiveSession={hasBlockingSession} />
           )}
 
           {activeMode === "discussion" && (
@@ -370,7 +404,13 @@ function DetailContent({
 }
 
 // ─── Practice Mode ───────────────────────────────────────────────────────
-function PracticeMode({ data }: { data: IeltsExamDetailData }) {
+function PracticeMode({
+  data,
+  blockedByActiveSession = false,
+}: {
+  data: IeltsExamDetailData;
+  blockedByActiveSession?: boolean;
+}) {
   const navigate = useNavigate();
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [timeLimit, setTimeLimit] = useState<string>("");
@@ -411,6 +451,7 @@ function PracticeMode({ data }: { data: IeltsExamDetailData }) {
   }, [suggestedTime, userPickedTime]);
 
   const handleStart = () => {
+    if (blockedByActiveSession) return;
     if (selected.size === 0) return;
     const sectionsParam = Array.from(selected).sort((a, b) => a - b).join(",");
     const params = new URLSearchParams();
@@ -493,20 +534,34 @@ function PracticeMode({ data }: { data: IeltsExamDetailData }) {
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={handleStart}
-        disabled={selected.size === 0}
-        className="px-6 py-2.5 rounded-lg font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
-      >
-        LUYỆN TẬP
-      </button>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <button
+          type="button"
+          onClick={handleStart}
+          disabled={selected.size === 0 || blockedByActiveSession}
+          title={blockedByActiveSession ? "Vui lòng xóa phiên bài làm đang dở trước khi bắt đầu phiên mới." : undefined}
+          className="px-6 py-2.5 rounded-lg font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
+        >
+          LUYỆN TẬP
+        </button>
+        {blockedByActiveSession && (
+          <span className="text-xs font-medium text-amber-700">
+            Đang có phiên bài làm dở. Hãy tiếp tục hoặc xóa phiên trước khi luyện tập phần mới.
+          </span>
+        )}
+      </div>
     </>
   );
 }
 
 // ─── Full Test Mode ──────────────────────────────────────────────────────
-function FullTestMode({ data }: { data: IeltsExamDetailData }) {
+function FullTestMode({
+  data,
+  blockedByActiveSession = false,
+}: {
+  data: IeltsExamDetailData;
+  blockedByActiveSession?: boolean;
+}) {
   const navigate = useNavigate();
 
   if (!data.playMode.full_test_enabled) {
@@ -514,6 +569,7 @@ function FullTestMode({ data }: { data: IeltsExamDetailData }) {
   }
 
   const handleStart = () => {
+    if (blockedByActiveSession) return;
     navigate(`/hoc-vien/lam-bai-ielts/${data.examId}/${data.skill}?mode=full_test`);
   };
 
@@ -529,11 +585,82 @@ function FullTestMode({ data }: { data: IeltsExamDetailData }) {
       <button
         type="button"
         onClick={handleStart}
-        className="px-6 py-2.5 rounded-lg font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-sm cursor-pointer"
+        disabled={blockedByActiveSession}
+        title={blockedByActiveSession ? "Vui lòng xóa phiên bài làm đang dở trước khi bắt đầu phiên mới." : undefined}
+        className="px-6 py-2.5 rounded-lg font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
       >
         BẮT ĐẦU THI
       </button>
     </>
+  );
+}
+
+function ActiveSessionChoice({
+  session,
+  totalQuestions,
+  onContinue,
+  onDiscardSession,
+  discardLoading,
+}: {
+  session: NonNullable<IeltsExamDetailData["activeSession"]>;
+  totalQuestions: number;
+  onContinue: () => void;
+  onDiscardSession: () => void;
+  discardLoading: boolean;
+}) {
+  const [remainingSeconds, setRemainingSeconds] = useState(() => getSessionRemainingSeconds(session, Date.now()));
+
+  useEffect(() => {
+    const receivedAt = Date.now();
+    setRemainingSeconds(getSessionRemainingSeconds(session, receivedAt));
+    const timer = window.setInterval(() => {
+      setRemainingSeconds(getSessionRemainingSeconds(session, receivedAt));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [session]);
+
+  const answeredText = totalQuestions > 0
+    ? `Đã trả lời ${session.answered_count}/${totalQuestions} câu`
+    : `Đã trả lời ${session.answered_count} câu`;
+
+  return (
+    <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-md bg-white px-2 py-1 text-[11px] font-bold text-amber-700 ring-1 ring-amber-200">
+              Có phiên đang làm
+            </span>
+            <span className="text-xs font-semibold text-amber-900">
+              Còn {formatRemaining(remainingSeconds)}
+            </span>
+            <span className="text-xs text-amber-700">
+              {answeredText}
+            </span>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-amber-800">
+            Bạn có thể tiếp tục bài làm dang dở. Muốn bắt đầu phiên mới, hãy xóa phiên bài làm hiện tại trước.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <button
+            type="button"
+            onClick={onContinue}
+            className="inline-flex items-center justify-center rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-700"
+          >
+            Tiếp tục bài đang làm
+          </button>
+          <button
+            type="button"
+            onClick={onDiscardSession}
+            disabled={discardLoading}
+            className="inline-flex items-center justify-center rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-50 disabled:cursor-wait disabled:opacity-70"
+          >
+            {discardLoading ? "Đang xóa phiên..." : "Xóa phiên bài làm"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -578,7 +705,48 @@ function parseExamData(raw: any): IeltsExamDetailData {
     commentsCount: raw.commentsCount || raw.comments_count || 0,
     sections: parseSections(raw.sections || raw.ielts_data?.[skill] || []),
     playMode,
+    activeSession: raw.activeSession ?? raw.active_session ?? null,
   };
+}
+
+function formatRemaining(totalSeconds: number): string {
+  const sec = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(sec / 3600);
+  const minutes = Math.floor((sec % 3600) / 60);
+  const seconds = sec % 60;
+  if (hours > 0) return `${hours} giờ ${minutes} phút`;
+  if (minutes > 0) return `${minutes} phút ${seconds.toString().padStart(2, "0")} giây`;
+  return `${seconds} giây`;
+}
+
+function getSessionRemainingSeconds(
+  session: NonNullable<IeltsExamDetailData["activeSession"]>,
+  clientReceivedAt: number
+): number {
+  const deadlineMs = session.deadline_at ? new Date(session.deadline_at).getTime() : NaN;
+  if (Number.isFinite(deadlineMs)) {
+    const serverMs = session.server_time ? new Date(session.server_time).getTime() : NaN;
+    const clockSkewMs = Number.isFinite(serverMs) ? serverMs - clientReceivedAt : 0;
+    return Math.max(0, Math.round((deadlineMs - (Date.now() + clockSkewMs)) / 1000));
+  }
+  return Math.max(0, Math.floor(session.time_remaining_seconds));
+}
+
+function clearIeltsLocalDeadlines(examId: number, skill: IeltsSkill) {
+  if (typeof window === "undefined") return;
+  const exact = `ielts_deadline_${examId}_${skill}`;
+  const practicePrefix = `${exact}_practice_`;
+  try {
+    localStorage.removeItem(exact);
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(practicePrefix)) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    /* storage unavailable */
+  }
 }
 
 function parseSections(raw: any): SectionInfo[] {

@@ -32,6 +32,7 @@ class ExamAutoSubmitService
     public const REASON_TIMEOUT  = 'timeout';
     public const REASON_INACTIVE = 'inactive';
     public const REASON_UNLOAD   = 'unload';
+    public const REASON_RESTART  = 'restart';
 
     /**
      * Auto-submit 1 submission.
@@ -58,7 +59,7 @@ class ExamAutoSubmitService
         }
 
         // Validate reason
-        if (!in_array($reason, [self::REASON_TIMEOUT, self::REASON_INACTIVE, self::REASON_UNLOAD], true)) {
+        if (!in_array($reason, [self::REASON_TIMEOUT, self::REASON_INACTIVE, self::REASON_UNLOAD, self::REASON_RESTART], true)) {
             $reason = self::REASON_UNLOAD;
         }
 
@@ -245,6 +246,7 @@ class ExamAutoSubmitService
             case self::REASON_TIMEOUT:  return 'hết thời gian';
             case self::REASON_INACTIVE: return 'không hoạt động > ' . self::INACTIVITY_THRESHOLD_MIN . ' phút';
             case self::REASON_UNLOAD:   return 'đóng tab/trình duyệt';
+            case self::REASON_RESTART:  return 'bắt đầu bài mới';
             default:                    return $reason;
         }
     }

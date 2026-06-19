@@ -15,7 +15,7 @@
  *  • Submit dialog → POST /api/student/tests/:submissionId/submit
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router";
+import { useBlocker, useNavigate, useParams, useSearchParams } from "react-router";
 import { Loader2, AlertCircle, Headphones } from "lucide-react";
 import { studentApi } from "../../../../../services/studentApi";
 import { api } from "../../../../../services/api";
@@ -26,7 +26,6 @@ import {
   SaveStatusIndicator,
   OfflineBanner,
   MultiTabWarning,
-  ResumeExamModal,
   TimeWarningBanner,
 } from "../../../../../components/exam";
 import { examDraftStorage } from "../../../../../lib/exam/examDraftStorage";
@@ -176,8 +175,9 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
   const user = userStr ? JSON.parse(userStr) : null;
 
   // Mode CBT thật (full test) vs PRACTICE (luyện tập).
-  const isFullTest = fullTest || searchParams.get("mode") === "full_test";
-  const isPracticeMode = searchParams.get("mode") === "practice" && !isFullTest;
+  const isFullSkillMode = searchParams.get("mode") === "full_test";
+  const isTimedTestMode = fullTest || isFullSkillMode;
+  const isPracticeMode = searchParams.get("mode") === "practice" && !isTimedTestMode;
   const practiceSectionNumbers = useMemo(() => {
     if (!isPracticeMode) return null;
     const raw = searchParams.get("sections") ?? "";
@@ -207,10 +207,10 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
 
   // Resolve effective skill ordering for full test
   const skillSequence: IeltsSkill[] = useMemo(() => {
-    if (isFullTest) return ["listening", "reading", "writing", "speaking"];
     if (skill) return [skill];
+    if (fullTest) return ["listening", "reading", "writing", "speaking"];
     return ["listening"]; // default fallback
-  }, [skill, isFullTest]);
+  }, [skill, fullTest]);
 
   const [skillIdx, setSkillIdx] = useState(0);
   const currentSkill = skillSequence[skillIdx];
@@ -220,7 +220,6 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
   const [sessionLoading, setSessionLoading] = useState(true);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [startedAtServer, setStartedAtServer] = useState('');
-  const [resumeDraft, setResumeDraft] = useState<any>(null);
 
   const session = useExamSession({
     submissionId: reviewMode ? null : submissionId,
@@ -229,7 +228,12 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
     startedAtServer,
     examType: 'IELTS',
     role: 'adults',
-    enableAutoSubmitOnUnload: !reviewMode,
+    enableAutoSubmitOnUnload: false,
+    serializeAnswerForServer: (qid, value) => {
+      const questionId = Number(qid);
+      if (!Number.isFinite(questionId) || value == null) return null;
+      return { question_id: questionId, saAnswer_text: String(value) };
+    },
   });
 
   // Skill payload (loaded per skill)
@@ -255,6 +259,12 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
   // Timeout flow — overlay "đang nộp tự động" + chống double trigger
   const [timeUp, setTimeUp] = useState(false);
   const timeUpHandledRef = useRef(false);
+  const leavePromptActiveRef = useRef(false);
+  const sessionSetAnswerRef = useRef(session.setAnswer);
+
+  useEffect(() => {
+    sessionSetAnswerRef.current = session.setAnswer;
+  }, [session.setAnswer]);
 
   // ─── 1) Start the exam session ────────────────────────────────────────
   useEffect(() => {
@@ -276,9 +286,14 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
       try {
         const res = await studentApi.startDirectVstepExam(examId, true);
         if (cancelled) return;
+        const responseStatus = String(res.data?.status ?? "").toLowerCase();
         const startData: any = res.data?.data;
         const sId = startData?.submissionId;
         if (!sId) throw new Error("No submission ID returned.");
+        if (responseStatus === "finalized" || (startData?.sStatus && startData.sStatus !== "in_progress")) {
+          navigate(`/hoc-vien/ket-qua-ielts/${sId}`, { replace: true });
+          return;
+        }
         setSubmissionId(sId);
         // Neo deadline theo thời gian còn lại thật từ server (giây)
         const remainingSec = startData?.time_remaining;
@@ -293,20 +308,32 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
           setStartedAtServer(new Date().toISOString());
         }
         
+        const restored: AnswerMap = {};
+
         // ✅ NEW: Restore saved answers from backend (F5 case)
         if (startData?.savedAnswers) {
-          const restored: AnswerMap = {};
           for (const [qId, answerText] of Object.entries(startData.savedAnswers)) {
             restored[parseInt(qId)] = String(answerText);
           }
-          if (Object.keys(restored).length > 0) {
-            setAnswers(restored);
-          }
         }
-        
-        // Kiểm tra draft localStorage (fallback if savedAnswers not returned)
+
+        // Kiểm tra draft localStorage và tự khôi phục, không mở modal.
         const draft = examDraftStorage.load(sId);
-        if (draft && Object.keys(draft.answers).length > 0) setResumeDraft(draft);
+        const draftAnswers = draft?.answers ?? {};
+        const draftCount = Object.keys(draftAnswers).length;
+        if (draftCount > 0) {
+          Object.entries(draftAnswers).forEach(([qId, value]) => {
+            const numericQid = Number(qId);
+            sessionSetAnswerRef.current(Number.isFinite(numericQid) ? numericQid : qId, value);
+          });
+        }
+
+        const mergedAnswers = { ...restored, ...draftAnswers } as AnswerMap;
+        const restoredCount = Object.keys(mergedAnswers).length;
+        if (restoredCount > 0) {
+          setAnswers(mergedAnswers);
+          toast.info(`Đã khôi phục ${restoredCount} câu trả lời trong bài làm dang dở.`, 3500);
+        }
         setSessionLoading(false);
       } catch (e: any) {
         if (cancelled) return;
@@ -316,7 +343,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
     })();
 
     return () => { cancelled = true; };
-  }, [examId, reviewMode, reviewSubmissionId]);
+  }, [examId, navigate, reviewMode, reviewSubmissionId, toast]);
 
   // ─── 1b) Review mode: load submission để pre-fill answers + correct map ──
   useEffect(() => {
@@ -495,6 +522,33 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
   }, [answers, payload, currentSkill]);
 
   const flaggedCount = useMemo(() => Object.values(flagged).filter(Boolean).length, [flagged]);
+  const shouldWarnBeforeLeave = !reviewMode && !submitting && !timeUp && answeredCount > 0;
+  const routeBlocker = useBlocker(({ currentLocation, nextLocation }) => {
+    if (!shouldWarnBeforeLeave) return false;
+    const current = `${currentLocation.pathname}${currentLocation.search}`;
+    const next = `${nextLocation.pathname}${nextLocation.search}`;
+    return current !== next;
+  });
+
+  useEffect(() => {
+    if (routeBlocker.state !== "blocked" || leavePromptActiveRef.current) return;
+    leavePromptActiveRef.current = true;
+
+    void (async () => {
+      const saved = await session.flushNow().then(() => true).catch(() => false);
+      const ok = window.confirm(
+        saved
+          ? "Bạn đang làm bài và đáp án tạm thời đã được lưu. Bạn có chắc muốn rời khỏi trang làm bài không?"
+          : "Bạn đang làm bài nhưng hệ thống chưa xác nhận lưu đáp án mới nhất. Bạn vẫn muốn rời khỏi trang làm bài không?"
+      );
+      if (ok) {
+        routeBlocker.proceed();
+      } else {
+        routeBlocker.reset();
+      }
+      leavePromptActiveRef.current = false;
+    })();
+  }, [routeBlocker, session, shouldWarnBeforeLeave]);
 
   const handleRequestSubmit = () => {
     setSubmitOpen(true);
@@ -521,7 +575,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
       // Vẫn tiếp tục điều hướng dù submit lỗi — bài đã auto-save từng câu
     }
 
-    const isLastSkill = !isFullTest || skillIdx >= skillSequence.length - 1;
+    const isLastSkill = !fullTest || skillIdx >= skillSequence.length - 1;
 
     if (isLastSkill) {
       toast.warning("Đã hết thời gian làm bài. Bài thi của bạn đã được nộp tự động.", 5000);
@@ -543,7 +597,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
       setAnswers({});
       setFlagged({});
     }
-  }, [examId, currentSkill, submissionId, isFullTest, skillIdx, skillSequence.length, navigate, toast, isPracticeMode, practiceSectionNumbers, session]);
+  }, [examId, currentSkill, submissionId, fullTest, skillIdx, skillSequence.length, navigate, toast, isPracticeMode, practiceSectionNumbers, session]);
 
   const handleConfirmSubmit = async () => {
     if (!submissionId) return;
@@ -557,7 +611,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
       deadlineRef.current = null;
 
       // If this is part of a full test, advance to next skill instead of leaving
-      if (isFullTest && skillIdx < skillSequence.length - 1) {
+      if (fullTest && skillIdx < skillSequence.length - 1) {
         serverRemainingRef.current = null; // skill kế tiếp sẽ neo deadline riêng
         setSkillIdx((i) => i + 1);
         setAnswers({});
@@ -698,7 +752,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
           onSubmit={reviewMode ? () => {} : handleRequestSubmit}
           timeLeft={reviewMode ? undefined : timeLeft}
           showTimer={!reviewMode}
-          practiceMode={reviewMode || !isFullTest}
+          practiceMode={reviewMode || !isTimedTestMode}
           reviewMode={reviewMode}
           correctAnswers={correctAnswers}
           isCorrectMap={isCorrectMap}
@@ -752,12 +806,6 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
           <div className="fixed bottom-4 right-4 z-50">
             <SaveStatusIndicator status={session.saveStatus} lastSavedAt={session.lastSavedAt} pendingCount={session.pendingCount} />
           </div>
-          <ResumeExamModal
-            draft={resumeDraft}
-            open={!!resumeDraft}
-            onResume={(draft) => { session.resume(draft); setResumeDraft(null); }}
-            onDiscard={() => { if (submissionId) examDraftStorage.clear(submissionId); setResumeDraft(null); }}
-          />
           <MultiTabWarning hasOtherTab={session.hasOtherTab} position="floating" />
         </>
       )}

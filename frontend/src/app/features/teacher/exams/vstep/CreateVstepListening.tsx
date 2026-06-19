@@ -599,7 +599,7 @@ export const CreateVstepListening = ({
     runTranscribe(partNumber, sectionNumber, file);
   };
 
-  // ─── Question updates with smart paste + leading number strip ───────────
+  // ─── Question updates ──────────────────────────────────────────────────
 
   const updateQuestion = (
     partNumber: number,
@@ -608,56 +608,6 @@ export const CreateVstepListening = ({
     field: "questionText" | "correctAnswer",
     value: any
   ) => {
-    if (field === "questionText" && typeof value === "string") {
-      // Strip leading "1.", "2)" etc.
-      value = value.replace(/^\s*\d+\s*[.)]\s*/, "");
-
-      // Smart paste: detect 4 options
-      const hasA = /\bA\.\s+/i.test(value);
-      const hasB = /\bB\.\s+/i.test(value);
-      const hasC = /\bC\.\s+/i.test(value);
-      const hasD = /\bD\.\s+/i.test(value);
-      const optionCount = [hasA, hasB, hasC, hasD].filter(Boolean).length;
-
-      if (optionCount >= 2) {
-        const firstOptionMatch = value.match(/\b([A-D])\.\s+/i);
-        if (firstOptionMatch) {
-          const firstIdx = firstOptionMatch.index!;
-          const qText = value.substring(0, firstIdx).trim();
-          const optsText = value.substring(firstIdx);
-
-          const options: Partial<Record<"A" | "B" | "C" | "D", string>> = {};
-          const tokens = optsText.split(/\b([A-D])\.\s+/i).filter((s) => s.trim());
-          for (let i = 0; i < tokens.length - 1; i += 2) {
-            const letter = tokens[i].toUpperCase() as "A" | "B" | "C" | "D";
-            const text = tokens[i + 1].trim();
-            if (["A", "B", "C", "D"].includes(letter) && text)
-              options[letter] = text;
-          }
-
-          updateSection(partNumber, sectionNumber, (s) => ({
-            ...s,
-            questions: s.questions.map((q) =>
-              q.id === questionId
-                ? {
-                    ...q,
-                    questionText: qText,
-                    options: {
-                      A: options.A || q.options.A,
-                      B: options.B || q.options.B,
-                      C: options.C || q.options.C,
-                      D: options.D || q.options.D,
-                    },
-                  }
-                : q
-            ),
-          }));
-          scheduleSectionAutoSave(partNumber, sectionNumber);
-          return;
-        }
-      }
-    }
-
     updateSection(partNumber, sectionNumber, (s) => ({
       ...s,
       questions: s.questions.map((q) =>
@@ -674,41 +624,84 @@ export const CreateVstepListening = ({
     option: "A" | "B" | "C" | "D",
     value: string
   ) => {
-    // Smart paste: 4 options at once
-    const multiOptPattern = /([A-D])\.\s*([^\n]+?)(?=[A-D]\.|$)/gi;
-    const matches = [...value.matchAll(multiOptPattern)];
-    if (matches.length >= 2) {
-      const parsedOpts: Partial<Record<"A" | "B" | "C" | "D", string>> = {};
-      matches.forEach((m) => {
-        const letter = m[1].toUpperCase() as "A" | "B" | "C" | "D";
-        parsedOpts[letter] = m[2].trim();
-      });
-      updateSection(partNumber, sectionNumber, (s) => ({
-        ...s,
-        questions: s.questions.map((q) =>
-          q.id === questionId
-            ? {
-                ...q,
-                options: {
-                  A: parsedOpts.A || q.options.A,
-                  B: parsedOpts.B || q.options.B,
-                  C: parsedOpts.C || q.options.C,
-                  D: parsedOpts.D || q.options.D,
-                },
-              }
-            : q
-        ),
-      }));
-      scheduleSectionAutoSave(partNumber, sectionNumber);
-      return;
-    }
-
     updateSection(partNumber, sectionNumber, (s) => ({
       ...s,
       questions: s.questions.map((q) =>
         q.id === questionId
           ? { ...q, options: { ...q.options, [option]: value } }
           : q
+      ),
+    }));
+    scheduleSectionAutoSave(partNumber, sectionNumber);
+  };
+
+  const handleQuestionPaste = (
+    event: React.ClipboardEvent<HTMLInputElement>,
+    partNumber: number,
+    sectionNumber: number,
+    questionId: string
+  ) => {
+    const value = event.clipboardData.getData("text");
+    const firstOption = value.match(/\b([A-D])\.\s+/i);
+    const optionCount = ["A", "B", "C", "D"].filter((letter) =>
+      new RegExp(`\\b${letter}\\.\\s+`, "i").test(value)
+    ).length;
+    if (!firstOption || optionCount < 2) return;
+
+    const options: Partial<Record<"A" | "B" | "C" | "D", string>> = {};
+    const firstIndex = firstOption.index!;
+    const tokens = value
+      .substring(firstIndex)
+      .split(/\b([A-D])\.\s+/i)
+      .filter((token) => token.trim());
+    for (let index = 0; index < tokens.length - 1; index += 2) {
+      const letter = tokens[index].toUpperCase() as "A" | "B" | "C" | "D";
+      const optionText = tokens[index + 1].trim();
+      if (optionText) options[letter] = optionText;
+    }
+
+    event.preventDefault();
+    updateSection(partNumber, sectionNumber, (section) => ({
+      ...section,
+      questions: section.questions.map((question) =>
+        question.id === questionId
+          ? {
+              ...question,
+              questionText: value
+                .substring(0, firstIndex)
+                .replace(/^\s*\d+\s*[.)]\s*/, "")
+                .trim(),
+              options: { ...question.options, ...options },
+            }
+          : question
+      ),
+    }));
+    scheduleSectionAutoSave(partNumber, sectionNumber);
+  };
+
+  const handleOptionsPaste = (
+    event: React.ClipboardEvent<HTMLInputElement>,
+    partNumber: number,
+    sectionNumber: number,
+    questionId: string
+  ) => {
+    const value = event.clipboardData.getData("text");
+    const matches = [
+      ...value.matchAll(/(?:^|\s)([A-D])\.\s*(.*?)(?=(?:\s+[A-D]\.\s)|$)/gis),
+    ];
+    if (matches.length < 2) return;
+
+    const options: Partial<Record<"A" | "B" | "C" | "D", string>> = {};
+    matches.forEach((match) => {
+      options[match[1].toUpperCase() as "A" | "B" | "C" | "D"] = match[2].trim();
+    });
+    event.preventDefault();
+    updateSection(partNumber, sectionNumber, (section) => ({
+      ...section,
+      questions: section.questions.map((question) =>
+        question.id === questionId
+          ? { ...question, options: { ...question.options, ...options } }
+          : question
       ),
     }));
     scheduleSectionAutoSave(partNumber, sectionNumber);
@@ -1268,6 +1261,14 @@ export const CreateVstepListening = ({
                                         e.target.value
                                       )
                                     }
+                                    onPaste={(event) =>
+                                      handleQuestionPaste(
+                                        event,
+                                        currentPart,
+                                        section.sectionNumber,
+                                        q.id
+                                      )
+                                    }
                                     placeholder="Câu hỏi..."
                                     className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                                   />
@@ -1304,6 +1305,14 @@ export const CreateVstepListening = ({
                                             q.id,
                                             opt,
                                             e.target.value
+                                          )
+                                        }
+                                        onPaste={(event) =>
+                                          handleOptionsPaste(
+                                            event,
+                                            currentPart,
+                                            section.sectionNumber,
+                                            q.id
                                           )
                                         }
                                         onDoubleClick={() =>

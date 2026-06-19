@@ -8,13 +8,10 @@ import { usePageHeader } from "../../../../contexts/TeacherHeaderContext";
 import {
   ComposedChart,
   Bar,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  ReferenceLine,
-  Cell,
   ResponsiveContainer,
 } from "recharts";
 import {
@@ -59,20 +56,22 @@ const ACTION_CONFIG: Record<string, { icon: React.ComponentType<{ className?: st
   'profile.update':    { icon: GraduationCap, color: '#6366F1', bg: '#EEF2FF', label: 'Cập nhật hồ sơ' },
 };
 
-interface ChartPoint {
-  date: string;
+interface SubmissionTypePoint {
+  exam_type: string;
   label: string;
-  weekday: string;
-  submissions: number;
-  avg_score: number | null;
-  students: number;
+  adults: number;
+  teens: number;
+  kids: number;
+  total: number;
 }
 
-interface ChartMeta {
-  total_submissions: number;
-  overall_avg_score: number | null;
-  peak_day: ChartPoint | null;
-  days: number;
+interface SubmissionTypeMeta {
+  total: number;
+  adults: number;
+  teens: number;
+  kids: number;
+  date: string;
+  timezone: string;
 }
 
 export function Dashboard() {
@@ -111,10 +110,10 @@ export function Dashboard() {
   // Fetch dashboard statistics with 30-second polling
   const [dashboardStats, setDashboardStats] = useState<any>(null);
   const [statsLoading, setStatsLoading] = useState(true);
-  const [chartData, setChartData] = useState<ChartPoint[]>([]);
-  const [chartMeta, setChartMeta] = useState<ChartMeta | null>(null);
+  const [chartData, setChartData] = useState<SubmissionTypePoint[]>([]);
+  const [chartMeta, setChartMeta] = useState<SubmissionTypeMeta | null>(null);
   const [chartLoading, setChartLoading] = useState(true);
-  const [chartMode, setChartMode] = useState<"today" | "7d" | "30d">("7d");
+  const [chartError, setChartError] = useState(false);
   const [activityLogs, setActivityLogs] = useState<any[]>([]);
   const [activityLogsLoading, setActivityLogsLoading] = useState(true);
 
@@ -155,20 +154,20 @@ export function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch activity chart data (refresh 60s)
+  // Fetch today's submitted attempts by exam type and student age group.
   useEffect(() => {
     let cancelled = false;
     const fetchChart = async () => {
       try {
-        const { data: result } = await api.get('/teacher/dashboard/activity-chart', {
-          params: { mode: chartMode },
-        });
+        const { data: result } = await api.get('/teacher/dashboard/today-submissions-by-type');
         if (!cancelled && result.status === 'success') {
           setChartData(result.data || []);
           setChartMeta(result.meta || null);
+          setChartError(false);
         }
       } catch (error) {
         console.error('Error fetching activity chart:', error);
+        if (!cancelled) setChartError(true);
       } finally {
         if (!cancelled) setChartLoading(false);
       }
@@ -181,7 +180,7 @@ export function Dashboard() {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [chartMode]);
+  }, []);
 
   const hour = new Date().getHours();
   const greeting =
@@ -467,7 +466,7 @@ export function Dashboard() {
             className="grid gap-5 mb-5"
             style={{ gridTemplateColumns: "1fr 380px" }}
           >
-            {/* ── Activity Chart (Bar + Line combo) ── */}
+            {/* ── Today's submissions by exam type and student group ── */}
             <div
               className="bg-white rounded-2xl p-6 shadow-sm"
               style={{
@@ -483,62 +482,44 @@ export function Dashboard() {
                       <Activity className="w-3.5 h-3.5 text-indigo-500" />
                     </div>
                     <h3 className="text-[#111827]" style={{ fontSize: "16px", fontWeight: 700 }}>
-                      Hoạt động làm bài VSTEP
+                      Bài thi học viên đã nộp hôm nay
                     </h3>
-                    <span className="px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-600 text-[10px] font-bold tracking-wide">
-                      FULL SKILL
+                    <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 text-[10px] font-bold tracking-wide">
+                      TOÀN HỆ THỐNG
                     </span>
                   </div>
                   <p className="text-[#9CA3AF]" style={{ fontSize: "12px" }}>
-                    Đề thi VSTEP đủ 4 kỹ năng · Số lượt nộp & điểm trung bình theo ngày
+                    Số lượt nộp theo loại đề và nhóm học viên · Giờ Việt Nam
                   </p>
                 </div>
-
-                {/* Range switcher */}
-                <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-0.5 flex-shrink-0">
-                  {([
-                    { key: "today", label: "Hôm nay" },
-                    { key: "7d", label: "7 ngày" },
-                    { key: "30d", label: "30 ngày" },
-                  ] as const).map((opt) => (
-                    <button
-                      key={opt.key}
-                      type="button"
-                      onClick={() => setChartMode(opt.key)}
-                      className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all cursor-pointer ${
-                        chartMode === opt.key
-                          ? "bg-white text-slate-800 shadow-sm"
-                          : "text-slate-500 hover:text-slate-700"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
+                <span className="text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-100 rounded-lg px-2.5 py-1.5 flex-shrink-0">
+                  {chartMeta?.date
+                    ? chartMeta.date.split("-").reverse().join("/")
+                    : "Hôm nay"}
+                </span>
               </div>
 
               {/* Summary chips */}
-              <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="grid grid-cols-4 gap-3 mb-4">
                 <ChartSummaryChip
-                  label={chartMode === "today" ? "Tổng hôm nay" : "Tổng bài nộp"}
-                  value={chartLoading ? "..." : (chartMeta?.total_submissions ?? 0).toString()}
+                  label="Tổng lượt nộp"
+                  value={chartLoading ? "..." : (chartMeta?.total ?? 0).toString()}
                   accentClass="bg-indigo-500"
                 />
                 <ChartSummaryChip
-                  label="Điểm TB"
-                  value={chartLoading ? "..." : (chartMeta?.overall_avg_score != null ? chartMeta.overall_avg_score.toString() : "—")}
-                  accentClass="bg-amber-500"
+                  label="Adults"
+                  value={chartLoading ? "..." : (chartMeta?.adults ?? 0).toString()}
+                  accentClass="bg-blue-500"
                 />
                 <ChartSummaryChip
-                  label={chartMode === "today" ? "Giờ cao nhất" : "Ngày cao nhất"}
-                  value={
-                    chartLoading
-                      ? "..."
-                      : chartMeta?.peak_day && chartMeta.peak_day.submissions > 0
-                      ? `${chartMeta.peak_day.label} · ${chartMeta.peak_day.submissions}`
-                      : "—"
-                  }
+                  label="Teens"
+                  value={chartLoading ? "..." : (chartMeta?.teens ?? 0).toString()}
                   accentClass="bg-emerald-500"
+                />
+                <ChartSummaryChip
+                  label="Kids"
+                  value={chartLoading ? "..." : (chartMeta?.kids ?? 0).toString()}
+                  accentClass="bg-orange-500"
                 />
               </div>
 
@@ -548,133 +529,52 @@ export function Dashboard() {
                   <div className="h-full flex items-center justify-center">
                     <div className="w-6 h-6 border-2 border-indigo-200 border-t-indigo-500 rounded-full animate-spin" />
                   </div>
-                ) : chartData.length === 0 || chartData.every((d) => d.submissions === 0) ? (
+                ) : chartError ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center px-4">
+                    <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-3">
+                      <AlertCircle className="w-6 h-6 text-red-400" />
+                    </div>
+                    <p className="text-sm font-semibold text-gray-700">Không thể tải thống kê</p>
+                    <p className="text-xs text-gray-400 mt-1">Hệ thống sẽ tự động thử lại sau 60 giây.</p>
+                  </div>
+                ) : chartData.length === 0 || chartData.every((d) => d.total === 0) ? (
                   <div className="h-full flex flex-col items-center justify-center text-center px-4">
                     <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center mb-3">
                       <BarChart2 className="w-6 h-6 text-gray-300" />
                     </div>
-                    <p className="text-sm font-semibold text-gray-700">
-                      {chartMode === "today" ? "Hôm nay chưa có bài nộp" : "Chưa có dữ liệu VSTEP full"}
-                    </p>
+                    <p className="text-sm font-semibold text-gray-700">Hôm nay chưa có bài nộp</p>
                     <p className="text-xs text-gray-400 mt-1 max-w-xs">
-                      {chartMode === "today"
-                        ? "Khi học viên làm bài VSTEP đủ 4 kỹ năng (>1 phút), biểu đồ sẽ hiện theo từng giờ."
-                        : "Khi học viên làm bài VSTEP đủ 4 kỹ năng (>1 phút), biểu đồ sẽ hiện ở đây."}
+                      Biểu đồ sẽ cập nhật khi học viên thuộc nhóm Adults, Teens hoặc Kids nộp bài.
                     </p>
                   </div>
                 ) : (
-                  (() => {
-                    // Derived: peak submission count, scored-days count, max bar value
-                    const maxSub = Math.max(...chartData.map((d) => d.submissions), 1);
-                    const scoredDays = chartData.filter((d) => d.avg_score != null).length;
-                    const showLine = scoredDays >= 2;
-                    const overallAvg = chartMeta?.overall_avg_score ?? null;
-
-                    return (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={chartData} margin={{ top: 16, right: 24, left: 0, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="barFill" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#6366F1" stopOpacity={0.95} />
-                              <stop offset="100%" stopColor="#6366F1" stopOpacity={0.55} />
-                            </linearGradient>
-                            <linearGradient id="barFillPeak" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#4F46E5" stopOpacity={1} />
-                              <stop offset="100%" stopColor="#4338CA" stopOpacity={0.85} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid stroke="#F3F4F6" vertical={false} />
-                          <XAxis
-                            dataKey="label"
-                            tick={{ fill: "#9CA3AF", fontSize: 11 }}
-                            axisLine={{ stroke: "#E5E7EB" }}
-                            tickLine={false}
-                            interval={chartMode === "today" ? 2 : "preserveStartEnd"}
-                            minTickGap={chartMode === "today" ? 0 : 10}
-                          />
-                          <YAxis
-                            yAxisId="left"
-                            tick={{ fill: "#9CA3AF", fontSize: 11 }}
-                            axisLine={false}
-                            tickLine={false}
-                            allowDecimals={false}
-                            width={32}
-                            domain={[0, (dataMax: number) => Math.max(2, Math.ceil(dataMax * 1.15))]}
-                          />
-                          {showLine && (
-                            <YAxis
-                              yAxisId="right"
-                              orientation="right"
-                              domain={[0, 10]}
-                              ticks={[0, 5, 10]}
-                              tick={{ fill: "#9CA3AF", fontSize: 11 }}
-                              axisLine={false}
-                              tickLine={false}
-                              width={28}
-                            />
-                          )}
-                          <Tooltip
-                            content={<ChartTooltip />}
-                            cursor={{ fill: "rgba(99, 102, 241, 0.06)" }}
-                          />
-
-                          {/* Reference line: điểm TB tổng */}
-                          {showLine && overallAvg != null && (
-                            <ReferenceLine
-                              yAxisId="right"
-                              y={overallAvg}
-                              stroke="#F59E0B"
-                              strokeDasharray="3 4"
-                              strokeOpacity={0.4}
-                              label={{
-                                value: `TB ${overallAvg}`,
-                                position: "right",
-                                fill: "#D97706",
-                                fontSize: 10,
-                                fontWeight: 600,
-                              }}
-                            />
-                          )}
-
-                          <Bar
-                            yAxisId="left"
-                            dataKey="submissions"
-                            name="Số bài"
-                            radius={[6, 6, 0, 0]}
-                            maxBarSize={28}
-                            minPointSize={2}
-                          >
-                            {chartData.map((entry, index) => (
-                              <Cell
-                                key={`cell-${index}`}
-                                fill={
-                                  entry.submissions === maxSub && entry.submissions > 0
-                                    ? "url(#barFillPeak)"
-                                    : entry.submissions === 0
-                                    ? "#F3F4F6"
-                                    : "url(#barFill)"
-                                }
-                              />
-                            ))}
-                          </Bar>
-
-                          {showLine && (
-                            <Line
-                              yAxisId="right"
-                              type="monotone"
-                              dataKey="avg_score"
-                              name="Điểm TB"
-                              stroke="#F59E0B"
-                              strokeWidth={2.2}
-                              dot={{ r: 3, fill: "#F59E0B", stroke: "white", strokeWidth: 1.5 }}
-                              activeDot={{ r: 5, fill: "#F59E0B", stroke: "white", strokeWidth: 2 }}
-                              connectNulls
-                            />
-                          )}
-                        </ComposedChart>
-                      </ResponsiveContainer>
-                    );
-                  })()
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={chartData} margin={{ top: 16, right: 20, left: 0, bottom: 0 }}>
+                      <CartesianGrid stroke="#F3F4F6" vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        tick={{ fill: "#6B7280", fontSize: 11 }}
+                        axisLine={{ stroke: "#E5E7EB" }}
+                        tickLine={false}
+                        interval={0}
+                      />
+                      <YAxis
+                        tick={{ fill: "#9CA3AF", fontSize: 11 }}
+                        axisLine={false}
+                        tickLine={false}
+                        allowDecimals={false}
+                        width={32}
+                        domain={[0, (dataMax: number) => Math.max(2, Math.ceil(dataMax * 1.15))]}
+                      />
+                      <Tooltip
+                        content={<SubmissionTypeTooltip />}
+                        cursor={{ fill: "rgba(99, 102, 241, 0.05)" }}
+                      />
+                      <Bar dataKey="adults" name="Adults" fill="#3B82F6" radius={[5, 5, 0, 0]} maxBarSize={26} />
+                      <Bar dataKey="teens" name="Teens" fill="#10B981" radius={[5, 5, 0, 0]} maxBarSize={26} />
+                      <Bar dataKey="kids" name="Kids" fill="#F97316" radius={[5, 5, 0, 0]} maxBarSize={26} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
                 )}
               </div>
 
@@ -682,26 +582,19 @@ export function Dashboard() {
               <div className="flex items-center justify-between gap-4 mt-3 pt-3 border-t border-gray-100">
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-indigo-500" />
-                    Số bài nộp
+                    <span className="w-2.5 h-2.5 rounded-sm bg-blue-500" />
+                    Adults
                   </span>
                   <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                    <span className="w-2.5 h-2.5 rounded-sm bg-indigo-700" />
-                    Cao nhất
+                    <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />
+                    Teens
                   </span>
-                  {chartData.some((d) => d.avg_score != null) && (
-                    <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                      <span className="w-3 h-0.5 bg-amber-500" />
-                      Điểm TB (0–10)
-                    </span>
-                  )}
+                  <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-orange-500" />
+                    Kids
+                  </span>
                 </div>
-                {chartData.filter((d) => d.avg_score != null).length < 2 &&
-                  chartData.some((d) => d.avg_score != null) && (
-                    <span className="text-[10px] text-slate-400 italic">
-                      Cần ≥ 2 ngày có điểm để hiện đường TB
-                    </span>
-                  )}
+                <span className="text-[10px] text-slate-400">Tự động cập nhật mỗi 60 giây</span>
               </div>
             </div>
 
@@ -939,50 +832,33 @@ function ChartSummaryChip({
   );
 }
 
-// ─── Helper: Recharts custom tooltip ─────────────────────────────────────
-function ChartTooltip({ active, payload, label }: any) {
+// ─── Helper: grouped submission chart tooltip ────────────────────────────
+function SubmissionTypeTooltip({ active, payload, label }: any) {
   if (!active || !payload || payload.length === 0) return null;
 
-  const point: ChartPoint | undefined = payload[0]?.payload;
+  const point: SubmissionTypePoint | undefined = payload[0]?.payload;
   if (!point) return null;
-
-  const isEmptyDay = point.submissions === 0;
 
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-100 px-3 py-2.5 min-w-[170px]">
-      <p className="text-[11px] font-semibold text-slate-500 mb-1.5">
-        {point.weekday ? `${point.weekday} · ` : ""}
-        {label}
-      </p>
-
-      {isEmptyDay ? (
-        <p className="text-[12px] text-slate-400 italic">Không có bài nộp</p>
-      ) : (
-        <>
-          <div className="flex items-center justify-between gap-4 text-[12px]">
-            <span className="flex items-center gap-1.5 text-slate-600">
-              <span className="w-2 h-2 rounded-sm bg-indigo-500" />
-              Số bài nộp
-            </span>
-            <span className="font-bold text-slate-900 tabular-nums">{point.submissions}</span>
-          </div>
-          <div className="flex items-center justify-between gap-4 text-[12px] mt-1">
-            <span className="flex items-center gap-1.5 text-slate-600">
-              <span className="w-2 h-2 rounded-full bg-amber-500" />
-              Điểm TB
-            </span>
-            <span className="font-bold text-slate-900 tabular-nums">
-              {point.avg_score != null ? point.avg_score : "—"}
-            </span>
-          </div>
-          {point.students > 0 && (
-            <div className="flex items-center justify-between gap-4 text-[11px] mt-1 pt-1 border-t border-gray-100 text-slate-400">
-              <span>Học viên tham gia</span>
-              <span className="font-semibold tabular-nums">{point.students}</span>
-            </div>
-          )}
-        </>
-      )}
+      <p className="text-[12px] font-bold text-slate-800 mb-2">{label}</p>
+      {([
+        ["Adults", point.adults, "bg-blue-500"],
+        ["Teens", point.teens, "bg-emerald-500"],
+        ["Kids", point.kids, "bg-orange-500"],
+      ] as const).map(([group, count, color]) => (
+        <div key={group} className="flex items-center justify-between gap-5 text-[12px] mt-1">
+          <span className="flex items-center gap-1.5 text-slate-600">
+            <span className={`w-2 h-2 rounded-sm ${color}`} />
+            {group}
+          </span>
+          <span className="font-bold text-slate-900 tabular-nums">{count}</span>
+        </div>
+      ))}
+      <div className="flex items-center justify-between gap-5 text-[12px] mt-2 pt-1.5 border-t border-gray-100">
+        <span className="font-semibold text-slate-600">Tổng lượt nộp</span>
+        <span className="font-bold text-indigo-600 tabular-nums">{point.total}</span>
+      </div>
     </div>
   );
 }

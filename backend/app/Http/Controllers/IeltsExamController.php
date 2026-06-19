@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Exam;
+use App\Models\Submission;
 use App\Services\IELTSService;
+use App\Services\ExamAutoSubmitService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
@@ -512,6 +514,7 @@ class IeltsExamController extends Controller
         // Aggregate query: lấy sections + question count trong 1 query
         $sections = $this->buildSectionsLight($exam->eId, $skill);
         $totalQuestions = array_sum(array_column($sections, 'questionCount'));
+        $activeSession = $this->activeSessionForExam($request, $exam);
 
         return response()->json([
             'status' => 'success',
@@ -531,6 +534,7 @@ class IeltsExamController extends Controller
                 'participants' => $this->countParticipants($exam->eId),
                 'commentsCount' => $this->countComments($exam->eId),
                 'playMode' => $playModes,
+                'activeSession' => $activeSession,
             ],
         ]);
     }
@@ -545,6 +549,53 @@ class IeltsExamController extends Controller
             'practice_enabled' => true,
             'full_test_enabled' => true,
             'time_limit_options' => [null, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75],
+        ];
+    }
+
+    private function activeSessionForExam(Request $request, Exam $exam): ?array
+    {
+        $user = $request->user();
+        if (!$user || $user->uRole !== 'student') {
+            return null;
+        }
+
+        $submission = Submission::withCount([
+                'answers as answered_count' => function ($q) {
+                    $q->whereNotNull('saAnswer_text')->where('saAnswer_text', '!=', '');
+                },
+            ])
+            ->where('exam_id', $exam->eId)
+            ->where('user_id', $user->uId)
+            ->whereNull('sSubmit_time')
+            ->whereIn('sStatus', ['draft', 'in_progress'])
+            ->orderByDesc('sId')
+            ->first();
+
+        if (!$submission) {
+            return null;
+        }
+
+        $durationSeconds = (int) ($exam->eDuration_minutes ?: self::DEFAULT_DURATIONS[$exam->ielts_skill ?: $this->detectSkillFromExam($exam)]) * 60;
+        $startTime = $submission->sStart_time ?? now();
+        $elapsed = max(0, \Carbon\Carbon::parse($startTime)->diffInSeconds(now(), false));
+        $remaining = max(0, $durationSeconds - $elapsed);
+
+        if ($remaining <= 0) {
+            app(ExamAutoSubmitService::class)->autoSubmit($submission, ExamAutoSubmitService::REASON_TIMEOUT);
+            return null;
+        }
+
+        $startAt = \Carbon\Carbon::parse($startTime);
+        $deadlineAt = $startAt->copy()->addSeconds($durationSeconds);
+
+        return [
+            'submissionId' => $submission->sId,
+            'started_at' => $startTime,
+            'deadline_at' => $deadlineAt->toIso8601String(),
+            'server_time' => now()->toIso8601String(),
+            'time_remaining_seconds' => $remaining,
+            'duration_seconds' => $durationSeconds,
+            'answered_count' => (int) ($submission->answered_count ?? 0),
         ];
     }
 

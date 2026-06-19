@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Services\TestWebSocketService;
 use App\Models\Submission;
 use App\Models\TestAssignment;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Redis;
 
 /**
@@ -681,6 +682,104 @@ class TeacherDashboardController extends Controller
                 'days'              => $days,
             ],
         ]);
+    }
+
+    /**
+     * Return all submitted attempts for the current Vietnam calendar day,
+     * grouped by normalized exam type and student age group.
+     */
+    public function getTodaySubmissionsByType(Request $request)
+    {
+        $user = $request->user();
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
+        }
+
+        $timezone = 'Asia/Ho_Chi_Minh';
+        $today = Carbon::now($timezone);
+        $startUtc = $today->copy()->startOfDay()->utc();
+        $endUtc = $today->copy()->addDay()->startOfDay()->utc();
+
+        $rows = Submission::query()
+            ->join('exams', 'exams.eId', '=', 'submissions.exam_id')
+            ->join('users', 'users.uId', '=', 'submissions.user_id')
+            ->where('users.uRole', 'student')
+            ->whereIn('users.age_group', ['adults', 'teens', 'kids'])
+            ->whereNotNull('submissions.sSubmit_time')
+            ->where('submissions.sSubmit_time', '>=', $startUtc->format('Y-m-d H:i:s'))
+            ->where('submissions.sSubmit_time', '<', $endUtc->format('Y-m-d H:i:s'))
+            ->selectRaw(
+                'exams.eType as exam_type, exams.age_group as exam_age_group, '
+                . 'users.age_group as student_age_group, COUNT(*) as submission_count'
+            )
+            ->groupBy('exams.eType', 'exams.age_group', 'users.age_group')
+            ->get();
+
+        $groups = [];
+        foreach ($rows as $row) {
+            [$key, $label, $order] = $this->normalizeDashboardExamType(
+                (string) $row->exam_type,
+                (string) $row->exam_age_group
+            );
+
+            if (!isset($groups[$key])) {
+                $groups[$key] = [
+                    'exam_type' => $key,
+                    'label' => $label,
+                    'adults' => 0,
+                    'teens' => 0,
+                    'kids' => 0,
+                    'total' => 0,
+                    '_order' => $order,
+                ];
+            }
+
+            $ageGroup = (string) $row->student_age_group;
+            $count = (int) $row->submission_count;
+            $groups[$key][$ageGroup] += $count;
+            $groups[$key]['total'] += $count;
+        }
+
+        $data = collect(array_values($groups))
+            ->sortBy([['_order', 'asc'], ['label', 'asc']])
+            ->map(function (array $group) {
+                unset($group['_order']);
+                return $group;
+            })
+            ->values();
+
+        $meta = [
+            'total' => (int) $data->sum('total'),
+            'adults' => (int) $data->sum('adults'),
+            'teens' => (int) $data->sum('teens'),
+            'kids' => (int) $data->sum('kids'),
+            'date' => $today->format('Y-m-d'),
+            'timezone' => $timezone,
+        ];
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $data,
+            'meta' => $meta,
+        ]);
+    }
+
+    private function normalizeDashboardExamType(string $examType, string $examAgeGroup): array
+    {
+        $type = strtoupper(trim($examType));
+        $ageGroup = strtolower(trim($examAgeGroup));
+
+        if ($type === 'VSTEP') return ['vstep', 'VSTEP', 10];
+        if (str_starts_with($type, 'IELTS')) return ['ielts', 'IELTS', 20];
+        if ($type === 'THPT') return ['thpt', 'THPT', 30];
+        if ($ageGroup === 'kids' || in_array($type, ['STARTERS', 'MOVERS', 'FLYERS'], true)) {
+            return ['cambridge_yle', 'Cambridge YLE', 40];
+        }
+        if ($ageGroup === 'teens' && $type === 'GENERAL') {
+            return ['teens', 'Đề Teens', 50];
+        }
+
+        return ['general', 'General', 60];
     }
 
     /**

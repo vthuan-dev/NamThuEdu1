@@ -64,8 +64,6 @@ const WORD_LIMIT_OPTS = [
 ];
 
 type ParsedInlineForm = {
-  title?: string;
-  context: string;
   questions: Array<{
     questionNumber: number;
     questionText: string;
@@ -75,12 +73,10 @@ type ParsedInlineForm = {
 function parseInlineFormText(text: string, startQuestionNumber: number): ParsedInlineForm {
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   const questions: ParsedInlineForm["questions"] = [];
-  const questionLineSet = new Set<number>();
 
-  lines.forEach((line, index) => {
+  lines.forEach((line) => {
     const blankMatches = line.match(/_{3,}/g) ?? [];
     if (blankMatches.length === 0) return;
-    questionLineSet.add(index);
     blankMatches.forEach(() => {
       questions.push({
         questionNumber: startQuestionNumber + questions.length,
@@ -89,22 +85,14 @@ function parseInlineFormText(text: string, startQuestionNumber: number): ParsedI
     });
   });
 
-  const contextLines = lines.filter((_, index) => !questionLineSet.has(index));
-  const title = contextLines[0];
-  const context = contextLines.join("\n");
-
-  return { title, context, questions };
+  return { questions };
 }
 
-function buildInlineFormText(questions: ListeningQuestion[], fallbackTitle = ""): string {
+function buildInlineFormText(questions: ListeningQuestion[]): string {
   const rawFormText = questions.find((q) => q.formText != null)?.formText;
   if (rawFormText != null) return rawFormText;
 
-  const firstContext = questions.find((q) => q.taskInstruction?.trim())?.taskInstruction?.trim();
   const lines: string[] = [];
-  if (firstContext) lines.push(firstContext);
-  else if (fallbackTitle.trim()) lines.push(fallbackTitle.trim());
-
   questions.forEach((q) => {
     if (!q.questionText.trim()) return;
     lines.push(q.questionText);
@@ -287,7 +275,6 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
 
           return {
             ...s,
-            sectionTitle: s.sectionTitle || parsed.title || "",
             questions: s.questions.map((q, i) => {
               if (i < start) return q;
               if (i > end && i <= currentGroupEnd) {
@@ -309,7 +296,6 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
                 ...q,
                 questionType: "form-completion",
                 questionText: item ? item.questionText : "",
-                taskInstruction: parsed.context || q.taskInstruction || "",
                 formText,
                 wordLimit: q.wordLimit || "ONE WORD AND/OR A NUMBER",
                 options: undefined,
@@ -350,9 +336,6 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
           return {
             ...s,
             questions: s.questions.map((q, i) => {
-              if (newType === "form-completion") {
-                return i <= qIdx ? normalizeForType(q) : q;
-              }
               return i === qIdx ? normalizeForType(q) : q;
             }),
           };
@@ -1007,11 +990,20 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
   const handleChange = (patch: Partial<ListeningQuestion>) => onPatch(sectionNumber, index, patch);
   const handleGroup = (patch: Partial<ListeningQuestion>) =>
     (onPatchGroup ?? ((s, _i, p) => onPatch(s, index, p)))(sectionNumber, index, patch);
-  const formText = buildInlineFormText(
-    groupQuestions.length ? groupQuestions : [question],
-    question.taskTitle || question.taskInstruction || ""
-  );
+  const formText = buildInlineFormText(groupQuestions.length ? groupQuestions : [question]);
   const formBlankCount = (formText.match(/_{3,}/g) ?? []).length;
+  const formTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!isGroupStart || !isInlineForm || !formTextareaRef.current) return;
+    const textarea = formTextareaRef.current;
+    const maxHeight = 520;
+
+    textarea.style.height = "auto";
+    const nextHeight = Math.min(maxHeight, Math.max(220, textarea.scrollHeight));
+    textarea.style.height = `${nextHeight}px`;
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? "auto" : "hidden";
+  }, [formText, isGroupStart, isInlineForm]);
 
   const optionKeys = Object.keys(question.options || {})
     .filter((k) => /^[A-Za-z]+$/.test(k))
@@ -1177,11 +1169,12 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
                 </span>
               </div>
               <textarea
+                ref={formTextareaRef}
                 value={formText}
                 onChange={(e) => onApplyInlineFormText(sectionNumber, index, e.target.value)}
-                rows={Math.min(10, Math.max(5, formText.split(/\r?\n/).length + 1))}
+                rows={8}
                 placeholder={`Enquiry about joining Youth Council\n\nAge: 18\nCurrently staying in a ___ during the week\nPostal address: 217, ___ Street, Stamford, Lincs\nPostcode: ___`}
-                className="w-full px-3 py-2 text-sm border border-blue-200 rounded-lg bg-white font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                className="w-full min-h-[220px] px-3 py-2 text-sm border border-blue-200 rounded-lg bg-white font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
               />
               <p className="text-[11px] text-blue-700">
                 Giáo viên nhập/xóa tự do tại đây. Hệ thống chỉ nhận dạng mỗi ___ là một câu; chữ trước/sau ___ được giữ làm label cho học viên.

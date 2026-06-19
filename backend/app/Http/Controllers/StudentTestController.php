@@ -2971,11 +2971,31 @@ class StudentTestController extends Controller
             ->orderByDesc('sId')
             ->first();
 
+        if ($existing && $request->boolean('fresh')) {
+            app(\App\Services\ExamAutoSubmitService::class)
+                ->autoSubmit($existing, \App\Services\ExamAutoSubmitService::REASON_RESTART);
+            $existing = null;
+        }
+
         if ($existing) {
             // Resume existing submission (F5/reload case)
             $startTime = $existing->sStart_time ?? now();
             $elapsed   = max(0, \Carbon\Carbon::parse($startTime)->diffInSeconds(now(), false));
             $remaining = max(0, $totalSeconds - $elapsed);
+
+            if ($remaining <= 0) {
+                $result = app(\App\Services\ExamAutoSubmitService::class)
+                    ->autoSubmit($existing, \App\Services\ExamAutoSubmitService::REASON_TIMEOUT);
+
+                return response()->json([
+                    'status'  => $result['ok'] ? 'finalized' : 'error',
+                    'message' => $result['message'] ?? 'Bài thi đã hết thời gian.',
+                    'data'    => $result['data'] ?? [
+                        'submissionId' => $existing->sId,
+                        'sStatus' => $existing->sStatus,
+                    ],
+                ], $result['ok'] ? 200 : 500);
+            }
             
             // ✅ Load saved answers so frontend can restore them after F5
             $savedAnswers = SubmissionAnswer::where('submission_id', $existing->sId)
@@ -3019,6 +3039,54 @@ class StudentTestController extends Controller
                 'timeRemaining'  => $exam->eDuration_minutes ?? 179,
             ],
         ]);
+    }
+
+    /**
+     * POST /api/student/exams/{examId}/discard-active-session
+     * Kết thúc phiên IELTS/VSTEP đang làm dở để học viên có thể bắt đầu phiên mới.
+     */
+    public function discardActiveDirectExamSession(Request $request, $examId)
+    {
+        $user = $request->user();
+        if (!$user || $user->uRole !== 'student') {
+            return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
+        }
+
+        $exam = Exam::where('eId', $examId)
+            ->whereIn('eType', ['VSTEP', 'IELTS'])
+            ->first();
+
+        if (!$exam) {
+            return response()->json(['status' => 'error', 'message' => 'Không tìm thấy đề thi.'], 404);
+        }
+
+        $submission = Submission::where('exam_id', $examId)
+            ->where('user_id', $user->uId)
+            ->whereNull('sSubmit_time')
+            ->whereIn('sStatus', ['draft', 'in_progress'])
+            ->orderByDesc('sId')
+            ->first();
+
+        if (!$submission) {
+            return response()->json([
+                'status' => 'success',
+                'data' => ['discarded' => false],
+                'message' => 'Không có phiên bài làm đang dở.',
+            ]);
+        }
+
+        $result = app(\App\Services\ExamAutoSubmitService::class)
+            ->autoSubmit($submission, \App\Services\ExamAutoSubmitService::REASON_RESTART);
+
+        return response()->json([
+            'status' => $result['ok'] ? 'success' : 'error',
+            'data' => [
+                'discarded' => $result['ok'],
+                'submissionId' => $submission->sId,
+                'sStatus' => $result['data']['sStatus'] ?? null,
+            ],
+            'message' => $result['message'] ?? null,
+        ], $result['ok'] ? 200 : 500);
     }
 
     /**

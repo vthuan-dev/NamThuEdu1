@@ -277,6 +277,52 @@ export const studentApi = {
     }>(`/student/tests/${submissionId}/draft`, { answers }),
 
   /**
+   * Best-effort lưu nháp khi rời/đóng tab. Không await được, chỉ đảm bảo trình
+   * duyệt enqueue request nếu còn cho phép network trong unload/pagehide.
+   */
+  saveDraftOnUnload: (submissionId: number, answers: DraftAnswer[]): boolean => {
+    if (!answers.length) return true;
+    try {
+      const baseUrl =
+        (import.meta.env.VITE_API_URL as string | undefined) ||
+        (import.meta.env.VITE_API_BASE_URL as string | undefined) ||
+        '';
+      const url = `${baseUrl}/student/tests/${submissionId}/draft`;
+      const token = getAuthToken();
+      const body = JSON.stringify({ answers });
+
+      if (typeof fetch === 'function') {
+        try {
+          void fetch(url, {
+            method: 'POST',
+            keepalive: true,
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body,
+          }).catch(() => undefined);
+          return true;
+        } catch {
+          /* fall through */
+        }
+      }
+
+      if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+        const beaconUrl = token ? `${url}?token=${encodeURIComponent(token)}` : url;
+        const blob = new Blob([body], { type: 'application/json' });
+        return navigator.sendBeacon(beaconUrl, blob);
+      }
+      return false;
+    } catch (err) {
+      console.warn('[studentApi.saveDraftOnUnload] failed', err);
+      return false;
+    }
+  },
+
+  /**
    * Ping nhỏ để cập nhật `last_activity_at`. Trả về `timeRemaining`,
    * `serverTime` để FE hiệu chỉnh đồng hồ. BE tự auto-submit nếu hết giờ.
    */
@@ -468,8 +514,10 @@ export const studentApi = {
     api.post(`/student/exams/${examId}/start-teens`),
 
   // VSTEP direct exam — start by exam ID (no assignment needed)
-  startDirectVstepExam: (examId: number, resume = false) =>
-    api.post<{ status: string; data: { submissionId: number; timeRemaining: number; time_remaining?: number; started_at?: string; total_duration?: number } }>(`/student/exams/${examId}/start-direct${resume ? '?resume=1' : ''}`),
+  startDirectVstepExam: (examId: number, resume = false, fresh = false) =>
+    api.post<{ status: string; data: { submissionId: number; timeRemaining: number; time_remaining?: number; started_at?: string; total_duration?: number; sStatus?: string } }>(
+      `/student/exams/${examId}/start-direct${resume || fresh ? `?${new URLSearchParams({ ...(resume ? { resume: '1' } : {}), ...(fresh ? { fresh: '1' } : {}) }).toString()}` : ''}`
+    ),
 
   loadStudentVstepListening: (examId: number) =>
     api.get(`/student/exams/${examId}/vstep/listening`),

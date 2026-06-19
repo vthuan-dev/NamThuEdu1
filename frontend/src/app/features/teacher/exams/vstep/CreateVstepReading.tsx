@@ -196,99 +196,6 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
   };
 
   const updateQuestion = (questionId: string, field: string, value: any) => {
-    // Smart Paste for Question: Detect if pasted text contains question + options
-    if (field === 'questionText' && typeof value === 'string') {
-      console.log('Checking for smart paste, input length:', value.length);
-
-      // Auto-strip leading question number like "1.", "2)", "3. " for cleaner UX
-      value = value.replace(/^\s*\d+\s*[.)]\s*/, "");
-
-      // Check if text contains option markers (A. B. C. D.)
-      const hasOptionA = /\bA\.\s+/i.test(value);
-      const hasOptionB = /\bB\.\s+/i.test(value);
-      const hasOptionC = /\bC\.\s+/i.test(value);
-      const hasOptionD = /\bD\.\s+/i.test(value);
-      
-      const optionCount = [hasOptionA, hasOptionB, hasOptionC, hasOptionD].filter(Boolean).length;
-      
-      console.log('Option detection:', { hasOptionA, hasOptionB, hasOptionC, hasOptionD, optionCount });
-      
-      // If we have at least 2 options, parse them
-      if (optionCount >= 2) {
-        // Find the position of first option marker
-        const firstOptionMatch = value.match(/\b([A-D])\.\s+/i);
-        if (!firstOptionMatch) {
-          console.log('No first option match found');
-          // Fallback to normal update
-          setParts((prev) =>
-            prev.map((p) =>
-              p.partNumber === currentPart
-                ? {
-                    ...p,
-                    questions: p.questions.map((q) =>
-                      q.id === questionId ? { ...q, [field]: value } : q
-                    ),
-                  }
-                : p
-            )
-          );
-          return;
-        }
-        
-        const firstOptionIndex = firstOptionMatch.index!;
-        const questionText = value.substring(0, firstOptionIndex).trim();
-        const optionsText = value.substring(firstOptionIndex);
-        
-        console.log('Extracted question:', questionText);
-        console.log('Options text:', optionsText);
-        
-        // Parse options using split approach
-        const options: Partial<Record<"A" | "B" | "C" | "D", string>> = {};
-        
-        // Split by option markers and process
-        const parts = optionsText.split(/\b([A-D])\.\s+/i).filter(s => s.trim());
-        
-        for (let i = 0; i < parts.length - 1; i += 2) {
-          const letter = parts[i].toUpperCase() as "A" | "B" | "C" | "D";
-          const text = parts[i + 1].trim();
-          if (letter && text && ['A', 'B', 'C', 'D'].includes(letter)) {
-            options[letter] = text;
-          }
-        }
-        
-        console.log('Parsed options:', options);
-        
-        // Update question and options
-        setParts((prev) =>
-          prev.map((p) =>
-            p.partNumber === currentPart
-              ? {
-                  ...p,
-                  questions: p.questions.map((q) =>
-                    q.id === questionId
-                      ? {
-                          ...q,
-                          questionText: questionText,
-                          options: {
-                            A: options.A || q.options.A,
-                            B: options.B || q.options.B,
-                            C: options.C || q.options.C,
-                            D: options.D || q.options.D,
-                          },
-                        }
-                      : q
-                  ),
-                }
-              : p
-          )
-        );
-        
-        console.log('Smart paste completed!');
-        return; // Exit early
-      }
-    }
-    
-    // Normal update (no smart paste detected)
     setParts((prev) =>
       prev.map((p) =>
         p.partNumber === currentPart
@@ -304,51 +211,6 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
   };
 
   const updateOption = (questionId: string, option: "A" | "B" | "C" | "D", value: string) => {
-    // Smart Paste Detection: Check if user pasted all 4 options at once
-    const multiOptionPattern = /([A-D])\.\s*([^\n]+?)(?=[A-D]\.|$)/gi;
-    const matches = [...value.matchAll(multiOptionPattern)];
-    
-    if (matches.length >= 2) {
-      // User pasted multiple options! Auto-distribute them
-      const parsedOptions: Partial<Record<"A" | "B" | "C" | "D", string>> = {};
-      
-      matches.forEach((match) => {
-        const optionLetter = match[1].toUpperCase() as "A" | "B" | "C" | "D";
-        const optionText = match[2].trim();
-        parsedOptions[optionLetter] = optionText;
-      });
-      
-      // Update all parsed options
-      setParts((prev) =>
-        prev.map((p) =>
-          p.partNumber === currentPart
-            ? {
-                ...p,
-                questions: p.questions.map((q) =>
-                  q.id === questionId
-                    ? { 
-                        ...q, 
-                        options: { 
-                          A: parsedOptions.A || q.options.A,
-                          B: parsedOptions.B || q.options.B,
-                          C: parsedOptions.C || q.options.C,
-                          D: parsedOptions.D || q.options.D,
-                        } 
-                      }
-                    : q
-                ),
-              }
-            : p
-        )
-      );
-      return;
-    }
-    
-    // Normal single option update: Auto-remove option prefix (A., B., C., D.)
-    let cleanedValue = value;
-    const prefixPattern = new RegExp(`^${option}\\.?\\s*`, 'i');
-    cleanedValue = cleanedValue.replace(prefixPattern, '');
-    
     setParts((prev) =>
       prev.map((p) =>
         p.partNumber === currentPart
@@ -356,13 +218,79 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
               ...p,
               questions: p.questions.map((q) =>
                 q.id === questionId
-                  ? { ...q, options: { ...q.options, [option]: cleanedValue } }
+                  ? { ...q, options: { ...q.options, [option]: value } }
                   : q
               ),
             }
           : p
       )
     );
+  };
+
+  const handleQuestionPaste = (
+    event: React.ClipboardEvent<HTMLInputElement>,
+    questionId: string
+  ) => {
+    const value = event.clipboardData.getData('text');
+    const firstOption = value.match(/\b([A-D])\.\s+/i);
+    const optionCount = ['A', 'B', 'C', 'D'].filter((letter) =>
+      new RegExp(`\\b${letter}\\.\\s+`, 'i').test(value)
+    ).length;
+    if (!firstOption || optionCount < 2) return;
+
+    const options: Partial<Record<'A' | 'B' | 'C' | 'D', string>> = {};
+    const firstIndex = firstOption.index!;
+    const tokens = value.substring(firstIndex).split(/\b([A-D])\.\s+/i).filter((token) => token.trim());
+    for (let index = 0; index < tokens.length - 1; index += 2) {
+      const letter = tokens[index].toUpperCase() as 'A' | 'B' | 'C' | 'D';
+      const optionText = tokens[index + 1].trim();
+      if (optionText) options[letter] = optionText;
+    }
+
+    event.preventDefault();
+    setParts((previous) => previous.map((part) =>
+      part.partNumber === currentPart
+        ? {
+            ...part,
+            questions: part.questions.map((question) =>
+              question.id === questionId
+                ? {
+                    ...question,
+                    questionText: value.substring(0, firstIndex).replace(/^\s*\d+\s*[.)]\s*/, '').trim(),
+                    options: { ...question.options, ...options },
+                  }
+                : question
+            ),
+          }
+        : part
+    ));
+  };
+
+  const handleOptionsPaste = (
+    event: React.ClipboardEvent<HTMLInputElement>,
+    questionId: string
+  ) => {
+    const value = event.clipboardData.getData('text');
+    const matches = [...value.matchAll(/(?:^|\s)([A-D])\.\s*(.*?)(?=(?:\s+[A-D]\.\s)|$)/gis)];
+    if (matches.length < 2) return;
+
+    const options: Partial<Record<'A' | 'B' | 'C' | 'D', string>> = {};
+    matches.forEach((match) => {
+      options[match[1].toUpperCase() as 'A' | 'B' | 'C' | 'D'] = match[2].trim();
+    });
+    event.preventDefault();
+    setParts((previous) => previous.map((part) =>
+      part.partNumber === currentPart
+        ? {
+            ...part,
+            questions: part.questions.map((question) =>
+              question.id === questionId
+                ? { ...question, options: { ...question.options, ...options } }
+                : question
+            ),
+          }
+        : part
+    ));
   };
 
   const countWords = (text: string) => {
@@ -783,6 +711,7 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
                           onChange={(e) =>
                             updateQuestion(question.id, "questionText", e.target.value)
                           }
+                          onPaste={(event) => handleQuestionPaste(event, question.id)}
                           placeholder={t('vstep.reading.questions.placeholder')}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
@@ -810,6 +739,7 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
                               onChange={(e) =>
                                 updateOption(question.id, option, e.target.value)
                               }
+                              onPaste={(event) => handleOptionsPaste(event, question.id)}
                               onDoubleClick={() =>
                                 updateQuestion(question.id, "correctAnswer", option)
                               }
