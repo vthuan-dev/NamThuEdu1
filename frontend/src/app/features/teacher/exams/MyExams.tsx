@@ -39,7 +39,7 @@ interface Exam {
   title: string;
   description: string;
   type: "VSTEP" | "IELTS" | "Cambridge" | "General";
-  skill: "Listening" | "Reading" | "Writing" | "Speaking";
+  skill: string;
   duration: number;
   questions: number;
   points: number;
@@ -55,6 +55,8 @@ interface Exam {
   avgTimeSpent: number;
   // Internal fields để route Sửa/Xem đúng
   _eType?: string;
+  _eSkill?: string;
+  _eScope?: string;
   _ielts_skill?: string;
   _eId?: number;
 }
@@ -140,7 +142,7 @@ export function MyExams() {
               title: exam.eTitle || exam.title || "Untitled Exam",
               description: exam.eDescription || exam.description || "",
               type: (exam.eType || exam.type || "General").toUpperCase() as "VSTEP" | "IELTS" | "Cambridge" | "General",
-              skill: capitalizeFirst(exam.eSkill || exam.skill || "reading") as "Listening" | "Reading" | "Writing" | "Speaking",
+              skill: capitalizeFirst(exam.eSkill || exam.skill || "reading"),
               duration: exam.eDuration_minutes || exam.duration || 60,
               questions: exam.questions_count || exam.questionsCount || 0,
               points: exam.total_points || exam.totalPoints || 100,
@@ -157,6 +159,8 @@ export function MyExams() {
               avgTimeSpent: exam.avg_time_spent || exam.avgTimeSpent || 0,
               // Lưu thêm field gốc để route Sửa/Xem đúng loại đề
               _eType: exam.eType,
+              _eSkill: exam.eSkill,
+              _eScope: exam.eScope,
               _ielts_skill: exam.ielts_skill,
               _eId: exam.eId,
             }))
@@ -260,7 +264,11 @@ export function MyExams() {
   const getEditUrl = (exam: Exam): string => {
     const eType = (exam._eType || exam.type || "").toUpperCase();
     if (eType === "IELTS") {
-      const skill = (exam._ielts_skill || exam.skill || "").toLowerCase();
+      const scope = (exam._eScope || "").toLowerCase();
+      const skill = (exam._ielts_skill || exam._eSkill || exam.skill || "").toLowerCase();
+      if (scope === "full" || skill === "mixed" || skill === "full") {
+        return `/giao-vien/de-thi/ielts/full/edit/${exam.id}`;
+      }
       const validSkills = ["listening", "reading", "writing", "speaking"];
       const s = validSkills.includes(skill) ? skill : "listening";
       return `/giao-vien/de-thi/ielts/${s}/sua/${exam.id}`;
@@ -279,7 +287,11 @@ export function MyExams() {
   const getPreviewUrl = (exam: Exam): string => {
     const eType = (exam._eType || exam.type || "").toUpperCase();
     if (eType === "IELTS") {
-      const skill = (exam._ielts_skill || exam.skill || "").toLowerCase();
+      const scope = (exam._eScope || "").toLowerCase();
+      const skill = (exam._ielts_skill || exam._eSkill || exam.skill || "").toLowerCase();
+      if (scope === "full" || skill === "mixed" || skill === "full") {
+        return `/giao-vien/de-thi/ielts/full/edit/${exam.id}`;
+      }
       const validSkills = ["listening", "reading", "writing", "speaking"];
       const s = validSkills.includes(skill) ? skill : "listening";
       return `/giao-vien/de-thi/ielts/${s}/xem/${exam.id}`;
@@ -1007,5 +1019,3 @@ export function MyExams() {
     </div>
   );
 }
-
-

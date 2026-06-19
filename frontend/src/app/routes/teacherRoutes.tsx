@@ -139,8 +139,9 @@ export const teacherRoutes = {
     { path: "de-thi/vstep/full/sua/:examId", Component: CreateVstepFull },
 
     // ── IELTS routes ────────────────────────────────────────────────────
-    // Full test (4 kỹ năng) — tạo 4 đề con liên kết bằng full_group_id.
+    // Full test (4 kỹ năng) — một exam ID với eSkill=mixed.
     { path: "de-thi/ielts/full/tao-moi", Component: CreateIeltsFullExam },
+    { path: "de-thi/ielts/full/edit/:examId", Component: CreateIeltsFullExam },
     // Single-skill (1 đề = 1 kỹ năng).
     { path: "de-thi/ielts/listening/tao-moi", Component: () => <CreateIeltsExam initialSkill="listening" /> },
     { path: "de-thi/ielts/listening/edit/:examId", Component: () => <CreateIeltsExam initialSkill="listening" /> },

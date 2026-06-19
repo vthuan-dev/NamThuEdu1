@@ -87,6 +87,9 @@ class KidsExamController extends Controller
             'exam_type_code' => 'required|string', // yle_starters, yle_movers, yle_flyers
             'eDescription' => 'nullable|string',
             'eDuration' => 'nullable|integer',
+            'scope' => 'nullable|in:full,skill,part',
+            'scope_skill' => 'nullable|in:listening,reading_writing,speaking',
+            'scope_part' => 'nullable|integer|min:1|max:99',
         ]);
 
         if ($validator->fails()) {
@@ -103,6 +106,12 @@ class KidsExamController extends Controller
         }
 
         $templateConfig = json_decode($template->config, true);
+        $scope = $request->input('scope', 'full');
+        $scopeSkill = $request->input('scope_skill');
+        $scopePart = $request->input('scope_part');
+        $examSkill = $scope === 'full'
+            ? 'mixed'
+            : ($scopeSkill === 'speaking' ? 'speaking' : ($scopeSkill === 'listening' ? 'listening' : 'reading'));
 
         // Create exam with kids_exam_config JSON
         $exam = Exam::create([
@@ -111,14 +120,18 @@ class KidsExamController extends Controller
             'eDuration' => $request->eDuration,
             'age_group' => 'kids',
             'eType' => 'GENERAL', // Kids (Cambridge YLE) — KHÔNG phải VSTEP; tránh default 'VSTEP' của cột eType
+            'eSkill' => $examSkill,
+            'eScope' => $scope,
+            'ePart_type' => $scope === 'part' && $scopeSkill ? "{$scopeSkill}_part_{$scopePart}" : null,
+            'ePart_number' => $scope === 'part' ? $scopePart : null,
             'eTeacher_id' => auth()->id(),
             'eStatus' => 'draft',
             'kids_exam_config' => [
                 'exam_type' => $request->exam_type_code,
                 'mode' => $request->mode ?? 'flexible', // Add mode field
-                'scope' => $request->scope ?? 'full', // Phạm vi: full | skill | part
-                'scope_skill' => $request->scope_skill, // listening | reading_writing | speaking
-                'scope_part' => $request->scope_part, // số part trong kỹ năng (khi scope=part)
+                'scope' => $scope, // Phạm vi: full | skill | part
+                'scope_skill' => $scopeSkill, // listening | reading_writing | speaking
+                'scope_part' => $scopePart, // số part trong kỹ năng (khi scope=part)
                 'level' => $templateConfig['level'],
                 'age_range' => $templateConfig['age_range'],
                 'vocabulary_size' => $templateConfig['vocabulary_size'],
@@ -273,6 +286,15 @@ class KidsExamController extends Controller
             if ($request->has('scope_skill')) $config['scope_skill'] = $request->scope_skill;
             if ($request->has('scope_part')) $config['scope_part'] = $request->scope_part;
             $updateData['kids_exam_config'] = $config;
+            $scope = $config['scope'] ?? 'full';
+            $scopeSkill = $config['scope_skill'] ?? null;
+            $scopePart = $config['scope_part'] ?? null;
+            $updateData['eScope'] = $scope;
+            $updateData['eSkill'] = $scope === 'full'
+                ? 'mixed'
+                : ($scopeSkill === 'speaking' ? 'speaking' : ($scopeSkill === 'listening' ? 'listening' : 'reading'));
+            $updateData['ePart_type'] = $scope === 'part' && $scopeSkill ? "{$scopeSkill}_part_{$scopePart}" : null;
+            $updateData['ePart_number'] = $scope === 'part' ? $scopePart : null;
         }
 
         $exam->update($updateData);

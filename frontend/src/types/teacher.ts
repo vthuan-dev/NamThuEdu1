@@ -213,6 +213,9 @@ export interface Exam {
   eDescription: string;
   eType: string;
   eSkill: 'listening' | 'reading' | 'writing' | 'speaking' | 'mixed';
+  eScope?: 'full' | 'skill' | 'part';
+  ePart_type?: string | null;
+  ePart_number?: number | null;
   eDuration_minutes: number;
   eIs_private: boolean;
   eSource_type: 'manual' | 'template' | 'imported';
@@ -638,6 +641,9 @@ export interface CreateExamRequest {
   eDescription: string;
   eType: string;
   eSkill: string;
+  eScope?: 'full' | 'skill' | 'part';
+  ePart_type?: string | null;
+  ePart_number?: number | null;
   eDuration_minutes: number;
   eIs_private: boolean;
   eSource_type: 'manual' | 'template' | 'imported';

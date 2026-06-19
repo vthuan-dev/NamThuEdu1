@@ -102,14 +102,14 @@ function SubmitDialog({
 }) {
   if (!open) return null;
   const unansweredMCQ  = totalMCQ - answeredMCQ;
-  const writingDone    = answeredWriting >= totalWriting && totalWriting > 0;
-  const speakingDone   = answeredSpeaking >= totalSpeaking && totalSpeaking > 0;
-  const allDone        = unansweredMCQ === 0 && writingDone && speakingDone;
+  const writingDone    = totalWriting === 0 || answeredWriting >= totalWriting;
+  const speakingDone   = totalSpeaking === 0 || answeredSpeaking >= totalSpeaking;
   const skills = [
-    { label: "Listening + Reading", done: answeredMCQ, total: totalMCQ, ok: unansweredMCQ === 0 },
+    { label: "Listening + Reading", done: answeredMCQ, total: totalMCQ, ok: totalMCQ === 0 || unansweredMCQ === 0 },
     { label: "Writing",             done: answeredWriting, total: totalWriting, ok: writingDone },
     { label: "Speaking",            done: answeredSpeaking, total: totalSpeaking, ok: speakingDone },
-  ];
+  ].filter((s) => s.total > 0);
+  const allDone = skills.every((s) => s.ok);
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl mx-4 border border-slate-200">
@@ -321,10 +321,11 @@ export function StudentVstepExamPage() {
         const eType = String(data.exam?.eType ?? "").toUpperCase();
         if (eType === "IELTS" && !teacherMode) {
           const skill = String(data.exam?.eSkill ?? "listening").toLowerCase();
-          navigate(
-            `${STUDENT_BASE_PATH}/lam-bai-ielts/${data.exam_id}/${skill}?review=${reviewSubmissionId}`,
-            { replace: true }
-          );
+          const isFull = skill === "mixed" || skill === "full";
+          const url = isFull
+            ? `${STUDENT_BASE_PATH}/lam-bai-ielts/${data.exam_id}?review=${reviewSubmissionId}`
+            : `${STUDENT_BASE_PATH}/lam-bai-ielts/${data.exam_id}/${skill}?review=${reviewSubmissionId}`;
+          navigate(url, { replace: true });
           return;
         }
 
@@ -620,15 +621,21 @@ export function StudentVstepExamPage() {
   /* ── Auto-advance skill when per-skill timer hits 0 ──────── */
   useEffect(() => {
     if (skillTimeLeft > 0) return;
-    const skillIdx = SKILL_ORDER.indexOf(current.skill);
-    if (skillIdx < SKILL_ORDER.length - 1) {
-      const nextSkill = SKILL_ORDER[skillIdx + 1];
+    const present: SkillKey[] = [];
+    if (listeningParts.length > 0) present.push("listening");
+    if (readingParts.length > 0) present.push("reading");
+    if (writingTasks.length > 0) present.push("writing");
+    if (speakingParts.length > 0) present.push("speaking");
+    const skills = present.length > 0 ? present : SKILL_ORDER;
+    const skillIdx = skills.indexOf(current.skill);
+    if (skillIdx >= 0 && skillIdx < skills.length - 1) {
+      const nextSkill = skills[skillIdx + 1];
       navigate2(nextSkill, PARTS_PER_SKILL[nextSkill][0]);
     } else {
       handleAutoSubmit();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [skillTimeLeft]);
+  }, [skillTimeLeft, current.skill, listeningParts.length, readingParts.length, writingTasks.length, speakingParts.length]);
 
   /* ── Auto-submit on timeout ─────────────────────────────── */
   const handleAutoSubmit = useCallback(() => {
@@ -756,6 +763,34 @@ export function StudentVstepExamPage() {
     return present.length > 0 ? present : (Object.keys(PARTS_PER_SKILL) as SkillKey[]);
   }, [stats.lq, stats.rq, stats.wq, stats.sq]);
 
+  const partsInExam = useMemo<Record<SkillKey, number[]>>(() => ({
+    listening: listeningParts.map((p) => p.partNumber).sort((a, b) => a - b),
+    reading: readingParts.map((p) => p.partNumber).sort((a, b) => a - b),
+    writing: writingTasks.map((t) => t.taskNumber).sort((a, b) => a - b),
+    speaking: speakingParts.map((p) => p.partNumber).sort((a, b) => a - b),
+  }), [listeningParts, readingParts, writingTasks, speakingParts]);
+
+  const examPartOrder = useMemo<Array<{ skill: SkillKey; part: number }>>(() => (
+    skillsInExam.flatMap((skill) => {
+      const parts = partsInExam[skill].length > 0 ? partsInExam[skill] : PARTS_PER_SKILL[skill];
+      return parts.map((part) => ({ skill, part }));
+    })
+  ), [skillsInExam, partsInExam]);
+
+  useEffect(() => {
+    if (examPartOrder.length === 0) return;
+    const exists = examPartOrder.some((item) => item.skill === current.skill && item.part === current.partNumber);
+    if (!exists) {
+      const first = examPartOrder[0];
+      setCurrent({ skill: first.skill, partNumber: first.part });
+      setVisitedParts((prev) => ({
+        ...prev,
+        [first.skill]: new Set([...(prev[first.skill] ?? []), first.part]),
+      }));
+      setMaxSkillIdx(SKILL_ORDER.indexOf(first.skill));
+    }
+  }, [examPartOrder, current.skill, current.partNumber]);
+
   /* ── Format time ────────────────────────────────────────── */
   const fmtTime = (s: number) => {
     const m = Math.floor(s / 60), ss = s % 60;
@@ -764,12 +799,8 @@ export function StudentVstepExamPage() {
 
   /* ── Next part ──────────────────────────────────────────── */
   const goNext = () => {
-    const order: Array<{ skill: SkillKey; part: number }> = [];
-    (Object.keys(PARTS_PER_SKILL) as SkillKey[]).forEach((s) => {
-      PARTS_PER_SKILL[s].forEach((p) => order.push({ skill: s, part: p }));
-    });
-    const idx = order.findIndex((o) => o.skill === current.skill && o.part === current.partNumber);
-    const next = order[idx + 1];
+    const idx = examPartOrder.findIndex((o) => o.skill === current.skill && o.part === current.partNumber);
+    const next = examPartOrder[idx + 1];
     if (!next) return;
 
     // When crossing to a different skill, check for unanswered MCQ questions
@@ -802,12 +833,8 @@ export function StudentVstepExamPage() {
   };
 
   const isLastPart = (() => {
-    const order: Array<{ skill: SkillKey; part: number }> = [];
-    (Object.keys(PARTS_PER_SKILL) as SkillKey[]).forEach((s) => {
-      PARTS_PER_SKILL[s].forEach((p) => order.push({ skill: s, part: p }));
-    });
-    const idx = order.findIndex((o) => o.skill === current.skill && o.part === current.partNumber);
-    return idx === order.length - 1;
+    const idx = examPartOrder.findIndex((o) => o.skill === current.skill && o.part === current.partNumber);
+    return idx >= 0 && idx === examPartOrder.length - 1;
   })();
 
   /* ── Render content ─────────────────────────────────────── */
@@ -1028,7 +1055,7 @@ export function StudentVstepExamPage() {
               return (
                 <div key={s} className="flex flex-col items-center gap-1 flex-shrink-0">
                   <div className="flex items-center gap-1">
-                    {PARTS_PER_SKILL[s].map((pn) => {
+                    {(partsInExam[s].length > 0 ? partsInExam[s] : PARTS_PER_SKILL[s]).map((pn) => {
                       const isActive = current.skill === s && current.partNumber === pn;
                       const isVisited = visitedParts[s]?.has(pn);
                       const sameSkill = s === current.skill;
@@ -1139,7 +1166,7 @@ export function StudentVstepExamPage() {
         answeredWriting={stats.answeredWriting}
         totalWriting={stats.wq}
         answeredSpeaking={stats.answeredSpeaking}
-        totalSpeaking={PARTS_PER_SKILL.speaking.length}
+        totalSpeaking={speakingParts.length}
         onConfirm={handleSubmit}
         onCancel={() => setShowSubmit(false)}
         loading={submitting}

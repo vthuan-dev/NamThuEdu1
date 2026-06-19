@@ -60,6 +60,9 @@ class IeltsTeacherExamFlowTest extends TestCase
         $exam = Exam::find($examId);
         $this->assertNotNull($exam);
         $this->assertSame('IELTS', $exam->eType);
+        $this->assertSame('skill', $exam->eScope);
+        $this->assertNull($exam->ePart_type);
+        $this->assertNull($exam->ePart_number);
         $this->assertSame('Academic', $exam->ielts_test_type);
         $this->assertSame('listening', $exam->ielts_skill);
         $this->assertSame('draft', $exam->eStatus);
@@ -93,7 +96,31 @@ class IeltsTeacherExamFlowTest extends TestCase
                 "Default duration for {$skill} must be {$minutes}m"
             );
             $this->assertSame($skill, $exam->ielts_skill);
+            $this->assertSame('skill', $exam->eScope);
         }
+    }
+
+    /** @test */
+    public function teacher_can_create_ielts_full_draft_as_one_exam_id()
+    {
+        $response = $this->withHeaders($this->authHeader())
+            ->postJson('/api/teacher/exams/ielts', [
+                'eTitle' => 'IELTS Academic - Full Test',
+                'ielts_test_type' => 'Academic',
+                'ielts_skill' => 'mixed',
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('status', 'success');
+
+        $exam = Exam::find($response->json('data.eId'));
+        $this->assertNotNull($exam);
+        $this->assertSame('IELTS', $exam->eType);
+        $this->assertSame('mixed', $exam->eSkill);
+        $this->assertSame('full', $exam->eScope);
+        $this->assertNull($exam->ielts_skill);
+        $this->assertSame(['listening', 'reading', 'writing', 'speaking'], $exam->ielts_config['available_skills']);
+        $this->assertSame(174, (int) $exam->eDuration_minutes);
     }
 
     /** @test */
@@ -103,7 +130,7 @@ class IeltsTeacherExamFlowTest extends TestCase
             ->postJson('/api/teacher/exams/ielts', [
                 'eTitle' => 'Invalid skill',
                 'ielts_test_type' => 'Academic',
-                'ielts_skill' => 'mixed',
+                'ielts_skill' => 'grammar',
             ]);
         $response->assertStatus(400)
             ->assertJsonPath('status', 'error');

@@ -284,6 +284,7 @@ export function CreateVSTEPExam() {
         eDescription: examDescription.trim(),
         eType: "VSTEP",
         eSkill: "mixed",
+        eScope: "full",
         eDuration_minutes: 172,
         eIs_private: visibility === "private",
         eSource_type: "manual",

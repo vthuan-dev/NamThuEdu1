@@ -4,9 +4,7 @@
  * Pattern tham khảo: CreateVstepFull.tsx (Step 0 → Step 1 với 4 tab).
  *
  * Kiến trúc:
- *   - Backend hiện ENFORCE 1 IELTS exam = 1 skill.
- *   - Để KHÔNG đụng schema, ta tạo 4 IELTS exam riêng (mỗi skill 1 đề),
- *     nhóm chúng bằng `full_group_id` (UUID) lưu trong `ielts_config`.
+ *   - Full Test dùng 1 IELTS exam duy nhất với eSkill=mixed.
  *   - Tái sử dụng nguyên 4 editor có sẵn (Listening/Reading/Writing/Speaking).
  *
  * Flow:
@@ -16,7 +14,7 @@
  *   Publish: gọi /publish cho từng skill liên tiếp; điều hướng về danh sách đề.
  */
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate, useLocation } from "react-router";
+import { useNavigate, useLocation, useParams } from "react-router";
 import {
   ArrowLeft,
   Headphones,
@@ -73,14 +71,6 @@ const DEFAULT_PLAY_MODE = {
 // ─── Helpers ─────────────────────────────────────────────────────────────
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-function genGroupId(): string {
-  // Modern browsers (Chrome 92+, Firefox 95+) hỗ trợ crypto.randomUUID
-  if (typeof crypto !== "undefined" && typeof (crypto as any).randomUUID === "function") {
-    return (crypto as any).randomUUID();
-  }
-  return "ift-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
-}
-
 function getDataKey(skill: IeltsSkill): string {
   switch (skill) {
     case "listening": return "sections";
@@ -127,21 +117,21 @@ function hasSkillContent(skill: IeltsSkill, data: any): boolean {
 export function CreateIeltsFullExam() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { examId: routeExamId } = useParams<{ examId: string }>();
   const { success, error } = useToast();
 
   // Pre-fill từ navigation state nếu có (từ CreateExamSetup)
   const navState = (location.state as { title?: string; description?: string } | null) ?? {};
 
   // ── Step 0: Form inputs ──
-  const [step, setStep] = useState<0 | 1>(0);
+  const [step, setStep] = useState<0 | 1>(routeExamId ? 1 : 0);
   const [title, setTitle] = useState(navState.title || "");
   const [description, setDescription] = useState(navState.description || "");
   const [testType, setTestType] = useState<IeltsTestType>("Academic");
   const [ageGroup, setAgeGroup] = useState<"kids" | "teens" | "adults" | "all">("all");
 
   // ── Step 1: Editing state ──
-  const [groupId] = useState(genGroupId);
-  const [examIds, setExamIds] = useState<Record<IeltsSkill, string>>({} as any);
+  const [examId, setExamId] = useState<string>(routeExamId || "");
   const [skillData, setSkillData] = useState<Record<IeltsSkill, any>>({} as any);
   const [activeSkill, setActiveSkill] = useState<IeltsSkill>("listening");
 
@@ -150,13 +140,40 @@ export function CreateIeltsFullExam() {
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
 
-  // Auto-create 4 drafts khi nhận title từ navigate state (skip step 0)
+  // Auto-create draft khi nhận title từ navigate state (skip step 0)
   useEffect(() => {
-    if (navState.title && !Object.keys(examIds).length && step === 0) {
+    if (navState.title && !examId && step === 0) {
       handleStartCreate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!routeExamId) return;
+    let cancelled = false;
+    setIsCreating(true);
+    api.get(`/teacher/exams/${routeExamId}/ielts/draft`)
+      .then((res) => {
+        if (cancelled) return;
+        const raw = res.data?.data ?? res.data;
+        setTitle(raw?.eTitle || "");
+        setDescription(raw?.eDescription || "");
+        setTestType(raw?.ielts_test_type || "Academic");
+        setAgeGroup(raw?.age_group || "all");
+        const data = raw?.ielts_data || {};
+        setSkillData({
+          listening: data.listening || (data.sections ? { sections: data.sections } : undefined),
+          reading: data.reading || (data.passages ? { passages: data.passages } : undefined),
+          writing: data.writing || (data.tasks ? { tasks: data.tasks } : undefined),
+          speaking: data.speaking || (data.parts ? { parts: data.parts } : undefined),
+        } as any);
+        setExamId(String(raw?.eId || routeExamId));
+        setStep(1);
+      })
+      .catch((err: any) => error(err?.response?.data?.message || "Không thể tải IELTS Full Test"))
+      .finally(() => !cancelled && setIsCreating(false));
+    return () => { cancelled = true; };
+  }, [routeExamId]);
 
   const completedSkills = useMemo(() => {
     const set = new Set<IeltsSkill>();
@@ -180,41 +197,18 @@ export function CreateIeltsFullExam() {
     if (!title.trim()) return;
     setIsCreating(true);
     try {
-      // Tạo song song 4 IELTS draft
-      const results = await Promise.all(
-        SKILLS.map((skill) =>
-          api.post("/teacher/exams/ielts", {
-            eTitle: `${title.trim()} - ${capitalize(skill)}`,
-            eDescription: description.trim(),
-            ielts_test_type: testType,
-            ielts_skill: skill,
-            eDifficulty: "medium",
-            age_group: ageGroup,
-          })
-        )
-      );
-
-      const newIds = {} as Record<IeltsSkill, string>;
-      results.forEach((res, i) => {
-        const id = String(res.data?.data?.eId || res.data?.eId || "");
-        if (!id) throw new Error(`Không lấy được ID cho skill ${SKILLS[i]}`);
-        newIds[SKILLS[i]] = id;
+      const res = await api.post("/teacher/exams/ielts", {
+        eTitle: title.trim(),
+        eDescription: description.trim(),
+        ielts_test_type: testType,
+        ielts_skill: "mixed",
+        eScope: "full",
+        eDifficulty: "medium",
+        age_group: ageGroup,
       });
-
-      // Đánh dấu group_id vào 4 đề (backend sẽ merge vào ielts_config)
-      await Promise.all(
-        SKILLS.map((skill) =>
-          api.put(`/teacher/exams/${newIds[skill]}/ielts`, {
-            ielts_config: {
-              full_group_id: groupId,
-              full_skill: skill,
-              full_test_title: title.trim(),
-            },
-          })
-        )
-      );
-
-      setExamIds(newIds);
+      const id = String(res.data?.data?.eId || res.data?.eId || "");
+      if (!id) throw new Error("Không lấy được ID cho IELTS Full Test");
+      setExamId(id);
       setStep(1);
       success("Đã khởi tạo IELTS Full Test — bắt đầu nhập 4 kỹ năng.");
     } catch (err: any) {
@@ -229,28 +223,28 @@ export function CreateIeltsFullExam() {
   };
 
   const handleSaveDraftAll = async (showToast = true) => {
-    if (!Object.keys(examIds).length) return;
+    if (!examId) return;
     setIsSaving(true);
     try {
-      await Promise.all(
-        SKILLS.map((skill) => {
-          const data = skillData[skill];
-          const items = extractSkillItems(skill, data);
-          return api.put(`/teacher/exams/${examIds[skill]}/ielts`, {
-            eTitle: `${title.trim()} - ${capitalize(skill)}`,
-            eDescription: description.trim(),
-            ielts_test_type: testType,
-            age_group: ageGroup,
-            ielts_data: items.length > 0 ? { [getDataKey(skill)]: items } : null,
-            ielts_config: {
-              full_group_id: groupId,
-              full_skill: skill,
-              full_test_title: title.trim(),
-              play_modes: DEFAULT_PLAY_MODE,
-            },
-          });
-        })
-      );
+      const ieltsData = SKILLS.reduce((acc, skill) => {
+        const items = extractSkillItems(skill, skillData[skill]);
+        acc[skill] = { [getDataKey(skill)]: items };
+        return acc;
+      }, {} as Record<IeltsSkill, any>);
+      await api.put(`/teacher/exams/${examId}/ielts`, {
+        eTitle: title.trim(),
+        eDescription: description.trim(),
+        ielts_test_type: testType,
+        age_group: ageGroup,
+        eScope: "full",
+        ielts_data: ieltsData,
+        ielts_config: {
+          scope: "full",
+          skill: "mixed",
+          available_skills: [...SKILLS],
+          play_modes: DEFAULT_PLAY_MODE,
+        },
+      });
       if (showToast) success("Đã lưu nháp 4 kỹ năng");
     } catch (err: any) {
       if (showToast) error(err?.response?.data?.message || "Lưu nháp thất bại");
@@ -270,16 +264,17 @@ export function CreateIeltsFullExam() {
       // Lưu nháp lần cuối trước khi publish
       await handleSaveDraftAll(false);
 
-      // Publish 4 đề lần lượt
-      for (const skill of SKILLS) {
+      const ieltsData = SKILLS.reduce((acc, skill) => {
         const items = extractSkillItems(skill, skillData[skill]);
-        await api.post(`/teacher/exams/${examIds[skill]}/ielts/publish`, {
-          ielts_test_type: testType,
-          ielts_skill: skill,
-          ielts_data: { [getDataKey(skill)]: items },
-          play_modes: DEFAULT_PLAY_MODE,
-        });
-      }
+        acc[skill] = { [getDataKey(skill)]: items };
+        return acc;
+      }, {} as Record<IeltsSkill, any>);
+      await api.post(`/teacher/exams/${examId}/ielts/publish`, {
+        ielts_test_type: testType,
+        ielts_skill: "mixed",
+        ielts_data: ieltsData,
+        play_modes: DEFAULT_PLAY_MODE,
+      });
 
       // Best-effort: log activity
       try {
@@ -287,9 +282,9 @@ export function CreateIeltsFullExam() {
         logTeacherActivity({
           action: "exam.create",
           entity_type: "exam",
-          entity_id: Number(examIds.listening),
+          entity_id: Number(examId),
           detail: `Xuất bản đề IELTS Full Test: ${title}`,
-          meta: { type: "IELTS_FULL", group_id: groupId, test_type: testType },
+          meta: { type: "IELTS_FULL", test_type: testType },
         });
       } catch {
         /* ignore */
@@ -489,9 +484,8 @@ export function CreateIeltsFullExam() {
               <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3 text-[12px] text-amber-900">
                 <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-amber-600" />
                 <span>
-                  Hệ thống sẽ tạo 4 đề con theo từng kỹ năng (Listening / Reading / Writing / Speaking),
-                  liên kết bằng <strong>cùng một group ID</strong>. Học viên có thể làm full hoặc luyện
-                  từng phần.
+                  Hệ thống sẽ tạo <strong>1 exam ID duy nhất</strong> cho IELTS Full Test.
+                  Bốn kỹ năng được lưu chung trong đề này; học viên làm full bằng cùng một exam ID.
                 </span>
               </div>
 
@@ -514,7 +508,7 @@ export function CreateIeltsFullExam() {
                 {isCreating ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Đang tạo 4 đề con...
+                    Đang tạo IELTS Full Test...
                   </>
                 ) : (
                   <>
@@ -532,7 +526,7 @@ export function CreateIeltsFullExam() {
 
   // ─── Render Step 1: Tab editor cho 4 skill ────────────────────────────
   const activeMeta = SKILL_TABS.find((t) => t.id === activeSkill)!;
-  const activeExamId = examIds[activeSkill];
+  const activeExamId = examId;
   const progressPct = (completedSkills.size / 4) * 100;
 
   return (

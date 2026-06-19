@@ -28,15 +28,17 @@ const STATUS_META: Record<Status, { label: string; c: string; soft: string }> = 
 
 // Card chung cho cả 2 tab. Điều hướng phụ thuộc trạng thái + đề có được giao hay không.
 function ExamCard({
-  title, skill, duration, questions, status, submissionId, assignmentId, examId, isAssigned, showAssignedBadge,
+  title, skill, scope, partNumber, duration, questions, status, submissionId, assignmentId, examId, isAssigned, showAssignedBadge,
 }: {
-  title: string; skill?: string; duration?: number; questions?: number;
+  title: string; skill?: string; scope?: string; partNumber?: number | null; duration?: number; questions?: number;
   status: Status; submissionId: number | null; assignmentId: number | null;
   examId: number; isAssigned: boolean; showAssignedBadge: boolean;
 }) {
   const meta = STATUS_META[status] ?? STATUS_META.pending;
   const isCompleted = status === 'completed';
   const inProgress = status === 'in_progress';
+  const normalizedScope = String(scope || (skill === 'mixed' ? 'full' : 'skill')).toLowerCase();
+  const scopeLabel = normalizedScope === 'full' ? 'Full test' : normalizedScope === 'part' ? `Part ${partNumber ?? ''}`.trim() : 'Skill';
 
   // Link "Bắt đầu / Tiếp tục":
   //  - được giao → vào phòng chờ qua assignmentId
@@ -63,6 +65,10 @@ function ExamCard({
             <Gift className="w-3.5 h-3.5" /> Giáo viên giao
           </span>
         )}
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold"
+          style={{ background: '#FFF7ED', color: '#C2410C' }}>
+          {scopeLabel}
+        </span>
       </div>
 
       {/* Title */}
@@ -138,6 +144,8 @@ export function KidsTests() {
       examId: e.id,
       title: e.title,
       skill: e.skill,
+      scope: e.scope,
+      partNumber: e.part_number ?? null,
       duration: e.duration,
       questions: e.questions_count,
       status: (e.submission_status ?? 'pending') as Status,
@@ -164,6 +172,8 @@ export function KidsTests() {
       examId: t.exam_id,
       title: t.exam_title,
       skill: t.exam_skill,
+      scope: t.scope ?? (String(t.exam_skill ?? '').toLowerCase() === 'mixed' ? 'full' : 'skill'),
+      partNumber: t.part_number ?? null,
       duration: t.exam_duration,
       questions: t.total_questions,
       status: s,
@@ -364,6 +374,8 @@ export function KidsTests() {
                 key={t.key}
                 title={t.title}
                 skill={t.skill}
+                scope={t.scope}
+                partNumber={t.partNumber}
                 duration={t.duration}
                 questions={t.questions}
                 status={t.status}

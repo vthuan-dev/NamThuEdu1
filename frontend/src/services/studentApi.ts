@@ -158,6 +158,11 @@ export interface BrowseExam {
   title: string;
   type: 'VSTEP' | 'IELTS';
   skill: string;
+  ielts_skill?: string | null;
+  ielts_test_type?: string | null;
+  scope?: 'full' | 'skill' | 'part' | string;
+  part_type?: string | null;
+  part_number?: number | null;
   duration: number;
   description: string | null;
   age_group: string | null;
@@ -170,6 +175,9 @@ export interface BrowseKidsExam {
   title: string;
   type: string;
   skill: string;
+  scope?: 'full' | 'skill' | 'part' | string;
+  part_type?: string | null;
+  part_number?: number | null;
   duration: number;
   description: string | null;
   age_group: string | null;
@@ -187,6 +195,9 @@ export interface BrowseTeensExam {
   title: string;
   type: string;
   skill: string;
+  scope?: 'full' | 'skill' | 'part' | string;
+  part_type?: string | null;
+  part_number?: number | null;
   duration: number;
   description: string | null;
   age_group: string | null;

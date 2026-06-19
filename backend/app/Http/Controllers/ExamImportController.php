@@ -88,11 +88,15 @@ class ExamImportController extends Controller
 
             // Create exam
             $moderationStatus = Exam::resolveModerationStatus();
+            $scope = $request->eSkill === 'mixed' ? 'full' : 'skill';
             $exam = Exam::create([
                 'eTitle' => $request->eTitle,
                 'eDescription' => $request->eDescription,
                 'eType' => $request->eType,
                 'eSkill' => $request->eSkill,
+                'eScope' => $scope,
+                'ePart_type' => null,
+                'ePart_number' => null,
                 'eTeacher_id' => $user->uId,
                 'eDuration_minutes' => $request->eDuration_minutes,
                 'eIs_private' => $request->eIs_private ?? ($moderationStatus !== 'published'),

@@ -53,6 +53,8 @@ interface TeensExamItem {
   title: string;
   type?: string;
   skill?: string;
+  scope?: string;
+  partNumber?: number | null;
   duration?: number;
   questions?: number;
   status: Status;
@@ -67,6 +69,8 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
   const isCompleted = item.status === 'completed';
   const inProgress = item.status === 'in_progress';
   const SkillIcon = skillIcon(item.skill);
+  const normalizedScope = String(item.scope || (item.skill === 'mixed' ? 'full' : 'skill')).toLowerCase();
+  const scopeLabel = normalizedScope === 'full' ? 'Full test' : normalizedScope === 'part' ? `Part ${item.partNumber ?? ''}`.trim() : 'Skill';
 
   const dot = isCompleted ? '#10B981' : inProgress ? '#F59E0B' : '#94A3B8';
   const statusText = isCompleted ? 'Hoàn thành' : inProgress ? 'Đang làm' : 'Chưa làm';
@@ -96,6 +100,9 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
               <Gift className="w-3.5 h-3.5" /> GV giao
             </span>
           )}
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-700 bg-cyan-50 border border-cyan-100 rounded-full px-2 py-0.5">
+            {scopeLabel}
+          </span>
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
             <span className="w-1.5 h-1.5 rounded-full" style={{ background: dot }} />
             {statusText}
@@ -173,6 +180,8 @@ export function TeensTests() {
       title: e.title,
       type: e.type,
       skill: e.skill,
+      scope: e.scope,
+      partNumber: e.part_number ?? null,
       duration: e.duration,
       questions: e.questions_count,
       status: (e.submission_status ?? 'pending') as Status,
@@ -192,6 +201,8 @@ export function TeensTests() {
       title: t.exam_title,
       type: t.exam_type,
       skill: t.exam_skill,
+      scope: t.scope ?? (String(t.exam_skill ?? '').toLowerCase() === 'mixed' ? 'full' : 'skill'),
+      partNumber: t.part_number ?? null,
       duration: t.exam_duration,
       questions: t.total_questions,
       status: s,

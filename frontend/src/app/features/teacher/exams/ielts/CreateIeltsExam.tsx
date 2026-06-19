@@ -179,6 +179,7 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
           eDescription: examDescription,
           ielts_test_type: testType,
           ielts_skill: skill,
+          eScope: "skill",
           eDifficulty: "medium",
           age_group: ageGroup,
         });
@@ -212,6 +213,7 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
         eTitle: examTitle,
         eDescription: examDescription,
         ielts_test_type: testType,
+        eScope: "skill",
         age_group: ageGroup,
         ielts_config: {
           test_type: testType,

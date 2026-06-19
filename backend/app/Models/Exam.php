@@ -36,6 +36,9 @@ class Exam extends Model
         'eIs_private',
         'eSource_type',
         'ePurpose', // New: Purpose of exam (exam, practice, review, etc.)
+        'eScope',
+        'ePart_type',
+        'ePart_number',
         'eTopic', // New: Topic for practice sessions
         'eDifficulty', // New: Difficulty level
         'eParent_exam_id', // New: Link to parent exam if cloned
@@ -69,6 +72,7 @@ class Exam extends Model
         'thpt_config' => 'array',
         'thpt_draft_config' => 'array',
         'thpt_versions' => 'array',
+        'ePart_number' => 'integer',
     ];
 
     /**

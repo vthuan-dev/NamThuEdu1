@@ -12,10 +12,11 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
 /**
- * IeltsExamController — quản lý đề IELTS theo concept đúng:
- *   • 1 đề = 1 skill (listening | reading | writing | speaking)
+ * IeltsExamController — quản lý đề IELTS theo một exam ID:
+ *   • Đề lẻ: 1 đề = 1 skill (listening | reading | writing | speaking)
+ *   • Full Test: 1 đề = 4 skills, eSkill=mixed
  *   • Có 2 chế độ chơi: practice (chọn sections) + full test (làm liên tục)
- *   • Không có "full 4 skills" trong 1 record exam
+ *   • Full Test mới lưu 4 skills trong cùng 1 record exam
  *
  * Endpoints:
  *   Teacher:
@@ -30,6 +31,7 @@ use Illuminate\Support\Facades\Auth;
 class IeltsExamController extends Controller
 {
     private const ALLOWED_SKILLS = ['listening', 'reading', 'writing', 'speaking'];
+    private const ALLOWED_SCOPES = ['listening', 'reading', 'writing', 'speaking', 'mixed'];
     private const ALLOWED_TEST_TYPES = ['Academic', 'General Training'];
 
     private const DEFAULT_DURATIONS = [
@@ -72,7 +74,7 @@ class IeltsExamController extends Controller
             'eTitle' => 'required|string|max:255',
             'eDescription' => 'nullable|string',
             'ielts_test_type' => 'required|string|in:Academic,General Training',
-            'ielts_skill' => 'required|string|in:' . implode(',', self::ALLOWED_SKILLS),
+            'ielts_skill' => 'required|string|in:' . implode(',', self::ALLOWED_SCOPES),
             'eDifficulty' => 'nullable|string',
             'age_group' => 'nullable|in:kids,teens,adults,all',
         ]);
@@ -84,14 +86,20 @@ class IeltsExamController extends Controller
         $skill = $request->input('ielts_skill');
         $testType = $request->input('ielts_test_type');
 
+        $isFull = $skill === 'mixed';
         $exam = Exam::create([
             'eTitle' => $request->input('eTitle'),
             'eDescription' => $request->input('eDescription', ''),
             'eType' => 'IELTS',  // Single value, phân biệt AC/GT bằng ielts_test_type
-            'eSkill' => ucfirst($skill),
+            'eSkill' => $isFull ? 'mixed' : $skill,
+            'eScope' => $isFull ? 'full' : 'skill',
+            'ePart_type' => null,
+            'ePart_number' => null,
             'ielts_test_type' => $testType,
-            'ielts_skill' => $skill,
-            'eDuration_minutes' => self::DEFAULT_DURATIONS[$skill],
+            'ielts_skill' => $isFull ? null : $skill,
+            'eDuration_minutes' => $isFull
+                ? array_sum(self::DEFAULT_DURATIONS)
+                : self::DEFAULT_DURATIONS[$skill],
             'eStatus' => 'draft',
             'ePurpose' => 'exam',
             'eDifficulty' => $request->input('eDifficulty', 'medium'),
@@ -100,6 +108,8 @@ class IeltsExamController extends Controller
             'ielts_config' => [
                 'test_type' => $testType,
                 'skill' => $skill,
+                'scope' => $isFull ? 'full' : 'single',
+                'available_skills' => $isFull ? self::ALLOWED_SKILLS : [$skill],
                 'play_modes' => $this->defaultPlayModes(),
             ],
         ]);
@@ -208,7 +218,7 @@ class IeltsExamController extends Controller
 
         $validator = Validator::make($request->all(), [
             'ielts_test_type' => 'required|string|in:Academic,General Training',
-            'ielts_skill' => 'required|string|in:' . implode(',', self::ALLOWED_SKILLS),
+            'ielts_skill' => 'required|string|in:' . implode(',', self::ALLOWED_SCOPES),
             'ielts_data' => 'required|array',
             'play_modes' => 'sometimes|array',
             'play_modes.practice_enabled' => 'sometimes|boolean',
@@ -233,32 +243,43 @@ class IeltsExamController extends Controller
             );
         }
 
-        // Validate có ít nhất 1 section/passage/task/part
-        if (!$this->hasContent($skill, $data)) {
+        $isFull = $skill === 'mixed';
+
+        // Full Test bắt buộc có đủ 4 skills; single-skill giữ validation cũ.
+        $missingSkills = $isFull
+            ? array_values(array_filter(self::ALLOWED_SKILLS, fn ($item) => !$this->hasContent($item, $data[$item] ?? [])))
+            : [];
+        if ((!$isFull && !$this->hasContent($skill, $data)) || !empty($missingSkills)) {
             return $this->errorResponse(
-                'Đề thi phải có ít nhất 1 ' . $this->sectionWordFor($skill) . ' với câu hỏi.',
+                $isFull
+                    ? 'IELTS Full Test còn thiếu nội dung: ' . implode(', ', $missingSkills) . '.'
+                    : 'Đề thi phải có ít nhất 1 ' . $this->sectionWordFor($skill) . ' với câu hỏi.',
                 400
             );
         }
 
         // Câu CÓ LỰA CHỌN (trắc nghiệm/TFNG/matching…) chưa chọn → tự điền "A".
         // Câu NHẬP TAY (điền từ/hoàn thành câu) thiếu đáp án → CHẶN xuất bản.
-        if (in_array($skill, ['listening', 'reading'], true)) {
-            [$data, $missing] = $this->fillIeltsChoiceAndFindMissing($data);
+        $objectiveSkills = $isFull ? ['listening', 'reading'] : (in_array($skill, ['listening', 'reading'], true) ? [$skill] : []);
+        foreach ($objectiveSkills as $objectiveSkill) {
+            $targetData = $isFull ? ($data[$objectiveSkill] ?? []) : $data;
+            [$targetData, $missing] = $this->fillIeltsChoiceAndFindMissing($targetData);
             if (!empty($missing)) {
                 $shown = implode(', ', array_slice($missing, 0, 20)) . (count($missing) > 20 ? '…' : '');
                 return $this->errorResponse(
-                    "Không thể xuất bản: câu {$shown} dạng tự nhập (điền từ / hoàn thành câu) chưa có đáp án. Vui lòng nhập đáp án cho các câu này trước khi xuất bản.",
+                    "Không thể xuất bản {$objectiveSkill}: câu {$shown} dạng tự nhập chưa có đáp án.",
                     422
                 );
             }
+            if ($isFull) $data[$objectiveSkill] = $targetData;
+            else $data = $targetData;
         }
 
         try {
             // Wrap data theo format mà IELTSService expect (full structure với 4 skills)
             // Vì service hiện tại dùng publishIeltsExam(exam, testType, fullData)
             // Chỉ truyền skill mình đang publish, các skill khác để rỗng
-            $wrappedData = [
+            $wrappedData = $isFull ? $data : [
                 'listening' => $skill === 'listening' ? ['sections' => $data['sections'] ?? $data] : ['sections' => []],
                 'reading'   => $skill === 'reading'   ? ['passages' => $data['passages'] ?? $data] : ['passages' => []],
                 'writing'   => $skill === 'writing'   ? ['tasks' => $data['tasks'] ?? $data]      : ['tasks' => []],
@@ -270,13 +291,20 @@ class IeltsExamController extends Controller
             // Update thêm các field single-skill specific (publishIeltsExam đã set published)
             $exam->update([
                 'eType' => 'IELTS',  // Giữ đúng enum
-                'eSkill' => ucfirst($skill),
+                'eSkill' => $isFull ? 'mixed' : $skill,
+                'eScope' => $isFull ? 'full' : 'skill',
+                'ePart_type' => null,
+                'ePart_number' => null,
                 'ielts_test_type' => $testType,
-                'ielts_skill' => $skill,
-                'eDuration_minutes' => self::DEFAULT_DURATIONS[$skill],
+                'ielts_skill' => $isFull ? null : $skill,
+                'eDuration_minutes' => $isFull
+                    ? array_sum(self::DEFAULT_DURATIONS)
+                    : self::DEFAULT_DURATIONS[$skill],
                 'ielts_config' => array_merge($exam->ielts_config ?? [], [
                     'test_type' => $testType,
                     'skill' => $skill,
+                    'scope' => $isFull ? 'full' : 'single',
+                    'available_skills' => $isFull ? self::ALLOWED_SKILLS : [$skill],
                     'play_modes' => $playModes,
                 ]),
             ]);
@@ -327,6 +355,15 @@ class IeltsExamController extends Controller
         // Ưu tiên draft_data (do user gõ chưa publish). Nếu trống (đề đã publish hoặc
         // import từ chỗ khác) → reconstruct từ contentBlocks + questions thật trong DB.
         $ieltsData = $config['draft_data'] ?? null;
+        if (!$ieltsData && strtolower((string) ($exam->eSkill ?? '')) === 'mixed') {
+            $fromConfig = [];
+            foreach (self::ALLOWED_SKILLS as $skillKey) {
+                if (!empty($config[$skillKey]) && is_array($config[$skillKey])) {
+                    $fromConfig[$skillKey] = $config[$skillKey];
+                }
+            }
+            $ieltsData = count($fromConfig) > 0 ? $fromConfig : null;
+        }
         if (!$ieltsData) {
             $ieltsData = $this->reconstructIeltsDraftFromExam($exam);
         }
@@ -338,9 +375,12 @@ class IeltsExamController extends Controller
                 'eTitle' => $exam->eTitle,
                 'eDescription' => $exam->eDescription,
                 'eStatus' => $exam->eStatus,
+                'eScope' => $exam->eScope ?: (strtolower((string) ($exam->eSkill ?? '')) === 'mixed' ? 'full' : 'skill'),
+                'ePart_type' => $exam->ePart_type,
+                'ePart_number' => $exam->ePart_number,
                 'eDuration_minutes' => $exam->eDuration_minutes,
                 'ielts_test_type' => $exam->ielts_test_type,
-                'ielts_skill' => $exam->ielts_skill,
+                'ielts_skill' => strtolower((string) ($exam->eSkill ?? '')) === 'mixed' ? 'mixed' : $exam->ielts_skill,
                 'ielts_config' => $config,
                 'ielts_data' => $ieltsData,
                 'age_group' => $exam->age_group ?? 'all',
@@ -495,6 +535,7 @@ class IeltsExamController extends Controller
             ->where('eStatus', 'published')
             ->first([
                 'eId', 'eTitle', 'eDescription', 'eType', 'eSkill',
+                'eScope', 'ePart_type', 'ePart_number',
                 'eDuration_minutes', 'ielts_test_type', 'ielts_skill', 'ielts_config',
             ]);
 
@@ -506,14 +547,39 @@ class IeltsExamController extends Controller
             return $this->errorResponse('Đề này không phải IELTS.', 400);
         }
 
-        $skill = $exam->ielts_skill ?: $this->detectSkillFromExam($exam);
+        $skill = strtolower((string) ($exam->eSkill ?? '')) === 'mixed'
+            ? 'mixed'
+            : ($exam->ielts_skill ?: $this->detectSkillFromExam($exam));
+        $scope = $exam->eScope ?: ($skill === 'mixed' ? 'full' : 'skill');
+        $isFull = $scope === 'full' || $skill === 'mixed';
+        $availableSkills = $isFull
+            ? self::ALLOWED_SKILLS
+            : [$skill];
         $testType = $exam->ielts_test_type ?: 'Academic';
         $config = $exam->ielts_config ?? [];
         $playModes = $config['play_modes'] ?? $this->defaultPlayModes();
 
         // Aggregate query: lấy sections + question count trong 1 query
-        $sections = $this->buildSectionsLight($exam->eId, $skill);
-        $totalQuestions = array_sum(array_column($sections, 'questionCount'));
+        $skillSummaries = [];
+        $totalQuestions = 0;
+        $totalParts = 0;
+        foreach ($availableSkills as $availableSkill) {
+            $skillSections = $this->buildSectionsLight($exam->eId, $availableSkill);
+            $questionCount = \DB::table('questions')
+                ->where('exam_id', $exam->eId)
+                ->whereRaw('LOWER(qSkill) = ?', [$availableSkill])
+                ->count();
+            $partCount = count($skillSections) ?: self::DEFAULT_PARTS_COUNT[$availableSkill];
+            $skillSummaries[$availableSkill] = [
+                'duration' => self::DEFAULT_DURATIONS[$availableSkill],
+                'totalQuestions' => $questionCount,
+                'totalParts' => $partCount,
+                'sections' => $skillSections,
+            ];
+            $totalQuestions += $questionCount;
+            $totalParts += $partCount;
+        }
+        $sections = $isFull ? [] : ($skillSummaries[$skill]['sections'] ?? []);
         $activeSession = $this->activeSessionForExam($request, $exam);
 
         return response()->json([
@@ -523,13 +589,19 @@ class IeltsExamController extends Controller
                 'eTitle' => $exam->eTitle,
                 'eDescription' => $exam->eDescription,
                 'eType' => $exam->eType,
-                'eSkill' => ucfirst($skill),
-                'eDuration_minutes' => $exam->eDuration_minutes ?: self::DEFAULT_DURATIONS[$skill],
+                'eSkill' => $isFull ? 'mixed' : $skill,
+                'eScope' => $isFull ? 'full' : $scope,
+                'part_type' => $exam->ePart_type,
+                'part_number' => $exam->ePart_number,
+                'eDuration_minutes' => $exam->eDuration_minutes ?: ($isFull ? array_sum(self::DEFAULT_DURATIONS) : self::DEFAULT_DURATIONS[$skill]),
                 'ielts_test_type' => $testType,
                 'ielts_skill' => $skill,
+                'scope' => $isFull ? 'full' : ($scope === 'part' ? 'part' : 'single'),
+                'available_skills' => $availableSkills,
+                'skill_summaries' => $skillSummaries,
                 'ielts_config' => $config,
-                'totalQuestions' => $totalQuestions ?: self::DEFAULT_TOTAL_QUESTIONS[$skill],
-                'totalParts' => count($sections) ?: self::DEFAULT_PARTS_COUNT[$skill],
+                'totalQuestions' => $totalQuestions ?: array_sum(array_map(fn ($item) => self::DEFAULT_TOTAL_QUESTIONS[$item], $availableSkills)),
+                'totalParts' => $totalParts,
                 'sections' => $sections,
                 'participants' => $this->countParticipants($exam->eId),
                 'commentsCount' => $this->countComments($exam->eId),
@@ -575,7 +647,13 @@ class IeltsExamController extends Controller
             return null;
         }
 
-        $durationSeconds = (int) ($exam->eDuration_minutes ?: self::DEFAULT_DURATIONS[$exam->ielts_skill ?: $this->detectSkillFromExam($exam)]) * 60;
+        $scopeSkill = strtolower((string) ($exam->eSkill ?? '')) === 'mixed'
+            ? 'mixed'
+            : ($exam->ielts_skill ?: $this->detectSkillFromExam($exam));
+        $fallbackMinutes = $scopeSkill === 'mixed'
+            ? array_sum(self::DEFAULT_DURATIONS)
+            : self::DEFAULT_DURATIONS[$scopeSkill];
+        $durationSeconds = (int) ($exam->eDuration_minutes ?: $fallbackMinutes) * 60;
         $startTime = $submission->sStart_time ?? now();
         $elapsed = max(0, \Carbon\Carbon::parse($startTime)->diffInSeconds(now(), false));
         $remaining = max(0, $durationSeconds - $elapsed);
@@ -691,6 +769,7 @@ class IeltsExamController extends Controller
         $blockIds = $blocks->pluck('id')->toArray();
         $statsByBlock = \DB::table('questions')
             ->whereIn('content_block_id', $blockIds)
+            ->whereRaw('LOWER(qSkill) = ?', [$skill])
             ->select('content_block_id', \DB::raw('COUNT(*) as cnt'), \DB::raw("GROUP_CONCAT(DISTINCT qType) as types"))
             ->groupBy('content_block_id')
             ->get()
@@ -698,8 +777,9 @@ class IeltsExamController extends Controller
 
         $sections = [];
         foreach ($blocks as $i => $block) {
+            if (!$statsByBlock->has($block->id)) continue;
             $meta = is_string($block->metadata) ? json_decode($block->metadata, true) : (array)$block->metadata;
-            $sectionNumber = $meta['section_number'] ?? $meta['part'] ?? ($i + 1);
+            $sectionNumber = $meta['section_number'] ?? $meta['part_number'] ?? $meta['part'] ?? ($i + 1);
             $stats = $statsByBlock->get($block->id);
 
             $types = [];

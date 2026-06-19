@@ -164,8 +164,11 @@ class ExamController extends Controller
         $validator = Validator::make($request->all(), [
             'eTitle' => 'required|string|max:255',
             'eDescription' => 'nullable|string',
-            'eType' => 'required|in:VSTEP,IELTS,GENERAL,exam,practice',
+            'eType' => 'required|in:VSTEP,IELTS,GENERAL,THPT',
             'eSkill' => 'required|in:listening,reading,writing,speaking,mixed',
+            'eScope' => 'nullable|in:full,skill,part',
+            'ePart_type' => 'nullable|string|max:64',
+            'ePart_number' => 'nullable|integer|min:1|max:99',
             'eDuration_minutes' => 'required|integer|min:1',
             'eIs_private' => 'nullable|boolean',
             'eSource_type' => 'nullable|in:manual,upload',
@@ -195,7 +198,8 @@ class ExamController extends Controller
         \DB::beginTransaction();
         try {
             // 1. Create exam
-            $ePurpose = ($request->eType === 'VSTEP' && $request->eSkill !== 'mixed') ? 'practice' : null;
+            $ePurpose = null;
+            $scope = $request->input('eScope') ?: ($request->eSkill === 'mixed' ? 'full' : 'skill');
 
             // Trạng thái khởi tạo dựa trên cài đặt auto-duyệt (dùng helper chung)
             $initialStatus = Exam::resolveModerationStatus();
@@ -205,6 +209,9 @@ class ExamController extends Controller
                 'eDescription' => $request->eDescription,
                 'eType' => $request->eType,
                 'eSkill' => $request->eSkill,
+                'eScope' => $scope,
+                'ePart_type' => $scope === 'part' ? $request->input('ePart_type') : null,
+                'ePart_number' => $scope === 'part' ? $request->input('ePart_number') : null,
                 'eTeacher_id' => $user->uId,
                 'eDuration_minutes' => $request->eDuration_minutes,
                 'eIs_private' => $request->eIs_private ?? false,
@@ -407,6 +414,9 @@ class ExamController extends Controller
             'eDescription' => 'nullable|string',
             'eType' => 'sometimes|required|in:VSTEP,IELTS,GENERAL',
             'eSkill' => 'sometimes|required|in:listening,reading,writing,speaking,mixed',
+            'eScope' => 'nullable|in:full,skill,part',
+            'ePart_type' => 'nullable|string|max:64',
+            'ePart_number' => 'nullable|integer|min:1|max:99',
             'eDuration_minutes' => 'sometimes|required|integer|min:1',
             'eIs_private' => 'nullable|boolean',
             'eSource_type' => 'nullable|in:manual,upload',
@@ -422,6 +432,7 @@ class ExamController extends Controller
 
         $exam->update($request->only([
             'eTitle', 'eDescription', 'eType', 'eSkill', 
+            'eScope', 'ePart_type', 'ePart_number',
             'eDuration_minutes', 'eIs_private', 'eSource_type'
         ]));
 
@@ -894,6 +905,9 @@ class ExamController extends Controller
                 'eDescription' => $request->eDescription ?? $originalExam->eDescription,
                 'eType' => $originalExam->eType,
                 'eSkill' => $originalExam->eSkill,
+                'eScope' => $originalExam->eScope ?: ($originalExam->eSkill === 'mixed' ? 'full' : 'skill'),
+                'ePart_type' => $originalExam->ePart_type,
+                'ePart_number' => $originalExam->ePart_number,
                 'eTeacher_id' => $user->uId,
                 'eDuration_minutes' => $originalExam->eDuration_minutes,
                 'eIs_private' => $originalExam->eIs_private,
@@ -906,6 +920,7 @@ class ExamController extends Controller
             foreach ($originalExam->questions as $originalQuestion) {
                 $newQuestion = Question::create([
                     'exam_id' => $newExam->eId,
+                    'qType' => $originalQuestion->qType,
                     'qContent' => $originalQuestion->qContent,
                     'qPoints' => $originalQuestion->qPoints,
                     'qMedia_url' => $originalQuestion->qMedia_url,
@@ -3263,25 +3278,18 @@ class ExamController extends Controller
 
         DB::beginTransaction();
         try {
-            // Find or create exam
+            // Part/task save APIs must never create a new exam. The exam scope
+            // is decided once at the parent exam level.
             $exam = Exam::where('eId', $examId)
                        ->where('eTeacher_id', $user->uId)
                        ->first();
 
             if (!$exam) {
-                // Create exam if not exists
-                $exam = Exam::create([
-                    'eTitle' => 'VSTEP Speaking Practice',
-                    'eDescription' => 'VSTEP Speaking Test - 3 Parts',
-                    'eType' => 'VSTEP',
-                    'eSkill' => 'speaking',
-                    'eTeacher_id' => $user->uId,
-                    'eDuration_minutes' => 12,
-                    'eIs_private' => true,
-                    'eSource_type' => 'manual',
-                    'age_group' => 'adults',
-                    'ePurpose' => 'practice',
-                ]);
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Không tìm thấy đề thi.'
+                ], 404);
             }
 
             // Delete existing content blocks and questions for THIS Speaking part only.

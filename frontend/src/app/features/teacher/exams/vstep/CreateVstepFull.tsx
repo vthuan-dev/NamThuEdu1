@@ -210,6 +210,7 @@ export const CreateVstepFull = () => {
         eDescription: examDescription.trim() || undefined,
         eType: "VSTEP",
         eSkill: "mixed",
+        eScope: "full",
         eDuration_minutes: duration,
         eIs_private: false,
         eSource_type: "manual",

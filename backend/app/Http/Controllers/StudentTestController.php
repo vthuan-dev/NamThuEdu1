@@ -120,15 +120,10 @@ class StudentTestController extends Controller
         $ageGroup = $user->age_group;
 
         // Get assignments for student (individual or class-based)
-        // VSTEP đề thi chính thức phải là full (eSkill=mixed); đề nào skill riêng thuộc về /practice
         $assignments = TestAssignment::with(['exam' => function ($q) {
                                             $q->withCount('questions');
                                         }])
                                     ->whereHas('exam', function ($q) use ($ageGroup) {
-                                        $q->where(function ($inner) {
-                                            $inner->where('eType', '!=', 'VSTEP')
-                                                  ->orWhere('eSkill', 'mixed');
-                                        });
                                         $this->applyAgeGroupExamFilter($q, $ageGroup);
                                     })
                                     ->where(function ($query) use ($user, $classIds) {
@@ -276,14 +271,6 @@ class StudentTestController extends Controller
             ], 404);
         }
 
-        // VSTEP đề thi chính thức phải là full mixed
-        if ($assignment->exam->eType === 'VSTEP' && $assignment->exam->eSkill !== 'mixed') {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Đề thi VSTEP từng kỹ năng chỉ có trong mục ôn tập. Vui lòng truy cập /student/practice.'
-            ], 403);
-        }
-
         // VSTEP chỉ adults; IELTS: adults + teens; Cambridge YL: chỉ kids
         if ($assignment->exam->eType === 'VSTEP' && $user->age_group !== 'adults') {
             return response()->json([
@@ -384,14 +371,6 @@ class StudentTestController extends Controller
                 'status' => 'error',
                 'message' => 'Không tìm thấy bài thi.'
             ], 404);
-        }
-
-        // VSTEP đề thi chính thức phải là full mixed
-        if ($assignment->exam->eType === 'VSTEP' && $assignment->exam->eSkill !== 'mixed') {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Đề thi VSTEP từng kỹ năng chỉ có trong mục ôn tập. Vui lòng truy cập /student/practice.'
-            ], 403);
         }
 
         // VSTEP chỉ adults; IELTS: adults + teens; Cambridge YL: chỉ kids
@@ -3903,14 +3882,6 @@ class StudentTestController extends Controller
             ->whereIn('eType', ['VSTEP', 'IELTS'])
             ->where('eStatus', 'published')
             ->where(function ($q) {
-                // VSTEP: chỉ lấy đề full 4 skills (mixed/full)
-                // IELTS: theo concept mới, 1 đề = 1 skill, nên không filter eSkill
-                $q->where(function ($sub) {
-                    $sub->where('eType', 'VSTEP')
-                        ->whereIn('eSkill', ['mixed', 'full', 'Mixed', 'Full']);
-                })->orWhere('eType', 'IELTS');
-            })
-            ->where(function ($q) {
                 $q->whereNull('age_group')
                   ->orWhereIn('age_group', ['adults', 'all']);
             })
@@ -3924,7 +3895,14 @@ class StudentTestController extends Controller
         }
 
         if ($skill && in_array(strtolower($skill), ['listening', 'reading', 'writing', 'speaking'])) {
-            $query->where('ielts_skill', strtolower($skill));
+            $skillLower = strtolower($skill);
+            $query->where(function ($q) use ($skillLower) {
+                $q->where(function ($sub) use ($skillLower) {
+                    $sub->where('eType', 'IELTS')->where('ielts_skill', $skillLower);
+                })->orWhere(function ($sub) use ($skillLower) {
+                    $sub->where('eType', 'VSTEP')->where('eSkill', $skillLower);
+                });
+            });
         }
 
         if ($testType && in_array($testType, ['Academic', 'General Training'])) {
@@ -3939,6 +3917,9 @@ class StudentTestController extends Controller
                 'skill'           => $exam->eSkill,
                 'ielts_skill'     => $exam->ielts_skill,
                 'ielts_test_type' => $exam->ielts_test_type,
+                'scope'           => $exam->eScope ?: ($exam->eSkill === 'mixed' ? 'full' : 'skill'),
+                'part_type'       => $exam->ePart_type,
+                'part_number'     => $exam->ePart_number,
                 'duration'        => $exam->eDuration_minutes,
                 'description'     => $exam->eDescription,
                 'age_group'       => $exam->age_group,
@@ -4013,6 +3994,9 @@ class StudentTestController extends Controller
                 'title'             => $exam->eTitle,
                 'type'              => $exam->eType,
                 'skill'             => $exam->eSkill,
+                'scope'             => $exam->eScope ?: ($exam->eSkill === 'mixed' ? 'full' : 'skill'),
+                'part_type'         => $exam->ePart_type,
+                'part_number'       => $exam->ePart_number,
                 'duration'          => $exam->eDuration_minutes,
                 'description'       => $exam->eDescription,
                 'age_group'         => $exam->age_group,
@@ -4169,6 +4153,9 @@ class StudentTestController extends Controller
                 'title'             => $exam->eTitle,
                 'type'              => $exam->eType,
                 'skill'             => $exam->eSkill,
+                'scope'             => $exam->eScope ?: ($exam->eSkill === 'mixed' ? 'full' : 'skill'),
+                'part_type'         => $exam->ePart_type,
+                'part_number'       => $exam->ePart_number,
                 'duration'          => $exam->eDuration_minutes,
                 'description'       => $exam->eDescription,
                 'age_group'         => $exam->age_group,

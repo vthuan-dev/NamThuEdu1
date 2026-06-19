@@ -38,16 +38,17 @@ class TestExamController extends Controller
             ], 400);
         }
 
+        $skill = $this->normalizeSkill($request->skill);
         $exam = Exam::create([
             'eTitle' => $request->title,
             'eDescription' => $request->description,
             'eType' => $request->type,
-            'eSkill' => $request->skill,
+            'eSkill' => $skill,
+            'eScope' => $skill === 'mixed' ? 'full' : 'skill',
             'eTeacher_id' => 1, // Default teacher ID for testing
             'eDuration_minutes' => $request->duration,
             'eIs_private' => false,
             'eSource_type' => 'manual',
-            'eExam_metadata' => $request->exam_metadata ? json_encode($request->exam_metadata) : null,
         ]);
 
         // Process questions if provided
@@ -58,15 +59,16 @@ class TestExamController extends Controller
                 }
 
                 $question = Question::create([
+                    'exam_id' => $exam->eId,
                     'qExam_id' => $exam->eId,
                     'qContent' => $questionData['text'] ?? '',
                     'qType' => $this->normalizeQuestionType($questionData['type'] ?? 'multiple_choice'),
-                    'qSkill' => $questionData['skill'] ?? $request->skill,
+                    'qSkill' => $this->normalizeSkill($questionData['skill'] ?? $skill),
                     'qPart' => $questionData['part'] ?? 1,
                     'qOrder' => $questionData['order'] ?? 1,
                     'qPoints' => $questionData['points'] ?? 1,
                     'qPassage' => $questionData['passage'] ?? null,
-                    'qAudio_file' => $questionData['audioFile'] ?? null,
+                    'qMedia_url' => $questionData['audioFile'] ?? null,
                 ]);
 
                 // Process answers
@@ -120,7 +122,7 @@ class TestExamController extends Controller
                 'skill' => $exam->eSkill,
                 'duration' => $exam->eDuration_minutes,
                 'duration_unit' => 'minutes',
-                'exam_metadata' => $exam->eExam_metadata ? json_decode($exam->eExam_metadata, true) : null,
+                'exam_metadata' => null,
                 'questions' => $exam->questions->map(function ($question) {
                     return [
                         'id' => $question->qId,
@@ -131,7 +133,7 @@ class TestExamController extends Controller
                         'order' => $question->qOrder ?? $question->qSection_order,
                         'points' => $question->qPoints,
                         'passage' => $question->qPassage_text ?? $question->qPassage,
-                        'audioFile' => $question->qAudio_file ?? $question->qMedia_url,
+                        'audioFile' => $question->qMedia_url,
                         'answers' => $question->answers->map(function ($answer) {
                             return [
                                 'id' => $answer->aId,
@@ -176,14 +178,16 @@ class TestExamController extends Controller
             ], 400);
         }
 
+        $skill = $request->has('skill') ? $this->normalizeSkill($request->skill) : $exam->eSkill;
+
         // Update exam
         $exam->update([
             'eTitle' => $request->get('title', $exam->eTitle),
             'eDescription' => $request->get('description', $exam->eDescription),
             'eType' => $request->get('type', $exam->eType),
-            'eSkill' => $request->get('skill', $exam->eSkill),
+            'eSkill' => $skill,
+            'eScope' => $skill === 'mixed' ? 'full' : 'skill',
             'eDuration_minutes' => $request->get('duration', $exam->eDuration_minutes),
-            'eExam_metadata' => $request->has('exam_metadata') ? json_encode($request->exam_metadata) : $exam->eExam_metadata,
         ]);
 
         return response()->json([
@@ -215,5 +219,13 @@ class TestExamController extends Controller
         ];
 
         return $typeMap[$type] ?? 'multiple_choice';
+    }
+
+    private function normalizeSkill($skill): string
+    {
+        $normalized = strtolower((string) $skill);
+        return in_array($normalized, ['listening', 'reading', 'writing', 'speaking', 'mixed'], true)
+            ? $normalized
+            : 'listening';
     }
 }

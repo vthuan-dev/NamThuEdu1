@@ -651,6 +651,7 @@ export function VstepResultPage() {
           const isIeltsFullReview =
             isIelts &&
             (skill === "full" ||
+              skill === "mixed" ||
               examFormat.includes("FULL") ||
               ieltsSections.filter(Boolean).length > 1);
           const reviewUrl = isIelts

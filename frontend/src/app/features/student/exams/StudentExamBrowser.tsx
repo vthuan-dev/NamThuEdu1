@@ -475,6 +475,11 @@ function ExamCard({
   const examPath   = isIelts
     ? `/hoc-vien/de-thi/ielts/${exam.id}`        // Trang detail (chọn mode practice/full test)
     : `/hoc-vien/lam-bai-vstep/${exam.id}`;
+  const scope = (exam.scope || (exam.skill === "mixed" ? "full" : "skill")).toLowerCase();
+  const scopeLabel = scope === "full" ? "Full test" : scope === "part" ? "Part" : "Skill";
+  const visibleSkills = scope === "full"
+    ? SKILLS
+    : SKILLS.filter((item) => item.key === (exam.ielts_skill || exam.skill || "").toLowerCase());
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
   const [mobileBlocked, setMobileBlocked] = useState(false);
@@ -551,9 +556,9 @@ function ExamCard({
           <Highlight text={exam.title} query={highlight} />
         </h3>
 
-        {/* 4 skill chips */}
+        {/* Skill chips */}
         <div className="flex items-center gap-1.5 flex-wrap relative z-10">
-          {SKILLS.map(({ key, label, icon: Icon, color }) => (
+          {visibleSkills.map(({ key, label, icon: Icon, color }) => (
             <span
               key={key}
               className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
@@ -563,6 +568,9 @@ function ExamCard({
               {label}
             </span>
           ))}
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-900 text-white border border-slate-800">
+            {scopeLabel}{exam.part_number ? ` ${exam.part_number}` : ""}
+          </span>
         </div>
       </div>
 
@@ -593,7 +601,7 @@ function ExamCard({
           )}
           <span className="ml-auto flex items-center gap-1 text-xs font-semibold" style={{ color: typeColor }}>
             <Trophy className="w-3 h-3" />
-            Full Test
+            {scopeLabel}
           </span>
         </div>
       </div>

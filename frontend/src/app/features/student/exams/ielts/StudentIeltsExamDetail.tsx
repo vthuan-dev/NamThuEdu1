@@ -52,6 +52,8 @@ interface IeltsExamDetailData {
   description?: string;
   testType: IeltsTestType;
   skill: IeltsSkill;
+  scope: "full" | "single";
+  availableSkills: IeltsSkill[];
   duration: number;
   totalQuestions: number;
   totalParts: number;
@@ -253,13 +255,15 @@ function DetailContent({
   const [activeSession, setActiveSession] = useState(data.activeSession ?? null);
   const [discardingSession, setDiscardingSession] = useState(false);
 
-  const continueUrl = `/hoc-vien/lam-bai-ielts/${data.examId}/${data.skill}?mode=full_test`;
+  const continueUrl = data.scope === "full"
+    ? `/hoc-vien/lam-bai-ielts/${data.examId}`
+    : `/hoc-vien/lam-bai-ielts/${data.examId}/${data.skill}?mode=full_test`;
   const hasBlockingSession = !!activeSession;
   const handleDiscardSession = async () => {
     try {
       setDiscardingSession(true);
       await api.post(`/student/exams/${data.examId}/discard-active-session`);
-      clearIeltsLocalDeadlines(data.examId, data.skill);
+      data.availableSkills.forEach((skill) => clearIeltsLocalDeadlines(data.examId, skill));
       setActiveSession(null);
     } finally {
       setDiscardingSession(false);
@@ -570,7 +574,11 @@ function FullTestMode({
 
   const handleStart = () => {
     if (blockedByActiveSession) return;
-    navigate(`/hoc-vien/lam-bai-ielts/${data.examId}/${data.skill}?mode=full_test`);
+    navigate(
+      data.scope === "full"
+        ? `/hoc-vien/lam-bai-ielts/${data.examId}`
+        : `/hoc-vien/lam-bai-ielts/${data.examId}/${data.skill}?mode=full_test`
+    );
   };
 
   return (
@@ -681,13 +689,28 @@ function DiscussionMode() {
 function parseExamData(raw: any): IeltsExamDetailData {
   // Parse từ response API — cần backend trả về đúng format
   const config = raw.ielts_config || {};
-  const playMode = config.play_modes || {
+  const rawSkill = String(raw.ielts_skill || raw.eSkill || raw.skill || "listening").toLowerCase();
+  const scope: "full" | "single" = raw.scope === "full" || rawSkill === "mixed" ? "full" : "single";
+  const playMode = {
+    ...(config.play_modes || {
     practice_enabled: true,
     full_test_enabled: true,
     // Theo chuẩn IELTS: Listening 40' · Reading 60' · Writing 60' · Speaking 11–14'
     time_limit_options: [null, 5, 10, 15, 20, 30, 40, 45, 60],
+    }),
+    practice_enabled: scope === "full" ? false : (config.play_modes?.practice_enabled ?? true),
   };
-  const skill: IeltsSkill = (raw.eSkill || raw.skill || "listening").toLowerCase();
+  const isIeltsSkill = (value: string): value is IeltsSkill =>
+    ["listening", "reading", "writing", "speaking"].includes(value);
+  const normalizedRawSkill: IeltsSkill = isIeltsSkill(rawSkill) ? rawSkill : "listening";
+  const availableSkills = Array.isArray(raw.available_skills) && raw.available_skills.length
+    ? raw.available_skills
+        .map((item: unknown) => String(item).toLowerCase())
+        .filter(isIeltsSkill)
+    : scope === "full"
+      ? ["listening", "reading", "writing", "speaking"]
+      : [normalizedRawSkill];
+  const skill: IeltsSkill = scope === "full" ? (availableSkills[0] ?? "listening") : normalizedRawSkill;
   const testType: IeltsTestType =
     raw.ielts_test_type ||
     (raw.eType === "IELTS_GENERAL" ? "General Training" : "Academic");
@@ -698,6 +721,8 @@ function parseExamData(raw: any): IeltsExamDetailData {
     description: raw.eDescription || raw.description,
     testType,
     skill,
+    scope,
+    availableSkills,
     duration: raw.eDuration_minutes || raw.duration || 60,
     totalQuestions: raw.totalQuestions || raw.total_questions || 0,
     totalParts: raw.totalParts || raw.total_parts || (raw.sections?.length || 0),

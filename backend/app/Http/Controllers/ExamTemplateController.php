@@ -316,15 +316,23 @@ class ExamTemplateController extends Controller
             }
 
             // Determine primary skill (first skill in template)
-            $primarySkill = $template->skills[0] ?? 'listening';
+            $skills = is_array($template->skills ?? null) ? $template->skills : [];
+            $validSkills = ['listening', 'reading', 'writing', 'speaking', 'mixed'];
+            $primarySkill = strtolower((string) ($skills[0] ?? 'listening'));
+            $isFullScope = count($skills) > 1;
+            $examSkill = $isFullScope ? 'mixed' : (in_array($primarySkill, $validSkills, true) ? $primarySkill : 'listening');
+            $validExamTypes = ['VSTEP', 'IELTS', 'GENERAL', 'THPT'];
+            $examType = strtoupper((string) $template->template_code);
+            $examType = in_array($examType, $validExamTypes, true) ? $examType : 'GENERAL';
 
             // Create exam from template
             $exam = Exam::create([
                 'template_id' => $template->id,
                 'eTitle' => $request->eTitle,
                 'eDescription' => $request->eDescription ?? $template->description,
-                'eType' => $template->template_code,
-                'eSkill' => $primarySkill,
+                'eType' => $examType,
+                'eSkill' => $examSkill,
+                'eScope' => $isFullScope ? 'full' : 'skill',
                 'eTeacher_id' => $user->uId,
                 'eDuration_minutes' => $duration,
                 'eIs_private' => $request->eIs_private ?? false,

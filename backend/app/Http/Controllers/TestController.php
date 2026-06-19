@@ -91,12 +91,16 @@ class TestController extends Controller
                 'exam_code' => 'UPLOAD-' . time(),
                 'eTitle' => $request->title,
                 'eDescription' => $request->description ?? 'Uploaded from file',
+                'eType' => 'VSTEP',
+                'eSkill' => 'mixed',
+                'eScope' => 'full',
                 'eDifficulty_level' => 'intermediate',
                 'eDuration' => 120, // Default 2 hours
                 'eTotal_score' => 100,
                 'eStatus' => 'draft',
                 'eVisibility' => 'private',
                 'teacher_id' => $user->uId,
+                'eTeacher_id' => $user->uId,
             ]);
 
             return response()->json([

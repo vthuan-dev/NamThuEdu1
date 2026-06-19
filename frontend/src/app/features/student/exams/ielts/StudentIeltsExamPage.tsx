@@ -202,18 +202,51 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
   const [correctAnswers, setCorrectAnswers] = useState<Record<number, string>>({});
   /** Map qId → boolean: kết quả chấm của server (saIs_correct). Dùng thay cho so sánh text ở client */
   const [isCorrectMap, setIsCorrectMap] = useState<Record<number, boolean>>({});
+  const [availableSkills, setAvailableSkills] = useState<IeltsSkill[] | null>(skill ? [skill] : null);
 
   usePageTitle(reviewMode ? "Xem lại bài IELTS" : "IELTS Test");
 
   // Resolve effective skill ordering for full test
   const skillSequence: IeltsSkill[] = useMemo(() => {
     if (skill) return [skill];
-    if (fullTest) return ["listening", "reading", "writing", "speaking"];
+    if (fullTest) return availableSkills?.length ? availableSkills : ["listening", "reading", "writing", "speaking"];
     return ["listening"]; // default fallback
-  }, [skill, fullTest]);
+  }, [skill, fullTest, availableSkills]);
 
   const [skillIdx, setSkillIdx] = useState(0);
   const currentSkill = skillSequence[skillIdx];
+
+  useEffect(() => {
+    if (skill || !examId || !fullTest) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get(`/student/exams/${examId}/ielts/detail`);
+        if (cancelled) return;
+        const raw = res.data?.data || res.data;
+        const fromApi = Array.isArray(raw?.available_skills)
+          ? raw.available_skills
+              .map((item: string) => String(item).toLowerCase())
+              .filter((item: string) => ["listening", "reading", "writing", "speaking"].includes(item)) as IeltsSkill[]
+          : [];
+        const rawSkill = String(raw?.ielts_skill || raw?.eSkill || raw?.skill || "").toLowerCase();
+        if (fromApi.length > 0) {
+          setAvailableSkills(fromApi);
+        } else if (["listening", "reading", "writing", "speaking"].includes(rawSkill)) {
+          setAvailableSkills([rawSkill as IeltsSkill]);
+        }
+      } catch {
+        // Fallback giữ thứ tự chuẩn để không chặn bài thi nếu detail endpoint lỗi tạm thời.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [examId, fullTest, skill]);
+
+  useEffect(() => {
+    if (skillIdx >= skillSequence.length) {
+      setSkillIdx(Math.max(0, skillSequence.length - 1));
+    }
+  }, [skillIdx, skillSequence.length]);
 
   // Session
   const [submissionId, setSubmissionId] = useState<number | null>(null);
@@ -566,18 +599,17 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
     clearDeadline(deadlineKeyRef.current ?? buildIeltsDeadlineKey(examId, currentSkill, isPracticeMode, practiceSectionNumbers));
     deadlineRef.current = null;
 
-    try {
-      if (submissionId) {
-        await session.flushNow().catch(() => {});
-        await api.post(`/student/tests/${submissionId}/submit`, {});
-      }
-    } catch {
-      // Vẫn tiếp tục điều hướng dù submit lỗi — bài đã auto-save từng câu
-    }
-
     const isLastSkill = !fullTest || skillIdx >= skillSequence.length - 1;
 
     if (isLastSkill) {
+      try {
+        if (submissionId) {
+          await session.flushNow().catch(() => {});
+          await api.post(`/student/tests/${submissionId}/submit`, {});
+        }
+      } catch {
+        // Vẫn tiếp tục điều hướng dù submit lỗi — bài đã auto-save từng câu
+      }
       toast.warning("Đã hết thời gian làm bài. Bài thi của bạn đã được nộp tự động.", 5000);
       // Rời trang làm bài, chuyển sang trang kết quả
       setTimeout(() => {
@@ -590,6 +622,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
     } else {
       // Full test: hết giờ skill này → chuyển skill kế tiếp
       toast.info("Hết giờ phần này. Chuyển sang phần thi tiếp theo.", 4000);
+      await session.flushNow().catch(() => {});
       serverRemainingRef.current = null;
       timeUpHandledRef.current = false;
       setTimeUp(false);
@@ -604,7 +637,6 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
     try {
       setSubmitting(true);
       await session.flushNow().catch(() => {});
-      await api.post(`/student/tests/${submissionId}/submit`, {});
 
       // Xoá deadline của skill vừa nộp để lần làm mới không dính giờ cũ
       clearDeadline(deadlineKeyRef.current ?? buildIeltsDeadlineKey(examId, currentSkill, isPracticeMode, practiceSectionNumbers));
@@ -622,6 +654,8 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
         // New session for next skill — reuse same submissionId? In this design we reuse.
         return;
       }
+
+      await api.post(`/student/tests/${submissionId}/submit`, {});
 
       // Single-skill: navigate to results
       navigate(`/hoc-vien/ket-qua-ielts/${submissionId}`);

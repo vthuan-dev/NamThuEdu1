@@ -71,7 +71,10 @@ class ThptExamController extends Controller
             'eTitle' => $request->input('eTitle'),
             'eDescription' => $request->input('eDescription', ''),
             'eType' => 'THPT',
-            'eSkill' => 'reading',                  // chủ yếu reading-based
+            'eSkill' => 'mixed',
+            'eScope' => 'full',
+            'ePart_type' => null,
+            'ePart_number' => null,
             'eDuration_minutes' => $config['total_duration_minutes'] ?? self::DEFAULT_DURATION_MINUTES,
             'eStatus' => 'draft',
             'ePurpose' => 'exam',

@@ -132,6 +132,8 @@ class ThptExamTest extends TestCase
         $this->assertDatabaseHas('exams', [
             'eTitle' => 'Đề THPT thử',
             'eType' => 'THPT',
+            'eSkill' => 'mixed',
+            'eScope' => 'full',
             'age_group' => 'teens',
             'eStatus' => 'draft',
         ]);

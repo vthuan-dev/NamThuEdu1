@@ -48,6 +48,8 @@ export function CreateTeensExam() {
   const [duration, setDuration] = useState(skill === "speaking" ? 15 : 30);
   const [groups, setGroups] = useState<LGroup[]>([newLGroup()]);
   const [parts, setParts] = useState<SPart[]>([newSPart()]);
+  const [scope, setScope] = useState<"skill" | "part">("skill");
+  const [scopePart, setScopePart] = useState(1);
   const [saving, setSaving] = useState(false);
 
   const isListening = skill === "listening";
@@ -96,7 +98,11 @@ export function CreateTeensExam() {
   const updatePart = (pid: string, fn: (p: SPart) => SPart) =>
     setParts((prev) => prev.map((p) => (p.id === pid ? fn(p) : p)));
   const addPart = () => setParts((p) => [...p, newSPart()]);
-  const removePart = (pid: string) => setParts((p) => (p.length > 1 ? p.filter((x) => x.id !== pid) : p));
+  const removePart = (pid: string) => setParts((p) => {
+    const next = p.length > 1 ? p.filter((x) => x.id !== pid) : p;
+    setScopePart((current) => Math.min(current, next.length));
+    return next;
+  });
 
   // ─── Validate + Save ──────────────────────────────────────────────────
   const validate = (): string | null => {
@@ -113,6 +119,7 @@ export function CreateTeensExam() {
         }
       }
     } else {
+      if (scope === "part" && (scopePart < 1 || scopePart > parts.length)) return "Vui lòng chọn part hợp lệ.";
       for (let pi = 0; pi < parts.length; pi++) {
         if (!parts[pi].qContent.trim()) return `Part ${pi + 1}: chưa nhập đề nói.`;
       }
@@ -130,6 +137,9 @@ export function CreateTeensExam() {
         eTitle: title.trim(),
         eDescription: description.trim(),
         eDuration_minutes: duration,
+        eScope: scope,
+        ePart_type: scope === "part" ? `speaking_part_${scopePart}` : null,
+        ePart_number: scope === "part" ? scopePart : null,
       };
       if (isListening) {
         body.groups = groups.map((g) => ({
@@ -140,7 +150,8 @@ export function CreateTeensExam() {
           })),
         }));
       } else {
-        body.parts = parts.map((p) => ({
+        const selectedParts: SPart[] = scope === "part" ? parts.slice(scopePart - 1, scopePart) : parts;
+        body.parts = selectedParts.map((p) => ({
           qContent: p.qContent.trim(),
           prepSeconds: p.prepSeconds,
           speakSeconds: p.speakSeconds,
@@ -195,6 +206,49 @@ export function CreateTeensExam() {
               <span className="text-sm text-slate-500">Tổng số {isListening ? "câu" : "part"}: <b className="text-slate-800">{totalQuestions}</b></span>
             </div>
           </div>
+          {!isListening && (
+            <div className="rounded-2xl border border-pink-100 bg-pink-50/40 p-4">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Phạm vi đề Speaking</label>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { value: "skill", label: "Nguyên skill" },
+                  { value: "part", label: "Một part riêng" },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setScope(opt.value)}
+                    className="px-3 py-2 rounded-xl text-sm font-bold border transition-colors"
+                    style={scope === opt.value
+                      ? { borderColor: "#EC4899", background: "#FCE7F3", color: "#BE185D" }
+                      : { borderColor: "#E2E8F0", background: "#fff", color: "#64748B" }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {scope === "part" && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {parts.map((_, index) => {
+                    const partNumber = index + 1;
+                    return (
+                      <button
+                        key={partNumber}
+                        type="button"
+                        onClick={() => setScopePart(partNumber)}
+                        className="px-3 py-1.5 rounded-full text-xs font-extrabold border transition-colors"
+                        style={scopePart === partNumber
+                          ? { borderColor: "#EC4899", background: "#EC4899", color: "#fff" }
+                          : { borderColor: "#FBCFE8", background: "#fff", color: "#BE185D" }}
+                      >
+                        Part {partNumber}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1.5">Mô tả (tuỳ chọn)</label>
             <textarea className={inputCls + " resize-y min-h-[64px]"} value={description}

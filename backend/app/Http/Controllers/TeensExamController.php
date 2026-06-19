@@ -50,6 +50,9 @@ class TeensExamController extends Controller
             'eTitle'            => 'required|string|max:255',
             'eDescription'      => 'nullable|string',
             'eDuration_minutes' => 'nullable|integer|min:1|max:300',
+            'eScope'            => 'nullable|in:skill,part',
+            'ePart_type'        => 'nullable|string|max:64',
+            'ePart_number'      => 'nullable|integer|min:1|max:99',
         ];
 
         if ($skill === 'listening') {
@@ -97,14 +100,18 @@ class TeensExamController extends Controller
 
         $duration = (int) ($request->input('eDuration_minutes') ?: ($skill === 'speaking' ? 15 : 30));
         $moderationStatus = Exam::resolveModerationStatus();
+        $scope = $request->input('eScope', 'skill');
 
         try {
-            $examId = DB::transaction(function () use ($request, $user, $skill, $duration, $moderationStatus) {
+            $examId = DB::transaction(function () use ($request, $user, $skill, $duration, $moderationStatus, $scope) {
                 $exam = Exam::create([
                     'eTitle'            => $request->input('eTitle'),
                     'eDescription'      => $request->input('eDescription', ''),
                     'eType'             => 'GENERAL',
                     'eSkill'            => $skill,
+                    'eScope'            => $scope,
+                    'ePart_type'        => $scope === 'part' ? $request->input('ePart_type') : null,
+                    'ePart_number'      => $scope === 'part' ? $request->input('ePart_number') : null,
                     'ePurpose'          => 'exam',
                     'eDifficulty'       => 'medium',
                     'eDuration_minutes' => $duration,
