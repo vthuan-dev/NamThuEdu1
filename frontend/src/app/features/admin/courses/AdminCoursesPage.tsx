@@ -8,6 +8,8 @@ import {
   Search,
   AlertTriangle,
   LayoutGrid,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { adminApi, AdminExam } from "@/services/adminApi";
 import { AdminStatsSkeleton } from "../components/AdminPageSkeleton";
@@ -23,31 +25,42 @@ import {
   getExamTeacher,
   getExamSkill,
   getExamStatus,
-  AGE_GROUP_META,
+  EXAM_TYPE_META,
   type AgeGroupKey,
 } from "./examClassify";
 
-type AgeTab = "all" | AgeGroupKey;
-
-const AGE_TABS: { key: AgeTab; label: string }[] = [
+/** Tab chính = phân loại đề thi.
+ *  Thứ tự cố định, dễ predict cho admin.
+ */
+type TypeTabKey = "all" | "VSTEP" | "IELTS" | "THPT" | "KIDS" | "CAMBRIDGE" | "GENERAL";
+const TYPE_TABS: { key: TypeTabKey; label: string }[] = [
   { key: "all", label: "Tất cả" },
-  { key: "kids", label: "Kids" },
-  { key: "teens", label: "Teens" },
-  { key: "adults", label: "Adults" },
-  { key: "other", label: "Khác" },
+  { key: "VSTEP", label: "VSTEP" },
+  { key: "IELTS", label: "IELTS" },
+  { key: "THPT", label: "THPT" },
+  { key: "KIDS", label: "Cambridge YLE" },
+  { key: "CAMBRIDGE", label: "Cambridge" },
+  { key: "GENERAL", label: "Khác" },
 ];
+
+const PAGE_SIZE_OPTIONS = [12, 24, 48];
 
 export function AdminCoursesPage() {
   const [exams, setExams] = useState<AdminExam[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [ageTab, setAgeTab] = useState<AgeTab>("all");
+  const [typeTab, setTypeTab] = useState<TypeTabKey>("all");
+  const [ageFilter, setAgeFilter] = useState<"all" | AgeGroupKey>("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [busyId, setBusyId] = useState<number | null>(null);
   const [viewTarget, setViewTarget] = useState<AdminExam | null>(null);
   const [previewTarget, setPreviewTarget] = useState<AdminExam | null>(null);
   const [rejectTarget, setRejectTarget] = useState<AdminExam | null>(null);
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
 
   const loadExams = async () => {
     try {
@@ -66,11 +79,17 @@ export function AdminCoursesPage() {
     loadExams();
   }, []);
 
-  // Đếm số đề theo từng nhóm tuổi (cho badge trên tab)
-  const ageCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: exams.length, kids: 0, teens: 0, adults: 0, other: 0 };
+  // Reset về trang 1 khi đổi filter/tab
+  useEffect(() => {
+    setPage(1);
+  }, [typeTab, ageFilter, statusFilter, search, pageSize]);
+
+  // Đếm số đề theo từng loại đề (cho badge trên tab)
+  const typeCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: exams.length };
     exams.forEach((e) => {
-      counts[classifyAgeGroup(e)] = (counts[classifyAgeGroup(e)] || 0) + 1;
+      const k = classifyExamType(e).key;
+      counts[k] = (counts[k] || 0) + 1;
     });
     return counts;
   }, [exams]);
@@ -95,22 +114,19 @@ export function AdminCoursesPage() {
         getExamTeacher(e).toLowerCase().includes(q) ||
         classifyExamType(e).label.toLowerCase().includes(q) ||
         getExamSkill(e).toLowerCase().includes(q);
-      const matchesAge = ageTab === "all" || classifyAgeGroup(e) === ageTab;
+      const matchesType = typeTab === "all" || classifyExamType(e).key === typeTab;
+      const matchesAge = ageFilter === "all" || classifyAgeGroup(e) === ageFilter;
       const matchesStatus = statusFilter === "all" || getExamStatus(e) === statusFilter;
-      return matchesSearch && matchesAge && matchesStatus;
+      return matchesSearch && matchesType && matchesAge && matchesStatus;
     });
-  }, [exams, search, ageTab, statusFilter]);
+  }, [exams, search, typeTab, ageFilter, statusFilter]);
 
-  // Gom nhóm theo loại đề để render từng section
-  const grouped = useMemo(() => {
-    const map = new Map<string, { label: string; color: string; exams: AdminExam[] }>();
-    filtered.forEach((e) => {
-      const meta = classifyExamType(e);
-      if (!map.has(meta.key)) map.set(meta.key, { label: meta.label, color: meta.color, exams: [] });
-      map.get(meta.key)!.exams.push(e);
-    });
-    return Array.from(map.values()).sort((a, b) => b.exams.length - a.exams.length);
-  }, [filtered]);
+  // Pagination logic
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageStart = (safePage - 1) * pageSize;
+  const pageEnd = Math.min(pageStart + pageSize, filtered.length);
+  const pageItems = filtered.slice(pageStart, pageEnd);
 
   const handleApprove = async (id: number) => {
     try {
@@ -156,7 +172,7 @@ export function AdminCoursesPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Quản lý đề thi</h1>
-          <p className="text-sm text-slate-500">Ngân hàng đề thi toàn hệ thống, phân loại theo nhóm tuổi</p>
+          <p className="text-sm text-slate-500">Ngân hàng đề thi toàn hệ thống</p>
         </div>
         <button
           onClick={loadExams}
@@ -178,42 +194,40 @@ export function AdminCoursesPage() {
         </div>
       )}
 
-      {/* Segmented control nhóm tuổi */}
-      <div className="mb-4 flex flex-wrap gap-2">
-        {AGE_TABS.map((tab) => {
-          const active = ageTab === tab.key;
-          const meta = tab.key !== "all" ? AGE_GROUP_META[tab.key as AgeGroupKey] : null;
-          const count = ageCounts[tab.key] || 0;
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setAgeTab(tab.key)}
-              className="inline-flex cursor-pointer items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-medium transition-all"
-              style={{
-                background: active ? (meta ? meta.color : "#0F172A") : "#FFFFFF",
-                color: active ? "#FFFFFF" : "#475569",
-                borderColor: active ? (meta ? meta.color : "#0F172A") : "#E2E8F0",
-              }}
-              aria-pressed={active}
-            >
-              {meta && <meta.icon className="h-4 w-4" />}
-              {tab.label}
-              <span
-                className="inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold"
-                style={{
-                  background: active ? "rgba(255,255,255,0.25)" : "#F1F5F9",
-                  color: active ? "#FFFFFF" : "#64748B",
-                }}
+      {/* ── Type tabs (primary) ── */}
+      <div className="mb-4 border-b border-slate-200">
+        <div className="flex flex-wrap gap-x-6 gap-y-1">
+          {TYPE_TABS.map((tab) => {
+            const active = typeTab === tab.key;
+            const count = typeCounts[tab.key] ?? 0;
+            const meta = tab.key !== "all" ? EXAM_TYPE_META[tab.key] : null;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setTypeTab(tab.key)}
+                className={`relative inline-flex cursor-pointer items-center gap-2 px-1 pb-3 pt-2 text-sm font-semibold transition-colors ${
+                  active ? "text-slate-950" : "text-slate-500 hover:text-slate-800"
+                }`}
+                aria-pressed={active}
               >
-                {count}
-              </span>
-            </button>
-          );
-        })}
+                {meta && <meta.icon className="h-4 w-4" style={{ color: active ? meta.color : "#94A3B8" }} />}
+                <span>{tab.label}</span>
+                <span
+                  className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold ${
+                    active ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  {count}
+                </span>
+                {active && <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-slate-900" />}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Toolbar: search + status */}
-      <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:flex-row md:items-center">
+      {/* ── Toolbar: search + filters ── */}
+      <div className="mb-4 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 md:flex-row md:items-center">
         <label htmlFor="exam-search" className="sr-only">Tìm kiếm đề thi</label>
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -221,18 +235,28 @@ export function AdminCoursesPage() {
             id="exam-search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm theo đề thi, giáo viên, loại đề, kỹ năng..."
+            placeholder="Tìm theo tên đề, giáo viên, kỹ năng..."
             aria-label="Tìm kiếm đề thi"
-            className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+            className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none transition-colors focus:border-slate-800 focus:ring-2 focus:ring-slate-100"
           />
         </div>
-        <label htmlFor="status-filter" className="sr-only">Lọc theo trạng thái</label>
         <select
-          id="status-filter"
+          value={ageFilter}
+          onChange={(e) => setAgeFilter(e.target.value as "all" | AgeGroupKey)}
+          aria-label="Lọc theo nhóm tuổi"
+          className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition-colors focus:border-slate-800 focus:ring-2 focus:ring-slate-100"
+        >
+          <option value="all">Tất cả nhóm tuổi</option>
+          <option value="kids">Kids (6-12)</option>
+          <option value="teens">Teens (13-17)</option>
+          <option value="adults">Adults (18+)</option>
+          <option value="other">Chưa phân loại</option>
+        </select>
+        <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           aria-label="Lọc theo trạng thái"
-          className="cursor-pointer rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+          className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition-colors focus:border-slate-800 focus:ring-2 focus:ring-slate-100"
         >
           <option value="all">Tất cả trạng thái</option>
           <option value="published">Đã xuất bản</option>
@@ -241,7 +265,7 @@ export function AdminCoursesPage() {
         </select>
       </div>
 
-      {/* Content */}
+      {/* ── Content ── */}
       {loading ? (
         <CardGridSkeleton />
       ) : error ? (
@@ -252,7 +276,7 @@ export function AdminCoursesPage() {
           <p className="text-sm font-semibold text-slate-900">{error}</p>
           <button
             onClick={loadExams}
-            className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700"
+            className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
           >
             <RefreshCw className="h-4 w-4" /> Thử lại
           </button>
@@ -263,40 +287,40 @@ export function AdminCoursesPage() {
             <LayoutGrid className="h-7 w-7 text-slate-300" />
           </span>
           <p className="text-sm font-semibold text-slate-900">Không tìm thấy đề thi</p>
-          <p className="mt-1 text-xs text-slate-500">Thử đổi nhóm tuổi, bộ lọc hoặc từ khóa tìm kiếm</p>
+          <p className="mt-1 text-xs text-slate-500">Thử đổi tab, bộ lọc hoặc từ khóa tìm kiếm</p>
         </div>
       ) : (
-        <div className="space-y-7">
-          {grouped.map((group) => (
-            <section key={group.label}>
-              {/* Section header theo loại đề */}
-              <div className="mb-3 flex items-center gap-2.5">
-                <span className="h-5 w-1.5 rounded-full" style={{ background: group.color }} aria-hidden />
-                <h2 className="text-base font-bold text-slate-800">{group.label}</h2>
-                <span className="inline-flex items-center justify-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">
-                  {group.exams.length}
-                </span>
-              </div>
-              {/* Lưới card */}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                {group.exams.map((e) => {
-                  const id = getExamId(e);
-                  return (
-                    <ExamCard
-                      key={id}
-                      exam={e}
-                      busy={busyId === id}
-                      onView={() => setViewTarget(e)}
-                      onApprove={() => handleApprove(id)}
-                      onReject={() => setRejectTarget(e)}
-                      onDelete={() => handleDelete(id)}
-                    />
-                  );
-                })}
-              </div>
-            </section>
-          ))}
-        </div>
+        <>
+          {/* Card grid */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {pageItems.map((e) => {
+              const id = getExamId(e);
+              return (
+                <ExamCard
+                  key={id}
+                  exam={e}
+                  busy={busyId === id}
+                  onView={() => setViewTarget(e)}
+                  onApprove={() => handleApprove(id)}
+                  onReject={() => setRejectTarget(e)}
+                  onDelete={() => handleDelete(id)}
+                />
+              );
+            })}
+          </div>
+
+          {/* Pagination */}
+          <Pagination
+            page={safePage}
+            totalPages={totalPages}
+            pageStart={pageStart + 1}
+            pageEnd={pageEnd}
+            total={filtered.length}
+            pageSize={pageSize}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
+        </>
       )}
 
       {/* Modals */}
@@ -314,6 +338,99 @@ export function AdminCoursesPage() {
         onCancel={() => setRejectTarget(null)}
         onConfirm={submitReject}
       />
+    </div>
+  );
+}
+
+// ── Pagination ─────────────────────────────────────────────────────────────
+function Pagination({
+  page,
+  totalPages,
+  pageStart,
+  pageEnd,
+  total,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
+}: {
+  page: number;
+  totalPages: number;
+  pageStart: number;
+  pageEnd: number;
+  total: number;
+  pageSize: number;
+  onPageChange: (n: number) => void;
+  onPageSizeChange: (n: number) => void;
+}) {
+  // Tạo danh sách số trang hiển thị: luôn có trang 1, hiện tại ± 1, cuối + dấu …
+  const pages: (number | "…")[] = useMemo(() => {
+    const set = new Set<number>([1, totalPages, page, page - 1, page + 1]);
+    const list = Array.from(set).filter((n) => n >= 1 && n <= totalPages).sort((a, b) => a - b);
+    const out: (number | "…")[] = [];
+    list.forEach((n, i) => {
+      if (i > 0 && n - (list[i - 1] as number) > 1) out.push("…");
+      out.push(n);
+    });
+    return out;
+  }, [page, totalPages]);
+
+  return (
+    <div className="mt-5 flex flex-col items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row">
+      <div className="flex items-center gap-3 text-xs text-slate-500">
+        <span>
+          Hiển thị <strong className="text-slate-800">{pageStart}-{pageEnd}</strong> / <strong className="text-slate-800">{total}</strong>
+        </span>
+        <span className="hidden h-3 w-px bg-slate-200 sm:inline-block" />
+        <label className="hidden items-center gap-1.5 sm:inline-flex">
+          <span>Mỗi trang</span>
+          <select
+            value={pageSize}
+            onChange={(e) => onPageSizeChange(Number(e.target.value))}
+            className="cursor-pointer rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-xs text-slate-700 outline-none focus:border-slate-800"
+          >
+            {PAGE_SIZE_OPTIONS.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+          disabled={page <= 1}
+          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Trang trước"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        {pages.map((p, i) =>
+          p === "…" ? (
+            <span key={`gap-${i}`} className="px-1.5 text-xs text-slate-400">…</span>
+          ) : (
+            <button
+              key={p}
+              onClick={() => onPageChange(p)}
+              className={`inline-flex h-8 min-w-8 cursor-pointer items-center justify-center rounded-lg px-2 text-xs font-semibold transition-colors ${
+                p === page
+                  ? "bg-slate-900 text-white"
+                  : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+              }`}
+              aria-current={p === page ? "page" : undefined}
+            >
+              {p}
+            </button>
+          )
+        )}
+        <button
+          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+          disabled={page >= totalPages}
+          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+          aria-label="Trang sau"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -341,54 +458,37 @@ function StatCard({ icon, label, value, tone }: { icon: React.ReactNode; label: 
   );
 }
 
-// ── Skeleton lưới card ───────────────────────────────────────────────────────
-// Khớp đúng layout thật: các section (header nhóm + lưới card) cách nhau bằng
-// space-y-7, tránh nhảy layout khi loading → loaded.
+// ── Skeleton lưới card (không còn group section) ───────────────────────────
 function CardGridSkeleton() {
-  const groups = [6, 3]; // số card giả lập cho 2 nhóm đầu
   return (
-    <div className="space-y-7">
-      {groups.map((cardCount, gi) => (
-        <section key={gi}>
-          {/* Section header skeleton (thanh màu + nhãn nhóm + badge số lượng) */}
-          <div className="mb-3 flex items-center gap-2.5">
-            <span className="h-5 w-1.5 animate-pulse rounded-full bg-slate-200" />
-            <div className="h-4 w-24 animate-pulse rounded bg-slate-200" />
-            <div className="h-5 w-7 animate-pulse rounded-full bg-slate-100" />
-          </div>
-          {/* Lưới card */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {Array.from({ length: cardCount }, (_, i) => (
-              <div key={i} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 pl-5">
-                {/* Accent bar trái (giống ExamCard) */}
-                <span className="absolute left-0 top-0 h-full w-1 animate-pulse bg-slate-200" />
-                <div className="mb-3 flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <div className="h-9 w-9 animate-pulse rounded-xl bg-slate-200" />
-                    <div className="space-y-1.5">
-                      <div className="h-3 w-16 animate-pulse rounded bg-slate-200" />
-                      <div className="h-2.5 w-10 animate-pulse rounded bg-slate-100" />
-                    </div>
-                  </div>
-                  <div className="h-8 w-8 animate-pulse rounded-lg bg-slate-100" />
-                </div>
-                <div className="mb-3 space-y-1.5">
-                  <div className="h-4 w-full animate-pulse rounded bg-slate-200" />
-                  <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200" />
-                </div>
-                <div className="mb-3 flex gap-1.5">
-                  <div className="h-4 w-14 animate-pulse rounded bg-slate-100" />
-                  <div className="h-4 w-12 animate-pulse rounded bg-slate-100" />
-                  <div className="h-4 w-10 animate-pulse rounded bg-slate-100" />
-                </div>
-                <div className="flex items-center justify-between border-t border-slate-100 pt-3">
-                  <div className="h-3 w-24 animate-pulse rounded bg-slate-100" />
-                  <div className="h-4 w-16 animate-pulse rounded-full bg-slate-100" />
-                </div>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      {Array.from({ length: 8 }, (_, i) => (
+        <div key={i} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 pl-5">
+          <span className="absolute left-0 top-0 h-full w-1 animate-pulse bg-slate-200" />
+          <div className="mb-3 flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="h-9 w-9 animate-pulse rounded-xl bg-slate-200" />
+              <div className="space-y-1.5">
+                <div className="h-3 w-16 animate-pulse rounded bg-slate-200" />
+                <div className="h-2.5 w-10 animate-pulse rounded bg-slate-100" />
               </div>
-            ))}
+            </div>
+            <div className="h-8 w-8 animate-pulse rounded-lg bg-slate-100" />
           </div>
-        </section>
+          <div className="mb-3 space-y-1.5">
+            <div className="h-4 w-full animate-pulse rounded bg-slate-200" />
+            <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200" />
+          </div>
+          <div className="mb-3 flex gap-1.5">
+            <div className="h-4 w-14 animate-pulse rounded bg-slate-100" />
+            <div className="h-4 w-12 animate-pulse rounded bg-slate-100" />
+            <div className="h-4 w-10 animate-pulse rounded bg-slate-100" />
+          </div>
+          <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+            <div className="h-3 w-24 animate-pulse rounded bg-slate-100" />
+            <div className="h-4 w-16 animate-pulse rounded-full bg-slate-100" />
+          </div>
+        </div>
       ))}
     </div>
   );
