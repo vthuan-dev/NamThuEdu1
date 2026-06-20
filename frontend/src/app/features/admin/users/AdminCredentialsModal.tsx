@@ -39,13 +39,13 @@ export function AdminCredentialsModal({ isOpen, onClose, userData, onPasswordRes
       return;
     }
 
-    // In "reset" mode, auto-trigger reset on open if no password yet
-    if (mode === "reset" && !currentPassword) {
-      handleResetPassword();
-      return;
-    }
+    // KHÔNG auto-trigger reset trên mode="reset". Để admin click nút Reset
+    // trong modal mới gọi API — phòng trường hợp lỡ tay click "Reset MK"
+    // ngoài bảng. Cancel modal thì không có hành động phá huỷ nào xảy ra.
 
-    // Countdown timer
+    // Countdown timer chỉ chạy khi đã có password để hiển thị
+    if (!currentPassword) return;
+
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -59,7 +59,7 @@ export function AdminCredentialsModal({ isOpen, onClose, userData, onPasswordRes
 
     return () => clearInterval(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, mode]);
+  }, [isOpen, mode, currentPassword]);
 
   const handleCopy = async (text: string, type: 'phone' | 'password') => {
     try {
@@ -218,7 +218,7 @@ export function AdminCredentialsModal({ isOpen, onClose, userData, onPasswordRes
                     <label className="block text-sm font-medium text-[#6B7280]">
                       Mật khẩu
                     </label>
-                    {showPassword && timeLeft > 0 && (
+                    {showPassword && timeLeft > 0 && currentPassword && (
                       <div className="flex items-center gap-1 text-[#6366F1] text-sm font-medium">
                         <Clock className="w-4 h-4" />
                         <span>Ẩn sau {timeLeft}s</span>
@@ -279,9 +279,14 @@ export function AdminCredentialsModal({ isOpen, onClose, userData, onPasswordRes
                       </button>
                     </div>
                   ) : (
-                    <div className="px-4 py-3 bg-[#F3F4F6] border border-[#E5E7EB] rounded-lg flex items-center gap-3">
-                      <RotateCcw className="w-5 h-5 text-[#6B7280]" />
-                      <p className="text-sm text-[#6B7280]">Chưa có mật khẩu — nhấn Reset để tạo mới</p>
+                    <div className="px-4 py-3 bg-[#FEF3C7] border border-[#FDE68A] rounded-lg flex items-start gap-3">
+                      <span className="w-5 h-5 rounded-full bg-[#F59E0B] flex items-center justify-center flex-shrink-0 mt-0.5 text-white text-xs font-bold">!</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-[#92400E]">Chưa reset mật khẩu</p>
+                        <p className="text-xs text-[#92400E] mt-0.5">
+                          Nhấn nút <strong>"Reset mật khẩu"</strong> bên dưới để tạo mật khẩu ngẫu nhiên mới. Mật khẩu cũ sẽ bị thay thế và không khôi phục được.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -300,12 +305,18 @@ export function AdminCredentialsModal({ isOpen, onClose, userData, onPasswordRes
                     }`}
                   >
                     <RotateCcw className={`w-4 h-4 ${isResettingPassword ? 'animate-spin' : ''}`} />
-                    {isResettingPassword ? 'Đang tạo mật khẩu mới...' : 'Reset mật khẩu (tạo mật khẩu mới ngẫu nhiên)'}
+                    {isResettingPassword
+                      ? 'Đang tạo mật khẩu mới...'
+                      : currentPassword
+                        ? 'Tạo lại mật khẩu khác'
+                        : 'Reset mật khẩu (tạo mật khẩu mới ngẫu nhiên)'}
                   </button>
                   <p className="text-xs text-[#6B7280] mt-2 text-center">
-                    {mode === "reset"
-                      ? "Tạo mật khẩu ngẫu nhiên mới cho người dùng này"
-                      : "Khi người dùng quên mật khẩu, bạn có thể reset về mật khẩu ngẫu nhiên mới"}
+                    {currentPassword
+                      ? 'Nhấn để tạo mật khẩu ngẫu nhiên KHÁC (mật khẩu vừa tạo sẽ bị thay thế)'
+                      : mode === "reset"
+                        ? 'Tạo mật khẩu ngẫu nhiên mới cho người dùng này — mật khẩu cũ sẽ bị xoá vĩnh viễn'
+                        : 'Khi người dùng quên mật khẩu, bạn có thể reset về mật khẩu ngẫu nhiên mới'}
                   </p>
                 </div>
               )}
