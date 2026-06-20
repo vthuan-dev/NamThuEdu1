@@ -14,7 +14,7 @@ import { IeltsQuestionRenderer } from "../components/IeltsQuestionRenderer";
 import { type QuestionMeta } from "../components/IeltsBottomNav";
 import { IeltsQuestionNavigator } from "../components/IeltsQuestionNavigator";
 import { HighlightablePassage } from "../../../components/HighlightablePassage";
-import { useTextHighlight } from "../../../../../hooks/exam/useTextHighlight";
+import { useTextHighlight } from "../../../../../../hooks/exam/useTextHighlight";
 
 interface IeltsReadingViewProps {
   payload: IeltsReadingPayload;
