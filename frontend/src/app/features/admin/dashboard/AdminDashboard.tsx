@@ -193,7 +193,7 @@ export function AdminDashboard() {
         id: 4,
         text: t(`${d}.alerts.completionRate`, { rate: (dashboard?.performance as Record<string, unknown> | undefined)?.assignment_completion_rate ?? 0 }),
         severity: "info",
-        path: "/admin/reports/students",
+        path: "/admin/users?tab=students",
       },
     ],
     [contentStats, dashboard, examStats, lockedUsers]

@@ -15,10 +15,7 @@ const AdminDashboard               = lazy(() => import("../features/admin/dashbo
 const AdminUsersPage               = lazy(() => import("../features/admin/users/AdminUsersPage").then(m => ({ default: m.AdminUsersPage })));
 const AdminPostsPage               = lazy(() => import("../features/admin/content/AdminPostsPage").then(m => ({ default: m.AdminPostsPage })));
 
-const AdminStudentsReportPage      = lazy(() => import("../features/admin/reports/AdminStudentsReportPage").then(m => ({ default: m.AdminStudentsReportPage })));
 const AdminCoursesPage             = lazy(() => import("../features/admin/courses/AdminCoursesPage").then(m => ({ default: m.AdminCoursesPage })));
-const AdminRevenueReportPage       = lazy(() => import("../features/admin/reports/AdminRevenueReportPage").then(m => ({ default: m.AdminRevenueReportPage })));
-const AdminTeachersReportPage      = lazy(() => import("../features/admin/reports/AdminTeachersReportPage").then(m => ({ default: m.AdminTeachersReportPage })));
 const AdminSettingsPage            = lazy(() => import("../features/admin/settings/AdminSettingsPage").then(m => ({ default: m.AdminSettingsPage })));
 const AdminHandoverPage            = lazy(() => import("../features/admin/handover/AdminHandoverPage").then(m => ({ default: m.AdminHandoverPage })));
 const AdminClassManagementPage     = lazy(() => import("../features/admin/classes/AdminClassManagementPage").then(m => ({ default: m.AdminClassManagementPage })));
@@ -57,10 +54,10 @@ export const adminRoutes = {
     { path: "content/posts", Component: AdminPostsPage },
     { path: "content/exams", Component: () => <Navigate to="/admin/courses" replace /> },
 
-    // Báo cáo
-    { path: "reports/revenue", Component: AdminRevenueReportPage },
-    { path: "reports/students", Component: AdminStudentsReportPage },
-    { path: "reports/teachers", Component: AdminTeachersReportPage },
+    // Báo cáo (đã gỡ — redirect về dashboard)
+    { path: "reports/revenue", Component: () => <Navigate to="/admin" replace /> },
+    { path: "reports/students", Component: () => <Navigate to="/admin" replace /> },
+    { path: "reports/teachers", Component: () => <Navigate to="/admin" replace /> },
 
     // Hệ thống (Redirect to /admin as these pages are removed)
     { path: "system/activity-logs", Component: () => <Navigate to="/admin" replace /> },
@@ -90,9 +87,9 @@ export const adminRoutes = {
     { path: "khoa-hoc/danh-muc", Component: () => <Navigate to="/admin/courses" replace /> },
     { path: "noi-dung/bai-viet", Component: () => <Navigate to="/admin/content/posts" replace /> },
     { path: "noi-dung/de-thi", Component: () => <Navigate to="/admin/courses" replace /> },
-    { path: "bao-cao/doanh-thu", Component: () => <Navigate to="/admin/reports/revenue" replace /> },
-    { path: "bao-cao/students", Component: () => <Navigate to="/admin/reports/students" replace /> },
-    { path: "bao-cao/giao-vien", Component: () => <Navigate to="/admin/reports/teachers" replace /> },
+    { path: "bao-cao/doanh-thu", Component: () => <Navigate to="/admin" replace /> },
+    { path: "bao-cao/students", Component: () => <Navigate to="/admin" replace /> },
+    { path: "bao-cao/giao-vien", Component: () => <Navigate to="/admin" replace /> },
     { path: "he-thong/nhat-ky", Component: () => <Navigate to="/admin" replace /> },
     { path: "he-thong/server", Component: () => <Navigate to="/admin" replace /> },
     { path: "he-thong/backup", Component: () => <Navigate to="/admin" replace /> },

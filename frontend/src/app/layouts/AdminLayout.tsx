@@ -5,7 +5,6 @@ import {
   Users,
   GraduationCap,
   FileText,
-  BarChart3,
   Settings,
   Shield,
   LogOut,
@@ -46,15 +45,6 @@ const adminNav: NavItem[] = [
   { label: "Đề thi", href: "/admin/courses", icon: FileText },
   { label: "Bài viết", href: "/admin/content/posts", icon: FileEdit },
   { label: "Quản lý lớp", href: "/admin/quan-ly-lop", icon: GraduationCap },
-  {
-    label: "Báo cáo",
-    icon: BarChart3,
-    submenu: [
-      { label: "Doanh thu", href: "/admin/reports/revenue" },
-      { label: "Học viên", href: "/admin/reports/students" },
-      { label: "Hiệu suất GV", href: "/admin/reports/teachers" },
-    ],
-  },
   { label: "Cài đặt", href: "/admin/settings", icon: Settings },
 ];
 
@@ -379,7 +369,6 @@ export function AdminLayout() {
                location.pathname.startsWith("/admin/content/posts") ? "Bài viết" :
                location.pathname.startsWith("/admin/quan-ly-lop") ? "Quản lý lớp" :
                location.pathname.startsWith("/admin/ban-giao-lop") ? "Bàn giao lớp" :
-               location.pathname.startsWith("/admin/reports") ? "Báo cáo" :
                location.pathname.startsWith("/admin/settings") ? "Cài đặt" :
                location.pathname.startsWith("/admin/profile") ? "Hồ sơ" : "Admin"}
             </span>
