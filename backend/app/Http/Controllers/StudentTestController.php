@@ -2731,19 +2731,45 @@ class StudentTestController extends Controller
         // Build VSTEP per-skill meta (0–10 scale, null for subjective)
         $vstepMeta = null;
         if ($isVstep) {
+            // Determine which skills exist in the exam by checking ALL questions in exam (not just answered ones)
+            $examSkills = Question::where('exam_id', $examId)
+                ->whereNotNull('qSection')
+                ->distinct()
+                ->pluck('qSection')
+                ->map(fn($s) => strtolower($s))
+                ->filter()
+                ->values()
+                ->toArray();
+
+            // Initialize skill scores: if skill has no answers, set to 0.0 (not null)
+            // Only set to null if skill doesn't exist in exam at all
             $vstepMeta = [
-                'listening' => isset($skillBuckets['listening'])
-                    ? round(($skillBuckets['listening']['correct'] / max(1, $skillBuckets['listening']['total'])) * 10, 2)
-                    : null,
-                'reading'   => isset($skillBuckets['reading'])
-                    ? round(($skillBuckets['reading']['correct'] / max(1, $skillBuckets['reading']['total'])) * 10, 2)
-                    : null,
-                'writing'   => null, // pending manual grading
-                'speaking'  => null, // pending manual grading
+                'listening' => null,
+                'reading'   => null,
+                'writing'   => null,
+                'speaking'  => null,
                 'raw_mcq_pct' => $scorePercentage,
             ];
+
+            // Calculate MCQ scores (listening, reading)
+            if (in_array('listening', $examSkills)) {
+                $vstepMeta['listening'] = isset($skillBuckets['listening'])
+                    ? round(($skillBuckets['listening']['correct'] / max(1, $skillBuckets['listening']['total'])) * 10, 2)
+                    : 0.0; // Exam has listening but student didn't answer
+            }
+            if (in_array('reading', $examSkills)) {
+                $vstepMeta['reading'] = isset($skillBuckets['reading'])
+                    ? round(($skillBuckets['reading']['correct'] / max(1, $skillBuckets['reading']['total'])) * 10, 2)
+                    : 0.0; // Exam has reading but student didn't answer
+            }
+
+            // Writing and Speaking will be graded later (kept as null for now)
+            // They will be updated when AI grading completes
+
             // Overall score = average of available skill scores (L + R only for now)
-            $availableScores = array_filter([$vstepMeta['listening'], $vstepMeta['reading']]);
+            $availableScores = array_filter([$vstepMeta['listening'], $vstepMeta['reading']], function($v) {
+                return $v !== null;
+            });
             if (count($availableScores) > 0) {
                 $scorePercentage = round((array_sum($availableScores) / count($availableScores)) * 10, 2);
             }
