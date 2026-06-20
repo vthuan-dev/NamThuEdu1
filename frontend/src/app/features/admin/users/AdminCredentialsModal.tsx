@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Copy, Eye, EyeOff, CheckCircle2, Clock, RotateCcw } from "lucide-react";
+import { X, Copy, Eye, EyeOff, Check, Clock, RotateCcw, KeyRound, ShieldCheck, AlertTriangle } from "lucide-react";
 import { adminApi } from "../../../../services/adminApi";
 
 interface AdminCredentialsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  mode?: "create" | "reset"; // "create" = after creating user, "reset" = reset existing user password
+  /** "create" = sau khi tạo user, "reset" = reset password user hiện có */
+  mode?: "create" | "reset";
   userData: {
     name: string;
     phone: string;
@@ -17,110 +18,90 @@ interface AdminCredentialsModalProps {
   onPasswordReset?: (newPassword: string) => void;
 }
 
-export function AdminCredentialsModal({ isOpen, onClose, userData, onPasswordReset, mode = "create" }: AdminCredentialsModalProps) {
+const ROLE_LABEL: Record<"student" | "teacher" | "admin", string> = {
+  student: "Học viên",
+  teacher: "Giáo viên",
+  admin: "Quản trị viên",
+};
+
+export function AdminCredentialsModal({
+  isOpen,
+  onClose,
+  userData,
+  onPasswordReset,
+  mode = "create",
+}: AdminCredentialsModalProps) {
   const [timeLeft, setTimeLeft] = useState(10);
   const [showPassword, setShowPassword] = useState(true);
   const [copiedPhone, setCopiedPhone] = useState(false);
   const [copiedPassword, setCopiedPassword] = useState(false);
-  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [currentPassword, setCurrentPassword] = useState(userData.password);
+  const [confirmReset, setConfirmReset] = useState(false);
 
-  // Sync currentPassword when userData changes (e.g., after reset)
+  // Sync khi userData.password đổi (sau khi reset từ ngoài)
   useEffect(() => {
     setCurrentPassword(userData.password);
   }, [userData.password]);
 
+  // Countdown 10s tự động ẩn password
   useEffect(() => {
     if (!isOpen) {
       setTimeLeft(10);
       setShowPassword(true);
       setCopiedPhone(false);
       setCopiedPassword(false);
+      setConfirmReset(false);
       return;
     }
-
-    // KHÔNG auto-trigger reset trên mode="reset". Để admin click nút Reset
-    // trong modal mới gọi API — phòng trường hợp lỡ tay click "Reset MK"
-    // ngoài bảng. Cancel modal thì không có hành động phá huỷ nào xảy ra.
-
-    // Countdown timer chỉ chạy khi đã có password để hiển thị
     if (!currentPassword) return;
 
-    const timer = setInterval(() => {
+    const t = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           setShowPassword(false);
-          clearInterval(timer);
+          clearInterval(t);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
+    return () => clearInterval(t);
+  }, [isOpen, currentPassword]);
 
-    return () => clearInterval(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, mode, currentPassword]);
-
-  const handleCopy = async (text: string, type: 'phone' | 'password') => {
+  const copy = async (text: string, type: "phone" | "password") => {
     try {
       await navigator.clipboard.writeText(text);
-      if (type === 'phone') {
+      if (type === "phone") {
         setCopiedPhone(true);
-        setTimeout(() => setCopiedPhone(false), 2000);
+        setTimeout(() => setCopiedPhone(false), 1800);
       } else {
         setCopiedPassword(true);
-        setTimeout(() => setCopiedPassword(false), 2000);
+        setTimeout(() => setCopiedPassword(false), 1800);
       }
-    } catch (err) {
-      console.error('Failed to copy:', err);
+    } catch {
+      // ignore
     }
   };
 
-  const handleResetPassword = async () => {
+  const handleReset = async () => {
     if (!userData.id) return;
-    
-    setIsResettingPassword(true);
-    
+    setIsResetting(true);
     try {
       const result = await adminApi.resetUserPassword(userData.id);
-      if (result.status === 'success' && result.data?.new_password) {
-        const newPassword = result.data.new_password;
-        
-        // Update local password display
-        setCurrentPassword(newPassword);
-        if (onPasswordReset) {
-          onPasswordReset(newPassword);
-        }
-        
-        // Show password and restart timer
+      if (result.status === "success" && result.data?.new_password) {
+        const np = result.data.new_password;
+        setCurrentPassword(np);
+        onPasswordReset?.(np);
         setShowPassword(true);
         setTimeLeft(10);
-        
-        // Start countdown
-        const timer = setInterval(() => {
-          setTimeLeft((prev) => {
-            if (prev <= 1) {
-              setShowPassword(false);
-              clearInterval(timer);
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
+        setConfirmReset(false);
       }
-    } catch (error) {
-      console.error('Error resetting password:', error);
-      alert('Lỗi khi reset mật khẩu');
+    } catch (err) {
+      console.error("Reset password failed", err);
+      alert("Không reset được mật khẩu. Vui lòng thử lại.");
     } finally {
-      setIsResettingPassword(false);
-    }
-  };
-
-  const getRoleLabel = () => {
-    switch (userData.role) {
-      case "teacher": return "Giáo viên";
-      case "admin": return "Quản trị viên";
-      default: return "Học viên";
+      setIsResetting(false);
     }
   };
 
@@ -128,224 +109,204 @@ export function AdminCredentialsModal({ isOpen, onClose, userData, onPasswordRes
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 bg-white/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(15,23,42,0.45)", backdropFilter: "blur(2px)" }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
+          transition={{ duration: 0.15 }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) onClose();
+          }}
         >
           <motion.div
-            className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl"
-            initial={{ opacity: 0, scale: 0.92, y: 16 }}
+            className="w-full max-w-md overflow-hidden rounded-2xl bg-white"
+            style={{
+              boxShadow: "0 20px 60px rgba(15,23,42,0.18)",
+              border: "1px solid #E2E8F0",
+            }}
+            initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 8 }}
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            exit={{ opacity: 0, scale: 0.97, y: 4 }}
+            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
           >
-            {/* Header */}
-            <div className={`p-6 text-white ${mode === "reset" ? "bg-gradient-to-r from-[#7C3AED] to-[#DB2777]" : "bg-gradient-to-r from-[#6366F1] to-[#8B5CF6]"}`}>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-                    {mode === "reset" ? (
-                      <RotateCcw className="w-6 h-6" />
-                    ) : (
-                      <CheckCircle2 className="w-6 h-6" />
-                    )}
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold">
-                      {mode === "reset" ? "Reset mật khẩu" : "Tạo tài khoản thành công!"}
-                    </h2>
-                    <p className="text-sm text-white/90">
-                      {mode === "reset" ? "Tạo mật khẩu mới ngẫu nhiên" : "Thông tin đăng nhập người dùng"}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={onClose}
-                  className="w-8 h-8 rounded-lg hover:bg-white/20 flex items-center justify-center transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="p-6">
-              {/* User Info */}
-              <div className="mb-6 p-4 bg-[#F0F9FF] rounded-lg border border-[#BAE6FD]">
-                <p className="text-sm text-[#0369A1] mb-1">{getRoleLabel()}</p>
-                <p className="text-lg font-bold text-[#111827]">{userData.name}</p>
-              </div>
-
-              {/* Login Credentials */}
-              <div className="space-y-4">
-                {/* Phone Number (Username) */}
-                <div>
-                  <label className="block text-sm font-medium text-[#6B7280] mb-2">
-                    Tên đăng nhập (Số điện thoại)
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 px-4 py-3 bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg font-mono text-[#111827]">
-                      {userData.phone}
-                    </div>
-                    <button
-                      onClick={() => handleCopy(userData.phone, 'phone')}
-                      className={`px-4 py-3 rounded-lg transition-colors font-medium flex items-center gap-2 ${
-                        copiedPhone
-                          ? 'bg-[#10B981] text-white'
-                          : 'bg-[#6366F1] text-white hover:bg-[#4F46E5]'
-                      }`}
-                    >
-                      {copiedPhone ? (
-                        <>
-                          <CheckCircle2 className="w-4 h-4" />
-                          Đã copy
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-4 h-4" />
-                          Copy
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Password */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-[#6B7280]">
-                      Mật khẩu
-                    </label>
-                    {showPassword && timeLeft > 0 && currentPassword && (
-                      <div className="flex items-center gap-1 text-[#6366F1] text-sm font-medium">
-                        <Clock className="w-4 h-4" />
-                        <span>Ẩn sau {timeLeft}s</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {isResettingPassword ? (
-                    <div className="px-4 py-3 bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg flex items-center gap-3">
-                      <RotateCcw className="w-5 h-5 text-[#3B82F6] animate-spin" />
-                      <p className="text-sm font-medium text-[#1D4ED8]">Đang tạo mật khẩu mới...</p>
-                    </div>
-                  ) : currentPassword && showPassword ? (
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 px-4 py-3 bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg font-mono text-[#111827] flex items-center justify-between">
-                        <span>{currentPassword}</span>
-                        <button
-                          onClick={() => setShowPassword(false)}
-                          className="text-[#6B7280] hover:text-[#111827]"
-                        >
-                          <EyeOff className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <button
-                        onClick={() => handleCopy(currentPassword, 'password')}
-                        className={`px-4 py-3 rounded-lg transition-colors font-medium flex items-center gap-2 ${
-                          copiedPassword
-                            ? 'bg-[#10B981] text-white'
-                            : 'bg-[#6366F1] text-white hover:bg-[#4F46E5]'
-                        }`}
-                      >
-                        {copiedPassword ? (
-                          <>
-                            <CheckCircle2 className="w-4 h-4" />
-                            Đã copy
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-4 h-4" />
-                            Copy
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  ) : currentPassword && !showPassword ? (
-                    <div className="px-4 py-3 bg-[#FEE2E2] border border-[#FCA5A5] rounded-lg flex items-center gap-3">
-                      <EyeOff className="w-5 h-5 text-[#DC2626]" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-[#DC2626]">Mật khẩu đã bị ẩn</p>
-                        <p className="text-xs text-[#991B1B]">Vì lý do bảo mật, mật khẩu chỉ hiển thị 1 lần</p>
-                      </div>
-                      <button
-                        onClick={() => setShowPassword(true)}
-                        className="px-3 py-1.5 bg-[#DC2626] text-white rounded-lg hover:bg-[#B91C1C] text-sm font-medium flex items-center gap-1"
-                      >
-                        <Eye className="w-3 h-3" />
-                        Hiện
-                      </button>
-                    </div>
+            {/* ── Header ── */}
+            <div className="flex items-start justify-between px-6 pt-5 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900">
+                  {mode === "reset" ? (
+                    <KeyRound className="h-5 w-5 text-white" />
                   ) : (
-                    <div className="px-4 py-3 bg-[#FEF3C7] border border-[#FDE68A] rounded-lg flex items-start gap-3">
-                      <span className="w-5 h-5 rounded-full bg-[#F59E0B] flex items-center justify-center flex-shrink-0 mt-0.5 text-white text-xs font-bold">!</span>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-[#92400E]">Chưa reset mật khẩu</p>
-                        <p className="text-xs text-[#92400E] mt-0.5">
-                          Nhấn nút <strong>"Reset mật khẩu"</strong> bên dưới để tạo mật khẩu ngẫu nhiên mới. Mật khẩu cũ sẽ bị thay thế và không khôi phục được.
-                        </p>
-                      </div>
-                    </div>
+                    <ShieldCheck className="h-5 w-5 text-white" />
                   )}
                 </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900 leading-tight">
+                    {mode === "reset" ? "Reset mật khẩu" : "Tạo tài khoản thành công"}
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {ROLE_LABEL[userData.role]} • {userData.name}
+                  </p>
+                </div>
               </div>
+              <button
+                onClick={onClose}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+                aria-label="Đóng"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
 
-              {/* Reset Password Section */}
-              {userData.id && (
-                <div className="mt-4">
+            {/* ── Body ── */}
+            <div className="px-6 py-5 space-y-4">
+              {/* Phone (Username) */}
+              <div>
+                <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
+                  Tên đăng nhập
+                </label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg font-mono text-sm text-slate-900">
+                    {userData.phone}
+                  </div>
                   <button
-                    onClick={handleResetPassword}
-                    disabled={isResettingPassword}
-                    className={`w-full px-4 py-3 text-white rounded-lg transition-all font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-                      mode === "reset"
-                        ? "bg-gradient-to-r from-[#7C3AED] to-[#DB2777] hover:from-[#6D28D9] hover:to-[#BE185D]"
-                        : "bg-gradient-to-r from-[#F59E0B] to-[#F97316] hover:from-[#D97706] hover:to-[#EA580C]"
+                    onClick={() => copy(userData.phone, "phone")}
+                    className={`px-3 py-2.5 rounded-lg text-sm font-medium border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                      copiedPhone
+                        ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                        : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
                     }`}
                   >
-                    <RotateCcw className={`w-4 h-4 ${isResettingPassword ? 'animate-spin' : ''}`} />
-                    {isResettingPassword
-                      ? 'Đang tạo mật khẩu mới...'
-                      : currentPassword
-                        ? 'Tạo lại mật khẩu khác'
-                        : 'Reset mật khẩu (tạo mật khẩu mới ngẫu nhiên)'}
+                    {copiedPhone ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {copiedPhone ? "Đã copy" : "Copy"}
                   </button>
-                  <p className="text-xs text-[#6B7280] mt-2 text-center">
-                    {currentPassword
-                      ? 'Nhấn để tạo mật khẩu ngẫu nhiên KHÁC (mật khẩu vừa tạo sẽ bị thay thế)'
-                      : mode === "reset"
-                        ? 'Tạo mật khẩu ngẫu nhiên mới cho người dùng này — mật khẩu cũ sẽ bị xoá vĩnh viễn'
-                        : 'Khi người dùng quên mật khẩu, bạn có thể reset về mật khẩu ngẫu nhiên mới'}
-                  </p>
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Mật khẩu
+                  </label>
+                  {currentPassword && showPassword && timeLeft > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500">
+                      <Clock className="h-3 w-3" />
+                      Ẩn sau {timeLeft}s
+                    </span>
+                  )}
+                </div>
+
+                {isResetting ? (
+                  <div className="px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center gap-2.5 text-sm text-slate-600">
+                    <RotateCcw className="h-4 w-4 animate-spin text-slate-500" />
+                    Đang tạo mật khẩu mới…
+                  </div>
+                ) : currentPassword && showPassword ? (
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-lg font-mono text-sm text-slate-900 flex items-center justify-between">
+                      <span>{currentPassword}</span>
+                      <button
+                        onClick={() => setShowPassword(false)}
+                        className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                        aria-label="Ẩn mật khẩu"
+                      >
+                        <EyeOff className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => copy(currentPassword, "password")}
+                      className={`px-3 py-2.5 rounded-lg text-sm font-medium border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                        copiedPassword
+                          ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                          : "bg-slate-900 border-slate-900 text-white hover:bg-slate-800"
+                      }`}
+                    >
+                      {copiedPassword ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      {copiedPassword ? "Đã copy" : "Copy"}
+                    </button>
+                  </div>
+                ) : currentPassword && !showPassword ? (
+                  <div className="px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center gap-2.5">
+                    <EyeOff className="h-4 w-4 text-slate-400" />
+                    <p className="flex-1 text-sm text-slate-600">Mật khẩu đã ẩn vì lý do bảo mật</p>
+                    <button
+                      onClick={() => setShowPassword(true)}
+                      className="text-xs font-medium text-slate-700 hover:text-slate-900 inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      Hiện
+                    </button>
+                  </div>
+                ) : (
+                  <div className="px-3.5 py-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2.5">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      Chưa reset mật khẩu. Nhấn nút bên dưới để tạo mật khẩu ngẫu nhiên mới.
+                      <br />
+                      <span className="text-amber-700">Mật khẩu cũ sẽ bị thay thế và không khôi phục được.</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Reset Action */}
+              {userData.id && (
+                <div>
+                  {confirmReset ? (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+                      <p className="text-xs font-semibold text-rose-800 mb-2">
+                        Xác nhận tạo mật khẩu mới?
+                      </p>
+                      <p className="text-[11px] text-rose-700 mb-3 leading-relaxed">
+                        Mật khẩu hiện tại của <strong>{userData.name}</strong> sẽ bị thay thế ngay lập tức.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleReset}
+                          disabled={isResetting}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          <RotateCcw className={`h-3.5 w-3.5 ${isResetting ? "animate-spin" : ""}`} />
+                          {isResetting ? "Đang tạo…" : "Xác nhận reset"}
+                        </button>
+                        <button
+                          onClick={() => setConfirmReset(false)}
+                          disabled={isResetting}
+                          className="px-3 py-2 rounded-lg border border-rose-200 bg-white text-rose-700 text-xs font-semibold hover:bg-rose-50 transition-colors cursor-pointer"
+                        >
+                          Huỷ
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmReset(true)}
+                      disabled={isResetting}
+                      className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-slate-200 bg-white text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      {currentPassword ? "Tạo mật khẩu khác" : "Reset mật khẩu"}
+                    </button>
+                  )}
                 </div>
               )}
 
-              {/* Warning Message */}
-              <div className="mt-6 p-4 bg-[#FEF3C7] border border-[#FDE68A] rounded-lg">
-                <div className="flex items-start gap-3">
-                  <div className="w-5 h-5 rounded-full bg-[#F59E0B] flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-white text-xs font-bold">!</span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-[#92400E] mb-1">
-                      Lưu ý quan trọng
-                    </p>
-                    <ul className="text-xs text-[#92400E] space-y-1">
-                      <li>• Hãy copy và gửi thông tin đăng nhập cho người dùng ngay</li>
-                      <li>• Mật khẩu chỉ hiển thị 1 lần duy nhất vì lý do bảo mật</li>
-                      <li>• Người dùng nên đổi mật khẩu sau lần đăng nhập đầu tiên</li>
-                    </ul>
-                  </div>
-                </div>
+              {/* Lưu ý — gọn, ít màu */}
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-3">
+                <p className="text-[11px] font-semibold text-slate-700 mb-1">Lưu ý</p>
+                <ul className="text-[11px] text-slate-600 space-y-1 leading-relaxed">
+                  <li>• Mật khẩu chỉ hiển thị 1 lần. Hãy copy và gửi cho người dùng ngay.</li>
+                  <li>• Người dùng nên đổi mật khẩu sau lần đăng nhập đầu tiên.</li>
+                </ul>
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="px-6 py-4 bg-[#F9FAFB] border-t border-[#E5E7EB] flex justify-end gap-3">
+            {/* ── Footer ── */}
+            <div className="flex justify-end px-6 py-3.5 bg-slate-50 border-t border-slate-100">
               <button
                 onClick={onClose}
-                className="px-6 py-2.5 bg-[#6366F1] text-white rounded-lg hover:bg-[#4F46E5] transition-colors font-medium"
+                className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium transition-colors cursor-pointer"
               >
                 Đã hiểu
               </button>
