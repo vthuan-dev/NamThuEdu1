@@ -48,6 +48,7 @@ export function AddStudent() {
     name: string;
     phone: string;
     password: string;
+    id?: number;
   } | null>(null);
   const [formData, setFormData] = useState({
     studentName: "",
@@ -208,6 +209,7 @@ export function AddStudent() {
         name: formData.studentName,
         phone: formData.studentPhone,
         password: data.data?.password || passwordToSend,
+        id: data.data?.created_students?.[0]?.id ?? null,
       });
       setShowCredentialsModal(true);
 
@@ -662,6 +664,9 @@ export function AddStudent() {
             setTimeout(() => navigate('/giao-vien/students'), 300);
           }}
           studentData={studentCredentials}
+          onPasswordReset={(newPassword) => {
+            setStudentCredentials(prev => prev ? { ...prev, password: newPassword } : null);
+          }}
         />
       )}
     </div>

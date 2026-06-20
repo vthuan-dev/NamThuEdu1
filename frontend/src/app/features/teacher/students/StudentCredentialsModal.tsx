@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Copy, Eye, EyeOff, CheckCircle2, Clock } from "lucide-react";
+import { X, Copy, Eye, EyeOff, CheckCircle2, Clock, RotateCcw } from "lucide-react";
+import { getApiUrl } from "../../../../utils/apiConfig";
+import { getAuthToken } from "../../../../utils/authStorage";
 
 interface StudentCredentialsModalProps {
   isOpen: boolean;
@@ -9,14 +11,17 @@ interface StudentCredentialsModalProps {
     name: string;
     phone: string;
     password: string;
+    id?: number;
   };
+  onPasswordReset?: (newPassword: string) => void;
 }
 
-export function StudentCredentialsModal({ isOpen, onClose, studentData }: StudentCredentialsModalProps) {
+export function StudentCredentialsModal({ isOpen, onClose, studentData, onPasswordReset }: StudentCredentialsModalProps) {
   const [timeLeft, setTimeLeft] = useState(5);
   const [showPassword, setShowPassword] = useState(true);
   const [copiedPhone, setCopiedPhone] = useState(false);
   const [copiedPassword, setCopiedPassword] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -54,6 +59,50 @@ export function StudentCredentialsModal({ isOpen, onClose, studentData }: Studen
       }
     } catch (err) {
       console.error('Failed to copy:', err);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!studentData.id) return;
+    
+    setIsResettingPassword(true);
+    
+    try {
+      const token = getAuthToken();
+      const response = await fetch(getApiUrl(`teacher/student/${studentData.id}/reset-password`), {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.status === 'success' && result.data?.new_password) {
+          const newPassword = result.data.new_password;
+          
+          // Update local password display
+          if (onPasswordReset) {
+            onPasswordReset(newPassword);
+          }
+          
+          // Show password and restart timer
+          setShowPassword(true);
+          setTimeLeft(10);
+          
+          // Show success message
+          alert(`Đã reset mật khẩu thành công!\nMật khẩu mới: ${newPassword}`);
+        }
+      } else {
+        const errorData = await response.json();
+        alert(`Lỗi: ${errorData.message || 'Không thể reset mật khẩu'}`);
+      }
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      alert('Lỗi khi reset mật khẩu');
+    } finally {
+      setIsResettingPassword(false);
     }
   };
 
@@ -201,6 +250,23 @@ export function StudentCredentialsModal({ isOpen, onClose, studentData }: Studen
               )}
             </div>
           </div>
+
+          {/* Reset Password Section */}
+          {studentData.id && (
+            <div className="mt-4">
+              <button
+                onClick={handleResetPassword}
+                disabled={isResettingPassword}
+                className="w-full px-4 py-3 bg-gradient-to-r from-[#F59E0B] to-[#F97316] text-white rounded-lg hover:from-[#D97706] hover:to-[#EA580C] transition-all font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RotateCcw className={`w-4 h-4 ${isResettingPassword ? 'animate-spin' : ''}`} />
+                {isResettingPassword ? 'Đang reset...' : 'Reset mật khẩu về "user123"'}
+              </button>
+              <p className="text-xs text-[#6B7280] mt-2 text-center">
+                Khi học viên quên mật khẩu, bạn có thể reset về mật khẩu mặc định
+              </p>
+            </div>
+          )}
 
           {/* Warning Message */}
           <div className="mt-6 p-4 bg-[#FEF3C7] border border-[#FDE68A] rounded-lg">
