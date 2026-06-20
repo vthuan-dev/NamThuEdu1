@@ -764,7 +764,7 @@ export function TeensDashboard() {
           </div>
         </div>
 
-        {/* News feed: kỳ thi THPT Quốc gia */}
+        {/* News feed: kỳ thi THPT Quốc gia - moved to bottom */}
         <ExamNewsFeed topic="thpt-quoc-gia" limit={8} />
 
       </div>
