@@ -108,7 +108,11 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             return (
               <QCard key={key} n={item.question_number}>
                 {!isError && item.prompt && (
-                  <p className="text-sm text-slate-800 leading-relaxed font-medium mb-3">{item.prompt}</p>
+                  <div className="text-sm text-slate-800 leading-relaxed font-medium mb-3 space-y-1">
+                    {item.prompt.split(/\s+(?=[a-e]\.\s)/i).map((part: string, i: number) => (
+                      <p key={i} className="leading-relaxed">{part.trim()}</p>
+                    ))}
+                  </div>
                 )}
                 {isError && item.sentence && (
                   <p className="text-sm text-slate-700 italic mb-3">{item.sentence}</p>
@@ -185,7 +189,11 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             return (
               <QCard key={key} n={item.question_number}>
                 {item.prompt && (
-                  <p className="text-sm text-slate-800 leading-relaxed font-medium mb-3">{item.prompt}</p>
+                  <div className="text-sm text-slate-800 leading-relaxed font-medium mb-3 space-y-1">
+                    {item.prompt.split(/\s+(?=[a-e]\.\s)/i).map((part: string, i: number) => (
+                      <p key={i} className="leading-relaxed">{part.trim()}</p>
+                    ))}
+                  </div>
                 )}
                 <div className="space-y-2">
                   {item.options.map((opt: any) => (
@@ -455,7 +463,11 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
               )}
               {item.kind === 'mc' && (
                 <div className="space-y-2">
-                  <p className="text-sm text-slate-800 font-medium mb-1">{item.prompt}</p>
+                  <div className="text-sm text-slate-800 font-medium mb-1 space-y-1">
+                    {item.prompt.split(/\s+(?=[a-e]\.\s)/i).map((part: string, i: number) => (
+                      <p key={i} className="leading-relaxed">{part.trim()}</p>
+                    ))}
+                  </div>
                   {item.options.map((opt: any) => {
                     const key = `q${item.question_number}`;
                     const userVal = String(answers[key] ?? '');
