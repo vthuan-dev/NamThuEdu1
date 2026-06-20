@@ -704,6 +704,7 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         Route::post('/users/{id}/change-role', [UserController::class, 'changeUserRole']);
         Route::post('/users/{id}/lock', [UserController::class, 'lockUser']);
         Route::post('/users/{id}/unlock', [UserController::class, 'unlockUser']);
+        Route::post('/users/{id}/reset-password', [UserController::class, 'adminResetPassword']);
         Route::get('/users/{id}', [UserController::class, 'adminUserDetail']);
         Route::put('/users/{id}', [UserController::class, 'adminUpdateUser']);
         Route::delete('/users/{id}', [UserController::class, 'adminDeleteUser']);

@@ -74,7 +74,7 @@ class UserController extends Controller
      *     description="Create a new user (public endpoint)",
      *     @OA\RequestBody(
      *         required=true,
-     *         @OA\JsonContent(
+     *         @Otml:JsonContent(
      *             required={"phone", "password"},
      *             @OA\Property(property="phone", type="string", example="0987654321"),
      *             @OA\Property(property="password", type="string", example="password123"),
@@ -115,11 +115,13 @@ class UserController extends Controller
             'phone' => 'required|string|unique:users,uPhone',
             'password' => 'required|string|min:6',
             'name' => 'nullable|string|max:150',
-            'role' => 'nullable|in:student,teacher',
+            'role' => 'nullable|in:student,teacher,admin',
             'dob' => 'nullable|date',
             'address' => 'nullable|string',
             'gender' => 'nullable|boolean',
             'class' => 'nullable|integer',
+            'age_group' => 'nullable|in:kids,teens,adults',
+            'status' => 'nullable|in:active,inactive',
         ]);
 
         if ($validator->fails()) {
@@ -131,16 +133,20 @@ class UserController extends Controller
         }
 
         try {
+            // Keep the plaintext password to return to admin (only once)
+            $plaintextPassword = $request->password;
+
             $user = User::create([
                 'uPhone' => trim($request->phone),
-                'uPassword' => Hash::make($request->password),
+                'uPassword' => Hash::make($plaintextPassword),
                 'uName' => $request->name,
                 'uRole' => $request->role ?? 'student',
                 'uDoB' => $request->dob,
                 'uAddress' => $request->address ?? '',
                 'uGender' => $request->gender ?? 0,
                 'uClass' => $request->class ?? 0,
-                'uStatus' => 'active',
+                'age_group' => $request->age_group,
+                'uStatus' => $request->status ?? 'active',
             ]);
 
             return response()->json([
@@ -151,6 +157,9 @@ class UserController extends Controller
                     'phone' => $user->uPhone,
                     'name' => $user->uName,
                     'role' => $user->uRole,
+                    'age_group' => $user->age_group,
+                    'status' => $user->uStatus,
+                    'password' => $plaintextPassword, // Return password ONCE for admin to copy
                 ]
             ], 201);
 
@@ -158,6 +167,52 @@ class UserController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to create user: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * POST /api/admin/users/{id}/reset-password
+     * Admin reset user password to random password
+     */
+    public function adminResetPassword(Request $request, $id)
+    {
+        $authUser = auth()->user();
+        if (!$authUser || $authUser->uRole !== 'admin') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Bạn không có quyền thực hiện hành động này.'
+            ], 403);
+        }
+
+        $user = User::where('uId', $id)->whereNull('uDeleted_at')->first();
+
+        if (!$user) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'User not found'
+            ], 404);
+        }
+
+        // Generate random password (8 characters: letters + numbers)
+        $newPassword = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 8);
+
+        try {
+            $user->update([
+                'uPassword' => Hash::make($newPassword),
+            ]);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Đã reset mật khẩu thành công',
+                'data' => [
+                    'new_password' => $newPassword
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to reset password: ' . $e->getMessage()
             ], 500);
         }
     }

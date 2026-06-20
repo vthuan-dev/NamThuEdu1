@@ -7,6 +7,7 @@ import {
 import { adminApi, AdminUser } from "@/services/adminApi";
 import { AdminTableSkeleton } from "../components/AdminPageSkeleton";
 import { getFullMediaUrl } from "@/utils/mediaUtils";
+import { AdminCredentialsModal } from "./AdminCredentialsModal";
 
 type AgeFilter = "all" | "kids" | "teens" | "adults";
 type StatusFilter = "all" | "active" | "inactive";
@@ -210,7 +211,7 @@ export function AdminUsersPage() {
 
   // Creation modal state
   const [showCreate, setShowCreate] = useState(false);
-  const [cRole, setCRole] = useState<"student" | "teacher">("student");
+  const [cRole, setCRole] = useState<"student" | "teacher" | "admin">("student");
   const [cName, setCName] = useState("");
   const [cPhone, setCPhone] = useState("");
   const [cPass, setCPass] = useState("");
@@ -219,6 +220,16 @@ export function AdminUsersPage() {
   const [showPass, setShowPass] = useState(false);
   const [creating, setCreating] = useState(false);
   const [modalDone, setModalDone] = useState(false);
+
+  // Credentials modal state
+  const [showCredentials, setShowCredentials] = useState(false);
+  const [createdUser, setCreatedUser] = useState<{
+    name: string;
+    phone: string;
+    password: string;
+    role: "student" | "teacher" | "admin";
+    id?: number;
+  } | null>(null);
 
   // Phone duplication check states
   const [debouncedPhone, setDebouncedPhone] = useState("");
@@ -517,15 +528,27 @@ export function AdminUsersPage() {
   };
 
   // Modal reset & creation logic
+  const generateRandomPassword = () => {
+    // Generate 8-character random password (letters + numbers)
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let password = '';
+    for (let i = 0; i < 8; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
+
   const openModal = () => {
+    const randomPassword = generateRandomPassword();
+    
     setCRole(activeTab === "teachers" ? "teacher" : "student");
     setCName("");
     setCPhone("");
-    setCPass("");
+    setCPass(randomPassword); // Auto-generate random password
     setCAgeGroup("kids");
     setCStatus("active");
     setModalDone(false);
-    setShowPass(false);
+    setShowPass(true); // Show password by default
 
     // Clear validation states
     setDebouncedPhone("");
@@ -576,7 +599,7 @@ export function AdminUsersPage() {
 
     setCreating(true);
     try {
-      await adminApi.createUser({
+      const result = await adminApi.createUser({
         name: cName.trim(),
         phone: cPhone.trim(),
         password: cPass,
@@ -584,9 +607,27 @@ export function AdminUsersPage() {
         status: cStatus,
         age_group: cRole === "student" ? cAgeGroup : undefined,
       });
-      setModalDone(true);
-      showToast("Tạo tài khoản người dùng thành công", "ok");
-      await loadUsers();
+
+      if (result.status === 'success' && result.data) {
+        // Close creation modal
+        setShowCreate(false);
+        setModalDone(false);
+        
+        // Set created user data for credentials modal
+        setCreatedUser({
+          name: cName.trim(),
+          phone: cPhone.trim(),
+          password: result.data.password || cPass,
+          role: cRole,
+          id: result.data.id,
+        });
+        
+        // Show credentials modal
+        setShowCredentials(true);
+        
+        showToast("Tạo tài khoản người dùng thành công", "ok");
+        await loadUsers();
+      }
     } catch (err: any) {
       const errMsg = err?.response?.data?.message || "Tạo tài khoản thất bại";
       showToast(errMsg, "err");
@@ -1307,6 +1348,23 @@ export function AdminUsersPage() {
 
       {/* ── Toast notifications ── */}
       {toast && <Toast msg={toast.msg} type={toast.type} />}
+
+      {/* ── Credentials Modal ── */}
+      {createdUser && (
+        <AdminCredentialsModal
+          isOpen={showCredentials}
+          onClose={() => {
+            setShowCredentials(false);
+            setCreatedUser(null);
+          }}
+          userData={createdUser}
+          onPasswordReset={(newPassword) => {
+            if (createdUser) {
+              setCreatedUser({ ...createdUser, password: newPassword });
+            }
+          }}
+        />
+      )}
 
       {/* ── Animation presets ── */}
       <style>{`

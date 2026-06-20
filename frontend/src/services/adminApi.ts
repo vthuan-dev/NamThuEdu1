@@ -224,7 +224,12 @@ export const adminApi = {
     status?: "active" | "inactive";
     age_group?: "kids" | "teens" | "adults" | string;
   }) {
-    const response = await api.post<ApiResponse<unknown>>("/admin/users", payload);
+    const response = await api.post<ApiResponse<{ id: number; phone: string; name: string; role: string; age_group?: string; status?: string; password: string }>>("/admin/users", payload);
+    return response.data;
+  },
+
+  async resetUserPassword(userId: number) {
+    const response = await api.post<ApiResponse<{ new_password: string }>>(`/admin/users/${userId}/reset-password`);
     return response.data;
   },
 
