@@ -294,6 +294,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
   const timeUpHandledRef = useRef(false);
   const leavePromptActiveRef = useRef(false);
   const sessionSetAnswerRef = useRef(session.setAnswer);
+  const restoreToastShownRef = useRef(false);
 
   useEffect(() => {
     sessionSetAnswerRef.current = session.setAnswer;
@@ -365,7 +366,11 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
         const restoredCount = Object.keys(mergedAnswers).length;
         if (restoredCount > 0) {
           setAnswers(mergedAnswers);
-          toast.info(`Đã khôi phục ${restoredCount} câu trả lời trong bài làm dang dở.`, 3500);
+          // Only show toast once per session
+          if (!restoreToastShownRef.current) {
+            toast.info(`Đã khôi phục ${restoredCount} câu trả lời trong bài làm dang dở.`, 3500);
+            restoreToastShownRef.current = true;
+          }
         }
         setSessionLoading(false);
       } catch (e: any) {
