@@ -663,7 +663,9 @@ export function StudentVstepExamPage() {
     setAnswers((prev) => ({ ...prev, [qId]: letter }));
     if (submissionId) {
       studentApi.saveAnswer(submissionId, { question_id: qId, saAnswer_text: letter } as any)
-        .catch(() => {});
+        .catch((err: any) => {
+          console.warn("[VSTEP] saveAnswer failed for qId", qId, err);
+        });
     }
   }, [submissionId, reviewMode]);
 
@@ -671,7 +673,9 @@ export function StudentVstepExamPage() {
   const saveWriting = useCallback((questionId: number | undefined, text: string) => {
     if (submissionId && questionId) {
       studentApi.saveAnswer(submissionId, { question_id: questionId, saAnswer_text: text } as any)
-        .catch(() => {});
+        .catch((err: any) => {
+          console.warn("[VSTEP] saveWriting failed for qId", questionId, err);
+        });
     }
   }, [submissionId]);
 
@@ -686,7 +690,8 @@ export function StudentVstepExamPage() {
         writingTasks.map((task) => {
           const draft = writingDrafts[task.taskNumber] ?? "";
           if (task.questionId && draft.trim()) {
-            return studentApi.saveAnswer(submissionId, { question_id: task.questionId, saAnswer_text: draft } as any).catch(() => {});
+            return studentApi.saveAnswer(submissionId, { question_id: task.questionId, saAnswer_text: draft } as any)
+              .catch((err: any) => console.warn("[VSTEP] flush writing failed", err));
           }
           return Promise.resolve();
         })

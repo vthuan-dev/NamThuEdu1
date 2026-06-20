@@ -362,6 +362,14 @@ export function TestTaking() {
         setLoadError("Không thể tải dữ liệu bài thi. Vui lòng thử lại.");
         return;
       }
+      // Redirect VSTEP exams to dedicated VSTEP test-taking page
+      if (fetchedExam?.eType === 'VSTEP' || fetchedExam?.exam_type === 'VSTEP') {
+        const examId = fetchedExam?.eId ?? fetchedExam?.id;
+        if (examId) {
+          navigate(`${STUDENT_BASE_PATH}/lam-bai-vstep/${examId}?submissionId=${data?.submissionId ?? querySubmissionId ?? ''}`);
+          return;
+        }
+      }
       setSubmissionId(data?.submissionId ?? querySubmissionId ?? null);
       const sid = data?.submissionId ?? querySubmissionId ?? null;
       const remainingSec = Number(data?.timeRemaining ?? 0);
