@@ -31,6 +31,8 @@ import {
 } from '../../../../components/exam';
 import { examDraftStorage } from '../../../../lib/exam/examDraftStorage';
 import { PassageSplitLayout } from '../components/PassageSplitLayout';
+import { HighlightablePassage } from '../components/HighlightablePassage';
+import { useTextHighlight } from '../../../../hooks/exam/useTextHighlight';
 
 const BASE = '/hoc-vien';
 const TEAL = '#0D9488';
@@ -612,6 +614,13 @@ export function TeensTestTaking() {
     }
   }
 
+  // Text highlighting hook for reading passages
+  const highlightHook = useTextHighlight({
+    submissionId: submissionId || 0,
+    passageId: isReading ? groupIndices[0] || 0 : 0,
+    enabled: isReading && !!submissionId,
+  });
+
   const statusOf = (i: number): 'answered' | 'flagged' | 'current' | 'empty' => {
     const id = getQuestionId(questions[i]);
     if (i === current) return 'current';
@@ -663,7 +672,20 @@ export function TeensTestTaking() {
               gridClassName="grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]"
               tone="teal"
               passageTitle="Đọc hiểu"
-              passageHtml={passage}
+              passageContent={
+                <div className="flex-1 overflow-y-auto px-6 py-4">
+                  <HighlightablePassage
+                    html={passage}
+                    highlights={highlightHook.highlights}
+                    selectedColor={highlightHook.selectedColor}
+                    onAddHighlight={highlightHook.addHighlight}
+                    onRemoveHighlight={highlightHook.removeHighlight}
+                    onSelectColor={highlightHook.setSelectedColor}
+                    colors={highlightHook.colors}
+                    enabled={!!submissionId}
+                  />
+                </div>
+              }
               questionsTitle={`Câu ${groupIndices[0] + 1}-${groupIndices[groupIndices.length - 1] + 1}`}
               questionsSubtitle={`${groupIndices.length} câu dùng chung đoạn đọc`}
               questionsBodyClassName="space-y-4"

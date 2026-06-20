@@ -808,6 +808,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
           timeLeft={reviewMode ? undefined : timeLeft}
           showTimer={!reviewMode}
           reviewMode={reviewMode}
+          submissionId={submissionId || undefined}
         />
       )}
       {currentSkill === "writing" && (

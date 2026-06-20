@@ -13,6 +13,8 @@ import type { IeltsReadingPayload, AnswerMap } from "../types";
 import { IeltsQuestionRenderer } from "../components/IeltsQuestionRenderer";
 import { type QuestionMeta } from "../components/IeltsBottomNav";
 import { IeltsQuestionNavigator } from "../components/IeltsQuestionNavigator";
+import { HighlightablePassage } from "../../../components/HighlightablePassage";
+import { useTextHighlight } from "../../../../../hooks/exam/useTextHighlight";
 
 interface IeltsReadingViewProps {
   payload: IeltsReadingPayload;
@@ -26,6 +28,7 @@ interface IeltsReadingViewProps {
   /** Preview mode: navigator có thể kéo được */
   draggableNavigator?: boolean;
   reviewMode?: boolean;
+  submissionId?: number;
 }
 
 export function IeltsReadingView({
@@ -39,11 +42,19 @@ export function IeltsReadingView({
   showTimer,
   draggableNavigator = false,
   reviewMode = false,
+  submissionId,
 }: IeltsReadingViewProps) {
   const passages = payload.passages ?? [];
   const [activeIdx, setActiveIdx] = useState(0);
 
   const currentPassage = passages[activeIdx];
+
+  // Text highlighting cho passage hiện tại
+  const highlightHook = useTextHighlight({
+    submissionId: submissionId || 0,
+    passageId: currentPassage?.passageNumber || 0,
+    enabled: !reviewMode && !!submissionId,
+  });
 
   const allMeta: QuestionMeta[] = useMemo(() => {
     const out: QuestionMeta[] = [];
@@ -131,7 +142,20 @@ export function IeltsReadingView({
         <PassageSplitLayout
           passageTitle={currentPassage.passageName}
           passageSubtitle={currentPassage.title ? <span className="italic">{currentPassage.title}</span> : undefined}
-          passageHtml={currentPassage.body}
+          passageContent={
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <HighlightablePassage
+                html={currentPassage.body}
+                highlights={highlightHook.highlights}
+                selectedColor={highlightHook.selectedColor}
+                onAddHighlight={highlightHook.addHighlight}
+                onRemoveHighlight={highlightHook.removeHighlight}
+                onSelectColor={highlightHook.setSelectedColor}
+                colors={highlightHook.colors}
+                enabled={!reviewMode && !!submissionId}
+              />
+            </div>
+          }
           questionsTitle={`Questions ${currentPassage.questionStart}-${currentPassage.questionEnd}`}
           questionsHeaderExtra={
             <div className="text-xs text-gray-500">
