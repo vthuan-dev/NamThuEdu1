@@ -894,10 +894,18 @@ class StudentTestController extends Controller
 
         } catch (\Throwable $e) {
             DB::rollBack();
-            Log::error('VstepSubmit error', ['msg' => $e->getMessage(), 'trace' => substr($e->getTraceAsString(), 0, 800)]);
+            Log::error('Submit failed', [
+                'submission_id' => $submissionId,
+                'user_id'       => $user->uId ?? null,
+                'error'         => $e->getMessage(),
+                'trace'         => $e->getTraceAsString(),
+                'file'          => $e->getFile(),
+                'line'          => $e->getLine(),
+            ]);
             return response()->json([
                 'status' => 'error',
                 'message' => 'Lỗi hệ thống khi nộp bài.',
+                'debug'   => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
     }
