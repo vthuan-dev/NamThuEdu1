@@ -289,13 +289,15 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
           {section.items.map((item) => (
             <QCard key={item.question_number} n={item.question_number}>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="rounded-xl border border-teal-100 bg-teal-50/40 p-4">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-teal-700 mb-1">
+                <div className="rounded-xl border border-teal-100 bg-teal-50/40 p-4 space-y-2">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-teal-700">
                     {item.context_style ?? 'Notice'}
                   </div>
-                  <pre className="whitespace-pre-wrap text-sm text-slate-800 font-mono leading-relaxed">
-                    {item.context}
-                  </pre>
+                  {item.context.split(/\n\s*\n/).filter(Boolean).map((p: string, i: number) => (
+                    <pre key={i} className="whitespace-pre-wrap text-sm text-slate-800 font-mono leading-relaxed">
+                      {p}
+                    </pre>
+                  ))}
                 </div>
                 <div className="space-y-2">
                   {item.statements.map((s, si) => (
@@ -779,35 +781,40 @@ function TextAnswer({
 }
 
 function PassageBox({ text, markers }: { text: string; markers?: boolean }) {
-  const segs = useMemo(() => {
-    if (!markers) return null;
+  const paragraphs = useMemo(() => text.split(/\n\s*\n/).filter(Boolean), [text]);
+
+  const renderParagraph = (para: string) => {
     const parts: Array<{ kind: 'text' | 'marker'; value: string }> = [];
     const re = /\[([ABCD])\]/g;
     let last = 0;
     let m: RegExpExecArray | null;
-    while ((m = re.exec(text)) !== null) {
-      if (m.index > last) parts.push({ kind: 'text', value: text.slice(last, m.index) });
+    while ((m = re.exec(para)) !== null) {
+      if (m.index > last) parts.push({ kind: 'text', value: para.slice(last, m.index) });
       parts.push({ kind: 'marker', value: m[1] });
       last = m.index + m[0].length;
     }
-    if (last < text.length) parts.push({ kind: 'text', value: text.slice(last) });
+    if (last < para.length) parts.push({ kind: 'text', value: para.slice(last) });
     return parts;
-  }, [text, markers]);
+  };
 
   return (
     <article className="rounded-2xl bg-white border border-slate-200 p-6">
-      <div className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
-        {segs
-          ? segs.map((s, i) =>
-              s.kind === 'text' ? (
-                <span key={i}>{s.value}</span>
-              ) : (
-                <span key={i} className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-teal-100 text-teal-700 text-xs font-bold mx-0.5 align-middle">
-                  [{s.value}]
-                </span>
-              )
-            )
-          : text}
+      <div className="text-sm text-slate-800 leading-relaxed space-y-3">
+        {paragraphs.map((para, i) => (
+          <p key={i} className="whitespace-pre-wrap">
+            {markers
+              ? renderParagraph(para).map((s, j) =>
+                  s.kind === 'text' ? (
+                    <span key={j}>{s.value}</span>
+                  ) : (
+                    <span key={j} className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-teal-100 text-teal-700 text-xs font-bold mx-0.5 align-middle">
+                      [{s.value}]
+                    </span>
+                  )
+                )
+              : para}
+          </p>
+        ))}
       </div>
     </article>
   );
@@ -828,53 +835,62 @@ function ClozePassage({
   onAnswerChange: (key: string, v: string) => void;
   isReview: boolean;
 }) {
-  const tokens = useMemo(() => {
+  const paragraphs = useMemo(() => passage.split(/\n\s*\n/).filter(Boolean), [passage]);
+
+  const tokenize = (text: string) => {
     const out: Array<{ type: 'text' | 'blank'; text?: string; qn?: number }> = [];
     let last = 0;
     const re = new RegExp(CLOZE_RE.source, 'g');
     let m: RegExpExecArray | null;
-    while ((m = re.exec(passage)) !== null) {
-      if (m.index > last) out.push({ type: 'text', text: passage.slice(last, m.index) });
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > last) out.push({ type: 'text', text: text.slice(last, m.index) });
       out.push({ type: 'blank', qn: parseInt(m[1]) });
       last = m.index + m[0].length;
     }
-    if (last < passage.length) out.push({ type: 'text', text: passage.slice(last) });
+    if (last < text.length) out.push({ type: 'text', text: text.slice(last) });
     return out;
-  }, [passage]);
+  };
 
   return (
     <article className="rounded-2xl bg-white border border-slate-200 p-6">
-      <div className="text-base text-slate-800 leading-loose">
-        {tokens.map((tok, i) => {
-          if (tok.type === 'text') return <span key={i}>{tok.text}</span>;
-          const key = `q${tok.qn}`;
-          const userVal = String(answers[key] ?? '');
-          const correctVal = String(correctAnswers?.[key] ?? '');
-          const isCorrect = isReview && userVal && correctVal && userVal.trim().toLowerCase() === correctVal.trim().toLowerCase();
-          const isWrong = isReview && userVal && !isCorrect;
-          const isMissing = isReview && !userVal;
+      <div className="text-base text-slate-800 leading-loose space-y-4">
+        {paragraphs.map((para, pi) => {
+          const tokens = tokenize(para);
           return (
-            <span key={i} className="inline-flex flex-col items-center align-middle mx-1">
-              <span className="inline-flex items-center gap-1">
-                <span className="text-xs font-bold text-teal-600 align-super">({tok.qn})</span>
-                <input
-                  type="text"
-                  value={userVal}
-                  onChange={(e) => onAnswerChange(key, e.target.value)}
-                  disabled={isReview}
-                  className={`inline-block min-w-[80px] max-w-[160px] text-center text-sm font-semibold border-b-2 bg-transparent focus:outline-none px-1 py-0.5 ${
-                    isCorrect ? 'border-emerald-500 text-emerald-700' : isWrong ? 'border-red-500 text-red-700 line-through' : isMissing ? 'border-amber-400' : 'border-teal-400 focus:border-teal-600'
-                  }`}
-                  placeholder="..."
-                />
-              </span>
-              {isReview && (isWrong || isMissing) && (
-                <span className="text-[11px] mt-0.5 inline-flex items-center gap-1 text-emerald-700 font-bold whitespace-nowrap">
-                  <CheckCircle2 className="w-3 h-3" />
-                  {correctVal}
-                </span>
-              )}
-            </span>
+            <p key={pi} className="whitespace-pre-wrap">
+              {tokens.map((tok, i) => {
+                if (tok.type === 'text') return <span key={i}>{tok.text}</span>;
+                const key = `q${tok.qn}`;
+                const userVal = String(answers[key] ?? '');
+                const correctVal = String(correctAnswers?.[key] ?? '');
+                const isCorrect = isReview && userVal && correctVal && userVal.trim().toLowerCase() === correctVal.trim().toLowerCase();
+                const isWrong = isReview && userVal && !isCorrect;
+                const isMissing = isReview && !userVal;
+                return (
+                  <span key={i} className="inline-flex flex-col items-center align-middle mx-1">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="text-xs font-bold text-teal-600 align-super">({tok.qn})</span>
+                      <input
+                        type="text"
+                        value={userVal}
+                        onChange={(e) => onAnswerChange(key, e.target.value)}
+                        disabled={isReview}
+                        className={`inline-block min-w-[80px] max-w-[160px] text-center text-sm font-semibold border-b-2 bg-transparent focus:outline-none px-1 py-0.5 ${
+                          isCorrect ? 'border-emerald-500 text-emerald-700' : isWrong ? 'border-red-500 text-red-700 line-through' : isMissing ? 'border-amber-400' : 'border-teal-400 focus:border-teal-600'
+                        }`}
+                        placeholder="..."
+                      />
+                    </span>
+                    {isReview && (isWrong || isMissing) && (
+                      <span className="text-[11px] mt-0.5 inline-flex items-center gap-1 text-emerald-700 font-bold whitespace-nowrap">
+                        <CheckCircle2 className="w-3 h-3" />
+                        {correctVal}
+                      </span>
+                    )}
+                  </span>
+                );
+              })}
+            </p>
           );
         })}
       </div>
