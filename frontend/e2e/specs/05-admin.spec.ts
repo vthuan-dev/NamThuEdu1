@@ -15,7 +15,6 @@ test.describe('Admin portal', () => {
     { path: '/admin/students/new-registrations', name: 'admin-student-registrations' },
     { path: '/admin/students/complaints',        name: 'admin-student-complaints' },
     { path: '/admin/courses',                    name: 'admin-courses' },
-    { path: '/admin/courses/categories',         name: 'admin-course-categories' },
     { path: '/admin/content/posts',              name: 'admin-posts' },
     { path: '/admin/content/exams',              name: 'admin-exams' },
     { path: '/admin/reports/students',           name: 'admin-report-students' },

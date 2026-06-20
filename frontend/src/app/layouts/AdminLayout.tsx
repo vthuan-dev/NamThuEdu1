@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   Users,
   GraduationCap,
-  BookOpen,
   FileText,
   BarChart3,
   Settings,
@@ -45,14 +44,6 @@ const adminNav: NavItem[] = [
     ],
   },
   { label: "Đề thi", href: "/admin/courses", icon: FileText },
-  {
-    label: "Khóa học",
-    icon: BookOpen,
-    submenu: [
-      { label: "Tạo khóa học", href: "/admin/courses/new" },
-      { label: "Danh mục", href: "/admin/courses/categories" },
-    ],
-  },
   { label: "Bài viết", href: "/admin/content/posts", icon: FileEdit },
   { label: "Quản lý lớp", href: "/admin/quan-ly-lop", icon: GraduationCap },
   {
@@ -385,8 +376,6 @@ export function AdminLayout() {
               {location.pathname === "/admin" || location.pathname === "/admin/dashboard" ? "Tổng quan" :
                location.pathname.startsWith("/admin/users") ? "Người dùng" :
                location.pathname === "/admin/courses" ? "Đề thi" :
-               location.pathname.startsWith("/admin/courses/new") ? "Khóa học" :
-               location.pathname.startsWith("/admin/courses/categories") ? "Khóa học" :
                location.pathname.startsWith("/admin/content/posts") ? "Bài viết" :
                location.pathname.startsWith("/admin/quan-ly-lop") ? "Quản lý lớp" :
                location.pathname.startsWith("/admin/ban-giao-lop") ? "Bàn giao lớp" :

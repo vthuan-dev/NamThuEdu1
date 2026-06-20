@@ -17,8 +17,6 @@ const AdminPostsPage               = lazy(() => import("../features/admin/conten
 
 const AdminStudentsReportPage      = lazy(() => import("../features/admin/reports/AdminStudentsReportPage").then(m => ({ default: m.AdminStudentsReportPage })));
 const AdminCoursesPage             = lazy(() => import("../features/admin/courses/AdminCoursesPage").then(m => ({ default: m.AdminCoursesPage })));
-const AdminCategoriesPage          = lazy(() => import("../features/admin/courses/AdminCategoriesPage").then(m => ({ default: m.AdminCategoriesPage })));
-const AdminCourseCreatePage        = lazy(() => import("../features/admin/courses/AdminCourseCreatePage").then(m => ({ default: m.AdminCourseCreatePage })));
 const AdminRevenueReportPage       = lazy(() => import("../features/admin/reports/AdminRevenueReportPage").then(m => ({ default: m.AdminRevenueReportPage })));
 const AdminTeachersReportPage      = lazy(() => import("../features/admin/reports/AdminTeachersReportPage").then(m => ({ default: m.AdminTeachersReportPage })));
 const AdminSettingsPage            = lazy(() => import("../features/admin/settings/AdminSettingsPage").then(m => ({ default: m.AdminSettingsPage })));
@@ -43,10 +41,11 @@ export const adminRoutes = {
     // Người dùng (Học viên & Giáo viên)
     { path: "users", Component: AdminUsersPage },
 
-    // Khóa học
+    // Đề thi (giữ alias /admin/courses cho lịch sử URL — thực chất là quản lý đề thi)
     { path: "courses", Component: AdminCoursesPage },
-    { path: "courses/new", Component: AdminCourseCreatePage },
-    { path: "courses/categories", Component: AdminCategoriesPage },
+    // Các route khoá học cũ → redirect về trang đề thi
+    { path: "courses/new", Component: () => <Navigate to="/admin/courses" replace /> },
+    { path: "courses/categories", Component: () => <Navigate to="/admin/courses" replace /> },
 
     // Bàn giao lớp
     { path: "ban-giao-lop", Component: AdminHandoverPage },
@@ -87,8 +86,8 @@ export const adminRoutes = {
     { path: "students/complaints", Component: () => <Navigate to="/admin/users?tab=students" replace /> },
     { path: "students/khieu-nai", Component: () => <Navigate to="/admin/users?tab=students" replace /> },
     { path: "khoa-hoc", Component: () => <Navigate to="/admin/courses" replace /> },
-    { path: "khoa-hoc/tao-moi", Component: () => <Navigate to="/admin/courses/new" replace /> },
-    { path: "khoa-hoc/danh-muc", Component: () => <Navigate to="/admin/courses/categories" replace /> },
+    { path: "khoa-hoc/tao-moi", Component: () => <Navigate to="/admin/courses" replace /> },
+    { path: "khoa-hoc/danh-muc", Component: () => <Navigate to="/admin/courses" replace /> },
     { path: "noi-dung/bai-viet", Component: () => <Navigate to="/admin/content/posts" replace /> },
     { path: "noi-dung/de-thi", Component: () => <Navigate to="/admin/courses" replace /> },
     { path: "bao-cao/doanh-thu", Component: () => <Navigate to="/admin/reports/revenue" replace /> },
