@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { usePracticeSessions } from "@/hooks/usePracticeSessions";
 import { usePageHeader } from "@/contexts/TeacherHeaderContext";
+import { formatVNDate } from "@/utils/dateUtils";
 
 type PracticeType = "topic_based" | "template_based" | "random" | "skill_based" | "custom";
 type Skill = "listening" | "reading" | "writing" | "speaking";
@@ -299,7 +300,7 @@ export function PracticeSessionList() {
                     {session.ps_question_count && (
                       <span className="flex items-center gap-1"><FileText className="w-3.5 h-3.5" />{session.ps_question_count} câu</span>
                     )}
-                    <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{new Date(session.ps_created_at).toLocaleDateString('vi-VN')}</span>
+                    <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{formatVNDate(session.ps_created_at)}</span>
                   </div>
 
                   {/* Exam link */}

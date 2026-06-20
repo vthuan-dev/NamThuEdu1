@@ -7,6 +7,7 @@ import {
   Tag, Hash, Layers,
 } from "lucide-react";
 import { api } from "@/services/api";
+import { formatVNDate } from "@/utils/dateUtils";
 
 /* ─── Types ─── */
 type PracticeType = "topic_based" | "template_based" | "random" | "skill_based" | "custom";
@@ -180,7 +181,7 @@ export function PracticeSessionDetail() {
             { icon: Clock,    label: "Thời gian",    value: `${session.ps_duration_minutes} phút`, color: "text-blue-600",   bg: "bg-blue-50",   border: "border-blue-100" },
             { icon: FileText, label: "Số câu hỏi",   value: `${questions.length || session.ps_question_count} câu`, color: "text-purple-600", bg: "bg-purple-50", border: "border-purple-100" },
             { icon: Target,   label: "Mục đích",     value: PURPOSE_LABELS[session.ps_purpose] || session.ps_purpose, color: "text-amber-600",  bg: "bg-amber-50",  border: "border-amber-100" },
-            { icon: Calendar, label: "Ngày tạo",     value: new Date(session.ps_created_at).toLocaleDateString("vi-VN"), color: "text-gray-600",   bg: "bg-gray-50",   border: "border-gray-100" },
+            { icon: Calendar, label: "Ngày tạo",     value: formatVNDate(session.ps_created_at), color: "text-gray-600",   bg: "bg-gray-50",   border: "border-gray-100" },
           ].map(({ icon: Icon, label, value, color, bg, border }) => (
             <div key={label} className={`bg-white rounded-2xl border ${border} p-5 shadow-sm`}>
               <div className={`w-9 h-9 ${bg} rounded-xl flex items-center justify-center mb-3`}>

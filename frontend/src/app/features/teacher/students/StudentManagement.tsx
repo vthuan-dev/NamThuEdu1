@@ -32,6 +32,7 @@ import { useNavigate } from "react-router";
 import { EditStudentModal } from "./EditStudentModal";
 import { ExamScheduleModal } from "./ExamScheduleModal";
 import { getApiUrl, getAssetUrl } from "../../../../utils/apiConfig";
+import { formatVNDate } from "@/utils/dateUtils";
 
 type TabType = "list" | "deleted";
 
@@ -236,7 +237,7 @@ export function StudentManagement() {
               status: student.uStatus || 'active',
               avatar: student.uName?.split(' ').slice(-2).map((n: string) => n[0]).join('').toUpperCase() || 'NA',
               avatarUrl: student.avatar_url || null,
-              createdAt: new Date(student.uCreated_at).toLocaleDateString('vi-VN'),
+              createdAt: formatVNDate(student.uCreated_at),
               uDoB: student.uDoB || null,
               dateOfBirth: student.uDoB ? student.uDoB.split(' ')[0] : null,
               dailyGoal: student.daily_goal_minutes ?? null,

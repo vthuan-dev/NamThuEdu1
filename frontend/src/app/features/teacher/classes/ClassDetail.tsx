@@ -13,6 +13,7 @@ import {
   ageMeta, Avatar, Modal, Field, inputClass, btnPrimary, btnGhost,
 } from "./classMgmtUi";
 import { StudentGoalModal } from "./StudentGoalModal";
+import { formatVNDate } from "@/utils/dateUtils";
 
 type TabKey = "roster" | "assignments" | "announcements" | "goals" | "coteachers";
 
@@ -436,7 +437,7 @@ function AssignmentsTab({ assignments }: { assignments: ClassAssignmentRow[] }) 
               <p className="font-semibold text-[#111827] truncate">{a.exam_title || `Đề #${a.exam_id}`}</p>
               <p className="text-sm text-[#6B7280] inline-flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5" />
-                {a.taDeadline ? `Hạn: ${new Date(a.taDeadline).toLocaleDateString("vi-VN")}` : "Không hạn"}
+                {a.taDeadline ? `Hạn: ${formatVNDate(a.taDeadline)}` : "Không hạn"}
               </p>
             </div>
           </div>
@@ -603,7 +604,7 @@ function GoalsTab({ classId, items, onChanged, toast }: any) {
                     </div>
                     <p className="text-sm text-[#6B7280] mt-1 inline-flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5" />
-                      {new Date(g.target_date).toLocaleDateString("vi-VN")}
+                      {formatVNDate(g.target_date)}
                     </p>
                   </div>
                 </div>

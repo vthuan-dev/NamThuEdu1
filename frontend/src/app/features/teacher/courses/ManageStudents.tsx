@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
+import { formatVNDate } from "@/utils/dateUtils";
   ArrowLeft,
   Users,
   Plus,
@@ -498,7 +499,7 @@ export function ManageStudents() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {new Date(student.enrollmentDate).toLocaleDateString("vi-VN")}
+                      {formatVNDate(student.enrollmentDate)}
                     </td>
                     <td className="px-6 py-4">
                       <div className="space-y-1">
@@ -816,7 +817,7 @@ export function ManageStudents() {
                     <Calendar className="w-4 h-4 text-gray-400" />
                     <span className="text-gray-900">
                       Ghi danh:{" "}
-                      {new Date(selectedStudent.enrollmentDate).toLocaleDateString("vi-VN")}
+                      {formatVNDate(selectedStudent.enrollmentDate)}
                     </span>
                   </div>
                 </div>

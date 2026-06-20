@@ -5,6 +5,7 @@ import { getKidsExam } from "../../../../services/kidsExamApi";
 import { api } from "../../../../services/api";
 import { useToast } from "../../../../hooks/useToast";
 import { ToastContainer } from "../../../../components/ui/ToastContainer";
+import { formatVNDate } from "@/utils/dateUtils";
 
 interface Question {
   qId: number;
@@ -205,7 +206,7 @@ export function ExamDetail() {
                   </span>
                 )}
                 <span className="text-gray-500">
-                  📅 {new Date(examData.eCreated_at).toLocaleDateString('vi-VN')}
+                  📅 {formatVNDate(examData.eCreated_at.replace(' ', 'T') + '+07:00')}
                 </span>
               </div>
             </div>

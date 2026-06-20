@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { usePageTitle, PAGE_TITLES } from "../../../../hooks/usePageTitle";
 import { usePageHeader } from "../../../../contexts/TeacherHeaderContext";
 import {
+import { formatVNDate } from "@/utils/dateUtils";
   BookOpen,
   Users,
   TrendingUp,
@@ -438,8 +439,8 @@ export function CourseList() {
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <MapPin className="w-4 h-4 text-gray-400" />
                         <span>
-                          {new Date(course.cStartDate).toLocaleDateString("vi-VN")} -{" "}
-                          {new Date(course.cEndDate).toLocaleDateString("vi-VN")}
+                          {formatVNDate(course.cStartDate)} -{" "}
+                          {formatVNDate(course.cEndDate)}
                         </span>
                       </div>
                     </div>
@@ -590,7 +591,7 @@ export function CourseList() {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
-                          {new Date(course.cStartDate).toLocaleDateString("vi-VN")}
+                          {formatVNDate(course.cStartDate)}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-end gap-2">

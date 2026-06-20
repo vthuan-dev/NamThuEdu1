@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { teacherApi } from "../../../../services/teacherApi";
 import { usePageTitle, PAGE_TITLES } from "../../../../hooks/usePageTitle";
 import {
+import { formatVNDate } from "@/utils/dateUtils";
   FileText,
   Plus,
   LayoutTemplate,
@@ -691,7 +692,7 @@ export function MyExams() {
                       </div>
                       <div className="flex items-center gap-1.5 text-gray-600">
                         <Calendar className="w-3.5 h-3.5" />
-                        <span>{new Date(exam.modifiedAt).toLocaleDateString("vi-VN")}</span>
+                        <span>{formatVNDate(exam.modifiedAt)}</span>
                       </div>
                     </div>
 
@@ -867,7 +868,7 @@ export function MyExams() {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
-                          {new Date(exam.modifiedAt).toLocaleDateString("vi-VN")}
+                          {formatVNDate(exam.modifiedAt)}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-end gap-2">

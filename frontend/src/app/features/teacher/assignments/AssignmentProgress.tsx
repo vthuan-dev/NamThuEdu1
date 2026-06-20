@@ -17,6 +17,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useAssignmentProgress } from "@/hooks/useAssignmentProgress";
+import { formatVNDate } from "@/utils/dateUtils";
 
 export function AssignmentProgress() {
   const { t } = useTranslation();
@@ -168,7 +169,7 @@ export function AssignmentProgress() {
               <div className="flex items-center gap-2">
                 <Calendar className="w-5 h-5" />
                 <p className="font-bold text-lg">
-                  {assignment?.taDue_date ? new Date(assignment.taDue_date).toLocaleDateString("vi-VN") : 'N/A'}
+                  {assignment?.taDue_date ? formatVNDate(assignment.taDue_date) : 'N/A'}
                 </p>
               </div>
               <p className="text-sm mt-2 font-semibold">{getTimeRemaining()}</p>

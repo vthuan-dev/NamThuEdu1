@@ -35,6 +35,7 @@ import {
   getAdultExams,
 } from "../../../../services/examGroupsApi";
 import { AssignModal, type AssignExam } from "../assignments/AssignModal";
+import { formatVNDate } from "@/utils/dateUtils";
 
 interface KidsExam {
   eId: number;
@@ -164,8 +165,8 @@ export function AllExams() {
         .filter((e) => e && e.eId && e.eTitle)
         .sort(
           (a, b) =>
-            new Date(b.eCreated_at).getTime() -
-            new Date(a.eCreated_at).getTime()
+            new Date(b.eCreated_at.replace(' ', 'T') + '+07:00').getTime() -
+            new Date(a.eCreated_at.replace(' ', 'T') + '+07:00').getTime()
         );
       setExams(merged);
     } catch (err: any) {
@@ -408,7 +409,7 @@ export function AllExams() {
       const u = e.eUpdated_at || e.updated_at;
       const c = e.eCreated_at;
       const src = sortBy === "updated_desc" ? u || c : c;
-      return src ? new Date(src).getTime() : 0;
+      return src ? new Date(src.replace(' ', 'T') + '+07:00').getTime() : 0;
     };
     if (sortBy === "title_asc") {
       return (a.eTitle || "").localeCompare(b.eTitle || "", "vi");
@@ -1070,7 +1071,7 @@ export function AllExams() {
                       )}
                       <span className="inline-flex items-center gap-1 ml-auto">
                         <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                        {new Date(exam.eCreated_at).toLocaleDateString("vi-VN")}
+                        {formatVNDate(exam.eCreated_at.replace(' ', 'T') + '+07:00')}
                       </span>
                     </div>
                   </div>

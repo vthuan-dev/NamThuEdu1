@@ -19,6 +19,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import {
+import { formatVNDate } from "@/utils/dateUtils";
   AreaChart,
   Area,
   BarChart,
@@ -552,14 +553,14 @@ export function CourseStats() {
               <Calendar className="w-5 h-5 text-orange-600 mb-2" />
               <p className="text-sm text-gray-600 mb-1">Ngày bắt đầu</p>
               <p className="font-bold text-gray-900">
-                {new Date(courseData.startDate).toLocaleDateString("vi-VN")}
+                {formatVNDate(courseData.startDate)}
               </p>
             </div>
             <div className="bg-purple-50 rounded-lg p-4">
               <Calendar className="w-5 h-5 text-purple-600 mb-2" />
               <p className="text-sm text-gray-600 mb-1">Ngày kết thúc</p>
               <p className="font-bold text-gray-900">
-                {new Date(courseData.endDate).toLocaleDateString("vi-VN")}
+                {formatVNDate(courseData.endDate)}
               </p>
             </div>
             <div className="bg-green-50 rounded-lg p-4">
