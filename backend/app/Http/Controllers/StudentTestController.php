@@ -617,6 +617,121 @@ class StudentTestController extends Controller
     }
 
     /**
+     * Lưu nhiều câu trả lời cùng lúc (bulk save).
+     * Dùng để force-flush toàn bộ answers trong local state lên backend
+     * trước khi submit, đảm bảo không mất dữ liệu nếu các /answer call
+     * trước đó đã thất bại âm thầm (network blip, throttle, race...).
+     *
+     * Body: {
+     *   answers: [
+     *     { question_id: int, saAnswer_text: string }, ...
+     *   ]
+     * }
+     *
+     * Response: { saved: int, skipped: int, errors: array }
+     */
+    public function bulkAnswer(Request $request, $submissionId)
+    {
+        $user = $request->user();
+
+        if (!$user || $user->uRole !== 'student') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Bạn không có quyền truy cập.'
+            ], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'answers' => 'required|array|min:1|max:200',
+            'answers.*.question_id' => 'required|integer',
+            'answers.*.saAnswer_text' => 'required|string|max:50000',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Dữ liệu không hợp lệ.',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        try {
+            $result = DB::transaction(function () use ($request, $submissionId, $user) {
+                $submission = Submission::where('sId', $submissionId)
+                                       ->where('user_id', $user->uId)
+                                       ->lockForUpdate()
+                                       ->first();
+
+                if (!$submission) {
+                    return ['status' => 404, 'data' => [
+                        'status' => 'error',
+                        'message' => 'Không tìm thấy bài làm.'
+                    ]];
+                }
+
+                if ($submission->sStatus !== 'in_progress') {
+                    return ['status' => 400, 'data' => [
+                        'status' => 'error',
+                        'message' => 'Bài làm đã được nộp hoặc không thể chỉnh sửa.'
+                    ]];
+                }
+
+                // Pre-fetch all valid question IDs of this exam to avoid N+1
+                $questionIds = collect($request->answers)->pluck('question_id')->unique()->all();
+                $validQids = Question::where('exam_id', $submission->exam_id)
+                    ->whereIn('qId', $questionIds)
+                    ->pluck('qId')
+                    ->all();
+                $validSet = array_flip($validQids);
+
+                $saved = 0;
+                $skipped = 0;
+                $errors = [];
+
+                foreach ($request->answers as $item) {
+                    $qId = (int) $item['question_id'];
+                    if (!isset($validSet[$qId])) {
+                        $skipped++;
+                        $errors[] = ['question_id' => $qId, 'reason' => 'Câu hỏi không thuộc bài thi'];
+                        continue;
+                    }
+                    SubmissionAnswer::updateOrCreate(
+                        [
+                            'submission_id' => $submissionId,
+                            'question_id' => $qId,
+                        ],
+                        [
+                            'saAnswer_text' => (string) $item['saAnswer_text'],
+                        ]
+                    );
+                    $saved++;
+                }
+
+                $submission->update(['last_activity_at' => now()]);
+
+                return ['status' => 200, 'data' => [
+                    'status' => 'success',
+                    'data' => [
+                        'saved' => $saved,
+                        'skipped' => $skipped,
+                        'errors' => $errors,
+                        'message' => "Đã lưu {$saved} câu trả lời.",
+                    ]
+                ]];
+            });
+
+            return response()->json($result['data'], $result['status']);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Lỗi hệ thống khi lưu câu trả lời hàng loạt.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * @OA\Post(
      *     path="/student/tests/{submissionId}/submit",
      *     tags={"Students"},

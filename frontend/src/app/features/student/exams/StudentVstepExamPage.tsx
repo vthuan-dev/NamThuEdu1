@@ -638,16 +638,48 @@ export function StudentVstepExamPage() {
   }, [skillTimeLeft, current.skill, listeningParts.length, readingParts.length, writingTasks.length, speakingParts.length]);
 
   /* ── Auto-submit on timeout ─────────────────────────────── */
-  const handleAutoSubmit = useCallback(() => {
+  const handleAutoSubmit = useCallback(async () => {
     if (!submissionId || submittedRef.current) return;
     submittedRef.current = true;
+
+    // Force-flush all local answers before timeout submit (same as handleSubmit)
+    try {
+      const bulkPayload: Array<{ question_id: number; saAnswer_text: string }> = [];
+      for (const [qIdStr, letter] of Object.entries(answers)) {
+        const qId = Number(qIdStr);
+        if (!qId || !letter) continue;
+        bulkPayload.push({ question_id: qId, saAnswer_text: letter });
+      }
+      for (const task of writingTasks) {
+        const draft = writingDrafts[task.taskNumber] ?? "";
+        if (task.questionId && draft.trim()) {
+          bulkPayload.push({ question_id: task.questionId, saAnswer_text: draft });
+        }
+      }
+      if (bulkPayload.length > 0) {
+        const chunks: typeof bulkPayload[] = [];
+        for (let i = 0; i < bulkPayload.length; i += 100) {
+          chunks.push(bulkPayload.slice(i, i + 100));
+        }
+        for (const chunk of chunks) {
+          try {
+            await studentApi.bulkSaveAnswers(submissionId, chunk);
+          } catch (err) {
+            console.warn("[VSTEP] auto-submit bulk flush failed", err);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[VSTEP] auto-submit flush error", err);
+    }
+
     studentApi.submitTest(submissionId)
       .then((res: any) => {
         const sid = res?.data?.data?.submissionId ?? submissionId;
         navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${sid}`);
       })
       .catch(() => navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${submissionId}`));
-  }, [submissionId, examId, navigate]);
+  }, [submissionId, examId, navigate, answers, writingDrafts, writingTasks]);
 
   /* ── Navigate ───────────────────────────────────────────── */
   const navigate2 = (skill: SkillKey, partNumber: number) => {
@@ -685,17 +717,42 @@ export function StudentVstepExamPage() {
     submittedRef.current = true;
     setSubmitting(true);
     try {
-      // Flush all writing drafts to DB before submitting (in case textarea was never blurred)
-      await Promise.all(
-        writingTasks.map((task) => {
-          const draft = writingDrafts[task.taskNumber] ?? "";
-          if (task.questionId && draft.trim()) {
-            return studentApi.saveAnswer(submissionId, { question_id: task.questionId, saAnswer_text: draft } as any)
-              .catch((err: any) => console.warn("[VSTEP] flush writing failed", err));
+      // Build a single bulk payload with ALL local answers (MCQ + writing drafts).
+      // This force-flushes everything to backend, so even if the per-answer
+      // /answer calls during the test failed silently (network blip, throttle,
+      // race), the answers in local state are still pushed before grading.
+      const bulkPayload: Array<{ question_id: number; saAnswer_text: string }> = [];
+
+      // MCQ answers from state ({ qId: "A"|"B"|"C"|"D" })
+      for (const [qIdStr, letter] of Object.entries(answers)) {
+        const qId = Number(qIdStr);
+        if (!qId || !letter) continue;
+        bulkPayload.push({ question_id: qId, saAnswer_text: letter });
+      }
+
+      // Writing drafts (in case textarea was never blurred)
+      for (const task of writingTasks) {
+        const draft = writingDrafts[task.taskNumber] ?? "";
+        if (task.questionId && draft.trim()) {
+          bulkPayload.push({ question_id: task.questionId, saAnswer_text: draft });
+        }
+      }
+
+      if (bulkPayload.length > 0) {
+        // Chunk into batches of 100 to stay under the 200 max in backend validator
+        const chunks: typeof bulkPayload[] = [];
+        for (let i = 0; i < bulkPayload.length; i += 100) {
+          chunks.push(bulkPayload.slice(i, i + 100));
+        }
+        for (const chunk of chunks) {
+          try {
+            await studentApi.bulkSaveAnswers(submissionId, chunk);
+          } catch (err) {
+            console.warn("[VSTEP] bulkSaveAnswers failed for chunk", err);
           }
-          return Promise.resolve();
-        })
-      );
+        }
+      }
+
       const res: any = await studentApi.submitTest(submissionId);
       const sid = res?.data?.data?.submissionId ?? submissionId;
       localStorage.removeItem(LS_ANSWERS);

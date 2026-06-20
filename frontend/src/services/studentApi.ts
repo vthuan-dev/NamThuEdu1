@@ -271,6 +271,10 @@ export const studentApi = {
   saveAnswer: (submissionId: number, data: { question_id: number; answer_id?: number; answer_text?: string; saAnswer_text?: string }) =>
     api.post(`/student/tests/${submissionId}/answer`, data),
 
+  // Bulk save answers (used to force-flush all local answers before submit)
+  bulkSaveAnswers: (submissionId: number, answers: Array<{ question_id: number; saAnswer_text: string }>) =>
+    api.post(`/student/tests/${submissionId}/answers/bulk`, { answers }),
+
   submitTest: (submissionId: number) =>
     api.post(`/student/tests/${submissionId}/submit`),
 

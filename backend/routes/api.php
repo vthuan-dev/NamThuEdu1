@@ -543,6 +543,7 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         Route::get('/tests/{id}/resume', [StudentTestController::class, 'resume'])->where('id', '[0-9]+');
         Route::post('/tests/{id}/start', [StudentTestController::class, 'start'])->where('id', '[0-9]+');
         Route::post('/tests/{submissionId}/answer', [StudentTestController::class, 'answer'])->where('submissionId', '[0-9]+')->middleware('throttle:120,1');
+        Route::post('/tests/{submissionId}/answers/bulk', [StudentTestController::class, 'bulkAnswer'])->where('submissionId', '[0-9]+')->middleware('throttle:30,1');
         Route::post('/tests/{submissionId}/submit', [StudentTestController::class, 'submit'])->where('submissionId', '[0-9]+')->middleware('throttle:30,1');
 
         // ── Auto-save / Auto-submit session endpoints ──────────────────────────
