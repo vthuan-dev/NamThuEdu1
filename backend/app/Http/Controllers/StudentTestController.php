@@ -897,6 +897,29 @@ class StudentTestController extends Controller
                 ], 400);
             }
 
+            // ── Backfill blank answers for ALL unanswered questions ──────────
+            // Đảm bảo mọi câu hỏi trong đề đều có row trong submission_answers
+            // → gradeAnswers chấm 0 cho MCQ bỏ trống, teacher grading nhìn thấy
+            //   đủ câu hỏi (cả writing/speaking chưa làm), result page nhất quán.
+            $answeredQids = $submission->answers->pluck('question_id')->all();
+            $missingQuestions = $submission->exam->questions->reject(function ($q) use ($answeredQids) {
+                return in_array($q->qId, $answeredQids, true);
+            });
+            if ($missingQuestions->count() > 0) {
+                $rowsToInsert = $missingQuestions->map(function ($q) use ($submissionId) {
+                    return [
+                        'submission_id'    => $submissionId,
+                        'question_id'      => $q->qId,
+                        'saAnswer_text'    => '',
+                        'saIs_correct'     => null, // gradeAnswers sẽ set lại
+                        'saPoints_awarded' => null,
+                    ];
+                })->all();
+                SubmissionAnswer::insert($rowsToInsert);
+                // Reload submission->answers để gradeAnswers thấy các row vừa thêm
+                $submission->load('answers.question');
+            }
+
             // Grade all answers — skip subjective (writing/speaking) for VSTEP/IELTS
             $isVstepTx = in_array(strtoupper($submission->exam->eType ?? ''), ['VSTEP', 'IELTS']);
             $subjTypes  = ['essay', 'writing', 'speaking'];

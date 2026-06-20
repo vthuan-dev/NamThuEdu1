@@ -86,6 +86,27 @@ class ExamAutoSubmitService
                 ];
             }
 
+            // ── Backfill blank answers for ALL unanswered questions ──────────
+            // Đảm bảo mọi câu hỏi trong đề đều có row trong submission_answers
+            // (đồng nhất với luồng submit thủ công).
+            $answeredQids = $submission->answers->pluck('question_id')->all();
+            $missingQuestions = $submission->exam->questions->reject(function ($q) use ($answeredQids) {
+                return in_array($q->qId, $answeredQids, true);
+            });
+            if ($missingQuestions->count() > 0) {
+                $rowsToInsert = $missingQuestions->map(function ($q) use ($submission) {
+                    return [
+                        'submission_id'    => $submission->sId,
+                        'question_id'      => $q->qId,
+                        'saAnswer_text'    => '',
+                        'saIs_correct'     => null,
+                        'saPoints_awarded' => null,
+                    ];
+                })->all();
+                \App\Models\SubmissionAnswer::insert($rowsToInsert);
+                $submission->load('answers.question');
+            }
+
             // Reuse logic chấm điểm hiện tại của StudentTestController
             $isVstep = in_array(strtoupper($submission->exam->eType ?? ''), ['VSTEP', 'IELTS']);
             $subjectiveTypes = ['essay', 'writing', 'speaking'];

@@ -392,11 +392,43 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
     async (reason: 'manual' | 'timeout'): Promise<unknown> => {
       if (!submissionId) return null;
       submittedRef.current = true;
+
+      // ── FORCE-FLUSH ALL local answers before submit ────────────────────
+      // Kể cả khi queue đã empty (đã debounce save xong), ta vẫn re-push
+      // toàn bộ answers từ state để chống mất dữ liệu nếu có save trước
+      // đó thất bại âm thầm hoặc bị drop khỏi queue.
       try {
-        await flushNow();
-      } catch {
-        /* dù flush fail vẫn cho phép submit — BE sẽ chấm theo gì đã có */
+        const allDrafts: DraftAnswer[] = [];
+        for (const [qid, value] of Object.entries(answersRef.current)) {
+          const draft = serialize(qid, value);
+          if (draft) allDrafts.push(draft);
+        }
+        if (allDrafts.length > 0) {
+          // Chunk theo max 200 (giới hạn validator của /draft endpoint)
+          const CHUNK_SIZE = 200;
+          for (let i = 0; i < allDrafts.length; i += CHUNK_SIZE) {
+            const chunk = allDrafts.slice(i, i + CHUNK_SIZE);
+            try {
+              if (customSaveDraft) {
+                await customSaveDraft(submissionId, chunk);
+              } else {
+                await studentApi.saveDraft(submissionId, chunk);
+              }
+            } catch (err) {
+              console.warn('[useExamSession] final force-flush chunk failed', err);
+            }
+          }
+          pendingQueueRef.current.clear();
+          syncPendingCount();
+        } else {
+          // Không có answer nào → vẫn cố gắng flush queue (no-op nếu rỗng)
+          await flushNow();
+        }
+      } catch (err) {
+        /* dù force-flush fail vẫn cho phép submit — BE sẽ chấm theo gì đã có */
+        console.warn('[useExamSession] submit force-flush error', err);
       }
+
       try {
         const res = customSubmit
           ? await customSubmit(submissionId)
@@ -417,7 +449,7 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
         throw err;
       }
     },
-    [submissionId, flushNow, onAutoSubmitted, onSubmitted],
+    [submissionId, flushNow, onAutoSubmitted, onSubmitted, serialize, customSaveDraft, customSubmit, syncPendingCount],
   );
 
   const submit = useCallback(() => doSubmit('manual'), [doSubmit]);
