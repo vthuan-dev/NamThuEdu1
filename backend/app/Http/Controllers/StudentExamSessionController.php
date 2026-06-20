@@ -121,11 +121,16 @@ class StudentExamSessionController extends Controller
         } catch (\Throwable $e) {
             Log::error('Draft save failed', [
                 'submission_id' => $submissionId,
+                'user_id'       => $user->uId ?? null,
                 'error'         => $e->getMessage(),
+                'trace'         => $e->getTraceAsString(),
+                'file'          => $e->getFile(),
+                'line'          => $e->getLine(),
             ]);
             return response()->json([
                 'status'  => 'error',
                 'message' => 'Lỗi hệ thống khi lưu nháp.',
+                'debug'   => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
     }
