@@ -6,6 +6,7 @@ import { adminApi } from "../../../../services/adminApi";
 interface AdminCredentialsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  mode?: "create" | "reset"; // "create" = after creating user, "reset" = reset existing user password
   userData: {
     name: string;
     phone: string;
@@ -16,12 +17,18 @@ interface AdminCredentialsModalProps {
   onPasswordReset?: (newPassword: string) => void;
 }
 
-export function AdminCredentialsModal({ isOpen, onClose, userData, onPasswordReset }: AdminCredentialsModalProps) {
+export function AdminCredentialsModal({ isOpen, onClose, userData, onPasswordReset, mode = "create" }: AdminCredentialsModalProps) {
   const [timeLeft, setTimeLeft] = useState(10);
   const [showPassword, setShowPassword] = useState(true);
   const [copiedPhone, setCopiedPhone] = useState(false);
   const [copiedPassword, setCopiedPassword] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState(userData.password);
+
+  // Sync currentPassword when userData changes (e.g., after reset)
+  useEffect(() => {
+    setCurrentPassword(userData.password);
+  }, [userData.password]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -29,6 +36,12 @@ export function AdminCredentialsModal({ isOpen, onClose, userData, onPasswordRes
       setShowPassword(true);
       setCopiedPhone(false);
       setCopiedPassword(false);
+      return;
+    }
+
+    // In "reset" mode, auto-trigger reset on open if no password yet
+    if (mode === "reset" && !currentPassword) {
+      handleResetPassword();
       return;
     }
 
@@ -45,7 +58,8 @@ export function AdminCredentialsModal({ isOpen, onClose, userData, onPasswordRes
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isOpen]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, mode]);
 
   const handleCopy = async (text: string, type: 'phone' | 'password') => {
     try {
@@ -73,6 +87,7 @@ export function AdminCredentialsModal({ isOpen, onClose, userData, onPasswordRes
         const newPassword = result.data.new_password;
         
         // Update local password display
+        setCurrentPassword(newPassword);
         if (onPasswordReset) {
           onPasswordReset(newPassword);
         }
@@ -81,8 +96,17 @@ export function AdminCredentialsModal({ isOpen, onClose, userData, onPasswordRes
         setShowPassword(true);
         setTimeLeft(10);
         
-        // Show success message
-        alert(`Đã reset mật khẩu thành công!\nMật khẩu mới: ${newPassword}`);
+        // Start countdown
+        const timer = setInterval(() => {
+          setTimeLeft((prev) => {
+            if (prev <= 1) {
+              setShowPassword(false);
+              clearInterval(timer);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
       }
     } catch (error) {
       console.error('Error resetting password:', error);
@@ -118,15 +142,23 @@ export function AdminCredentialsModal({ isOpen, onClose, userData, onPasswordRes
             transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
           >
             {/* Header */}
-            <div className="bg-gradient-to-r from-[#6366F1] to-[#8B5CF6] p-6 text-white">
+            <div className={`p-6 text-white ${mode === "reset" ? "bg-gradient-to-r from-[#7C3AED] to-[#DB2777]" : "bg-gradient-to-r from-[#6366F1] to-[#8B5CF6]"}`}>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-                    <CheckCircle2 className="w-6 h-6" />
+                    {mode === "reset" ? (
+                      <RotateCcw className="w-6 h-6" />
+                    ) : (
+                      <CheckCircle2 className="w-6 h-6" />
+                    )}
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold">Tạo tài khoản thành công!</h2>
-                    <p className="text-sm text-white/90">Thông tin đăng nhập người dùng</p>
+                    <h2 className="text-xl font-bold">
+                      {mode === "reset" ? "Reset mật khẩu" : "Tạo tài khoản thành công!"}
+                    </h2>
+                    <p className="text-sm text-white/90">
+                      {mode === "reset" ? "Tạo mật khẩu mới ngẫu nhiên" : "Thông tin đăng nhập người dùng"}
+                    </p>
                   </div>
                 </div>
                 <button
@@ -194,10 +226,15 @@ export function AdminCredentialsModal({ isOpen, onClose, userData, onPasswordRes
                     )}
                   </div>
                   
-                  {showPassword ? (
+                  {isResettingPassword ? (
+                    <div className="px-4 py-3 bg-[#EFF6FF] border border-[#BFDBFE] rounded-lg flex items-center gap-3">
+                      <RotateCcw className="w-5 h-5 text-[#3B82F6] animate-spin" />
+                      <p className="text-sm font-medium text-[#1D4ED8]">Đang tạo mật khẩu mới...</p>
+                    </div>
+                  ) : currentPassword && showPassword ? (
                     <div className="flex items-center gap-2">
                       <div className="flex-1 px-4 py-3 bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg font-mono text-[#111827] flex items-center justify-between">
-                        <span>{userData.password}</span>
+                        <span>{currentPassword}</span>
                         <button
                           onClick={() => setShowPassword(false)}
                           className="text-[#6B7280] hover:text-[#111827]"
@@ -206,7 +243,7 @@ export function AdminCredentialsModal({ isOpen, onClose, userData, onPasswordRes
                         </button>
                       </div>
                       <button
-                        onClick={() => handleCopy(userData.password, 'password')}
+                        onClick={() => handleCopy(currentPassword, 'password')}
                         className={`px-4 py-3 rounded-lg transition-colors font-medium flex items-center gap-2 ${
                           copiedPassword
                             ? 'bg-[#10B981] text-white'
@@ -226,7 +263,7 @@ export function AdminCredentialsModal({ isOpen, onClose, userData, onPasswordRes
                         )}
                       </button>
                     </div>
-                  ) : (
+                  ) : currentPassword && !showPassword ? (
                     <div className="px-4 py-3 bg-[#FEE2E2] border border-[#FCA5A5] rounded-lg flex items-center gap-3">
                       <EyeOff className="w-5 h-5 text-[#DC2626]" />
                       <div className="flex-1">
@@ -241,6 +278,11 @@ export function AdminCredentialsModal({ isOpen, onClose, userData, onPasswordRes
                         Hiện
                       </button>
                     </div>
+                  ) : (
+                    <div className="px-4 py-3 bg-[#F3F4F6] border border-[#E5E7EB] rounded-lg flex items-center gap-3">
+                      <RotateCcw className="w-5 h-5 text-[#6B7280]" />
+                      <p className="text-sm text-[#6B7280]">Chưa có mật khẩu — nhấn Reset để tạo mới</p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -251,13 +293,19 @@ export function AdminCredentialsModal({ isOpen, onClose, userData, onPasswordRes
                   <button
                     onClick={handleResetPassword}
                     disabled={isResettingPassword}
-                    className="w-full px-4 py-3 bg-gradient-to-r from-[#F59E0B] to-[#F97316] text-white rounded-lg hover:from-[#D97706] hover:to-[#EA580C] transition-all font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`w-full px-4 py-3 text-white rounded-lg transition-all font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                      mode === "reset"
+                        ? "bg-gradient-to-r from-[#7C3AED] to-[#DB2777] hover:from-[#6D28D9] hover:to-[#BE185D]"
+                        : "bg-gradient-to-r from-[#F59E0B] to-[#F97316] hover:from-[#D97706] hover:to-[#EA580C]"
+                    }`}
                   >
                     <RotateCcw className={`w-4 h-4 ${isResettingPassword ? 'animate-spin' : ''}`} />
-                    {isResettingPassword ? 'Đang reset...' : 'Reset mật khẩu (tạo mật khẩu mới ngẫu nhiên)'}
+                    {isResettingPassword ? 'Đang tạo mật khẩu mới...' : 'Reset mật khẩu (tạo mật khẩu mới ngẫu nhiên)'}
                   </button>
                   <p className="text-xs text-[#6B7280] mt-2 text-center">
-                    Khi người dùng quên mật khẩu, bạn có thể reset về mật khẩu ngẫu nhiên mới
+                    {mode === "reset"
+                      ? "Tạo mật khẩu ngẫu nhiên mới cho người dùng này"
+                      : "Khi người dùng quên mật khẩu, bạn có thể reset về mật khẩu ngẫu nhiên mới"}
                   </p>
                 </div>
               )}

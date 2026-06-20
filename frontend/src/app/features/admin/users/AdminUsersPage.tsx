@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import {
   Lock, Search, Shield, Unlock, Users, Trash2, UserCog, X, CheckSquare, Square,
-  UserPlus, GraduationCap, Phone, CheckCircle2, XCircle, RefreshCw, AlertCircle, Check, Eye, EyeOff
+  UserPlus, GraduationCap, Phone, CheckCircle2, XCircle, RefreshCw, AlertCircle, Check, Eye, EyeOff, KeyRound
 } from "lucide-react";
 import { adminApi, AdminUser } from "@/services/adminApi";
 import { AdminTableSkeleton } from "../components/AdminPageSkeleton";
@@ -230,6 +230,7 @@ export function AdminUsersPage() {
     role: "student" | "teacher" | "admin";
     id?: number;
   } | null>(null);
+  const [credentialsMode, setCredentialsMode] = useState<"create" | "reset">("create");
 
   // Phone duplication check states
   const [debouncedPhone, setDebouncedPhone] = useState("");
@@ -624,6 +625,7 @@ export function AdminUsersPage() {
         
         // Show credentials modal
         setShowCredentials(true);
+        setCredentialsMode("create");
         
         showToast("Tạo tài khoản người dùng thành công", "ok");
         await loadUsers();
@@ -634,6 +636,21 @@ export function AdminUsersPage() {
     } finally {
       setCreating(false);
     }
+  };
+
+  // Handler to open reset password modal for existing user
+  const handleResetPasswordClick = (u: AdminUser) => {
+    const id = displayId(u);
+    if (!id) return;
+    setCreatedUser({
+      name: displayName(u),
+      phone: displayPhone(u),
+      password: "", // Will be populated after reset
+      role: (displayRole(u) as "student" | "teacher" | "admin"),
+      id,
+    });
+    setCredentialsMode("reset");
+    setShowCredentials(true);
   };
 
   return (
@@ -1021,7 +1038,18 @@ export function AdminUsersPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-right">
-                      {(() => {
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* Reset Password button */}
+                        <button
+                          onClick={() => handleResetPasswordClick(u)}
+                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold border transition-all transform hover:scale-[1.03] bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100"
+                          title="Reset mật khẩu"
+                        >
+                          <KeyRound className="h-3.5 w-3.5" />
+                          Reset MK
+                        </button>
+                        {/* Lock/Unlock button */}
+                        {(() => {
                         const cooldownMs = activeTab === "teachers" && isActive ? getCooldownMs(id) : 0;
                         const inCooldown = cooldownMs > 0;
                         const disabled = isLocking || inCooldown;
@@ -1057,6 +1085,7 @@ export function AdminUsersPage() {
                           </button>
                         );
                       })()}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -1353,9 +1382,11 @@ export function AdminUsersPage() {
       {createdUser && (
         <AdminCredentialsModal
           isOpen={showCredentials}
+          mode={credentialsMode}
           onClose={() => {
             setShowCredentials(false);
             setCreatedUser(null);
+            setCredentialsMode("create");
           }}
           userData={createdUser}
           onPasswordReset={(newPassword) => {
