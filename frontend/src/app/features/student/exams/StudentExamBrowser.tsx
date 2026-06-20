@@ -558,19 +558,25 @@ function ExamCard({
 
         {/* Skill chips */}
         <div className="flex items-center gap-1.5 flex-wrap relative z-10">
-          {visibleSkills.map(({ key, label, icon: Icon, color }) => (
-            <span
-              key={key}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
-              style={{ background: "#fff", color, border: `1px solid ${color}30` }}
+          {scope === "full" ? (
+            <span 
+              className="flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold text-white shadow-sm"
+              style={{ background: "linear-gradient(135deg, #FF6B6B 0%, #845EF7 100%)" }}
             >
-              <Icon className="w-2.5 h-2.5" />
-              {label}
+              Full test
             </span>
-          ))}
-          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-900 text-white border border-slate-800">
-            {scopeLabel}{exam.part_number ? ` ${exam.part_number}` : ""}
-          </span>
+          ) : (
+            visibleSkills.map(({ key, label, icon: Icon, color }) => (
+              <span
+                key={key}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                style={{ background: "#fff", color, border: `1px solid ${color}30` }}
+              >
+                <Icon className="w-2.5 h-2.5" />
+                {label}{exam.part_number ? ` - Part ${exam.part_number}` : ""}
+              </span>
+            ))
+          )}
         </div>
       </div>
 
