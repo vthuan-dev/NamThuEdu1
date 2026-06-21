@@ -64,7 +64,8 @@ class StudentExamSessionController extends Controller
 
         try {
             $result = DB::transaction(function () use ($request, $submissionId, $user) {
-                $submission = Submission::where('sId', $submissionId)
+                $submission = Submission::with('exam:eId,eDuration_minutes')
+                    ->where('sId', $submissionId)
                     ->where('user_id', $user->uId)
                     ->lockForUpdate()
                     ->first();
@@ -109,11 +110,21 @@ class StudentExamSessionController extends Controller
                 $now = now();
                 $submission->update(['last_activity_at' => $now]);
 
+                // Tính time_remaining_seconds để FE đồng bộ giờ sau mỗi draft save
+                $timeRemainingSeconds = null;
+                if ($submission->exam && $submission->sStart_time) {
+                    $duration = (int) ($submission->exam->eDuration_minutes ?? 0) * 60;
+                    $elapsed  = (int) $now->diffInSeconds($submission->sStart_time->copy()->utc(), false);
+                    $timeRemainingSeconds = max(0, $duration - $elapsed);
+                }
+
                 return ['status' => 200, 'data' => [
-                    'status'           => 'success',
-                    'savedCount'       => $savedCount,
-                    'last_activity_at' => $now->toIso8601String(),
-                    'serverTime'       => $now->toIso8601String(),
+                    'status'                 => 'success',
+                    'savedCount'             => $savedCount,
+                    'last_activity_at'       => $now->toIso8601String(),
+                    'serverTime'             => $now->toIso8601String(),
+                    'time_remaining_seconds' => $timeRemainingSeconds,
+                    'timeRemaining'          => $timeRemainingSeconds, // alias cho FE compatibility
                 ]];
             });
 
