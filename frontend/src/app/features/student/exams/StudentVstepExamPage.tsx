@@ -913,6 +913,30 @@ export function StudentVstepExamPage() {
     };
   }, [listeningParts, readingParts, writingTasks, speakingParts, answers, writingDrafts, speakingDone]);
 
+  /* ── Đủ điều kiện nộp bài? ─────────────────────────────────
+   * Bắt buộc hoàn thành 100% mỗi skill có trong đề trước khi cho nộp:
+   * - MCQ (Listening/Reading): đã khoanh hết
+   * - Writing: mỗi task có nội dung (đã lưu draft)
+   * - Speaking: đã thu âm xong tất cả parts
+   * Nếu chưa đủ → nút Nộp bài DISABLED + tooltip giải thích lý do.
+   */
+  const submitGate = useMemo(() => {
+    const reasons: string[] = [];
+    const lrRemain = Math.max(0, stats.totalMCQ - stats.answeredMCQ);
+    const wRemain = Math.max(0, stats.wq - stats.answeredWriting);
+    const sRemain = Math.max(0, speakingParts.length - stats.answeredSpeaking);
+    if (lrRemain > 0) reasons.push(`còn ${lrRemain} câu trắc nghiệm`);
+    if (wRemain > 0) reasons.push(`còn ${wRemain} bài viết`);
+    if (sRemain > 0) reasons.push(`còn ${sRemain} phần nói`);
+    return {
+      canSubmit: reasons.length === 0,
+      reasons,
+      tooltip: reasons.length === 0
+        ? "Sẵn sàng nộp bài"
+        : `Chưa đủ điều kiện: ${reasons.join(", ")}`,
+    };
+  }, [stats, speakingParts.length]);
+
   /* ── Skills thực sự có nội dung trong đề (IELTS thường chỉ 1 skill) ────── */
   const skillsInExam = useMemo<SkillKey[]>(() => {
     const present: SkillKey[] = [];
@@ -1162,7 +1186,13 @@ export function StudentVstepExamPage() {
               <>
                 <button
                   onClick={() => setShowSubmit(true)}
-                  className="inline-flex items-center gap-2 px-5 py-2 bg-sky-600 text-white text-base font-semibold rounded-lg hover:bg-sky-700 active:scale-[0.97] transition-all shadow-sm"
+                  disabled={!submitGate.canSubmit}
+                  title={submitGate.tooltip}
+                  className={`inline-flex items-center gap-2 px-5 py-2 text-base font-semibold rounded-lg active:scale-[0.97] transition-all shadow-sm ${
+                    submitGate.canSubmit
+                      ? "bg-sky-600 text-white hover:bg-sky-700 cursor-pointer"
+                      : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                  }`}
                 >
                   <Send className="w-4 h-4" />
                   Nộp bài
@@ -1189,6 +1219,8 @@ export function StudentVstepExamPage() {
             answeredCount={stats.answeredMCQ}
             totalCount={stats.totalMCQ}
             onSubmit={reviewMode ? undefined : () => setShowSubmit(true)}
+            canSubmit={submitGate.canSubmit}
+            submitTooltip={submitGate.tooltip}
             onJump={(pn, qId) => {
               if (pn !== current.partNumber) navigate2(current.skill, pn);
               setTimeout(() => {
@@ -1291,9 +1323,13 @@ export function StudentVstepExamPage() {
             <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 flex-shrink-0">
               <button
                 onClick={isLastPart && !reviewMode ? () => setShowSubmit(true) : goNext}
+                disabled={isLastPart && !reviewMode && !submitGate.canSubmit}
+                title={isLastPart && !reviewMode ? submitGate.tooltip : undefined}
                 className={`px-4 py-2 text-white active:scale-[0.97] rounded-md text-sm font-semibold transition-all shadow-sm ${
                   isLastPart && !reviewMode
-                    ? "bg-emerald-600 hover:bg-emerald-700 animate-pulse"
+                    ? submitGate.canSubmit
+                      ? "bg-emerald-600 hover:bg-emerald-700 animate-pulse"
+                      : "bg-slate-300 text-slate-500 cursor-not-allowed"
                     : "bg-sky-600 hover:bg-sky-700"
                 }`}
               >
@@ -2590,7 +2626,7 @@ function PartHeader({ icon: Icon, color, title, subtitle }: { icon: any; color: 
 
 function QuestionNavigator({
   skill, currentPart, listeningParts, readingParts, answers, flagged, onJump, reviewMode, correctAnswersMap,
-  answeredCount, totalCount, onSubmit,
+  answeredCount, totalCount, onSubmit, canSubmit, submitTooltip,
 }: {
   skill: "listening" | "reading";
   currentPart: number;
@@ -2607,6 +2643,10 @@ function QuestionNavigator({
   totalCount?: number;
   /** Callback nút Nộp bài — chỉ hiện khi không phải reviewMode */
   onSubmit?: () => void;
+  /** Cho phép bấm Nộp bài? false = disable button (chưa khoanh xong) */
+  canSubmit?: boolean;
+  /** Tooltip giải thích lý do disable / sẵn sàng nộp */
+  submitTooltip?: string;
 }) {
   const partsData = skill === "listening"
     ? listeningParts.map(p => ({
@@ -2679,7 +2719,13 @@ function QuestionNavigator({
             </span>
             <button
               onClick={onSubmit}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-bold transition-colors"
+              disabled={canSubmit === false}
+              title={submitTooltip}
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-[11px] font-bold transition-colors ${
+                canSubmit === false
+                  ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                  : "bg-sky-600 hover:bg-sky-700 text-white cursor-pointer"
+              }`}
             >
               <Send className="w-3 h-3" /> Nộp bài
             </button>

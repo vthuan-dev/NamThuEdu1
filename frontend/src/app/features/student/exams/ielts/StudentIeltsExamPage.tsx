@@ -571,6 +571,21 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
 
   const flaggedCount = useMemo(() => Object.values(flagged).filter(Boolean).length, [flagged]);
   const shouldWarnBeforeLeave = !reviewMode && !submitting && !timeUp && answeredCount > 0;
+
+  // ── Đủ điều kiện nộp bài? ─────────────────────────────────
+  // Yêu cầu: phải khoanh hết câu (Listening/Reading) hoặc viết đủ độ dài
+  // tối thiểu (Writing). Nếu chưa đủ → nút Nộp bài DISABLED.
+  const submitGate = useMemo(() => {
+    const remain = Math.max(0, totalQuestions - answeredCount);
+    if (remain === 0 || totalQuestions === 0) {
+      return { canSubmit: true, tooltip: "Sẵn sàng nộp bài" };
+    }
+    return {
+      canSubmit: false,
+      tooltip: `Còn ${remain} câu chưa hoàn thành — không thể nộp bài`,
+    };
+  }, [totalQuestions, answeredCount]);
+
   const routeBlocker = useBlocker(({ currentLocation, nextLocation }) => {
     if (!shouldWarnBeforeLeave) return false;
     const current = `${currentLocation.pathname}${currentLocation.search}`;
@@ -599,6 +614,11 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
   }, [routeBlocker, session, shouldWarnBeforeLeave]);
 
   const handleRequestSubmit = () => {
+    // Gate guard: nếu còn câu chưa khoanh, KHÔNG mở dialog, show toast.
+    if (!submitGate.canSubmit) {
+      toast.warning(submitGate.tooltip, 3500);
+      return;
+    }
     setSubmitOpen(true);
   };
 

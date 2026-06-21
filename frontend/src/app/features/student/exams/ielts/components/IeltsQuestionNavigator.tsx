@@ -29,6 +29,10 @@ interface IeltsQuestionNavigatorProps {
   draggable?: boolean;
   /** Ẩn nút "Nộp bài" — dùng cho preview mode */
   hideSubmit?: boolean;
+  /** Cho phép bấm Nộp bài? false = disable visual + onSubmit không gọi */
+  canSubmit?: boolean;
+  /** Tooltip giải thích lý do disable */
+  submitTooltip?: string;
   /**
    * `true` → chỉ render câu hỏi thuộc group đang active (`activeGroupIndex`).
    * Dùng cho IELTS Listening CBT: học viên chỉ thấy câu của part hiện tại,
@@ -67,6 +71,8 @@ export function IeltsQuestionNavigator({
   onSubmit,
   draggable = true,
   hideSubmit = false,
+  canSubmit = true,
+  submitTooltip,
   currentGroupOnly = false,
   onToggleFlag,
   reviewMode = false,
@@ -196,7 +202,13 @@ export function IeltsQuestionNavigator({
                 <button
                   type="button"
                   onClick={onSubmit}
-                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] transition-all cursor-pointer shadow-sm shadow-emerald-200/60"
+                  disabled={!canSubmit}
+                  title={submitTooltip ?? (canSubmit ? "Nộp bài" : "Cần khoanh hết câu hỏi mới được nộp")}
+                  className={`w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all shadow-sm ${
+                    canSubmit
+                      ? "text-white bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] cursor-pointer shadow-emerald-200/60"
+                      : "text-slate-400 bg-slate-100 cursor-not-allowed"
+                  }`}
                 >
                   <Send className="w-3.5 h-3.5" />
                   Nộp bài

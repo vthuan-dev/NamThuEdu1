@@ -29,6 +29,10 @@ interface IeltsBottomNavProps {
   reviewMode?: boolean;
   hideSubmit?: boolean;
   submitLabel?: string;
+  /** Cho phép nộp? false = disable button. Mặc định true (back-compat). */
+  canSubmit?: boolean;
+  /** Tooltip giải thích lý do disable (vd "còn 5 câu") */
+  submitTooltip?: string;
 }
 
 // ─── Theme ──────────────────────────────────────────────────────────────
@@ -48,6 +52,8 @@ export function IeltsBottomNav({
   canNext = true,
   hideSubmit = false,
   submitLabel,
+  canSubmit = true,
+  submitTooltip,
 }: IeltsBottomNavProps) {
   const answeredCount = questions.filter((q) => {
     const v = answers[q.qId];
@@ -174,10 +180,16 @@ export function IeltsBottomNav({
           <button
             type="button"
             onClick={onSubmit}
-            className="flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-bold text-white transition-all cursor-pointer shadow-sm hover:shadow-md"
-            style={{
+            disabled={!canSubmit}
+            title={submitTooltip ?? (canSubmit ? "Nộp bài" : "Cần khoanh hết câu hỏi mới được nộp")}
+            className={`flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-bold transition-all shadow-sm ${
+              canSubmit
+                ? "text-white cursor-pointer hover:shadow-md"
+                : "text-slate-400 bg-slate-100 cursor-not-allowed"
+            }`}
+            style={canSubmit ? {
               background: `linear-gradient(135deg, ${BRAND_PRIMARY}, ${BRAND_SECONDARY})`,
-            }}
+            } : undefined}
           >
             <Send className="w-3.5 h-3.5" />
             <span>{submitLabel ?? "Nộp bài"}</span>
