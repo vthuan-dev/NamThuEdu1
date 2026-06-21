@@ -650,6 +650,8 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
       }
 
       if (submitOk) {
+        // Hết giờ + nộp ok → clear practice scope cho session sau không dính
+        try { localStorage.removeItem(`ielts_practice_scope_${examId}_${currentSkill}`); } catch {}
         toast.warning("Đã hết thời gian làm bài. Bài thi của bạn đã được nộp tự động.", 5000);
         setTimeout(() => {
           if (submissionId) {
@@ -689,6 +691,9 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
       // Xoá deadline của skill vừa nộp để lần làm mới không dính giờ cũ
       clearDeadline(deadlineKeyRef.current ?? buildIeltsDeadlineKey(examId, currentSkill, isPracticeMode, practiceSectionNumbers));
       deadlineRef.current = null;
+      // Nộp xong → clear practice scope đã lưu để session sau không bị
+      // resume nhầm scope cũ.
+      try { localStorage.removeItem(`ielts_practice_scope_${examId}_${currentSkill}`); } catch {}
 
       // If this is part of a full test, advance to next skill instead of leaving
       if (fullTest && skillIdx < skillSequence.length - 1) {

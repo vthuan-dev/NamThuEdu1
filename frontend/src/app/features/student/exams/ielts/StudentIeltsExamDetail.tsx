@@ -255,15 +255,30 @@ function DetailContent({
   const [activeSession, setActiveSession] = useState(data.activeSession ?? null);
   const [discardingSession, setDiscardingSession] = useState(false);
 
-  const continueUrl = data.scope === "full"
-    ? `/hoc-vien/lam-bai-ielts/${data.examId}`
-    : `/hoc-vien/lam-bai-ielts/${data.examId}/${data.skill}?mode=full_test`;
+  // Đọc practice scope đã lưu (nếu có) khi học viên đã chọn 1 section + thời gian
+  // và đang có phiên dở → "Tiếp tục bài đang làm" phải giữ NGUYÊN scope đó,
+  // KHÔNG fallback sang full_test (sẽ render hết 40 câu, chấm sai).
+  const savedScope = readIeltsPracticeScope(data.examId, data.skill);
+  const continueUrl = (() => {
+    if (data.scope === "full") return `/hoc-vien/lam-bai-ielts/${data.examId}`;
+    const base = `/hoc-vien/lam-bai-ielts/${data.examId}/${data.skill}`;
+    if (savedScope && savedScope.sections.length > 0) {
+      const params = new URLSearchParams();
+      params.set("mode", "practice");
+      params.set("sections", savedScope.sections.join(","));
+      if (savedScope.time) params.set("time", String(savedScope.time));
+      return `${base}?${params.toString()}`;
+    }
+    return `${base}?mode=full_test`;
+  })();
   const hasBlockingSession = !!activeSession;
   const handleDiscardSession = async () => {
     try {
       setDiscardingSession(true);
       await api.post(`/student/exams/${data.examId}/discard-active-session`);
       data.availableSkills.forEach((skill) => clearIeltsLocalDeadlines(data.examId, skill));
+      // Practice scope cũng phải clear, không thì lần start mới ăn lại scope cũ
+      data.availableSkills.forEach((skill) => clearIeltsPracticeScope(data.examId, skill));
       setActiveSession(null);
     } finally {
       setDiscardingSession(false);
@@ -457,11 +472,18 @@ function PracticeMode({
   const handleStart = () => {
     if (blockedByActiveSession) return;
     if (selected.size === 0) return;
-    const sectionsParam = Array.from(selected).sort((a, b) => a - b).join(",");
+    const sortedSections = Array.from(selected).sort((a, b) => a - b);
+    const sectionsParam = sortedSections.join(",");
     const params = new URLSearchParams();
     params.set("mode", "practice");
     params.set("sections", sectionsParam);
     if (timeLimit) params.set("time", timeLimit);
+    // Lưu scope để khi student F5 / out-vào lại bấm "Tiếp tục bài đang làm"
+    // vẫn render đúng N section đã chọn (không bị reset thành full 40 câu).
+    saveIeltsPracticeScope(data.examId, data.skill, {
+      sections: sortedSections,
+      time: timeLimit ? Number(timeLimit) : null,
+    });
     navigate(`/hoc-vien/lam-bai-ielts/${data.examId}/${data.skill}?${params.toString()}`);
   };
 
@@ -574,6 +596,9 @@ function FullTestMode({
 
   const handleStart = () => {
     if (blockedByActiveSession) return;
+    // Khi chuyển sang full test, phải clear practice scope cũ (nếu có) để
+    // tránh lần "Tiếp tục bài đang làm" sau đó render nhầm scope practice.
+    clearIeltsPracticeScope(data.examId, data.skill);
     navigate(
       data.scope === "full"
         ? `/hoc-vien/lam-bai-ielts/${data.examId}`
@@ -769,6 +794,47 @@ function clearIeltsLocalDeadlines(examId: number, skill: IeltsSkill) {
         localStorage.removeItem(key);
       }
     }
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+// ─── Practice scope persistence (for resume to keep selected sections) ──
+type IeltsPracticeScope = { sections: number[]; time: number | null };
+const ieltsPracticeScopeKey = (examId: number, skill: IeltsSkill) =>
+  `ielts_practice_scope_${examId}_${skill}`;
+
+function saveIeltsPracticeScope(examId: number, skill: IeltsSkill, scope: IeltsPracticeScope) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(ieltsPracticeScopeKey(examId, skill), JSON.stringify(scope));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+function readIeltsPracticeScope(examId: number, skill: IeltsSkill): IeltsPracticeScope | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(ieltsPracticeScopeKey(examId, skill));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as IeltsPracticeScope;
+    if (!Array.isArray(parsed?.sections)) return null;
+    const sections = parsed.sections
+      .map((n) => Number(n))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    if (sections.length === 0) return null;
+    const time = typeof parsed.time === "number" && parsed.time > 0 ? parsed.time : null;
+    return { sections, time };
+  } catch {
+    return null;
+  }
+}
+
+function clearIeltsPracticeScope(examId: number, skill: IeltsSkill) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(ieltsPracticeScopeKey(examId, skill));
   } catch {
     /* storage unavailable */
   }
