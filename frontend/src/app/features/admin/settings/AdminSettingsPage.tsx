@@ -879,26 +879,6 @@ export function AdminSettingsPage() {
                         </div>
                       )}
 
-                      {/* Allow registration */}
-                      <div className="flex items-start justify-between gap-4 pt-2">
-                        <div className="flex-1">
-                          <label className="text-sm font-semibold text-slate-800">Cho phép đăng ký mới</label>
-                          <p className="text-xs text-slate-400 leading-normal">Cho phép tự tạo tài khoản (Chức năng này hiện đang do Admin/GV quản lý)</p>
-                        </div>
-                        <button
-                          type="button"
-                          disabled={saveState === "saving"}
-                          onClick={() => toggleSystemValue("allowRegistration", !settings.allowRegistration)}
-                          className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer items-center rounded-full transition-colors disabled:opacity-50 ${
-                            settings.allowRegistration ? "bg-blue-600" : "bg-slate-200"
-                          }`}
-                        >
-                          <span className={`inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow transition-transform ${
-                            settings.allowRegistration ? "translate-x-[16px]" : "translate-x-[2px]"
-                          }`} />
-                        </button>
-                      </div>
-
                       {/* Exam Auto Approve */}
                       <div className="flex items-start justify-between gap-4 pt-2">
                         <div className="flex-1">
