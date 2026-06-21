@@ -352,6 +352,29 @@ export function VstepResultPage() {
     return map;
   }, [raw]);
 
+  // ── Helper: Map letter answer to label (TRUE/FALSE/NOT GIVEN) ────────────
+  const getAnswerLabel = (questionId: number, letter: string): string | null => {
+    const question = (raw?.exam?.questions ?? []).find((q: any) => q.qId === questionId);
+    if (!question?.answers) return null;
+    
+    // Detect if this is TRUE/FALSE/NOT GIVEN question type
+    const answerTexts = question.answers.map((a: any) => String(a.aContent ?? "").toUpperCase().trim());
+    const isTrueFalseNotGiven = 
+      answerTexts.includes("TRUE") || 
+      answerTexts.includes("FALSE") || 
+      answerTexts.includes("NOT GIVEN");
+    
+    if (!isTrueFalseNotGiven) return null;
+    
+    // Find the answer option for this letter
+    const LETTERS = ["A", "B", "C", "D"];
+    const letterIndex = LETTERS.indexOf(letter.toUpperCase());
+    if (letterIndex === -1 || letterIndex >= question.answers.length) return null;
+    
+    const answer = question.answers[letterIndex];
+    return String(answer?.aContent ?? "").toUpperCase().trim();
+  };
+
   // ── Helper: tone của điểm theo band ────────────────────────────────────────
   const scoreTone = (avg: number | null) => {
     if (avg === null) return { text: "text-slate-800", chip: "bg-slate-100 text-slate-600" };
@@ -759,6 +782,12 @@ export function VstepResultPage() {
                 {(isPracticeMode ? answeredRows : rows).map((ans, idx) => {
                   const qText = ans.question?.qContent?.replace(/<[^>]*>/g, "").slice(0, 80) ?? `Câu ${idx + 1}`;
                   const correctAns = examQMap[ans.question?.qId] ?? "—";
+                  const userAns = ans.saAnswer_text ?? "—";
+                  
+                  // Get labels for TRUE/FALSE/NOT GIVEN questions
+                  const correctLabel = getAnswerLabel(ans.question?.qId, correctAns);
+                  const userLabel = getAnswerLabel(ans.question?.qId, userAns);
+                  
                   return (
                     <div key={ans.saId ?? idx} className="flex items-start gap-3 px-5 py-3">
                       <div className="flex-shrink-0 mt-0.5">
@@ -774,12 +803,16 @@ export function VstepResultPage() {
                           <span className="text-slate-500">
                             Bạn chọn:{" "}
                             <span className={`font-semibold ${ans.saIs_correct ? "text-emerald-600" : "text-red-500"}`}>
-                              {ans.saAnswer_text ?? "—"}
+                              {userAns}
+                              {userLabel && <span className="ml-1 text-[10px] opacity-70">({userLabel})</span>}
                             </span>
                           </span>
                           {!ans.saIs_correct && (
                             <span className="text-slate-500">
-                              Đáp án: <span className="font-semibold text-emerald-600">{correctAns}</span>
+                              Đáp án: <span className="font-semibold text-emerald-600">
+                                {correctAns}
+                                {correctLabel && <span className="ml-1 text-[10px] opacity-70">({correctLabel})</span>}
+                              </span>
                             </span>
                           )}
                         </div>
