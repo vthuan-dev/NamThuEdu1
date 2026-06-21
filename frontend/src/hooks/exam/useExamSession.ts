@@ -397,6 +397,8 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
       // Kể cả khi queue đã empty (đã debounce save xong), ta vẫn re-push
       // toàn bộ answers từ state để chống mất dữ liệu nếu có save trước
       // đó thất bại âm thầm hoặc bị drop khỏi queue.
+      let flushFailedChunks = 0;
+      let flushTotalChunks = 0;
       try {
         const allDrafts: DraftAnswer[] = [];
         for (const [qid, value] of Object.entries(answersRef.current)) {
@@ -408,14 +410,29 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
           const CHUNK_SIZE = 200;
           for (let i = 0; i < allDrafts.length; i += CHUNK_SIZE) {
             const chunk = allDrafts.slice(i, i + CHUNK_SIZE);
-            try {
-              if (customSaveDraft) {
-                await customSaveDraft(submissionId, chunk);
-              } else {
-                await studentApi.saveDraft(submissionId, chunk);
+            flushTotalChunks++;
+            // ⚠️ Retry mỗi chunk tối đa 3 lần với backoff trước khi bỏ cuộc.
+            let chunkOk = false;
+            let lastErr: any = null;
+            for (let attempt = 0; attempt < 3 && !chunkOk; attempt++) {
+              try {
+                if (customSaveDraft) {
+                  await customSaveDraft(submissionId, chunk);
+                } else {
+                  await studentApi.saveDraft(submissionId, chunk);
+                }
+                chunkOk = true;
+              } catch (err) {
+                lastErr = err;
+                await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
               }
-            } catch (err) {
-              console.warn('[useExamSession] final force-flush chunk failed', err);
+            }
+            if (!chunkOk) {
+              flushFailedChunks++;
+              console.warn(
+                '[useExamSession] final force-flush chunk failed sau 3 retry',
+                { reason, chunkSize: chunk.length, error: lastErr },
+              );
             }
           }
           pendingQueueRef.current.clear();
@@ -427,6 +444,20 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
       } catch (err) {
         /* dù force-flush fail vẫn cho phép submit — BE sẽ chấm theo gì đã có */
         console.warn('[useExamSession] submit force-flush error', err);
+      }
+
+      // Nếu reason='manual' và CÓ chunk fail → confirm với user trước khi submit.
+      // (Timeout submit không thể hỏi vì user đã rời/hết giờ — vẫn cố submit.)
+      if (reason === 'manual' && flushFailedChunks > 0) {
+        const ok = window.confirm(
+          `Có ${flushFailedChunks}/${flushTotalChunks} nhóm câu trả lời chưa lưu được lên server (mạng yếu).\n\n` +
+          `• Bấm OK để vẫn nộp bài (server sẽ chấm theo gì đã lưu được).\n` +
+          `• Bấm Cancel để dừng và kiểm tra mạng rồi nộp lại.`,
+        );
+        if (!ok) {
+          submittedRef.current = false;
+          throw new Error('Người dùng huỷ nộp bài do save thất bại.');
+        }
       }
 
       try {

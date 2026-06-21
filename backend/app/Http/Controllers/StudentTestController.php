@@ -881,6 +881,13 @@ class StudentTestController extends Controller
             $totalQuestions = $submission->exam->questions->count();
             $answeredQuestions = $submission->answers->count();
             if ($totalQuestions > 0 && $answeredQuestions === 0) {
+                \Log::warning('Non-VSTEP submit blocked: zero answers', [
+                    'submission_id' => $submissionId,
+                    'user_id' => $user->uId,
+                    'exam_id' => $submission->exam_id,
+                    'exam_type' => $submission->exam->eType,
+                    'total_questions' => $totalQuestions,
+                ]);
                 $unansweredQuestions = $submission->exam->questions->pluck('qId')->toArray();
                 return response()->json([
                     'status' => 'error',
@@ -888,6 +895,15 @@ class StudentTestController extends Controller
                     'unansweredQuestions' => array_values($unansweredQuestions)
                 ], 400);
             }
+
+            \Log::info('Non-VSTEP submit gate passed', [
+                'submission_id' => $submissionId,
+                'user_id' => $user->uId,
+                'exam_id' => $submission->exam_id,
+                'exam_type' => $submission->exam->eType,
+                'total_questions' => $totalQuestions,
+                'answered_questions' => $answeredQuestions,
+            ]);
         }
 
         DB::beginTransaction();

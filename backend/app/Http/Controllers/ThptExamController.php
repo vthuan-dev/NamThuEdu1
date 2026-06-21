@@ -558,6 +558,15 @@ class ThptExamController extends Controller
         $submission->submission_payload = $payload;
 
         if ($request->boolean('final')) {
+            // Diagnostic log để diagnose nếu user báo "nộp xong điểm 0"
+            \Log::info('THPT submit (final) received', [
+                'submission_id' => $submission->sId,
+                'user_id' => $user->uId,
+                'exam_id' => $examId,
+                'answers_count' => is_array($answers) ? count($answers) : 0,
+                'has_speaking_audio' => !empty(json_decode($submission->sGemini_feedback ?? '{}', true)['speaking_audio'] ?? []),
+            ]);
+
             // Grade dùng snapshot trong submission (NOT exam.thpt_config) để
             // không bị ảnh hưởng nếu teacher publish version mới giữa chừng.
             $configForGrading = $payload['exam_snapshot']['config']

@@ -351,6 +351,16 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
           }
         }
 
+        // ⚠️ Push backend savedAnswers vào session.setAnswer để force-flush khi
+        // submit cũng có chúng (nếu chỉ ở local state thì doSubmit re-push qua
+        // saveDraft sẽ KHÔNG có). Việc push này cũng cập nhật pendingQueueRef.
+        if (Object.keys(restored).length > 0) {
+          Object.entries(restored).forEach(([qId, val]) => {
+            const numericQid = Number(qId);
+            sessionSetAnswerRef.current(Number.isFinite(numericQid) ? numericQid : qId, val);
+          });
+        }
+
         // Kiểm tra draft localStorage và tự khôi phục, không mở modal.
         const draft = examDraftStorage.load(sId);
         const draftAnswers = draft?.answers ?? {};
@@ -607,23 +617,37 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
     const isLastSkill = !fullTest || skillIdx >= skillSequence.length - 1;
 
     if (isLastSkill) {
+      // Dùng session.submit() để force-flush + retry chunk + submit (atomic).
+      // Nếu fail → thông báo rõ ràng và CHO PHÉP user thử lại (không tự navigate).
+      let submitOk = false;
       try {
         if (submissionId) {
-          await session.flushNow().catch(() => {});
-          await api.post(`/student/tests/${submissionId}/submit`, {});
+          await session.submit();
+          submitOk = true;
         }
-      } catch {
-        // Vẫn tiếp tục điều hướng dù submit lỗi — bài đã auto-save từng câu
+      } catch (err) {
+        console.error('[IELTS] timeout submit failed', err);
       }
-      toast.warning("Đã hết thời gian làm bài. Bài thi của bạn đã được nộp tự động.", 5000);
-      // Rời trang làm bài, chuyển sang trang kết quả
-      setTimeout(() => {
-        if (submissionId) {
-          navigate(`/hoc-vien/ket-qua-ielts/${submissionId}`, { replace: true });
-        } else {
-          navigate("/hoc-vien/de-thi", { replace: true });
-        }
-      }, 1200);
+
+      if (submitOk) {
+        toast.warning("Đã hết thời gian làm bài. Bài thi của bạn đã được nộp tự động.", 5000);
+        setTimeout(() => {
+          if (submissionId) {
+            navigate(`/hoc-vien/ket-qua-ielts/${submissionId}`, { replace: true });
+          } else {
+            navigate("/hoc-vien/de-thi", { replace: true });
+          }
+        }, 1200);
+      } else {
+        // Submit thất bại — KHÔNG navigate. Cho user retry bằng nút submit thủ công.
+        timeUpHandledRef.current = false;
+        setTimeUp(false);
+        setSubmitOpen(true);
+        toast.error(
+          "Hết giờ nhưng nộp bài thất bại do mạng. Hãy bấm Nộp bài lại — dữ liệu vẫn còn trong trình duyệt.",
+          8000,
+        );
+      }
     } else {
       // Full test: hết giờ skill này → chuyển skill kế tiếp
       toast.info("Hết giờ phần này. Chuyển sang phần thi tiếp theo.", 4000);
@@ -641,7 +665,6 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
     if (!submissionId) return;
     try {
       setSubmitting(true);
-      await session.flushNow().catch(() => {});
 
       // Xoá deadline của skill vừa nộp để lần làm mới không dính giờ cũ
       clearDeadline(deadlineKeyRef.current ?? buildIeltsDeadlineKey(examId, currentSkill, isPracticeMode, practiceSectionNumbers));
@@ -649,6 +672,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
 
       // If this is part of a full test, advance to next skill instead of leaving
       if (fullTest && skillIdx < skillSequence.length - 1) {
+        await session.flushNow().catch(() => {});
         serverRemainingRef.current = null; // skill kế tiếp sẽ neo deadline riêng
         setSkillIdx((i) => i + 1);
         setAnswers({});
@@ -656,16 +680,18 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
         setSubmitOpen(false);
         setForceSubmit(false);
         setSubmitting(false);
-        // New session for next skill — reuse same submissionId? In this design we reuse.
         return;
       }
 
-      await api.post(`/student/tests/${submissionId}/submit`, {});
+      // Single-skill / last skill: dùng session.submit() — force-flush + retry +
+      // submit atomically. Nếu user huỷ trong confirm dialog (do save fail), throw.
+      await session.submit();
 
       // Single-skill: navigate to results
       navigate(`/hoc-vien/ket-qua-ielts/${submissionId}`);
     } catch (e: any) {
-      alert(e?.response?.data?.message ?? "Submit failed. Please try again.");
+      const msg = e?.response?.data?.message ?? e?.message ?? "Submit failed. Please try again.";
+      alert(`${msg}\n\nDữ liệu vẫn được giữ trong trình duyệt — bạn có thể thử nộp lại sau ít phút.`);
     } finally {
       setSubmitting(false);
     }

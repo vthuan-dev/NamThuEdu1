@@ -117,22 +117,53 @@ export function StudentThptExamPage() {
     if (!submissionId || !examId || isSubmitting) return;
     if (!auto && !window.confirm('Bạn chắc chắn muốn nộp bài? Sau khi nộp sẽ không sửa được.')) return;
     setIsSubmitting(true);
-    try {
-      // Flush last answers before final submit
-      await saveDraft().catch(() => {});
-      await api.post(`/student/thpt-exams/${examId}/submit`, {
-        submission_id: submissionId,
-        answers: session.answers,
-        final: true,
-      });
-      examDraftStorage.clear(submissionId);
-      localStorage.removeItem(thptDeadlineKey(examId, submissionId));
-      toast.success('Đã nộp bài thành công!');
-      navigate(`/hoc-vien/ket-qua-thpt/${submissionId}`, { replace: true });
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Nộp bài thất bại.');
-      setIsSubmitting(false);
+
+    // Cảnh báo nếu state rỗng — trường hợp bug FE wipe answers vô tình.
+    if (Object.keys(session.answers).length === 0) {
+      const proceed = window.confirm(
+        'Hệ thống không thấy câu trả lời nào trong bộ nhớ trình duyệt. Bạn có chắc chắn muốn nộp bài rỗng không?',
+      );
+      if (!proceed) {
+        setIsSubmitting(false);
+        return;
+      }
     }
+
+    // ⚠️ Retry submit tối đa 3 lần với backoff (mạng yếu → blip).
+    let lastErr: any = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        // Flush last answers before final submit
+        await saveDraft().catch(() => {});
+        await api.post(`/student/thpt-exams/${examId}/submit`, {
+          submission_id: submissionId,
+          answers: session.answers,
+          final: true,
+        });
+        examDraftStorage.clear(submissionId);
+        localStorage.removeItem(thptDeadlineKey(examId, submissionId));
+        toast.success('Đã nộp bài thành công!');
+        navigate(`/hoc-vien/ket-qua-thpt/${submissionId}`, { replace: true });
+        return;
+      } catch (err: any) {
+        lastErr = err;
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+        }
+      }
+    }
+
+    // Sau 3 lần vẫn fail
+    const msg = lastErr?.response?.data?.message || 'Nộp bài thất bại.';
+    if (auto) {
+      // Auto-submit do timeout — show alert (không chỉ toast) để user nhìn thấy
+      window.alert(
+        `${msg}\n\nDữ liệu vẫn được giữ trong trình duyệt. Hãy giữ tab mở và bấm Nộp bài thủ công khi mạng ổn định.`,
+      );
+    } else {
+      toast.error(msg);
+    }
+    setIsSubmitting(false);
   }, [submissionId, examId, isSubmitting, session.answers, navigate, toast]);
 
   // Manual countdown (THPT-specific; session.timeRemaining not used here)
