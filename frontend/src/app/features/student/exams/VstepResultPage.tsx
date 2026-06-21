@@ -151,6 +151,11 @@ export function VstepResultPage() {
 
   const examTitle = raw?.exam?.eTitle ?? "Kết quả bài thi";
   const submitTime = raw?.sSubmit_time ? new Date(raw.sSubmit_time) : null;
+  // Detect IELTS to switch scale + band conversion
+  const examType = String(raw?.exam?.eType ?? "").toUpperCase();
+  const isIelts = examType === "IELTS";
+  const maxScore = isIelts ? 9 : 10;
+  const scaleSuffix = `/${maxScore}`;
 
   const polledScores = (statusPoll as any)?.data?.data?.vstep_scores ?? null;
   const baseScores = vstepMeta?.vstep_scores ?? {};
@@ -184,18 +189,6 @@ export function VstepResultPage() {
       .map((s) => s.key);
   }, [visibleSkills, scores]);
 
-  // overallAvg chỉ tính KHI MỌI skill trong đề đã có điểm — không AVG dở dang.
-  // Tránh case "Listening 0, Reading 0, Writing chưa chấm" → overall = 0 (sai).
-  const overallAvg = useMemo<number | null>(() => {
-    if (visibleSkills.length === 0) return null;
-    if (fePendingSkills.length > 0) return null; // còn skill chưa chấm → ẩn overall
-    const vals = visibleSkills
-      .map((s) => scores[s.key])
-      .filter((v): v is number => typeof v === "number" && !isNaN(v));
-    if (vals.length !== visibleSkills.length) return null;
-    return +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2);
-  }, [visibleSkills, scores, fePendingSkills]);
-
   const skillStats = vstepMeta?.skill_stats ?? {};
   // Merge backend pending_skills + FE-derived pending → đầy đủ nhất, dùng cho UI
   const pendingSkills: SkillKey[] = useMemo(() => {
@@ -205,11 +198,98 @@ export function VstepResultPage() {
   }, [vstepMeta?.pending_skills, fePendingSkills]);
 
   // ── Thống kê tổng quan (MCQ: listening + reading) ──────────────────────────
-  const totalMcq =
+  // Đếm số câu user thực sự ĐÃ TRẢ LỜI (saAnswer_text non-blank), tách theo skill
+  // → cho phép practice mode (làm 1 section ~13 câu thay vì full 40) hiển thị
+  // đúng "6/13 câu đúng" thay vì "6/40".
+  const answers = (raw?.answers ?? []) as any[];
+  const skillAnswered = useMemo(() => {
+    const out: Record<string, { answered: number; correct: number }> = {
+      listening: { answered: 0, correct: 0 },
+      reading: { answered: 0, correct: 0 },
+    };
+    for (const a of answers) {
+      const sec = String(a.question?.qSection ?? a.question?.qSkill ?? "").toLowerCase();
+      if (!out[sec]) continue;
+      const text = a?.saAnswer_text;
+      const hasAnswer = text != null && String(text).trim() !== "";
+      if (hasAnswer) {
+        out[sec].answered++;
+        if (a.saIs_correct) out[sec].correct++;
+      }
+    }
+    return out;
+  }, [answers]);
+
+  const totalMcqExam =
     (skillStats.listening?.total ?? 0) + (skillStats.reading?.total ?? 0);
   const correctMcq =
     (skillStats.listening?.correct ?? 0) + (skillStats.reading?.correct ?? 0);
+  const answeredMcq = skillAnswered.listening.answered + skillAnswered.reading.answered;
+  // Practice mode = không phải tất cả câu MCQ đều có answer
+  const isPracticeMode = totalMcqExam > 0 && answeredMcq > 0 && answeredMcq < totalMcqExam;
+  // Stats hiển thị: practice mode dùng ANSWERED, full test dùng TOTAL
+  const totalMcq = isPracticeMode ? answeredMcq : totalMcqExam;
   const accuracy = totalMcq > 0 ? Math.round((correctMcq / totalMcq) * 100) : null;
+
+  // ── Recompute scores cho IELTS / practice mode ────────────────────────────
+  // Backend vstep_scores tính trên /10 (correct/totalExam × 10, AI W/S /10). Với:
+  //  - IELTS: cần /9 scale cho cả 4 kỹ năng
+  //  - Practice mode (làm 1 section): score nên dựa vào attempted, không phải total
+  // → Override scores tại FE.
+  const adjustedScores = useMemo<Record<string, number | null | undefined>>(() => {
+    const out: Record<string, number | null | undefined> = { ...scores };
+    if (!isIelts && !isPracticeMode) return out;
+
+    const round = (n: number) => (isIelts ? Math.round(n * 2) / 2 : Math.round(n * 10) / 10);
+
+    const computeBand = (correct: number, attempted: number): number | null => {
+      if (attempted <= 0) return null;
+      const pct = correct / attempted;
+      return round(pct * maxScore);
+    };
+
+    // L+R: dùng số đã trả lời thực tế (practice mode) hoặc convert tỉ lệ sang /9 (IELTS)
+    for (const sk of ["listening", "reading"] as const) {
+      const a = skillAnswered[sk];
+      if (a && a.answered > 0) {
+        out[sk] = computeBand(a.correct, a.answered);
+      } else if (isIelts && typeof scores[sk] === "number") {
+        // Convert backend /10 → /9
+        out[sk] = round((scores[sk] as number) / 10 * maxScore);
+      }
+    }
+
+    // W+S: backend trả /10 → convert sang /9 cho IELTS
+    if (isIelts) {
+      for (const sk of ["writing", "speaking"] as const) {
+        if (typeof scores[sk] === "number") {
+          out[sk] = round((scores[sk] as number) / 10 * maxScore);
+        }
+      }
+    }
+
+    return out;
+  }, [scores, isIelts, isPracticeMode, skillAnswered, maxScore]);
+
+  // Use adjusted scores instead of raw backend scores
+  const finalScores: Record<string, number | null | undefined> =
+    (isIelts || isPracticeMode) ? adjustedScores : scores;
+
+  // Overall average: chỉ tính khi MỌI skill được render đã có điểm hợp lệ.
+  // Nếu còn bất kỳ skill pending → overallAvg = null (hide until graded).
+  const overallAvg = useMemo<number | null>(() => {
+    const vals: number[] = [];
+    for (const s of visibleSkills) {
+      const v = finalScores[s.key];
+      if (typeof v !== "number" || isNaN(v)) return null;
+      vals.push(v);
+    }
+    if (vals.length === 0) return null;
+    const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+    // IELTS round to 0.5; VSTEP round to 1 decimal
+    return isIelts ? Math.round(avg * 2) / 2 : Math.round(avg * 10) / 10;
+  }, [visibleSkills, finalScores, isIelts]);
+
   const durationText =
     raw?.sStart_time && raw?.sSubmit_time
       ? formatDuration(
@@ -218,7 +298,6 @@ export function VstepResultPage() {
           raw?.exam?.eDuration_minutes ?? raw?.exam?.eDuration ?? null
         )
       : null;
-  const answers = (raw?.answers ?? []) as any[];
   const answeredCount = answers.filter((answer) => {
     const text = answer?.saAnswer_text;
     return text != null && String(text).trim() !== "";
@@ -246,7 +325,7 @@ export function VstepResultPage() {
     if (accuracy !== null) statsItems.push({ label: "Độ chính xác", value: `${accuracy}%` });
   }
   if (displayOverall !== null && !showScorePending) {
-    statsItems.push({ label: "Điểm số", value: displayOverall.toFixed(1), sub: "/10" });
+    statsItems.push({ label: "Điểm số", value: displayOverall.toFixed(1), sub: scaleSuffix });
   }
   if (durationText) {
     statsItems.push({ label: "Thời gian", value: durationText });
@@ -282,8 +361,8 @@ export function VstepResultPage() {
   };
   const tone = scoreTone(displayOverall);
   const formatSkillScore = (skill: SkillKey) => {
-    const score = scores[skill];
-    if (typeof score === "number" && !isNaN(score)) return `Điểm: ${score.toFixed(1)}/10`;
+    const score = finalScores[skill];
+    if (typeof score === "number" && !isNaN(score)) return `Điểm: ${score.toFixed(1)}${scaleSuffix}`;
     if (blankSubmission) return "Không có câu trả lời";
     return "Chưa có điểm";
   };
@@ -353,7 +432,7 @@ export function VstepResultPage() {
                 <span className={`text-6xl font-bold tabular-nums leading-none ${tone.text}`}>
                   {displayOverall.toFixed(1)}
                 </span>
-                <span className="text-xl font-medium text-slate-300 mb-1.5">/10</span>
+                <span className="text-xl font-medium text-slate-300 mb-1.5">{scaleSuffix}</span>
               </div>
               <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400 mt-2">
                 {isSingleSkill ? `Điểm ${visibleSkills[0].label}` : "Điểm trung bình"}
@@ -487,7 +566,7 @@ export function VstepResultPage() {
           const submitted =
             key === "writing" ? vstepMeta?.writing_submitted :
             key === "speaking" ? vstepMeta?.speaking_submitted : false;
-          const rawScore = scores[key];
+          const rawScore = finalScores[key];
           const hasScore = typeof rawScore === "number" && !isNaN(rawScore);
           const skillPending =
             pendingSkills.includes(key) ||
@@ -533,7 +612,7 @@ export function VstepResultPage() {
                   <span className={`text-2xl font-bold tabular-nums ${scoreTone(score as number).text}`}>
                     {(score as number).toFixed(1)}
                   </span>
-                  <span className="text-xs text-slate-400">/10</span>
+                  <span className="text-xs text-slate-400">{scaleSuffix}</span>
                 </div>
               )}
             </div>
