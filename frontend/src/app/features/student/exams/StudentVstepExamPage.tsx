@@ -463,6 +463,18 @@ export function StudentVstepExamPage() {
           }
         }
 
+        // ⚠️ Fallback: nếu wTasks (từ saPoints_awarded) rỗng nhưng wResults có
+        // điểm từ AI feedback, lấy score đó cho per-task display ở sidebar.
+        // Tránh case "Chưa chấm" hiển thị mặc dù AI đã chấm xong.
+        for (const taskNum of Object.keys(wResults).map(Number)) {
+          if ((wTasks[taskNum] === null || wTasks[taskNum] === undefined)) {
+            const aiScore = wResults[taskNum]?.score;
+            if (typeof aiScore === 'number' && !isNaN(aiScore)) {
+              wTasks[taskNum] = aiScore;
+            }
+          }
+        }
+
         // Compute overall writing score: prioritize average of manually graded/overridden parts if available
         const wScores = Object.values(wTasks).filter((s) => s !== null) as number[];
         let wOverall = feedback.vstep_scores?.writing ?? data.vstep_meta?.vstep_scores?.writing ?? null;
@@ -514,6 +526,15 @@ export function StudentVstepExamPage() {
               for (const key of Object.keys(wRes)) {
                 const t = parseInt(key.replace('task_', ''));
                 if (!isNaN(t)) wResults[t] = wRes[key];
+              }
+              // Fallback: dùng AI score nếu saPoints_awarded null (xem comment ở .then() đầu)
+              for (const taskNum of Object.keys(wResults).map(Number)) {
+                if (wTasks[taskNum] === null || wTasks[taskNum] === undefined) {
+                  const aiScore = wResults[taskNum]?.score;
+                  if (typeof aiScore === 'number' && !isNaN(aiScore)) {
+                    wTasks[taskNum] = aiScore;
+                  }
+                }
               }
               setReviewWritingScores({ overall: typeof wOverall === 'number' ? wOverall : null, tasks: wTasks, results: wResults });
               const spRes: Record<number, any> = {};

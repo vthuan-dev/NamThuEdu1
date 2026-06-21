@@ -68,6 +68,9 @@ class VstepGradingService
                     'saAi_model'      => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
                     'saAi_graded_at'  => now(),
                     'saReview_status' => 'pending',
+                    // ⚠️ Đồng bộ saPoints_awarded để FE result page (đọc cột này
+                    // qua `wTasks[part] = saPoints_awarded`) hiển thị điểm Task 1/2.
+                    'saPoints_awarded' => 0,
                 ]);
                 $taskScores[] = 0;
                 $rawResults["task_{$taskNum}"] = ['score' => 0, 'criteria' => [], 'feedback' => 'Bài viết quá ngắn hoặc bỏ trống.'];
@@ -87,6 +90,8 @@ class VstepGradingService
                 'saAi_model'      => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
                 'saAi_graded_at'  => now(),
                 'saReview_status' => 'pending',
+                // ⚠️ Đồng bộ saPoints_awarded để FE đọc đúng điểm per-task.
+                'saPoints_awarded' => $score,
             ]);
 
             // Audit log
@@ -198,6 +203,8 @@ class VstepGradingService
                         'saAi_model'      => 'llama-3.3-70b-versatile + whisper-large-v3-turbo',
                         'saAi_graded_at'  => now(),
                         'saReview_status' => 'pending',
+                        // ⚠️ Đồng bộ saPoints_awarded để FE đọc đúng điểm per-part.
+                        'saPoints_awarded' => $combined,
                     ]);
                 }
             }
