@@ -24,6 +24,8 @@ import {
   Filter,
   X,
   Ban,
+  CalendarX,
+  Timer,
 } from "lucide-react";
 import { studentApi } from "../../../../services/studentApi";
 import { getAuthUser } from "../../../../utils/authStorage";
@@ -72,6 +74,16 @@ function isOverdue(test: any): boolean {
   if (!test.deadline) return false;
   if (test.status === 'completed') return false;
   return new Date(test.deadline) < new Date();
+}
+
+function getOverdueDays(deadline: string): number {
+  const diff = Date.now() - new Date(deadline).getTime();
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
+}
+
+function formatDeadline(deadline: string): string {
+  const d = new Date(deadline);
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function getFormatMeta(format?: string) {
@@ -143,7 +155,7 @@ export function TestList() {
     ? normalizedTests
     : status === 'overdue'
     ? overdueTests
-    : normalizedTests.filter((t: any) => t.status === status);
+    : normalizedTests.filter((t: any) => t.status === status && !isOverdue(t));
 
   const filteredTests = currentTests.filter(test => {
     const bySearch = search ? test.exam_title.toLowerCase().includes(search.toLowerCase()) : true;
@@ -152,11 +164,11 @@ export function TestList() {
   });
 
   const tabs = [
-    { key: 'all',         label: 'Tất cả',     count: normalizedTests.length,                                              icon: ClipboardList, accent: false },
-    { key: 'pending',     label: 'Chưa làm',   count: normalizedTests.filter((x: any) => x.status === 'pending').length,   icon: Clock,         accent: false },
-    { key: 'in_progress', label: 'Đang làm',   count: normalizedTests.filter((x: any) => x.status === 'in_progress').length, icon: Play,          accent: false },
-    { key: 'completed',   label: 'Hoàn thành', count: normalizedTests.filter((x: any) => x.status === 'completed').length, icon: CheckCircle,   accent: false },
-    { key: 'overdue',     label: 'Quá hạn',    count: overdueTests.length,                                                 icon: Ban,           accent: true  },
+    { key: 'all',         label: 'Tất cả',     count: normalizedTests.length,                                                                       icon: ClipboardList, accent: false },
+    { key: 'pending',     label: 'Chưa làm',   count: normalizedTests.filter((x: any) => x.status === 'pending' && !isOverdue(x)).length,              icon: Clock,         accent: false },
+    { key: 'in_progress', label: 'Đang làm',   count: normalizedTests.filter((x: any) => x.status === 'in_progress' && !isOverdue(x)).length,          icon: Play,          accent: false },
+    { key: 'completed',   label: 'Hoàn thành', count: normalizedTests.filter((x: any) => x.status === 'completed').length,                               icon: CheckCircle,   accent: false },
+    { key: 'overdue',     label: 'Quá hạn',    count: overdueTests.length,                                                                              icon: CalendarX,     accent: true  },
   ];
 
   // Calculate stats
@@ -385,12 +397,97 @@ export function TestList() {
               const canStart = !testIsOverdue && test.attempts_used < test.attempts_allowed;
               const isCompleted = test.status === 'completed';
               const progress = test.attempts_allowed > 0 ? (test.attempts_used / test.attempts_allowed) * 100 : 0;
+              const overdueDays = testIsOverdue && test.deadline ? getOverdueDays(test.deadline) : 0;
+
+              if (testIsOverdue) {
+                return (
+                  <div key={test.assignment_id}
+                    className="relative flex flex-col rounded-2xl overflow-hidden"
+                    style={{ border: '2px solid #FCA5A5', boxShadow: '0 4px 20px rgba(220,38,38,0.15)' }}
+                  >
+                    {/* Red gradient banner */}
+                    <div className="relative px-5 pt-4 pb-3"
+                      style={{ background: 'linear-gradient(135deg, #DC2626 0%, #EF4444 50%, #F87171 100%)' }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="flex items-center gap-1.5 text-white font-black text-xs tracking-widest uppercase">
+                          <CalendarX className="w-3.5 h-3.5" />
+                          Quá Hạn
+                        </span>
+                        <span className="bg-white/20 text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                          {overdueDays === 0 ? 'Hôm nay' : `${overdueDays} ngày trước`}
+                        </span>
+                      </div>
+                      <h3 className="text-base font-extrabold text-white leading-snug line-clamp-2">
+                        {test.exam_title}
+                      </h3>
+                    </div>
+
+                    {/* Card body */}
+                    <div className="flex flex-col flex-1 p-4" style={{ background: '#FFF5F5' }}>
+                      {/* Deadline info */}
+                      {test.deadline && (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl mb-3"
+                          style={{ background: '#FEE2E2', border: '1px solid #FECACA' }}
+                        >
+                          <Calendar className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#B91C1C' }} />
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold" style={{ color: '#7F1D1D' }}>Hạn nộp</p>
+                            <p className="text-xs font-bold truncate" style={{ color: '#B91C1C' }}>{formatDeadline(test.deadline)}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Meta info */}
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        <div className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg" style={{ background: '#fff', border: '1px solid #FECACA' }}>
+                          <Timer className="w-3.5 h-3.5" style={{ color: '#EF4444' }} />
+                          <div>
+                            <p className="text-xs text-gray-400">Thời gian</p>
+                            <p className="text-xs font-bold text-gray-700">{test.exam_duration} phút</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg" style={{ background: '#fff', border: '1px solid #FECACA' }}>
+                          <BookOpen className="w-3.5 h-3.5" style={{ color: '#EF4444' }} />
+                          <div>
+                            <p className="text-xs text-gray-400">Câu hỏi</p>
+                            <p className="text-xs font-bold text-gray-700">{test.total_questions} câu</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Tags */}
+                      <div className="flex flex-wrap gap-1.5 mb-4">
+                        <span className="px-2.5 py-1 rounded-md text-xs font-bold" style={{ background: '#FEE2E2', color: '#991B1B' }}>
+                          {test.exam_type}
+                        </span>
+                        {test.exam_skill && (
+                          <span className="px-2.5 py-1 rounded-md text-xs font-semibold capitalize" style={{ background: '#FEE2E2', color: '#991B1B' }}>
+                            {test.exam_skill}
+                          </span>
+                        )}
+                        <span className="px-2.5 py-1 rounded-md text-xs font-semibold" style={{ background: '#FEE2E2', color: '#991B1B' }}>
+                          {test.attempts_used}/{test.attempts_allowed} lần
+                        </span>
+                      </div>
+
+                      <div className="mt-auto">
+                        <div className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold cursor-not-allowed"
+                          style={{ background: '#FEE2E2', color: '#B91C1C', border: '1.5px solid #FECACA' }}
+                        >
+                          <Ban className="w-4 h-4" />
+                          Không còn hạn nộp
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
 
               return (
                 <div
                   key={test.assignment_id}
                   className="group relative flex flex-col bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
-                  style={{ borderColor: testIsOverdue ? '#FECACA' : undefined }}
                 >
                   <div className="flex flex-col flex-1 p-5">
                     {/* Title */}
@@ -430,16 +527,16 @@ export function TestList() {
                           #{test.exam_skill}
                         </span>
                       )}
-                      {testIsOverdue && (
-                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-bold bg-red-100 text-red-700">
-                          <Ban className="w-3 h-3" />
-                          Quá hạn
-                        </span>
-                      )}
-                      {isUrgent && !isCompleted && !testIsOverdue && (
+                      {isUrgent && !isCompleted && (
                         <span className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium bg-red-50 text-red-600">
                           <AlertCircle className="w-3 h-3" />
                           Gấp
+                        </span>
+                      )}
+                      {test.deadline && !isCompleted && (
+                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium bg-orange-50 text-orange-700">
+                          <Calendar className="w-3 h-3" />
+                          Hạn: {formatDeadline(test.deadline)}
                         </span>
                       )}
                     </div>
@@ -467,11 +564,6 @@ export function TestList() {
                           <CheckCircle className="w-4 h-4" />
                           Xem kết quả
                         </Link>
-                      ) : testIsOverdue ? (
-                        <div className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-red-200 text-red-400 text-sm font-semibold cursor-not-allowed bg-red-50">
-                          <Ban className="w-4 h-4" />
-                          Đã quá hạn
-                        </div>
                       ) : (
                         <Link
                           to={`${BASE}/phong-cho/${test.assignment_id}`}
