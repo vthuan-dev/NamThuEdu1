@@ -521,16 +521,27 @@ export function VstepResultPage() {
           ]
             .filter((g) => g.rows.length > 0)
             .map((g) => {
-              const answeredCount = g.rows.filter(
+              // Practice mode: chỉ hiển thị câu đã trả lời thực tế
+              const displayRows = isPracticeMode
+                ? g.rows.filter((r) => {
+                    const text = r.saAnswer_text;
+                    return text != null && String(text).trim() !== "";
+                  })
+                : g.rows;
+              
+              const answeredCount = displayRows.filter(
                 (r) => r.saAnswer_text != null && String(r.saAnswer_text).trim() !== ""
               ).length;
-              const skipped = g.rows.length - answeredCount;
+              const skipped = displayRows.length - answeredCount;
+              
+              if (displayRows.length === 0) return null;
+              
               return (
                 <div key={g.key} className="mb-4 last:mb-0">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-bold text-slate-600">{g.label}</span>
                     <span className="text-[11px] text-slate-500 tabular-nums">
-                      Đã trả lời {answeredCount}/{g.rows.length}
+                      Đã trả lời {answeredCount}/{displayRows.length}
                       {skipped > 0 && (
                         <span className="ml-2 text-rose-500 font-semibold">
                           · Bỏ trống {skipped}
@@ -539,7 +550,7 @@ export function VstepResultPage() {
                     </span>
                   </div>
                   <div className="grid grid-cols-10 gap-1">
-                    {g.rows.map((r, idx) => {
+                    {displayRows.map((r, idx) => {
                       const num = r.question?.qNumber ?? idx + 1;
                       const text = r.saAnswer_text;
                       const answered = text != null && String(text).trim() !== "";
@@ -744,7 +755,8 @@ export function VstepResultPage() {
 
             {isOpen && (
               <div className="divide-y divide-slate-100 border-t border-slate-100">
-                {rows.map((ans, idx) => {
+                {/* Practice mode: chỉ hiển thị câu đã trả lời thực tế */}
+                {(isPracticeMode ? answeredRows : rows).map((ans, idx) => {
                   const qText = ans.question?.qContent?.replace(/<[^>]*>/g, "").slice(0, 80) ?? `Câu ${idx + 1}`;
                   const correctAns = examQMap[ans.question?.qId] ?? "—";
                   return (
