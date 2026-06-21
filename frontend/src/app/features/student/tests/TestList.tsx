@@ -26,6 +26,9 @@ import {
   Ban,
   CalendarX,
   Timer,
+  HelpCircle,
+  RotateCcw,
+  ChevronRight,
 } from "lucide-react";
 import { studentApi } from "../../../../services/studentApi";
 import { getAuthUser } from "../../../../utils/authStorage";
@@ -84,6 +87,21 @@ function getOverdueDays(deadline: string): number {
 function formatDeadline(deadline: string): string {
   const d = new Date(deadline);
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function getExamTypeMeta(type?: string): { color: string; bg: string; light: string } {
+  const t = String(type || '').toUpperCase();
+  if (t === 'VSTEP')  return { color: '#7C3AED', bg: '#EDE9FE', light: '#F5F3FF' };
+  if (t === 'IELTS')  return { color: '#0284C7', bg: '#E0F2FE', light: '#F0F9FF' };
+  if (t === 'TOEIC')  return { color: '#059669', bg: '#D1FAE5', light: '#ECFDF5' };
+  if (t === 'THPT')   return { color: '#D97706', bg: '#FEF3C7', light: '#FFFBEB' };
+  return { color: '#6366F1', bg: '#EEF2FF', light: '#F5F3FF' };
+}
+
+function getStatusMeta(status: string): { label: string; color: string; bg: string } {
+  if (status === 'in_progress') return { label: 'Đang làm', color: '#0284C7', bg: '#E0F2FE' };
+  if (status === 'completed')   return { label: 'Hoàn thành', color: '#059669', bg: '#D1FAE5' };
+  return { label: 'Chưa làm', color: '#7C3AED', bg: '#EDE9FE' };
 }
 
 function getFormatMeta(format?: string) {
@@ -484,82 +502,116 @@ export function TestList() {
                 );
               }
 
-              return (
-                <div
-                  key={test.assignment_id}
-                  className="group relative flex flex-col bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
-                >
-                  <div className="flex flex-col flex-1 p-5">
+              {
+                const typeMeta = getExamTypeMeta(test.exam_type);
+                const statusMeta = getStatusMeta(test.status);
+                const attemptsLeft = Math.max(0, test.attempts_allowed - test.attempts_used);
+                return (
+                  <div
+                    key={test.assignment_id}
+                    className="group relative flex flex-col bg-white rounded-2xl overflow-hidden transition-all duration-200 hover:-translate-y-0.5"
+                    style={{ border: `1.5px solid ${typeMeta.bg}`, boxShadow: `0 2px 16px ${typeMeta.color}18` }}
+                  >
+                    {/* Colored top accent bar */}
+                    <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${typeMeta.color}, ${typeMeta.color}99)` }} />
+
+                    {/* Header: type badge + status badge */}
+                    <div className="flex items-center justify-between px-5 pt-4 pb-2">
+                      <span className="px-2.5 py-1 rounded-lg text-xs font-extrabold tracking-wide"
+                        style={{ background: typeMeta.bg, color: typeMeta.color }}>
+                        {test.exam_type}
+                      </span>
+                      <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold"
+                        style={{ background: statusMeta.bg, color: statusMeta.color }}>
+                        {test.status === 'in_progress' ? <Play className="w-3 h-3 fill-current" /> :
+                         test.status === 'completed'   ? <CheckCircle className="w-3 h-3" /> :
+                                                         <Clock className="w-3 h-3" />}
+                        {statusMeta.label}
+                      </span>
+                    </div>
+
                     {/* Title */}
-                    <h3 className="text-lg font-bold text-gray-900 line-clamp-2 leading-snug mb-3 min-h-[56px]">
+                    <h3 className="px-5 text-base font-extrabold text-gray-900 line-clamp-2 leading-snug mb-3 min-h-[48px]">
                       {test.exam_title}
                     </h3>
 
-                    {/* Stats row - inline với icons */}
-                    <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 text-sm text-gray-600 mb-1.5">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Clock className="w-4 h-4 text-gray-400" />
-                        {test.exam_duration} phút
-                      </span>
-                      <span className="text-gray-300">|</span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <BookOpen className="w-4 h-4 text-gray-400" />
-                        {test.attempts_used}/{test.attempts_allowed}
-                      </span>
-                    </div>
-
-                    {/* Sub stats */}
-                    <p className="text-sm text-gray-600 mb-4">
-                      {test.exam_skill && (
-                        <span className="capitalize">{test.exam_skill}</span>
-                      )}
-                      {test.exam_skill && ' | '}
-                      <span className="font-medium">{test.total_questions} câu hỏi</span>
-                    </p>
-
-                    {/* Hashtag tags */}
-                    <div className="flex flex-wrap gap-2 mb-5">
-                      <span className="px-3 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700">
-                        #{test.exam_type}
-                      </span>
-                      {test.exam_skill && (
-                        <span className="px-3 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 capitalize">
-                          #{test.exam_skill}
-                        </span>
-                      )}
-                      {isUrgent && !isCompleted && (
-                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium bg-red-50 text-red-600">
-                          <AlertCircle className="w-3 h-3" />
-                          Gấp
-                        </span>
-                      )}
-                      {test.deadline && !isCompleted && (
-                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium bg-orange-50 text-orange-700">
-                          <Calendar className="w-3 h-3" />
-                          Hạn: {formatDeadline(test.deadline)}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Progress (only when started) */}
-                    {test.attempts_allowed > 0 && progress > 0 && progress < 100 && (
-                      <div className="mb-4">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-xs font-medium text-gray-500">Tiến độ</span>
-                          <span className="text-xs font-bold text-blue-600">{Math.round(progress)}%</span>
+                    {/* Info grid - 2x2 with labels */}
+                    <div className="grid grid-cols-2 gap-2 px-5 mb-3">
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                        style={{ background: typeMeta.light, border: `1px solid ${typeMeta.bg}` }}>
+                        <Clock className="w-3.5 h-3.5 flex-shrink-0" style={{ color: typeMeta.color }} />
+                        <div className="min-w-0">
+                          <p className="text-xs text-gray-400">Thời gian</p>
+                          <p className="text-xs font-bold text-gray-800">{test.exam_duration} phút</p>
                         </div>
-                        <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
-                          <div className="h-full rounded-full bg-blue-500 transition-all duration-500" style={{ width: `${progress}%` }} />
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                        style={{ background: typeMeta.light, border: `1px solid ${typeMeta.bg}` }}>
+                        <FileCheck className="w-3.5 h-3.5 flex-shrink-0" style={{ color: typeMeta.color }} />
+                        <div className="min-w-0">
+                          <p className="text-xs text-gray-400">Câu hỏi</p>
+                          <p className="text-xs font-bold text-gray-800">{test.total_questions} câu</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                        style={{ background: typeMeta.light, border: `1px solid ${typeMeta.bg}` }}>
+                        <Target className="w-3.5 h-3.5 flex-shrink-0" style={{ color: typeMeta.color }} />
+                        <div className="min-w-0">
+                          <p className="text-xs text-gray-400">Kỹ năng</p>
+                          <p className="text-xs font-bold text-gray-800 capitalize">{test.exam_skill || 'Mixed'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                        style={{ background: typeMeta.light, border: `1px solid ${typeMeta.bg}` }}>
+                        <RotateCcw className="w-3.5 h-3.5 flex-shrink-0" style={{ color: typeMeta.color }} />
+                        <div className="min-w-0">
+                          <p className="text-xs text-gray-400">Lượt thi</p>
+                          <p className="text-xs font-bold text-gray-800">
+                            <span style={{ color: typeMeta.color }}>{test.attempts_used}</span>/{test.attempts_allowed} lần
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Attempts progress bar */}
+                    {test.attempts_allowed > 0 && (
+                      <div className="px-5 mb-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-gray-400">Lượt dùng</span>
+                          <span className="text-xs font-semibold" style={{ color: attemptsLeft === 0 ? '#EF4444' : typeMeta.color }}>
+                            {attemptsLeft > 0 ? `Còn ${attemptsLeft} lượt` : 'Hết lượt'}
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: typeMeta.bg }}>
+                          <div className="h-full rounded-full transition-all duration-500"
+                            style={{ width: `${progress}%`, background: attemptsLeft === 0 ? '#EF4444' : typeMeta.color }} />
                         </div>
                       </div>
                     )}
 
-                    {/* Action button - outline style "Chi tiết" - pinned to bottom */}
-                    <div className="mt-auto pt-2">
+                    {/* Deadline row */}
+                    {test.deadline && !isCompleted && (
+                      <div className="flex items-center gap-2 mx-5 mb-3 px-3 py-2 rounded-xl"
+                        style={{ background: isUrgent ? '#FEF3C7' : '#F9FAFB', border: `1px solid ${isUrgent ? '#FDE68A' : '#E5E7EB'}` }}>
+                        <Calendar className="w-3.5 h-3.5 flex-shrink-0" style={{ color: isUrgent ? '#D97706' : '#6B7280' }} />
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold" style={{ color: isUrgent ? '#92400E' : '#374151' }}>
+                            {isUrgent ? '⚠️ Hạn nộp — cần gấp!' : 'Hạn nộp'}
+                          </p>
+                          <p className="text-xs font-bold truncate" style={{ color: isUrgent ? '#B45309' : '#6B7280' }}>
+                            {formatDeadline(test.deadline)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Action button */}
+                    <div className="mt-auto px-5 pb-5">
                       {isCompleted ? (
                         <Link
                           to={resultUrlFor(test)}
-                          className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-green-500 text-green-600 text-sm font-semibold hover:bg-green-50 transition-colors"
+                          className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition-all hover:opacity-90"
+                          style={{ background: '#D1FAE5', color: '#065F46' }}
                         >
                           <CheckCircle className="w-4 h-4" />
                           Xem kết quả
@@ -568,17 +620,22 @@ export function TestList() {
                         <Link
                           to={`${BASE}/phong-cho/${test.assignment_id}`}
                           onClick={(e) => !canStart && e.preventDefault()}
-                          className={`w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-blue-500 text-blue-600 text-sm font-semibold transition-colors ${
-                            canStart ? 'hover:bg-blue-50' : 'opacity-50 cursor-not-allowed'
-                          }`}
+                          className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition-all hover:opacity-90"
+                          style={{
+                            background: canStart ? `linear-gradient(135deg, ${typeMeta.color}, ${typeMeta.color}CC)` : '#F3F4F6',
+                            color: canStart ? '#fff' : '#9CA3AF',
+                            cursor: canStart ? 'pointer' : 'not-allowed',
+                          }}
                         >
-                          {test.attempts_used > 0 ? 'Tiếp tục làm' : 'Chi tiết'}
+                          {test.status === 'in_progress'
+                            ? <><Play className="w-4 h-4 fill-current" />Tiếp tục làm</>
+                            : <><ChevronRight className="w-4 h-4" />Vào làm bài</>}
                         </Link>
                       )}
                     </div>
                   </div>
-                </div>
-              );
+                );
+              }
            })}
         </div>
       ) : (
