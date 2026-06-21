@@ -580,6 +580,13 @@ export function VstepResultPage() {
           const isPending = score === null && skillPending;
           const hasDisplayScore = score !== null;
 
+          // ── Practice mode: dùng answered count thay vì backend total ──
+          // Nếu practice mode (làm 1 section ~13 câu thay vì full 40), backend vẫn trả
+          // total=40 → hiển thị sai "1/40 câu đúng". Fix: đếm số câu đã answered thực tế.
+          const adjustedStats = stats && !isSubjective && isPracticeMode && skillAnswered[key]
+            ? { ...stats, total: skillAnswered[key].answered }
+            : stats;
+
           return (
             <div key={key} className="flex items-center justify-between px-5 py-4">
               <div className="flex items-center gap-3">
@@ -588,8 +595,8 @@ export function VstepResultPage() {
                 </div>
                 <div>
                   <p className="font-semibold text-sm text-slate-800">{label}</p>
-                  {!isSubjective && stats && (
-                    <p className="text-xs text-slate-400">{stats.correct}/{stats.total} câu đúng</p>
+                  {!isSubjective && adjustedStats && (
+                    <p className="text-xs text-slate-400">{adjustedStats.correct}/{adjustedStats.total} câu đúng</p>
                   )}
                   {isSubjective && isPending && (
                     <p className="text-xs text-slate-400">
