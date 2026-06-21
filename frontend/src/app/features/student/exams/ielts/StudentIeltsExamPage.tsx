@@ -71,24 +71,11 @@ function applyPracticeScope(
 
   if (!sectionNumbers) return scoped;
 
-  // ✅ DEBUG LOG
-  console.log('[IELTS Practice Scope] Applying filter:', {
-    skill,
-    sectionNumbers: Array.from(sectionNumbers),
-    practiceTimeMinutes,
-    rawPayloadKeys: Object.keys(rawPayload),
-  });
-
   if (skill === "listening" && Array.isArray(scoped.sections)) {
     const originalTotalParts = scoped.sections.length;
     const sections = scoped.sections.filter((section: IeltsListeningPayload["sections"][number]) =>
       sectionNumbers.has(Number(section.sectionNumber))
     );
-    console.log('[IELTS Practice Scope] Listening filter:', {
-      originalSections: originalTotalParts,
-      filteredSections: sections.length,
-      sectionsToKeep: Array.from(sectionNumbers),
-    });
     if (sections.length > 0) {
       scoped.sections = sections;
       scoped.totalParts = originalTotalParts;
@@ -104,12 +91,6 @@ function applyPracticeScope(
     const passages = scoped.passages.filter((passage: IeltsReadingPayload["passages"][number]) =>
       sectionNumbers.has(Number(passage.passageNumber))
     );
-    console.log('[IELTS Practice Scope] Reading filter:', {
-      originalPassages: originalTotalParts,
-      filteredPassages: passages.length,
-      passagesToKeep: Array.from(sectionNumbers),
-      allPassageNumbers: scoped.passages.map((p: any) => p.passageNumber),
-    });
     if (passages.length > 0) {
       scoped.passages = passages;
       scoped.totalParts = originalTotalParts;
@@ -905,8 +886,9 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
           isCorrectMap={isCorrectMap}
         />
       )}
-      {currentSkill === "reading" && (
+      {currentSkill === "reading" && payload && (
         <IeltsReadingView
+          key={`reading-${examId}-${isPracticeMode ? Array.from(practiceSectionNumbers || []).join('-') : 'full'}`}
           payload={payload as IeltsReadingPayload}
           answers={answers}
           flagged={flagged}
