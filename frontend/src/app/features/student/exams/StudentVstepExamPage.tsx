@@ -1071,9 +1071,6 @@ export function StudentVstepExamPage() {
               </button>
             ) : (
               <>
-                <span className="hidden sm:inline-flex items-center text-sm text-slate-600">
-                  Đã trả lời&nbsp;<span className="font-bold text-slate-900">{stats.answeredMCQ}</span>/{stats.totalMCQ}
-                </span>
                 <button
                   onClick={() => setShowSubmit(true)}
                   className="inline-flex items-center gap-2 px-5 py-2 bg-sky-600 text-white text-base font-semibold rounded-lg hover:bg-sky-700 active:scale-[0.97] transition-all shadow-sm"
@@ -1100,6 +1097,9 @@ export function StudentVstepExamPage() {
             flagged={flagged}
             reviewMode={reviewMode}
             correctAnswersMap={correctAnswersMap}
+            answeredCount={stats.answeredMCQ}
+            totalCount={stats.totalMCQ}
+            onSubmit={reviewMode ? undefined : () => setShowSubmit(true)}
             onJump={(pn, qId) => {
               if (pn !== current.partNumber) navigate2(current.skill, pn);
               setTimeout(() => {
@@ -2465,6 +2465,7 @@ function PartHeader({ icon: Icon, color, title, subtitle }: { icon: any; color: 
 
 function QuestionNavigator({
   skill, currentPart, listeningParts, readingParts, answers, flagged, onJump, reviewMode, correctAnswersMap,
+  answeredCount, totalCount, onSubmit,
 }: {
   skill: "listening" | "reading";
   currentPart: number;
@@ -2475,6 +2476,12 @@ function QuestionNavigator({
   onJump: (partNumber: number, qId: number) => void;
   reviewMode?: boolean;
   correctAnswersMap?: Record<number, string>;
+  /** Tổng số câu đã trả lời (MCQ) */
+  answeredCount?: number;
+  /** Tổng số câu MCQ trong đề */
+  totalCount?: number;
+  /** Callback nút Nộp bài — chỉ hiện khi không phải reviewMode */
+  onSubmit?: () => void;
 }) {
   const partsData = skill === "listening"
     ? listeningParts.map(p => ({
@@ -2537,6 +2544,22 @@ function QuestionNavigator({
         <span className="opacity-50">⋮⋮</span>
       </div>
       <div className="p-3 space-y-4">
+        {/* ── Submit bar — nằm trên danh sách số câu ── */}
+        {!reviewMode && onSubmit !== undefined && (
+          <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
+            <span className="text-[11px] text-slate-500">
+              Đã trả lời&nbsp;
+              <span className="font-bold text-slate-800">{answeredCount ?? 0}</span>
+              /{totalCount ?? 0}
+            </span>
+            <button
+              onClick={onSubmit}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-bold transition-colors"
+            >
+              <Send className="w-3 h-3" /> Nộp bài
+            </button>
+          </div>
+        )}
         {partsData.map(p => (
           <div key={p.partNumber}>
             <div className="flex items-center justify-between mb-1.5">
