@@ -715,6 +715,12 @@ export function VstepResultPage() {
         if (rows.length === 0) return null;
         const isOpen = expandedSkill === key;
         const correct = rows.filter((r) => r.saIs_correct).length;
+        // Practice mode: chỉ đếm câu đã trả lời thực tế thay vì tất cả câu trong đề
+        const answeredRows = rows.filter((r) => {
+          const text = r.saAnswer_text;
+          return text != null && String(text).trim() !== "";
+        });
+        const total = isPracticeMode ? answeredRows.length : rows.length;
 
         return (
           <div key={key} className="rounded-xl overflow-hidden border border-slate-200 bg-white">
@@ -726,7 +732,7 @@ export function VstepResultPage() {
                 <Icon className="w-4 h-4 text-slate-500" />
                 <span className="font-semibold text-sm text-slate-800">{label} — Chi tiết đáp án</span>
                 <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                  {correct}/{rows.length}
+                  {correct}/{total}
                 </span>
               </div>
               {isOpen ? (
