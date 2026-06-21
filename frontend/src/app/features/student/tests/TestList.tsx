@@ -23,12 +23,13 @@ import {
   Calendar,
   Filter,
   X,
+  Ban,
 } from "lucide-react";
 import { studentApi } from "../../../../services/studentApi";
 import { getAuthUser } from "../../../../utils/authStorage";
 import { getSkillColor, getSkillIcon } from "../../../../utils/skillHelpers";
 
-type TestStatus = 'all' | 'pending' | 'in_progress' | 'completed';
+type TestStatus = 'all' | 'pending' | 'in_progress' | 'completed' | 'overdue';
 type TestType = 'all' | 'IELTS' | 'VSTEP' | 'TOEIC';
 type TestFormat = 'all' | 'FULL_4_SKILLS' | 'MINI_MOCK' | 'DIAGNOSTIC';
 type ViewMode = 'grid' | 'list';
@@ -65,6 +66,12 @@ function mergeVstepIntoSingleTest(items: any[]) {
   };
 
   return [...nonVstep, merged];
+}
+
+function isOverdue(test: any): boolean {
+  if (!test.deadline) return false;
+  if (test.status === 'completed') return false;
+  return new Date(test.deadline) < new Date();
 }
 
 function getFormatMeta(format?: string) {
@@ -130,8 +137,12 @@ export function TestList() {
 
   const normalizedTests = mergeVstepIntoSingleTest([...pending, ...inProgress, ...completed]);
 
+  const overdueTests = normalizedTests.filter((t: any) => isOverdue(t));
+
   const currentTests = status === 'all'
     ? normalizedTests
+    : status === 'overdue'
+    ? overdueTests
     : normalizedTests.filter((t: any) => t.status === status);
 
   const filteredTests = currentTests.filter(test => {
@@ -141,10 +152,11 @@ export function TestList() {
   });
 
   const tabs = [
-    { key: 'all', label: 'Tất cả', count: normalizedTests.length, icon: ClipboardList },
-    { key: 'pending', label: 'Chưa làm', count: normalizedTests.filter((x: any) => x.status === 'pending').length, icon: Clock },
-    { key: 'in_progress', label: 'Đang làm', count: normalizedTests.filter((x: any) => x.status === 'in_progress').length, icon: Play },
-    { key: 'completed', label: 'Hoàn thành', count: normalizedTests.filter((x: any) => x.status === 'completed').length, icon: CheckCircle },
+    { key: 'all',         label: 'Tất cả',     count: normalizedTests.length,                                              icon: ClipboardList, accent: false },
+    { key: 'pending',     label: 'Chưa làm',   count: normalizedTests.filter((x: any) => x.status === 'pending').length,   icon: Clock,         accent: false },
+    { key: 'in_progress', label: 'Đang làm',   count: normalizedTests.filter((x: any) => x.status === 'in_progress').length, icon: Play,          accent: false },
+    { key: 'completed',   label: 'Hoàn thành', count: normalizedTests.filter((x: any) => x.status === 'completed').length, icon: CheckCircle,   accent: false },
+    { key: 'overdue',     label: 'Quá hạn',    count: overdueTests.length,                                                 icon: Ban,           accent: true  },
   ];
 
   // Calculate stats
@@ -153,6 +165,7 @@ export function TestList() {
     pending: normalizedTests.filter((x: any) => x.status === 'pending').length,
     urgent: normalizedTests.filter((x: any) => x.is_urgent && x.status !== 'completed').length,
     completed: normalizedTests.filter((x: any) => x.status === 'completed').length,
+    overdue: overdueTests.length,
   };
 
   const hasActiveFilters = type !== 'all' || format !== 'all' || search !== '';
@@ -218,6 +231,7 @@ export function TestList() {
               { label: "Chưa làm",    value: stats.pending,   color: "#FCD34D" },
               { label: "Cần gấp",     value: stats.urgent,    color: "#FCA5A5" },
               { label: "Hoàn thành",  value: stats.completed, color: "#86EFAC" },
+              ...(stats.overdue > 0 ? [{ label: "Quá hạn", value: stats.overdue, color: "#FDA4AF" }] : []),
             ].map((s) => (
               <div key={s.label} className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl"
                 style={{ background: "rgba(255,255,255,0.1)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.15)" }}>
@@ -241,21 +255,25 @@ export function TestList() {
             {tabs.map(tab => {
               const Icon = tab.icon;
               const active = status === tab.key;
+              const isOverdueTab = tab.key === 'overdue';
+              const tabBg = active ? (isOverdueTab ? '#DC2626' : PRIMARY) : 'transparent';
+              const tabColor = active ? '#fff' : (isOverdueTab ? '#DC2626' : '#6B7280');
               return (
                 <button key={tab.key} onClick={() => setStatus(tab.key as TestStatus)}
                   className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-bold transition-all duration-200"
                   style={{
-                    background: active ? PRIMARY : "transparent",
-                    color: active ? "#fff" : "#6B7280",
-                    boxShadow: active ? `0 2px 10px ${PRIMARY}50` : "none",
+                    background: tabBg,
+                    color: tabColor,
+                    boxShadow: active ? `0 2px 10px ${isOverdueTab ? '#DC262650' : PRIMARY + '50'}` : 'none',
+                    border: !active && isOverdueTab && tab.count > 0 ? '1.5px solid #FECACA' : 'none',
                   }}>
                   <Icon className="w-3.5 h-3.5" />
                   {tab.label}
                   {!isLoading && tab.count > 0 && (
                     <span className="text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5 font-bold"
                       style={{
-                        background: active ? "rgba(255,255,255,0.22)" : PRIMARY_LIGHT,
-                        color: active ? "#fff" : PRIMARY,
+                        background: active ? 'rgba(255,255,255,0.22)' : (isOverdueTab ? '#FEE2E2' : PRIMARY_LIGHT),
+                        color: active ? '#fff' : (isOverdueTab ? '#DC2626' : PRIMARY),
                       }}>
                       {tab.count}
                     </span>
@@ -363,14 +381,16 @@ export function TestList() {
               const Icon = formatMeta.icon;
               const color = formatMeta.color;
               const isUrgent = test.is_urgent;
-              const canStart = test.attempts_used < test.attempts_allowed;
+              const testIsOverdue = isOverdue(test);
+              const canStart = !testIsOverdue && test.attempts_used < test.attempts_allowed;
               const isCompleted = test.status === 'completed';
               const progress = test.attempts_allowed > 0 ? (test.attempts_used / test.attempts_allowed) * 100 : 0;
 
               return (
                 <div
                   key={test.assignment_id}
-                  className="group relative flex flex-col bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md hover:border-blue-300 hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+                  className="group relative flex flex-col bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden"
+                  style={{ borderColor: testIsOverdue ? '#FECACA' : undefined }}
                 >
                   <div className="flex flex-col flex-1 p-5">
                     {/* Title */}
@@ -410,7 +430,13 @@ export function TestList() {
                           #{test.exam_skill}
                         </span>
                       )}
-                      {isUrgent && !isCompleted && (
+                      {testIsOverdue && (
+                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-bold bg-red-100 text-red-700">
+                          <Ban className="w-3 h-3" />
+                          Quá hạn
+                        </span>
+                      )}
+                      {isUrgent && !isCompleted && !testIsOverdue && (
                         <span className="inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium bg-red-50 text-red-600">
                           <AlertCircle className="w-3 h-3" />
                           Gấp
@@ -441,6 +467,11 @@ export function TestList() {
                           <CheckCircle className="w-4 h-4" />
                           Xem kết quả
                         </Link>
+                      ) : testIsOverdue ? (
+                        <div className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-red-200 text-red-400 text-sm font-semibold cursor-not-allowed bg-red-50">
+                          <Ban className="w-4 h-4" />
+                          Đã quá hạn
+                        </div>
                       ) : (
                         <Link
                           to={`${BASE}/phong-cho/${test.assignment_id}`}
@@ -466,7 +497,8 @@ export function TestList() {
               const Icon = formatMeta.icon;
               const color = formatMeta.color;
               const isUrgent = test.is_urgent;
-              const canStart = test.attempts_used < test.attempts_allowed;
+              const testIsOverdue = isOverdue(test);
+              const canStart = !testIsOverdue && test.attempts_used < test.attempts_allowed;
               const isCompleted = test.status === 'completed';
               const progress = test.attempts_allowed > 0 ? (test.attempts_used / test.attempts_allowed) * 100 : 0;
 
@@ -509,7 +541,14 @@ export function TestList() {
                                   style={{ background: "#F3F4F6", color: "#4B5563" }}>
                               {test.exam_type}
                             </span>
-                            {isUrgent && !isCompleted && (
+                            {testIsOverdue && (
+                              <span className="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1"
+                                    style={{ background: "#FEE2E2", color: "#B91C1C" }}>
+                                <Ban className="w-3 h-3" />
+                                Quá hạn
+                              </span>
+                            )}
+                            {isUrgent && !isCompleted && !testIsOverdue && (
                               <span className="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1"
                                     style={{ background: "#FEF2F2", color: "#DC2626" }}>
                                 <AlertCircle className="w-3 h-3" />
@@ -559,6 +598,12 @@ export function TestList() {
                            <CheckCircle className="w-5 h-5" />
                            Xem kết quả
                         </Link>
+                      ) : testIsOverdue ? (
+                        <div className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold cursor-not-allowed"
+                             style={{ background: "#FEE2E2", color: "#B91C1C", opacity: 0.8 }}>
+                          <Ban className="w-5 h-5" />
+                          Đã quá hạn
+                        </div>
                       ) : (
                         <Link to={`${BASE}/phong-cho/${test.assignment_id}`}
                               className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all ${canStart ? 'hover:scale-105' : 'opacity-50 cursor-not-allowed'}`}

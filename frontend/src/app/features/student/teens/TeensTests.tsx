@@ -24,7 +24,7 @@ const BASE = '/hoc-vien';
 const TEAL = '#0D9488';
 const TEAL_MID = '#14B8A6';
 
-type Tab = 'all' | 'assigned';
+type Tab = 'all' | 'assigned' | 'overdue';
 type Status = 'pending' | 'in_progress' | 'completed';
 
 const SKILL_LABELS: Record<string, string> = {
@@ -72,6 +72,12 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
   const normalizedScope = String(item.scope || (item.skill === 'mixed' ? 'full' : 'skill')).toLowerCase();
   const scopeLabel = normalizedScope === 'full' ? 'Full test' : normalizedScope === 'part' ? `Part ${item.partNumber ?? ''}`.trim() : 'Skill';
 
+  // Check if overdue: deadline has passed and not completed
+  const isOverdue = useMemo(() => {
+    if (isCompleted || !item.deadline) return false;
+    return new Date(item.deadline) < new Date();
+  }, [item.deadline, isCompleted]);
+
   const dot = isCompleted ? '#10B981' : inProgress ? '#F59E0B' : '#94A3B8';
   const statusText = isCompleted ? 'Hoàn thành' : inProgress ? 'Đang làm' : 'Chưa làm';
 
@@ -95,6 +101,12 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
           <SkillIcon className="w-5 h-5" />
         </div>
         <div className="flex items-center gap-2.5">
+          {/* Overdue badge - highest priority */}
+          {isOverdue && (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-white bg-red-500 border border-red-600 rounded-full px-2 py-0.5">
+              <AlertTriangle className="w-3.5 h-3.5" /> Quá hạn
+            </span>
+          )}
           {showAssignedBadge && item.isAssigned && (
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-700">
               <Gift className="w-3.5 h-3.5" /> GV giao
@@ -218,7 +230,12 @@ export function TeensTests() {
     ];
   }, [assignedData]);
 
-  const source = tab === 'all' ? allExams : assignedExams;
+  const source = tab === 'all' ? allExams : tab === 'overdue' 
+    ? allExams.filter((e) => {
+        if (e.status === 'completed' || !e.deadline) return false;
+        return new Date(e.deadline) < new Date();
+      })
+    : assignedExams;
   const isLoading = tab === 'all' ? browseLoading : assignedLoading;
 
   const visible = useMemo(() => {
@@ -239,6 +256,10 @@ export function TeensTests() {
   );
 
   const assignedCount = allExams.filter((e) => e.isAssigned).length;
+  const overdueCount = allExams.filter((e) => {
+    if (e.status === 'completed' || !e.deadline) return false;
+    return new Date(e.deadline) < new Date();
+  }).length;
   const stats = {
     total: allExams.length,
     pending: allExams.filter((e) => e.status === 'pending').length,
@@ -312,6 +333,19 @@ export function TeensTests() {
                 <span className="text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5 font-bold"
                   style={tab === 'assigned' ? { background: 'rgba(255,255,255,0.25)' } : { background: '#EEF2FF', color: '#4F46E5' }}>
                   {assignedCount}
+                </span>
+              )}
+            </button>
+            <button onClick={() => setTab('overdue')}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all"
+              style={tab === 'overdue'
+                ? { background: 'linear-gradient(135deg, #DC2626, #EF4444)', color: '#fff', boxShadow: '0 4px 14px rgba(220,38,38,0.3)' }
+                : { background: 'transparent', color: '#64748B' }}>
+              <AlertTriangle className="w-4 h-4" /> Quá hạn
+              {overdueCount > 0 && (
+                <span className="text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5 font-bold"
+                  style={tab === 'overdue' ? { background: 'rgba(255,255,255,0.25)' } : { background: '#FEE2E2', color: '#DC2626' }}>
+                  {overdueCount}
                 </span>
               )}
             </button>
