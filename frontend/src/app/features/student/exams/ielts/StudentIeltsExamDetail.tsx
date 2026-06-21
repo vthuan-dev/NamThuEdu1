@@ -267,7 +267,12 @@ function DetailContent({
   // Fallback: localStorage (cho session cũ chưa có scope ở backend).
   const beScope = activeSession?.practice_scope ?? null;
   const lsScope = readIeltsPracticeScope(data.examId, data.skill);
-  const savedScope = beScope ?? lsScope;
+  // Chỉ dùng beScope nếu có sections hợp lệ, nếu không fallback localStorage
+  const savedScope = (beScope && Array.isArray(beScope.sections) && beScope.sections.length > 0)
+    ? beScope
+    : (lsScope || beScope);
+  // Phát hiện session cũ thiếu scope (tạo trước khi có feature này)
+  const hasMissingScope = !!activeSession && !savedScope;
   const continueUrl = (() => {
     if (data.scope === "full") return `/hoc-vien/lam-bai-ielts/${data.examId}`;
     // Skill ưu tiên: scope.skill (nếu có) > data.skill mặc định
@@ -377,6 +382,7 @@ function DetailContent({
             <ActiveSessionChoice
               session={activeSession}
               totalQuestions={data.totalQuestions}
+              hasMissingScope={hasMissingScope}
               onContinue={() => navigate(continueUrl)}
               onDiscardSession={handleDiscardSession}
               discardLoading={discardingSession}
@@ -642,12 +648,14 @@ function FullTestMode({
 function ActiveSessionChoice({
   session,
   totalQuestions,
+  hasMissingScope = false,
   onContinue,
   onDiscardSession,
   discardLoading,
 }: {
   session: NonNullable<IeltsExamDetailData["activeSession"]>;
   totalQuestions: number;
+  hasMissingScope?: boolean;
   onContinue: () => void;
   onDiscardSession: () => void;
   discardLoading: boolean;
@@ -685,6 +693,15 @@ function ActiveSessionChoice({
           <p className="mt-1 text-xs leading-relaxed text-amber-800">
             Bạn có thể tiếp tục bài làm dang dở. Muốn bắt đầu phiên mới, hãy xóa phiên bài làm hiện tại trước.
           </p>
+          {hasMissingScope && (
+            <div className="mt-2 flex items-start gap-1.5 rounded-md bg-red-50 border border-red-200 px-2.5 py-2">
+              <AlertCircle className="w-3.5 h-3.5 text-red-600 mt-0.5 flex-shrink-0" />
+              <p className="text-[11px] leading-relaxed text-red-800">
+                <b>Phiên này thiếu thông tin về sections đã chọn</b> (có thể do tạo trước khi hệ thống cập nhật).
+                Nếu tiếp tục, bài làm có thể render sai. <b>Đề xuất: Xóa phiên này và bắt đầu lại.</b>
+              </p>
+            </div>
+          )}
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <button
