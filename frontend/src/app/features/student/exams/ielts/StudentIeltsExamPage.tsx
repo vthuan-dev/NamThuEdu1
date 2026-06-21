@@ -77,6 +77,15 @@ function applyPracticeScope(
       sectionNumbers.has(Number(section.sectionNumber))
     );
     if (sections.length > 0) {
+      // ✅ RENUMBER questions to start from 1 in practice mode
+      let runningNumber = 1;
+      sections.forEach((section: IeltsListeningPayload["sections"][number]) => {
+        section.questionStart = runningNumber;
+        section.questions.forEach((q: any) => {
+          q.questionNumber = runningNumber++;
+        });
+      });
+      
       scoped.sections = sections;
       scoped.totalParts = originalTotalParts;
       scoped.totalQuestions = sections.reduce(
@@ -92,6 +101,17 @@ function applyPracticeScope(
       sectionNumbers.has(Number(passage.passageNumber))
     );
     if (passages.length > 0) {
+      // ✅ RENUMBER questions to start from 1 in practice mode
+      let runningNumber = 1;
+      passages.forEach((passage: IeltsReadingPayload["passages"][number]) => {
+        const questionStart = runningNumber;
+        passage.questions.forEach((q: any) => {
+          q.questionNumber = runningNumber++;
+        });
+        passage.questionStart = questionStart;
+        passage.questionEnd = runningNumber - 1;
+      });
+      
       scoped.passages = passages;
       scoped.totalParts = originalTotalParts;
       scoped.totalQuestions = passages.reduce(
