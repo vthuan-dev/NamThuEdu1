@@ -19,6 +19,7 @@ import {
   Loader2,
   Bot,
   RefreshCw,
+  Info,
 } from "lucide-react";
 import { studentApi } from "../../../../services/studentApi";
 
@@ -403,6 +404,22 @@ export function VstepResultPage() {
         <ArrowLeft className="w-4 h-4" />
         Về trang đề thi
       </button>
+
+      {/* ── Practice mode info banner ────────────────────────────────────────── */}
+      {isPracticeMode && answeredMcq > 0 && (
+        <div className="rounded-xl border border-cyan-200 bg-cyan-50/60 px-4 py-3 flex items-start gap-3">
+          <Info className="w-5 h-5 text-cyan-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-cyan-800">
+              Chế độ luyện tập (Practice Mode)
+            </p>
+            <p className="text-xs text-cyan-700/80 mt-0.5">
+              Đây là kết quả luyện tập {answeredMcq} câu - không phải bài thi đầy đủ ({totalMcqExam} câu). 
+              Điểm số được tính dựa trên phần bạn đã làm.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Hero card: tiêu đề + điểm + stats — gộp 1 khối, tối giản ──────── */}
       <div className="rounded-2xl border border-slate-200 bg-white">
