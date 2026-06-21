@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Exam;
 use App\Models\Submission;
+use App\Models\SubmissionAnswer;
 use App\Services\IELTSService;
 use App\Services\ExamAutoSubmitService;
 use Illuminate\Http\Request;
@@ -678,6 +679,22 @@ class IeltsExamController extends Controller
             ? $payload['practice_scope']
             : null;
 
+        // FALLBACK: phiên cũ tạo trước khi có persistence của practice_scope.
+        // Nếu chưa có scope nhưng học viên đã trả lời chỉ trong 1 vài qPart →
+        // suy ra scope từ answers để FE build URL practice đúng (không rớt về
+        // full_test render full đề rồi chấm sai).
+        if (!$practiceScope) {
+            $inferred = $this->inferPracticeScopeFromAnswers($submission, $exam);
+            if ($inferred) {
+                $practiceScope = $inferred;
+                // Self-heal: lưu lại để lần sau khỏi phải infer
+                $payload = is_array($payload) ? $payload : [];
+                $payload['practice_scope'] = $inferred;
+                $submission->submission_payload = $payload;
+                $submission->save();
+            }
+        }
+
         return [
             'submissionId' => $submission->sId,
             'started_at' => $startTime,
@@ -693,6 +710,44 @@ class IeltsExamController extends Controller
     private function isIeltsExam(Exam $exam): bool
     {
         return in_array($exam->eType, ['IELTS', 'IELTS_ACADEMIC', 'IELTS_GENERAL'], true);
+    }
+
+    /**
+     * Suy ra practice scope từ các câu đã trả lời. Dành cho phiên cũ tạo trước
+     * khi có persistence. Nếu học viên chỉ trả lời ở 1 qPart (vd Passage 1) →
+     * suy ra scope = section 1. Nếu trả ở nhiều qPart hoặc 0 câu → trả null
+     * (không suy đoán liều, để FE rớt về full_test).
+     */
+    private function inferPracticeScopeFromAnswers(Submission $submission, Exam $exam): ?array
+    {
+        $skill = $exam->ielts_skill ?: $this->detectSkillFromExam($exam);
+        if (!in_array($skill, ['listening', 'reading', 'writing', 'speaking'], true)) {
+            return null;
+        }
+
+        $parts = SubmissionAnswer::where('submission_id', $submission->sId)
+            ->whereNotNull('saAnswer_text')
+            ->where('saAnswer_text', '!=', '')
+            ->join('questions', 'submission_answers.question_id', '=', 'questions.qId')
+            ->whereNotNull('questions.qPart')
+            ->pluck('questions.qPart')
+            ->map(fn($v) => (int) $v)
+            ->filter(fn($v) => $v > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        // Không infer nếu: 0 câu trả lời, hoặc trả lời ở >= 3 phần (gần như full)
+        if (count($parts) === 0 || count($parts) >= 3) {
+            return null;
+        }
+
+        sort($parts);
+        return [
+            'skill'    => $skill,
+            'sections' => $parts,
+            'time'     => null, // không thể infer time từ answers
+        ];
     }
 
     private function detectSkillFromExam(Exam $exam): string
