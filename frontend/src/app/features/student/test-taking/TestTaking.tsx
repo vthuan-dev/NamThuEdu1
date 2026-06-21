@@ -372,12 +372,13 @@ export function TestTaking() {
       }
       setSubmissionId(data?.submissionId ?? querySubmissionId ?? null);
       const sid = data?.submissionId ?? querySubmissionId ?? null;
-      const remainingSec = Number(data?.timeRemaining ?? 0);
-      const durationSec = Number(fetchedExam?.eDuration_minutes ?? fetchedExam?.exam_duration ?? 120) * 60;
-      // Nếu F5/reload: kiểm tra sessionStorage để giữ timer chạy liên tục
-      const savedRemaining = sessionStorage.getItem(`test_remaining_${assignmentId}`);
-      const effectiveRemaining = savedRemaining ? Number(savedRemaining) : remainingSec;
-      setStartedAtServer(new Date(Date.now() - (durationSec - effectiveRemaining) * 1000).toISOString());
+      // ✅ Timer F5-resistant: dùng sStart_time từ backend (timestamp tuyệt đối).
+      // useExamSession tự lưu deadline vào localStorage theo submissionId.
+      if (data?.sStart_time || data?.started_at) {
+        setStartedAtServer(data.sStart_time || data.started_at);
+      } else {
+        setStartedAtServer(new Date().toISOString());
+      }
       setSubmissionId(sid);
       setExam(fetchedExam);
       if (sid) {
@@ -418,27 +419,12 @@ export function TestTaking() {
     return () => clearInterval(autoSaveRef.current);
   }, [started, doAutoSave]);
 
-  // Lưu timeRemaining vào sessionStorage trước khi F5/refresh
+  // useExamSession tự handle localStorage deadline — không cần sessionStorage thêm
   useEffect(() => {
-    if (!assignmentId) return;
-    const save = () => {
-      sessionStorage.setItem(`test_remaining_${assignmentId}`, String(session.timeRemaining));
-    };
-    window.addEventListener('beforeunload', save);
-    window.addEventListener('pagehide', save);
-    return () => {
-      window.removeEventListener('beforeunload', save);
-      window.removeEventListener('pagehide', save);
-    };
-  }, [assignmentId, session.timeRemaining]);
-
-  // Xoá sessionStorage khi nộp bài
-  useEffect(() => {
-    if (!assignmentId) return;
     if (submitMutation.isSuccess) {
-      sessionStorage.removeItem(`test_remaining_${assignmentId}`);
+      // noop — deadline đã được xoá bởi useExamSession.doSubmit
     }
-  }, [assignmentId, submitMutation.isSuccess]);
+  }, [submitMutation.isSuccess]);
 
   useEffect(() => {
     if (!sections.length) return;

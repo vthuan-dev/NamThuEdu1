@@ -383,7 +383,6 @@ export function TestTakingVSTEP() {
     mutationFn: () => session.submit(),
     onSuccess: (res: any) => {
       const sid = res?.data?.data?.submissionId ?? submissionId;
-      sessionStorage.removeItem(`vstep_test_remaining_${assignmentId}`);
       navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${sid}`);
     },
     onError: () => {
@@ -415,12 +414,13 @@ export function TestTakingVSTEP() {
         return;
       }
       const sid = data?.submissionId ?? querySubmissionId ?? null;
-      const remainingSec = Number(data?.timeRemaining ?? 0);
-      const durSec = Number(rawExam?.eDuration_minutes ?? 179) * 60;
-      // Nếu F5/reload: kiểm tra sessionStorage để giữ timer chạy liên tục
-      const savedRemaining = sessionStorage.getItem(`vstep_test_remaining_${assignmentId}`);
-      const effectiveRemaining = savedRemaining ? Number(savedRemaining) : remainingSec;
-      setStartedAtServer(new Date(Date.now() - (durSec - effectiveRemaining) * 1000).toISOString());
+      // ✅ Timer F5-resistant: dùng sStart_time từ backend (timestamp tuyệt đối).
+      // useExamSession tự lưu deadline vào localStorage theo submissionId.
+      if (data?.sStart_time || data?.started_at) {
+        setStartedAtServer(data.sStart_time || data.started_at);
+      } else {
+        setStartedAtServer(new Date().toISOString());
+      }
       setExam(rawExam);
       setSubmissionId(sid);
       if (sid) {
@@ -445,19 +445,7 @@ export function TestTakingVSTEP() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Lưu timeRemaining vào sessionStorage trước khi F5/refresh
-  useEffect(() => {
-    if (!assignmentId) return;
-    const save = () => {
-      sessionStorage.setItem(`vstep_test_remaining_${assignmentId}`, String(session.timeRemaining));
-    };
-    window.addEventListener('beforeunload', save);
-    window.addEventListener('pagehide', save);
-    return () => {
-      window.removeEventListener('beforeunload', save);
-      window.removeEventListener('pagehide', save);
-    };
-  }, [assignmentId, session.timeRemaining]);
+  // useExamSession tự handle localStorage deadline theo submissionId — không cần sessionStorage
 
   if (!started) {
     return (
