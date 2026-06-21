@@ -2127,6 +2127,8 @@ function SpeakingQuestionScreen({ part, partNumber, submissionId, onComplete, re
   const [recLeft, setRecLeft] = useState(times.recSec);
   const [count3, setCount3] = useState(3);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [micStream, setMicStream] = useState<MediaStream | null>(null);
   const [ttsProgress, setTtsProgress] = useState(0);
   const mediaRef = useRef<MediaRecorder | null>(null);
@@ -2166,19 +2168,36 @@ function SpeakingQuestionScreen({ part, partNumber, submissionId, onComplete, re
       setMicStream(stream); chunksRef.current = [];
       const mr = new MediaRecorder(stream);
       mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      mr.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        setAudioUrl(URL.createObjectURL(blob));
+      mr.onstop = async () => {
+        // ✅ FIX: đọc chunksRef.current SAU khi onstop — lúc này dataavailable đã đầy đủ
+        const chunks = chunksRef.current;
+        if (chunks.length === 0) {
+          console.warn('[Speaking] onstop fired but no audio chunks — recording may have been empty');
+        }
+        const blob = new Blob(chunks, { type: "audio/webm" });
+        const localUrl = URL.createObjectURL(blob);
+        setAudioUrl(localUrl);
         stream.getTracks().forEach((t) => t.stop());
         setMicStream(null); setPhase("done"); onComplete?.(partNumber);
-        // Upload recording to server silently (fire-and-forget)
-        if (submissionId) {
-          studentApi.uploadSpeakingAudio(submissionId, partNumber, blob).catch(() => {
-            // Non-critical — local playback still works even if upload fails
-          });
+        // Upload recording to server — show error if fails
+        const sid = submissionId; // capture current value (không dùng closure cũ)
+        if (sid && blob.size > 0) {
+          setUploading(true);
+          setUploadError(null);
+          studentApi.uploadSpeakingAudio(sid, partNumber, blob)
+            .then(() => { setUploading(false); })
+            .catch((err) => {
+              console.error('[Speaking] Upload failed:', err);
+              setUploading(false);
+              setUploadError('Không tải lên được. Vui lòng thử ghi âm lại.');
+            });
+        } else if (!sid) {
+          console.warn('[Speaking] submissionId is null — audio not uploaded');
         }
       };
-      mr.start(); mediaRef.current = mr; setPhase("recording"); setRecLeft(times.recSec); clearTimer();
+      // ✅ FIX: dùng timeslice 250ms để MediaRecorder flush data liên tục
+      // → đảm bảo dataavailable có dữ liệu kể cả khi stop sớm
+      mr.start(250); mediaRef.current = mr; setPhase("recording"); setRecLeft(times.recSec); clearTimer();
       timerRef.current = setInterval(() => setRecLeft((c) => { if (c <= 1) { clearTimer(); mr.stop(); return 0; } return c - 1; }), 1000);
     } catch {
       alert("Không thể truy cập microphone. Vui lòng cho phép quyền ghi âm.");
@@ -2232,7 +2251,24 @@ function SpeakingQuestionScreen({ part, partNumber, submissionId, onComplete, re
             </>
           )}
           <div className="text-slate-800">{formatPartContent(part, partNumber)}</div>
-          {!reviewMode && audioUrl && (<div className="mt-5"><p className="text-xs font-semibold text-slate-700 mb-2">Bài thu của bạn:</p><audio controls src={audioUrl} className="w-full h-10" /></div>)}
+          {!reviewMode && audioUrl && (
+            <div className="mt-5">
+              <p className="text-xs font-semibold text-slate-700 mb-2">Bài thu của bạn:</p>
+              <audio controls src={audioUrl} className="w-full h-10" />
+              {uploading && (
+                <p className="mt-2 text-xs text-sky-600 flex items-center gap-1">
+                  <span className="inline-block w-3 h-3 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
+                  Đang tải lên server...
+                </p>
+              )}
+              {uploadError && (
+                <p className="mt-2 text-xs text-red-600 font-medium">{uploadError}</p>
+              )}
+              {!uploading && !uploadError && phase === "done" && (
+                <p className="mt-2 text-xs text-emerald-600 font-medium">✓ Đã lưu bài ghi âm</p>
+              )}
+            </div>
+          )}
           {!reviewMode && (
             <div className="mt-5 flex gap-2">
               {phase === "recording" && (<button onClick={stopRecording} className="flex items-center gap-2 px-5 py-2.5 bg-slate-700 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 transition-colors"><Pause className="w-4 h-4" /> Dừng ghi âm</button>)}
