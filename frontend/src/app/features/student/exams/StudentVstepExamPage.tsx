@@ -193,12 +193,14 @@ export function StudentVstepExamPage() {
   const [startError, setStartError] = useState<string | null>(null);
   const [submissionId, setSubmissionId] = useState<number | null>(null);
   const [startedAtServer, setStartedAtServer] = useState('');
+  // duration từ server — fallback về TOTAL_MINUTES nếu API không trả
+  const [examDurationMinutes, setExamDurationMinutes] = useState(TOTAL_MINUTES);
 
   /* ── useExamSession hook (handles timer + auto-save + auto-submit) ── */
   const session = useExamSession({
     submissionId: reviewMode ? null : submissionId,
     examId: examId ? parseInt(examId) : 0,
-    durationMinutes: TOTAL_MINUTES,
+    durationMinutes: examDurationMinutes,
     startedAtServer,
     examType: 'VSTEP',
     role: 'adults',
@@ -530,6 +532,14 @@ export function StudentVstepExamPage() {
           } else {
             // Fallback: assume just started
             setStartedAtServer(new Date().toISOString());
+          }
+          
+          // ✅ FIX: Use actual exam duration from backend — không hardcode TOTAL_MINUTES
+          // total_duration là giây, eDuration_minutes là phút (backward compat)
+          if (data.total_duration) {
+            setExamDurationMinutes(Math.round(data.total_duration / 60));
+          } else if (data.eDuration_minutes) {
+            setExamDurationMinutes(Number(data.eDuration_minutes));
           }
           
           // ✅ NEW: Restore saved answers from backend (F5 case)

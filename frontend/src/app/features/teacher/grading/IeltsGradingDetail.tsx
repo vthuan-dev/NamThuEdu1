@@ -189,7 +189,8 @@ export function IeltsGradingDetail() {
         // Map answers → questions
         const qs: Question[] = (d.answers ?? []).map((sa: any, idx: number): Question => {
           const q = sa.question ?? {};
-          const skill = (q.qSkill ?? "").toLowerCase() as IeltsSkill;
+          // ✅ FIX: fallback qSection → đảm bảo câu hỏi không mất khi qSkill null
+          const skill = ((q.qSkill ?? q.qSection ?? "").toLowerCase()) as IeltsSkill;
           const isSubjective = skill === "writing" || skill === "speaking";
 
           return {

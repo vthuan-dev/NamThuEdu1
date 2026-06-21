@@ -240,7 +240,8 @@ function VstepGradingDetailInternal() {
         const useRealPoints = !(examTypeUpper.includes("VSTEP") || examTypeUpper.includes("IELTS"));
         const qs: Question[] = (d.answers ?? []).map((sa: any, idx: number) => {
           const q = sa.question ?? {};
-          const skill = (q.qSkill ?? "").toLowerCase() as VstepSkill;
+          // ✅ FIX: fallback qSection → đảm bảo câu hỏi không mất khi qSkill null
+          const skill = ((q.qSkill ?? q.qSection ?? "").toLowerCase()) as VstepSkill;
           const isSubjective = skill === "writing" || skill === "speaking";
           
           let studentAns = sa.saAnswer_text ?? "";

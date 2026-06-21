@@ -156,8 +156,18 @@ export function VstepResultPage() {
   const baseScores = vstepMeta?.vstep_scores ?? {};
   const scores = polledScores ? { ...baseScores, ...polledScores } : baseScores;
 
-  // Chỉ render skill thực sự có trong đề (IELTS thường 1 skill/đề)
-  const examSections: string[] = vstepMeta?.exam_sections ?? ["listening", "reading", "writing", "speaking"];
+  // Chỉ render skill thực sự có trong đề
+  // Ưu tiên: exam_sections từ API > suy từ scores có giá trị > fallback tất cả 4
+  const examSections: string[] = useMemo(() => {
+    if (vstepMeta?.exam_sections?.length) return vstepMeta.exam_sections;
+    // Suy từ scores: skill nào có điểm (kể cả 0) thì render
+    const fromScores = Object.entries(scores)
+      .filter(([k, v]) => k !== "raw_mcq_pct" && v !== null && v !== undefined)
+      .map(([k]) => k);
+    if (fromScores.length > 0) return fromScores;
+    // Fallback cuối: tất cả 4 kỹ năng
+    return ["listening", "reading", "writing", "speaking"];
+  }, [vstepMeta, scores]);
   const activeSkills = SKILLS.filter((s) => examSections.includes(s.key));
   const visibleSkills = activeSkills.length > 0 ? activeSkills : SKILLS;
   const isSingleSkill = visibleSkills.length === 1;
