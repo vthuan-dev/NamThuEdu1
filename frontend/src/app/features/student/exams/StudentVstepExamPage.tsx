@@ -181,12 +181,14 @@ export function StudentVstepExamPage() {
   const [correctAnswersMap, setCorrectAnswersMap] = useState<Record<number, string>>({});
   const [reviewSpeakingAudio, setReviewSpeakingAudio] = useState<Record<string, string>>({});
   const [reviewSpeakingScore, setReviewSpeakingScore] = useState<number | null>(null);
-  type WritingTaskResult = { score: number | null; criteria: Record<string, number | null>; criterion_comments?: Record<string, string | null>; feedback: string; suggestions: string[] };
-  type SpeakingPartResult = { score: number | null; criteria: Record<string, number | null>; criterion_comments?: Record<string, string | null>; feedback: string; suggestions: string[]; pronunciation_score?: number; content_score?: number; transcript?: string };
+  type WritingTaskResult = { score: number | null; criteria: Record<string, number | null>; criterion_comments?: Record<string, string | null>; feedback: string; suggestions: string[]; teacher_feedback?: string | null };
+  type SpeakingPartResult = { score: number | null; criteria: Record<string, number | null>; criterion_comments?: Record<string, string | null>; feedback: string; suggestions: string[]; pronunciation_score?: number; content_score?: number; transcript?: string; teacher_feedback?: string | null };
   const [reviewWritingScores, setReviewWritingScores] = useState<{ overall: number | null; tasks: Record<number, number | null>; results: Record<number, WritingTaskResult> }>({ overall: null, tasks: {}, results: {} });
   const [reviewSpeakingResults, setReviewSpeakingResults] = useState<Record<number, SpeakingPartResult>>({});
   const [reviewGradingPending, setReviewGradingPending] = useState(false);
   const [reviewStudentName, setReviewStudentName] = useState<string | null>(null);
+  /** Nhận xét tổng quát của giáo viên (sTeacher_feedback) — show ở top mỗi tab W/S */
+  const [reviewTeacherOverall, setReviewTeacherOverall] = useState<string | null>(null);
 
   /* ── Start / loading state ──────────────────────────────── */
   const [starting, setStarting] = useState(true);
@@ -419,7 +421,19 @@ export function StudentVstepExamPage() {
               }
               spResults[part].score = ptsNum;
             }
+            // Inject teacher per-part feedback
+            if (a.saTeacher_feedback) {
+              if (!spResults[part]) {
+                spResults[part] = { criteria: {}, criterion_comments: {}, feedback: "", suggestions: [] };
+              }
+              spResults[part].teacher_feedback = a.saTeacher_feedback;
+            }
           }
+        }
+
+        // Overall teacher feedback (sTeacher_feedback) — show ở mỗi tab subjective
+        if (data.sTeacher_feedback) {
+          setReviewTeacherOverall(String(data.sTeacher_feedback));
         }
         setReviewSpeakingResults(spResults);
 
@@ -434,12 +448,15 @@ export function StudentVstepExamPage() {
         // Writing scores: overall + per-task from saPoints_awarded + detailed results
         const wTasks: Record<number, number | null> = {};
         const wResults: Record<number, any> = {};
+        // Map taskNum → saTeacher_feedback (per-task teacher comment)
+        const wTeacherFeedback: Record<number, string | null> = {};
         for (const a of (data.answers ?? [])) {
           const sec = (a.question?.qSkill ?? a.question?.qSection ?? '').toLowerCase();
           if (sec === 'writing') {
             const part = a.question?.qPart ?? 1;
             const pts = a.saPoints_awarded;
             wTasks[part] = pts !== null && pts !== undefined ? parseFloat(String(pts)) : null;
+            if (a.saTeacher_feedback) wTeacherFeedback[part] = a.saTeacher_feedback;
           }
         }
 
@@ -473,6 +490,13 @@ export function StudentVstepExamPage() {
               wTasks[taskNum] = aiScore;
             }
           }
+        }
+
+        // Inject per-task teacher feedback (saTeacher_feedback) → results.teacher_feedback
+        for (const [taskKey, fb] of Object.entries(wTeacherFeedback)) {
+          const t = Number(taskKey);
+          if (!wResults[t]) wResults[t] = { criteria: {}, criterion_comments: {}, feedback: "", suggestions: [] };
+          wResults[t].teacher_feedback = fb;
         }
 
         // Compute overall writing score: prioritize average of manually graded/overridden parts if available
@@ -1065,6 +1089,7 @@ export function StudentVstepExamPage() {
           readOnly={reviewMode}
           reviewScores={reviewMode ? reviewWritingScores : undefined}
           isGradingPending={reviewMode ? reviewGradingPending : false}
+          teacherOverallFeedback={reviewMode ? reviewTeacherOverall : null}
         />
       );
     }
@@ -1081,6 +1106,7 @@ export function StudentVstepExamPage() {
         reviewSpeakingScore={reviewSpeakingScore}
         reviewSpeakingResults={reviewMode ? reviewSpeakingResults : undefined}
         isGradingPending={reviewMode ? reviewGradingPending : false}
+        teacherOverallFeedback={reviewMode ? reviewTeacherOverall : null}
       />
     );
   };
@@ -1880,7 +1906,7 @@ function ReadingView({
  *  WRITING VIEW
  * ============================================================ */
 function WritingView({
-  task, taskNumber, value, onChange, onBlur, readOnly, reviewScores, isGradingPending,
+  task, taskNumber, value, onChange, onBlur, readOnly, reviewScores, isGradingPending, teacherOverallFeedback,
 }: {
   task?: WritingTask;
   taskNumber: number;
@@ -1888,8 +1914,10 @@ function WritingView({
   onChange: (v: string) => void;
   onBlur: (v: string) => void;
   readOnly?: boolean;
-  reviewScores?: { overall: number | null; tasks: Record<number, number | null>; results: Record<number, { score: number | null; criteria: Record<string, number | null>; criterion_comments?: Record<string, string | null>; feedback: string; suggestions: string[] }> };
+  reviewScores?: { overall: number | null; tasks: Record<number, number | null>; results: Record<number, { score: number | null; criteria: Record<string, number | null>; criterion_comments?: Record<string, string | null>; feedback: string; suggestions: string[]; teacher_feedback?: string | null }> };
   isGradingPending?: boolean;
+  /** Nhận xét tổng quát của giáo viên (sTeacher_feedback) */
+  teacherOverallFeedback?: string | null;
 }) {
   if (!task) return <EmptyState skill="writing" />;
 
@@ -2003,8 +2031,25 @@ function WritingView({
           )}
 
           {/* Feedback + Suggestions sub-column */}
-          {(currentResult.feedback || (currentResult.suggestions ?? []).length > 0) && (
+          {(currentResult.feedback || (currentResult.suggestions ?? []).length > 0 || currentResult.teacher_feedback || teacherOverallFeedback) && (
             <div className="w-64 flex-shrink-0 bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
+              {/* Nhận xét giáo viên — ưu tiên show ở trên cùng (per-task → fallback overall) */}
+              {(currentResult.teacher_feedback || teacherOverallFeedback) && (
+                <>
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <p className="text-xs font-bold text-violet-700 uppercase tracking-wider">Nhận xét giáo viên</p>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 font-bold">GV</span>
+                    </div>
+                    <p className="text-xs text-slate-800 leading-relaxed whitespace-pre-line">
+                      {currentResult.teacher_feedback || teacherOverallFeedback}
+                    </p>
+                  </div>
+                  {(currentResult.feedback || (currentResult.suggestions ?? []).length > 0) && (
+                    <div className="border-t border-slate-100" />
+                  )}
+                </>
+              )}
               {currentResult.feedback && (
                 <div>
                   <p className="text-xs font-bold text-sky-700 uppercase tracking-wider mb-1.5">Nhận xét AI</p>
@@ -2436,7 +2481,7 @@ function SpeakingQuestionScreen({ part, partNumber, submissionId, onComplete, re
 }
 
 function SpeakingView({
-  part, partNumber, examId, submissionId, onComplete, reviewMode, reviewAudioUrl, reviewSpeakingScore, reviewSpeakingResults, isGradingPending,
+  part, partNumber, examId, submissionId, onComplete, reviewMode, reviewAudioUrl, reviewSpeakingScore, reviewSpeakingResults, isGradingPending, teacherOverallFeedback,
 }: {
   part?: SpeakingPart;
   partNumber: number;
@@ -2446,8 +2491,10 @@ function SpeakingView({
   reviewMode?: boolean;
   reviewAudioUrl?: string;
   reviewSpeakingScore?: number | null;
-  reviewSpeakingResults?: Record<number, { score: number | null; criteria: Record<string, number | null>; criterion_comments?: Record<string, string | null>; feedback: string; suggestions: string[]; pronunciation_score?: number; content_score?: number; transcript?: string }>;
+  reviewSpeakingResults?: Record<number, { score: number | null; criteria: Record<string, number | null>; criterion_comments?: Record<string, string | null>; feedback: string; suggestions: string[]; pronunciation_score?: number; content_score?: number; transcript?: string; teacher_feedback?: string | null }>;
   isGradingPending?: boolean;
+  /** Nhận xét tổng quát của giáo viên (sTeacher_feedback) */
+  teacherOverallFeedback?: string | null;
 }) {
   const LS_PREP = `svstep_speaking_prep_${examId}`;
   const [viewPhase, setViewPhase] = useState<"prep" | "questions">(() => {
@@ -2575,9 +2622,26 @@ function SpeakingView({
                 ) : <p className="text-sm text-slate-400 italic">Chưa chấm</p>}
               </div>
 
-              {/* AI feedback + suggestions */}
-              {(partResult.feedback || (partResult.suggestions ?? []).length > 0) && (
+              {/* AI feedback + suggestions + teacher feedback */}
+              {(partResult.feedback || (partResult.suggestions ?? []).length > 0 || partResult.teacher_feedback || teacherOverallFeedback) && (
                 <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
+                  {/* Nhận xét giáo viên — show ở trên cùng (per-part > overall) */}
+                  {(partResult.teacher_feedback || teacherOverallFeedback) && (
+                    <>
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <p className="text-xs font-bold text-violet-700 uppercase tracking-wider">Nhận xét giáo viên</p>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 font-bold">GV</span>
+                        </div>
+                        <p className="text-xs text-slate-800 leading-relaxed whitespace-pre-line">
+                          {partResult.teacher_feedback || teacherOverallFeedback}
+                        </p>
+                      </div>
+                      {(partResult.feedback || (partResult.suggestions ?? []).length > 0) && (
+                        <div className="border-t border-slate-100" />
+                      )}
+                    </>
+                  )}
                   {partResult.feedback && (
                     <div>
                       <p className="text-xs font-bold text-sky-700 uppercase tracking-wider mb-1.5">Nhận xét AI</p>
