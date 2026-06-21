@@ -666,6 +666,18 @@ class IeltsExamController extends Controller
         $startAt = \Carbon\Carbon::parse($startTime);
         $deadlineAt = $startAt->copy()->addSeconds($durationSeconds);
 
+        // Đọc practice scope từ submission_payload (nếu có) để FE biết phiên đang
+        // làm là practice 1 section nào → khi bấm "Tiếp tục" sẽ build URL đúng
+        // ?mode=practice&sections=...&time=... thay vì rớt về full_test.
+        $payload = $submission->submission_payload;
+        if (is_string($payload)) {
+            $decoded = json_decode($payload, true);
+            $payload = is_array($decoded) ? $decoded : null;
+        }
+        $practiceScope = is_array($payload) && isset($payload['practice_scope']) && is_array($payload['practice_scope'])
+            ? $payload['practice_scope']
+            : null;
+
         return [
             'submissionId' => $submission->sId,
             'started_at' => $startTime,
@@ -674,6 +686,7 @@ class IeltsExamController extends Controller
             'time_remaining_seconds' => $remaining,
             'duration_seconds' => $durationSeconds,
             'answered_count' => (int) ($submission->answered_count ?? 0),
+            'practice_scope' => $practiceScope,
         ];
     }
 

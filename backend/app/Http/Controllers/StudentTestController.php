@@ -3245,7 +3245,19 @@ class StudentTestController extends Controller
                 ->mapWithKeys(function ($a) {
                     return [$a->question_id => $a->saAnswer_text];
                 });
-            
+
+            // ✅ Persist practice scope (sections + time) nếu FE gửi lên.
+            // Lý do: học viên có thể chọn 1 section (vd Passage 1) để luyện tập;
+            // nếu chỉ lưu localStorage thì khi đổi máy / xóa storage sẽ MẤT scope
+            // → quay lại bấm "Tiếp tục bài đang làm" sẽ render full exam → chấm sai.
+            $practiceScopeReq = $this->extractPracticeScopeFromRequest($request);
+            if ($practiceScopeReq) {
+                $payload = is_array($existing->submission_payload) ? $existing->submission_payload : [];
+                $payload['practice_scope'] = $practiceScopeReq;
+                $existing->submission_payload = $payload;
+                $existing->save();
+            }
+
             return response()->json([
                 'status' => 'success',
                 'data'   => [
@@ -3254,6 +3266,7 @@ class StudentTestController extends Controller
                     'total_duration' => $totalSeconds,
                     'time_remaining' => $remaining,
                     'savedAnswers'   => $savedAnswers, // ← NEW: return saved answers
+                    'practice_scope' => $existing->submission_payload['practice_scope'] ?? null,
                     // backward-compat (phút)
                     'timeRemaining'  => round($remaining / 60),
                 ],
@@ -3262,13 +3275,20 @@ class StudentTestController extends Controller
 
         // Fresh start: No existing in_progress submission found
 
-        $submission = Submission::create([
+        $createPayload = [
             'exam_id'      => $examId,
             'user_id'      => $user->uId,
             'sStart_time'  => now(),
             'sStatus'      => 'in_progress',
             'last_activity_at' => now(),
-        ]);
+        ];
+
+        $practiceScopeReq = $this->extractPracticeScopeFromRequest($request);
+        if ($practiceScopeReq) {
+            $createPayload['submission_payload'] = ['practice_scope' => $practiceScopeReq];
+        }
+
+        $submission = Submission::create($createPayload);
 
         return response()->json([
             'status' => 'success',
@@ -3277,10 +3297,42 @@ class StudentTestController extends Controller
                 'started_at'     => $submission->sStart_time,
                 'total_duration' => $totalSeconds,
                 'time_remaining' => $totalSeconds,
+                'practice_scope' => $practiceScopeReq,
                 // backward-compat (phút)
                 'timeRemaining'  => $exam->eDuration_minutes ?? 179,
             ],
         ]);
+    }
+
+    /**
+     * Lấy practice scope từ request body. Trả null nếu không có hoặc không hợp lệ.
+     * Format: { practice_scope: { skill: 'reading', sections: [1,2], time: 20 } }
+     */
+    private function extractPracticeScopeFromRequest(Request $request): ?array
+    {
+        $scope = $request->input('practice_scope');
+        if (!is_array($scope)) return null;
+
+        $skill = is_string($scope['skill'] ?? null) ? strtolower($scope['skill']) : null;
+        if (!in_array($skill, ['listening', 'reading', 'writing', 'speaking'], true)) return null;
+
+        $sections = $scope['sections'] ?? null;
+        if (!is_array($sections)) return null;
+        $sections = array_values(array_unique(array_filter(array_map(
+            fn($v) => is_numeric($v) ? (int) $v : null,
+            $sections,
+        ), fn($v) => $v !== null && $v > 0)));
+        sort($sections);
+        if (empty($sections)) return null;
+
+        $time = $scope['time'] ?? null;
+        $time = is_numeric($time) && (int) $time > 0 ? (int) $time : null;
+
+        return [
+            'skill'    => $skill,
+            'sections' => $sections,
+            'time'     => $time,
+        ];
     }
 
     /**

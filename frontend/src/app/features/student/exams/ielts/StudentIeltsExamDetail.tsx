@@ -73,6 +73,11 @@ interface IeltsExamDetailData {
     time_remaining_seconds: number;
     duration_seconds: number;
     answered_count: number;
+    practice_scope?: {
+      skill?: string;
+      sections: number[];
+      time: number | null;
+    } | null;
   } | null;
 }
 
@@ -258,11 +263,17 @@ function DetailContent({
   // Đọc practice scope đã lưu (nếu có) khi học viên đã chọn 1 section + thời gian
   // và đang có phiên dở → "Tiếp tục bài đang làm" phải giữ NGUYÊN scope đó,
   // KHÔNG fallback sang full_test (sẽ render hết 40 câu, chấm sai).
-  const savedScope = readIeltsPracticeScope(data.examId, data.skill);
+  // Ưu tiên: backend.activeSession.practice_scope (canonical, cross-device)
+  // Fallback: localStorage (cho session cũ chưa có scope ở backend).
+  const beScope = activeSession?.practice_scope ?? null;
+  const lsScope = readIeltsPracticeScope(data.examId, data.skill);
+  const savedScope = beScope ?? lsScope;
   const continueUrl = (() => {
     if (data.scope === "full") return `/hoc-vien/lam-bai-ielts/${data.examId}`;
-    const base = `/hoc-vien/lam-bai-ielts/${data.examId}/${data.skill}`;
-    if (savedScope && savedScope.sections.length > 0) {
+    // Skill ưu tiên: scope.skill (nếu có) > data.skill mặc định
+    const skillForUrl = (savedScope as any)?.skill || data.skill;
+    const base = `/hoc-vien/lam-bai-ielts/${data.examId}/${skillForUrl}`;
+    if (savedScope && Array.isArray(savedScope.sections) && savedScope.sections.length > 0) {
       const params = new URLSearchParams();
       params.set("mode", "practice");
       params.set("sections", savedScope.sections.join(","));

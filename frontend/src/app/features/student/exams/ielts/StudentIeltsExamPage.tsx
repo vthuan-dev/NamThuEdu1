@@ -205,8 +205,6 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
   const [availableSkills, setAvailableSkills] = useState<IeltsSkill[] | null>(skill ? [skill] : null);
 
   usePageTitle(reviewMode ? "Xem lại bài IELTS" : "IELTS Test");
-
-  // Resolve effective skill ordering for full test
   const skillSequence: IeltsSkill[] = useMemo(() => {
     if (skill) return [skill];
     if (fullTest) return availableSkills?.length ? availableSkills : ["listening", "reading", "writing", "speaking"];
@@ -215,6 +213,26 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
 
   const [skillIdx, setSkillIdx] = useState(0);
   const currentSkill = skillSequence[skillIdx];
+
+  // ─── Persist practice scope to localStorage ───────────────────────────
+  // Khi học viên vào trang làm bài với URL ?mode=practice&sections=1&time=20
+  // thì save scope ngay lập tức. Lý do: nếu chỉ save lúc bấm nút LUYỆN TẬP
+  // bên trang detail thì các trường hợp F5 / paste URL trực tiếp / mở từ
+  // bookmark sẽ mất scope → khi quay lại detail bấm "Tiếp tục bài đang làm"
+  // sẽ nhảy về ?mode=full_test → render full 40 câu → chấm sai.
+  useEffect(() => {
+    if (!isPracticeMode || !currentSkill || !practiceSectionNumbers) return;
+    try {
+      const sections = Array.from(practiceSectionNumbers).sort((a, b) => a - b);
+      const scope = { sections, time: practiceTimeMinutes ?? null };
+      localStorage.setItem(
+        `ielts_practice_scope_${examId}_${currentSkill}`,
+        JSON.stringify(scope),
+      );
+    } catch {
+      /* localStorage unavailable */
+    }
+  }, [isPracticeMode, examId, currentSkill, practiceSectionNumbers, practiceTimeMinutes]);
 
   useEffect(() => {
     if (skill || !examId || !fullTest) return;
@@ -318,7 +336,19 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
     let cancelled = false;
     (async () => {
       try {
-        const res = await studentApi.startDirectVstepExam(examId, true);
+        // Build practice scope to send to backend so phiên lưu được scope.
+        // Khi học viên quay lại bấm "Tiếp tục bài đang làm" → activeSession từ
+        // BE trả về practice_scope → trang detail build URL đúng (?mode=practice
+        // &sections=...&time=...) thay vì rớt về full_test.
+        const practiceScopePayload = (() => {
+          if (!isPracticeMode || !currentSkill || !practiceSectionNumbers) return null;
+          return {
+            skill: currentSkill,
+            sections: Array.from(practiceSectionNumbers).sort((a, b) => a - b),
+            time: practiceTimeMinutes ?? null,
+          };
+        })();
+        const res = await studentApi.startDirectVstepExam(examId, true, false, practiceScopePayload);
         if (cancelled) return;
         const responseStatus = String(res.data?.status ?? "").toLowerCase();
         const startData: any = res.data?.data;

@@ -528,10 +528,20 @@ export const studentApi = {
   startTeensExamDirect: (examId: number) =>
     api.post(`/student/exams/${examId}/start-teens`),
 
-  // VSTEP direct exam — start by exam ID (no assignment needed)
-  startDirectVstepExam: (examId: number, resume = false, fresh = false) =>
-    api.post<{ status: string; data: { submissionId: number; timeRemaining: number; time_remaining?: number; started_at?: string; total_duration?: number; sStatus?: string } }>(
-      `/student/exams/${examId}/start-direct${resume || fresh ? `?${new URLSearchParams({ ...(resume ? { resume: '1' } : {}), ...(fresh ? { fresh: '1' } : {}) }).toString()}` : ''}`
+  // VSTEP/IELTS direct exam — start by exam ID (no assignment needed)
+  // For IELTS practice mode, pass `practiceScope` so backend persists scope to
+  // submission_payload — that way "Tiếp tục bài đang làm" rebuilds the right
+  // URL (?mode=practice&sections=...&time=...) instead of falling back to
+  // full_test (which would render all questions and grade incorrectly).
+  startDirectVstepExam: (
+    examId: number,
+    resume = false,
+    fresh = false,
+    practiceScope?: { skill: string; sections: number[]; time: number | null } | null,
+  ) =>
+    api.post<{ status: string; data: { submissionId: number; timeRemaining: number; time_remaining?: number; started_at?: string; total_duration?: number; sStatus?: string; practice_scope?: { skill: string; sections: number[]; time: number | null } | null } }>(
+      `/student/exams/${examId}/start-direct${resume || fresh ? `?${new URLSearchParams({ ...(resume ? { resume: '1' } : {}), ...(fresh ? { fresh: '1' } : {}) }).toString()}` : ''}`,
+      practiceScope ? { practice_scope: practiceScope } : {},
     ),
 
   loadStudentVstepListening: (examId: number) =>
