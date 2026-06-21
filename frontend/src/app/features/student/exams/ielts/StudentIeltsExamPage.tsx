@@ -73,17 +73,20 @@ function applyPracticeScope(
 
   if (skill === "listening" && Array.isArray(scoped.sections)) {
     const originalTotalParts = scoped.sections.length;
-    const sections = scoped.sections.filter((section: IeltsListeningPayload["sections"][number]) =>
+    let sections = scoped.sections.filter((section: IeltsListeningPayload["sections"][number]) =>
       sectionNumbers.has(Number(section.sectionNumber))
     );
     if (sections.length > 0) {
-      // ✅ RENUMBER questions to start from 1 in practice mode
+      // ✅ RENUMBER questions to start from 1 in practice mode - CREATE NEW OBJECTS
       let runningNumber = 1;
-      sections.forEach((section: IeltsListeningPayload["sections"][number]) => {
-        section.questionStart = runningNumber;
-        section.questions.forEach((q: any) => {
-          q.questionNumber = runningNumber++;
-        });
+      sections = sections.map((section: IeltsListeningPayload["sections"][number]) => {
+        const newSection = { ...section };
+        newSection.questionStart = runningNumber;
+        newSection.questions = section.questions.map((q: any) => ({
+          ...q,
+          questionNumber: runningNumber++
+        }));
+        return newSection;
       });
       
       scoped.sections = sections;
@@ -97,19 +100,22 @@ function applyPracticeScope(
 
   if (skill === "reading" && Array.isArray(scoped.passages)) {
     const originalTotalParts = scoped.passages.length;
-    const passages = scoped.passages.filter((passage: IeltsReadingPayload["passages"][number]) =>
+    let passages = scoped.passages.filter((passage: IeltsReadingPayload["passages"][number]) =>
       sectionNumbers.has(Number(passage.passageNumber))
     );
     if (passages.length > 0) {
-      // ✅ RENUMBER questions to start from 1 in practice mode
+      // ✅ RENUMBER questions to start from 1 in practice mode - CREATE NEW OBJECTS
       let runningNumber = 1;
-      passages.forEach((passage: IeltsReadingPayload["passages"][number]) => {
+      passages = passages.map((passage: IeltsReadingPayload["passages"][number]) => {
         const questionStart = runningNumber;
-        passage.questions.forEach((q: any) => {
-          q.questionNumber = runningNumber++;
-        });
-        passage.questionStart = questionStart;
-        passage.questionEnd = runningNumber - 1;
+        const newPassage = { ...passage };
+        newPassage.questions = passage.questions.map((q: any) => ({
+          ...q,
+          questionNumber: runningNumber++
+        }));
+        newPassage.questionStart = questionStart;
+        newPassage.questionEnd = runningNumber - 1;
+        return newPassage;
       });
       
       scoped.passages = passages;
