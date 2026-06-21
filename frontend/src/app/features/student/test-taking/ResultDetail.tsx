@@ -77,6 +77,12 @@ export function ResultDetail({ modalSubmissionId }: { modalSubmissionId?: number
     queryKey: ["submission", submissionId],
     queryFn: () => studentApi.getSubmissionDetail(submissionId),
     enabled: !!submissionId,
+    // Tự refetch mỗi 8s khi đang chờ AI chấm — để cập nhật điểm Speaking ngay
+    // khi job xong, user không cần F5.
+    refetchInterval: (query) => {
+      const status = String((query.state.data as any)?.data?.data?.sStatus ?? '').toLowerCase();
+      return status === 'grading_subjective' || status === 'partially_graded' ? 8000 : false;
+    },
   });
 
   const submission = (data as any)?.data?.data ?? (data as any)?.data;
@@ -96,6 +102,15 @@ export function ResultDetail({ modalSubmissionId }: { modalSubmissionId?: number
   const scoreRaw = isVstep ? (vstepMeta?.overall_avg ?? 0) : (submission?.sScore ?? 0);
   const score = typeof scoreRaw === "number" ? scoreRaw : parseFloat(scoreRaw) || 0;
   const maxScore = isVstep ? 10 : (typeof submission?.exam?.eMax_score === "number" ? submission.exam.eMax_score : parseFloat(submission?.exam?.eMax_score) || 100);
+
+  // ⚠️ "Đang chấm" detection — chung cho cả VSTEP/IELTS/Teens speaking:
+  // - VSTEP/IELTS: backend trả overall_avg=null khi còn skill chưa chấm
+  // - Teens/general: sStatus = grading_subjective khi AI đang chấm speaking
+  const submissionStatusLower = String(submission?.sStatus ?? "").toLowerCase();
+  const isAwaitingAi = submissionStatusLower === "grading_subjective" || submissionStatusLower === "partially_graded";
+  const overallPending = isVstep
+    ? (vstepMeta?.overall_avg === null || vstepMeta?.overall_avg === undefined)
+    : isAwaitingAi;
 
   const vstepBand = vstepMeta?.vstep_band;
   let grade = getGrade(score, maxScore);
@@ -192,12 +207,28 @@ export function ResultDetail({ modalSubmissionId }: { modalSubmissionId?: number
             <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Điểm số tổng quan</h2>
           </div>
           
-          <ScoreCircle score={score} maxScore={maxScore} />
+          {overallPending ? (
+            <div className="flex flex-col items-center justify-center py-6 gap-3">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center border-4 border-amber-200">
+                <Clock className="w-10 h-10 text-amber-500" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-bold text-amber-700">AI đang chấm</p>
+                <p className="text-[11px] text-slate-500 mt-1">Điểm sẽ hiện sau ít phút</p>
+              </div>
+            </div>
+          ) : (
+            <ScoreCircle score={score} maxScore={maxScore} />
+          )}
           
           <div className="text-center">
             <span className="px-4 py-1.5 rounded-full text-xs font-black border tracking-wider shadow-sm transition-all hover:scale-105"
-              style={{ background: grade.bg, color: grade.color, borderColor: grade.border }}>
-              {grade.label}
+              style={{
+                background: overallPending ? "#FEF3C7" : grade.bg,
+                color: overallPending ? "#B45309" : grade.color,
+                borderColor: overallPending ? "#FDE68A" : grade.border,
+              }}>
+              {overallPending ? "Đang chấm bài" : grade.label}
             </span>
           </div>
 

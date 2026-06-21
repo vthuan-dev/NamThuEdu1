@@ -172,15 +172,37 @@ export function VstepResultPage() {
   const visibleSkills = activeSkills.length > 0 ? activeSkills : SKILLS;
   const isSingleSkill = visibleSkills.length === 1;
 
-  const available = visibleSkills
-    .map((s) => scores[s.key])
-    .filter((v) => typeof v === "number" && !isNaN(v as number)) as number[];
-  const overallAvg = available.length > 0
-    ? +(available.reduce((a, b) => a + b, 0) / available.length).toFixed(2)
-    : (vstepMeta?.overall_avg ?? null);
+  // ── Tính skill nào còn pending (chưa có điểm) — dựa trên FE state, vì backend
+  // có thể chưa cập nhật pending_skills kịp lúc poll. Mục tiêu UX: show điểm các
+  // skill đã chấm xong NGAY, ẩn overall cho đến khi MỌI skill có điểm.
+  const fePendingSkills: SkillKey[] = useMemo(() => {
+    return visibleSkills
+      .filter((s) => {
+        const v = scores[s.key];
+        return typeof v !== "number" || isNaN(v);
+      })
+      .map((s) => s.key);
+  }, [visibleSkills, scores]);
+
+  // overallAvg chỉ tính KHI MỌI skill trong đề đã có điểm — không AVG dở dang.
+  // Tránh case "Listening 0, Reading 0, Writing chưa chấm" → overall = 0 (sai).
+  const overallAvg = useMemo<number | null>(() => {
+    if (visibleSkills.length === 0) return null;
+    if (fePendingSkills.length > 0) return null; // còn skill chưa chấm → ẩn overall
+    const vals = visibleSkills
+      .map((s) => scores[s.key])
+      .filter((v): v is number => typeof v === "number" && !isNaN(v));
+    if (vals.length !== visibleSkills.length) return null;
+    return +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2);
+  }, [visibleSkills, scores, fePendingSkills]);
 
   const skillStats = vstepMeta?.skill_stats ?? {};
-  const pendingSkills: SkillKey[] = (vstepMeta?.pending_skills ?? []) as SkillKey[];
+  // Merge backend pending_skills + FE-derived pending → đầy đủ nhất, dùng cho UI
+  const pendingSkills: SkillKey[] = useMemo(() => {
+    const bePending = (vstepMeta?.pending_skills ?? []) as SkillKey[];
+    const merged = new Set<SkillKey>([...bePending, ...fePendingSkills]);
+    return Array.from(merged);
+  }, [vstepMeta?.pending_skills, fePendingSkills]);
 
   // ── Thống kê tổng quan (MCQ: listening + reading) ──────────────────────────
   const totalMcq =
@@ -211,9 +233,11 @@ export function VstepResultPage() {
   const hasPendingSubjective =
     pendingSkills.some((skill) => skill === "writing" || skill === "speaking") ||
     (isGradingSubjective && hasSubmittedSubjective);
-  const objectiveOnlyNoScore = hasSubmitted && !hasPendingSubjective && overallAvg === null;
+  // Nếu đề không có W/S và không có pending → có thể show overall=0 (case không
+  // có data). Còn nếu CÒN skill pending (kể cả L/R chưa kịp set), GIỮ null.
+  const objectiveOnlyNoScore = hasSubmitted && pendingSkills.length === 0 && overallAvg === null;
   const displayOverall = overallAvg ?? (objectiveOnlyNoScore ? 0 : null);
-  const showScorePending = displayOverall === null && hasPendingSubjective;
+  const showScorePending = displayOverall === null && (hasPendingSubjective || pendingSkills.length > 0);
   const blankSubmission = hasSubmitted && answeredCount === 0;
 
   const statsItems: StatItem[] = [];

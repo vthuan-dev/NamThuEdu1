@@ -1303,9 +1303,23 @@ class StudentTestController extends Controller
             $vstepScores['speaking']  ?? null,
         ], fn($v) => !is_null($v));
 
-        $overallAvg = count($availableScores) > 0
-            ? round(array_sum($availableScores) / count($availableScores), 2)
-            : null;
+        // ⚠️ overall_avg chỉ tính khi MỌI skill có trong đề đã có điểm.
+        // Nếu còn skill pending (W/S đang chờ AI/teacher chấm), trả null để
+        // FE show "Đang chấm..." thay vì hiển thị avg nửa vời. UX này phù hợp
+        // với yêu cầu: show ngay điểm L/R, đợi W/S xong mới show overall.
+        $expectedSkillsForOverall = array_values(array_unique(array_filter(
+            $examSections,
+            fn($s) => in_array($s, ['listening', 'reading', 'writing', 'speaking'], true)
+        )));
+        $allExpectedScored = !empty($expectedSkillsForOverall) && collect($expectedSkillsForOverall)
+            ->every(fn($s) => !is_null($vstepScores[$s] ?? null));
+
+        if ($allExpectedScored) {
+            $relevant = array_map(fn($s) => $vstepScores[$s], $expectedSkillsForOverall);
+            $overallAvg = round(array_sum($relevant) / count($relevant), 2);
+        } else {
+            $overallAvg = null;
+        }
 
         $vstepBand = null;
         if (!is_null($overallAvg)) {

@@ -41,7 +41,9 @@ export function ThptResultPage() {
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
+    let pollTimer: number | null = null;
+
+    const fetchResult = async () => {
       if (!submissionId) return;
       try {
         const res = await api.get(`/student/thpt-submissions/${submissionId}/result`);
@@ -57,13 +59,25 @@ export function ThptResultPage() {
         setConfig(data.thpt_config || null);
         setDurationSec(data.duration_seconds || 0);
         setLoading(false);
+
+        // Nếu đề có Speaking và AI chưa chấm → poll mỗi 8s đến khi xong
+        const sections = data?.result?.sections ?? [];
+        const hasSpeakingSection = sections.some((s: any) => s.type === 'speaking');
+        const speakingScored = !!data?.result?.speaking
+          && typeof data.result.speaking.score === 'number';
+        if (hasSpeakingSection && !speakingScored) {
+          pollTimer = window.setTimeout(fetchResult, 8000);
+        }
       } catch (err: any) {
         setError(err?.response?.data?.message || 'Không tải được kết quả.');
         setLoading(false);
       }
-    })();
+    };
+
+    void fetchResult();
     return () => {
       mounted = false;
+      if (pollTimer) window.clearTimeout(pollTimer);
     };
   }, [submissionId]);
 
@@ -99,6 +113,10 @@ export function ThptResultPage() {
   const minutes = Math.floor(durationSec / 60);
   const seconds = durationSec % 60;
   const activeSection = config.sections[activeIdx];
+  // Đề có phần Nói nhưng AI chưa chấm xong → ẩn điểm tổng quát, show "đang chấm"
+  const hasSpeakingSection = result.sections.some((s) => s.type === 'speaking');
+  const speakingScored = !!result.speaking && typeof result.speaking.score === 'number';
+  const overallPending = hasSpeakingSection && !speakingScored;
 
   return (
     <div className="min-h-screen bg-slate-50 pb-12">
@@ -123,20 +141,38 @@ export function ThptResultPage() {
         <section className="rounded-2xl p-6 bg-gradient-to-br from-teal-50 via-white to-teal-50 border border-teal-100">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="md:col-span-2 flex items-center gap-4">
-              <div className="w-20 h-20 rounded-2xl bg-teal-600 flex items-center justify-center flex-shrink-0">
-                <Trophy className="w-10 h-10 text-white" />
+              <div className={`w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+                overallPending ? 'bg-gradient-to-br from-amber-400 to-orange-500' : 'bg-teal-600'
+              }`}>
+                {overallPending ? <Clock className="w-10 h-10 text-white" /> : <Trophy className="w-10 h-10 text-white" />}
               </div>
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Điểm số</p>
-                <p className="text-4xl font-bold text-slate-900">
-                  {result.scaled_score}
-                  <span className="text-lg text-slate-400">/{result.scale_max}</span>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  {overallPending ? 'AI đang chấm phần Nói' : 'Điểm số'}
                 </p>
-                <p className="text-xs text-slate-500 mt-0.5">Điểm thô: {result.raw_score}/{result.raw_score_max}</p>
-                {result.speaking && typeof result.speaking.score === 'number' && (
-                  <p className="inline-flex items-center gap-1 text-xs font-semibold text-teal-700 mt-1">
-                    <Sparkles className="w-3.5 h-3.5" /> Nói (AI): {Number(result.speaking.score).toFixed(1)}/{result.speaking.scale_max ?? 10}
-                  </p>
+                {overallPending ? (
+                  <>
+                    <p className="text-base font-bold text-amber-700 mt-1">Điểm tổng sẽ hiện sau khi AI chấm xong</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Phần khách quan (TN): {result.raw_score}/{result.raw_score_max}
+                    </p>
+                    <p className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600 mt-1.5">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Đang chấm Speaking…
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-4xl font-bold text-slate-900">
+                      {result.scaled_score}
+                      <span className="text-lg text-slate-400">/{result.scale_max}</span>
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">Điểm thô: {result.raw_score}/{result.raw_score_max}</p>
+                    {result.speaking && typeof result.speaking.score === 'number' && (
+                      <p className="inline-flex items-center gap-1 text-xs font-semibold text-teal-700 mt-1">
+                        <Sparkles className="w-3.5 h-3.5" /> Nói (AI): {Number(result.speaking.score).toFixed(1)}/{result.speaking.scale_max ?? 10}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </div>
