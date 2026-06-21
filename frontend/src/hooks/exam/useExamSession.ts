@@ -427,10 +427,30 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
                 await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
               }
             }
+
+            // ⚠️ Fallback: nếu /draft fail toàn bộ → thử /answers/bulk endpoint
+            // khác (khác URL, khác controller). Nếu cái nào hoạt động thì save ok.
+            if (!chunkOk) {
+              try {
+                const bulkPayload = chunk.map((d) => ({
+                  question_id: d.question_id,
+                  saAnswer_text: d.saAnswer_text ?? d.answer_text ?? '',
+                }));
+                await studentApi.bulkSaveAnswers(submissionId, bulkPayload);
+                chunkOk = true;
+                console.info(
+                  '[useExamSession] /draft failed but /answers/bulk fallback succeeded',
+                  { reason, chunkSize: chunk.length },
+                );
+              } catch (bulkErr) {
+                lastErr = bulkErr;
+              }
+            }
+
             if (!chunkOk) {
               flushFailedChunks++;
               console.warn(
-                '[useExamSession] final force-flush chunk failed sau 3 retry',
+                '[useExamSession] final force-flush chunk failed sau 3 retry + bulk fallback',
                 { reason, chunkSize: chunk.length, error: lastErr },
               );
             }

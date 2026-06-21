@@ -88,39 +88,75 @@ class StudentExamSessionController extends Controller
                 $validIds = Question::where('exam_id', $submission->exam_id)
                     ->whereIn('qId', $incomingIds)
                     ->pluck('qId')->all();
+                $validSet = array_flip($validIds);
 
                 $savedCount = 0;
+                $skippedInvalid = 0;
+                $skippedError  = 0;
                 foreach ($request->input('answers') as $ans) {
-                    if (!in_array((int) $ans['question_id'], $validIds, true)) {
+                    $qId = (int) ($ans['question_id'] ?? 0);
+                    if (!$qId || !isset($validSet[$qId])) {
+                        $skippedInvalid++;
                         continue; // bỏ qua câu hỏi không thuộc bài thi
                     }
-                    SubmissionAnswer::updateOrCreate(
-                        [
+                    // Coerce text: chấp nhận string hoặc bất kỳ scalar/object stringify-able
+                    $rawText = $ans['saAnswer_text'] ?? $ans['answer_text'] ?? '';
+                    if (is_array($rawText) || is_object($rawText)) {
+                        $rawText = json_encode($rawText) ?: '';
+                    }
+                    $text = (string) $rawText;
+                    // Cap để tránh exceed text column (TEXT = 65535 bytes)
+                    if (mb_strlen($text) > 50000) {
+                        $text = mb_substr($text, 0, 50000);
+                    }
+
+                    try {
+                        SubmissionAnswer::updateOrCreate(
+                            [
+                                'submission_id' => $submission->sId,
+                                'question_id'   => $qId,
+                            ],
+                            [
+                                'saAnswer_text' => $text,
+                            ]
+                        );
+                        $savedCount++;
+                    } catch (\Throwable $rowErr) {
+                        $skippedError++;
+                        Log::warning('Draft row save failed', [
                             'submission_id' => $submission->sId,
-                            'question_id'   => (int) $ans['question_id'],
-                        ],
-                        [
-                            'saAnswer_text' => (string) ($ans['saAnswer_text'] ?? $ans['answer_text'] ?? ''),
-                        ]
-                    );
-                    $savedCount++;
+                            'question_id'   => $qId,
+                            'error'         => $rowErr->getMessage(),
+                        ]);
+                    }
                 }
 
                 // Refresh activity timestamp
                 $now = now();
-                $submission->update(['last_activity_at' => $now]);
+                try { $submission->update(['last_activity_at' => $now]); }
+                catch (\Throwable $e) { Log::warning('last_activity_at update failed: ' . $e->getMessage()); }
 
-                // Tính time_remaining_seconds để FE đồng bộ giờ sau mỗi draft save
+                // Tính time_remaining_seconds — wrap riêng để KHÔNG bao giờ fail tổng thể
                 $timeRemainingSeconds = null;
-                if ($submission->exam && $submission->sStart_time) {
-                    $duration = (int) ($submission->exam->eDuration_minutes ?? 0) * 60;
-                    $elapsed  = (int) $now->diffInSeconds($submission->sStart_time->copy()->utc(), false);
-                    $timeRemainingSeconds = max(0, $duration - $elapsed);
+                try {
+                    if ($submission->exam && $submission->sStart_time) {
+                        $duration = (int) ($submission->exam->eDuration_minutes ?? 0) * 60;
+                        $start = $submission->sStart_time;
+                        // sStart_time đã là Carbon (cast datetime). copy() để không mutate.
+                        $startUtc = $start instanceof \Carbon\Carbon ? $start->copy()->utc() : \Carbon\Carbon::parse((string) $start)->utc();
+                        $elapsed = (int) $now->diffInSeconds($startUtc, false);
+                        $timeRemainingSeconds = max(0, $duration - $elapsed);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Draft time calc failed: ' . $e->getMessage());
+                    $timeRemainingSeconds = null;
                 }
 
                 return ['status' => 200, 'data' => [
                     'status'                 => 'success',
                     'savedCount'             => $savedCount,
+                    'skippedInvalid'         => $skippedInvalid,
+                    'skippedError'           => $skippedError,
                     'last_activity_at'       => $now->toIso8601String(),
                     'serverTime'             => $now->toIso8601String(),
                     'time_remaining_seconds' => $timeRemainingSeconds,
@@ -137,6 +173,7 @@ class StudentExamSessionController extends Controller
                 'trace'         => $e->getTraceAsString(),
                 'file'          => $e->getFile(),
                 'line'          => $e->getLine(),
+                'payload_count' => is_array($request->input('answers')) ? count($request->input('answers')) : 0,
             ]);
             return response()->json([
                 'status'  => 'error',
