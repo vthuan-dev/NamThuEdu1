@@ -833,18 +833,48 @@ class StudentTestController extends Controller
         if ($isVstep || $isKidsExam) {
             $mcqQuestions = $submission->exam->questions->filter(function ($q) use ($subjectiveTypes) {
                 return !in_array(strtolower($q->qType ?? ''), $subjectiveTypes)
-                    && !in_array(strtolower($q->qSection ?? ''), ['writing', 'speaking']);
+                    && !in_array(strtolower($q->qSection ?? ''), ['writing', 'speaking'])
+                    && !in_array(strtolower($q->qSkill ?? ''), ['writing', 'speaking']);
             });
             $answeredMcqIds = $submission->answers->pluck('question_id')->toArray();
             $mcqIds = $mcqQuestions->pluck('qId')->toArray();
             $unansweredMcq = array_diff($mcqIds, $answeredMcqIds);
-            if (count($unansweredMcq) > 0 && count($unansweredMcq) >= count($mcqIds)) {
+
+            // Soft gate: pass nếu có BẤT KỲ câu nào (MCQ hoặc subjective writing/speaking)
+            // đã có trong submission_answers. Tránh false-block khi user chỉ làm
+            // writing/speaking mà không làm MCQ.
+            $hasAnyAnswer = $submission->answers->count() > 0;
+            // Speaking audio cũng tính như "đã làm" — backend uploadSpeakingAudio
+            // ghi sGemini_feedback.speaking_audio + tạo placeholder row trong
+            // submission_answers, nên $hasAnyAnswer thường đã true.
+            $rawFeedbackChk = json_decode($submission->sGemini_feedback ?? '{}', true) ?? [];
+            $hasSpeakingAudio = !empty($rawFeedbackChk['speaking_audio'] ?? []);
+
+            if (!$hasAnyAnswer && !$hasSpeakingAudio) {
+                \Log::warning('VSTEP/IELTS submit blocked: no answers at all', [
+                    'submission_id' => $submissionId,
+                    'user_id' => $user->uId,
+                    'exam_id' => $submission->exam_id,
+                    'mcq_ids_count' => count($mcqIds),
+                ]);
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Bạn chưa trả lời bất kỳ câu hỏi nào.',
                     'unansweredQuestions' => array_values($unansweredMcq)
                 ], 400);
             }
+
+            // Log để diagnose case "0/35 + 0/40 + chưa có bài nào"
+            \Log::info('VSTEP/IELTS submit gate passed', [
+                'submission_id' => $submissionId,
+                'user_id' => $user->uId,
+                'exam_id' => $submission->exam_id,
+                'total_mcq' => count($mcqIds),
+                'answered_mcq_count' => count($mcqIds) - count($unansweredMcq),
+                'unanswered_mcq_count' => count($unansweredMcq),
+                'total_submission_answers' => $submission->answers->count(),
+                'has_speaking_audio' => $hasSpeakingAudio,
+            ]);
         } else {
             // Cổng mềm: chỉ chặn khi CHƯA trả lời câu nào. Câu bỏ trống sẽ được chấm 0 điểm.
             // (Khớp với UX: frontend đã cảnh báo "còn N câu chưa trả lời, vẫn nộp?" và cho nộp.)
@@ -936,14 +966,16 @@ class StudentTestController extends Controller
             $hasSubjectiveContent = false;
             if ($isVstepTx && $vstepMeta) {
                 // Xác định các skill thực sự có trong đề (IELTS thường chỉ 1 skill/đề)
+                // Dùng qSection ?? qSkill để chịu được data có 1 trong 2 cột.
                 $examSections = $submission->exam->questions
-                    ->map(fn($q) => strtolower($q->qSection ?? ''))
+                    ->map(fn($q) => strtolower($q->qSection ?? $q->qSkill ?? ''))
                     ->unique()->filter()->values()->all();
                 $hasWritingSection  = in_array('writing', $examSections, true);
                 $hasSpeakingSection = in_array('speaking', $examSections, true);
 
                 $hasWriting = $submission->answers->contains(function ($a) {
-                    if (strtolower($a->question->qSection ?? '') !== 'writing') return false;
+                    $sec = strtolower($a->question->qSection ?? $a->question->qSkill ?? '');
+                    if ($sec !== 'writing') return false;
                     return strlen(trim($a->saAnswer_text ?? '')) >= 30;
                 });
                 $rawFeedback = json_decode($submission->sGemini_feedback ?? '{}', true) ?? [];
@@ -952,9 +984,10 @@ class StudentTestController extends Controller
 
                 // Auto-grade empty/short writing answers as 0 — chỉ khi đề CÓ phần writing
                 if ($hasWritingSection && !$hasWriting) {
-                    $submission->answers->filter(fn($a) =>
-                        strtolower($a->question->qSection ?? '') === 'writing'
-                    )->each(fn($a) => $a->update(['saPoints_awarded' => 0]));
+                    $submission->answers->filter(function ($a) {
+                        $sec = strtolower($a->question->qSection ?? $a->question->qSkill ?? '');
+                        return $sec === 'writing';
+                    })->each(fn($a) => $a->update(['saPoints_awarded' => 0]));
                     $vstepMeta['writing'] = 0;
                 }
                 if ($hasSpeakingSection && !$hasSpeaking) {
@@ -1010,6 +1043,18 @@ class StudentTestController extends Controller
             $submission->update($updateData);
 
             DB::commit();
+
+            // Log diagnostics — giúp diagnose case "0/35 + 0/40" của user
+            \Log::info('VSTEP/IELTS/Generic submit completed', [
+                'submission_id' => $submissionId,
+                'user_id' => $user->uId,
+                'exam_id' => $submission->exam_id,
+                'final_status' => $finalStatus,
+                'score' => $scorePercentage,
+                'vstep_scores' => $vstepMeta,
+                'total_answered_after_backfill' => $submission->answers->count(),
+                'correct_answers_count' => $submission->answers->filter(fn($a) => $a->saIs_correct === true || $a->saIs_correct === 1)->count(),
+            ]);
 
             $responseData = [
                 'submissionId' => $submissionId,
@@ -1194,12 +1239,13 @@ class StudentTestController extends Controller
         ];
 
         // Per-skill answer stats (MCQ only — L and R)
+        // ⚠️ Dùng qSection ?? qSkill để chịu được data có 1 trong 2 cột.
         $skillStats = ['listening' => ['correct' => 0, 'answered' => 0, 'total' => 0],
                        'reading'   => ['correct' => 0, 'answered' => 0, 'total' => 0]];
 
         // Count total questions per skill from exam
         foreach ($submission->exam->questions as $q) {
-            $sec = strtolower($q->qSection ?? '');
+            $sec = strtolower($q->qSection ?? $q->qSkill ?? '');
             if (isset($skillStats[$sec])) {
                 $skillStats[$sec]['total']++;
             }
@@ -1207,7 +1253,7 @@ class StudentTestController extends Controller
 
         // Count answered + correct per skill
         foreach ($submission->answers as $ans) {
-            $sec = strtolower($ans->question->qSection ?? '');
+            $sec = strtolower($ans->question->qSection ?? $ans->question->qSkill ?? '');
             if (isset($skillStats[$sec])) {
                 $skillStats[$sec]['answered']++;
                 if ($ans->saIs_correct) {
@@ -1216,18 +1262,21 @@ class StudentTestController extends Controller
             }
         }
 
-        // Writing/Speaking: check audio/text was submitted
+        // Writing/Speaking: check audio/text was submitted — qSection ?? qSkill fallback
         $writingAnswers  = $submission->answers->filter(function ($a) {
-            return strtolower($a->question->qSection ?? '') === 'writing';
+            $sec = strtolower($a->question->qSection ?? $a->question->qSkill ?? '');
+            return $sec === 'writing'
+                && trim((string) ($a->saAnswer_text ?? '')) !== '';
         })->count();
         $speakingAnswers = $submission->answers->filter(function ($a) {
-            return strtolower($a->question->qSection ?? '') === 'speaking';
+            $sec = strtolower($a->question->qSection ?? $a->question->qSkill ?? '');
+            return $sec === 'speaking';
         })->count();
         $speakingAudios  = isset($raw['speaking_audio']) ? count((array) $raw['speaking_audio']) : 0;
 
         // Các skill thực sự có trong đề (IELTS thường chỉ 1 skill/đề)
         $examSections = $submission->exam->questions
-            ->map(fn($q) => strtolower($q->qSection ?? ''))
+            ->map(fn($q) => strtolower($q->qSection ?? $q->qSkill ?? ''))
             ->unique()->filter()->values()->all();
 
         // VSTEP band from available (non-null) scores
@@ -2789,7 +2838,9 @@ class StudentTestController extends Controller
             }
 
             $qType    = strtolower($question->qType    ?? '');
-            $qSection = strtolower($question->qSection ?? '');
+            // Resolve skill section (listening/reading/writing/speaking) — chấp nhận
+            // cả qSection lẫn qSkill (có exam set chỉ 1 trong 2 cột).
+            $qSection = strtolower($question->qSection ?? $question->qSkill ?? '');
 
             // Subjective check: skip grading for writing/speaking
             $qSkill = strtolower($question->qSkill ?? '');
@@ -2870,7 +2921,8 @@ class StudentTestController extends Controller
         $vstepMeta = null;
         if ($isVstep) {
             // Determine which skills exist in the exam by checking ALL questions in exam (not just answered ones)
-            $examSkills = Question::where('exam_id', $examId)
+            // Lấy cả qSection và qSkill rồi merge, vì có exam chỉ set 1 trong 2 cột.
+            $sectionSkills = Question::where('exam_id', $examId)
                 ->whereNotNull('qSection')
                 ->distinct()
                 ->pluck('qSection')
@@ -2878,6 +2930,15 @@ class StudentTestController extends Controller
                 ->filter()
                 ->values()
                 ->toArray();
+            $skillSkills = Question::where('exam_id', $examId)
+                ->whereNotNull('qSkill')
+                ->distinct()
+                ->pluck('qSkill')
+                ->map(fn($s) => strtolower($s))
+                ->filter()
+                ->values()
+                ->toArray();
+            $examSkills = array_values(array_unique(array_merge($sectionSkills, $skillSkills)));
 
             // Initialize skill scores: if skill has no answers, set to 0.0 (not null)
             // Only set to null if skill doesn't exist in exam at all

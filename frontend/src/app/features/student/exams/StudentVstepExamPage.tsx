@@ -280,21 +280,51 @@ export function StudentVstepExamPage() {
   }, [examId]);
 
   /* ── Restore saved answers once submissionId is known ──── */
+  // ⚠️ MERGE thay vì REPLACE: nếu .then() từ start-direct đã setAnswers() từ
+  // backend (savedAnswers), useEffect này KHÔNG được phép overwrite về data
+  // localStorage cũ hơn. Ngược lại nếu backend chưa có data nhưng localStorage
+  // có, localStorage được giữ. Mục tiêu: KHÔNG để mất câu trả lời.
   useEffect(() => {
     if (!submissionId) return;
     try {
       const saved = localStorage.getItem(`svstep_answers_sid_${submissionId}`);
-      if (saved) setAnswers(JSON.parse(saved));
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) {
+          setAnswers((prev) => ({ ...parsed, ...prev })); // prev (backend) thắng nếu trùng key
+        }
+      }
       const savedW = localStorage.getItem(`svstep_writing_sid_${submissionId}`);
-      if (savedW) setWritingDrafts(JSON.parse(savedW));
+      if (savedW) {
+        const parsed = JSON.parse(savedW);
+        if (parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) {
+          setWritingDrafts((prev) => ({ ...parsed, ...prev }));
+        }
+      }
       const savedF = localStorage.getItem(`svstep_flags_sid_${submissionId}`);
       if (savedF) setFlagged(JSON.parse(savedF));
     } catch {}
   }, [submissionId]);
 
   /* ── Auto-save to localStorage (per submission) ─────────── */
-  useEffect(() => { if (LS_ANSWERS) try { localStorage.setItem(LS_ANSWERS, JSON.stringify(answers)); } catch {} }, [answers, LS_ANSWERS]);
-  useEffect(() => { if (LS_WRITING) try { localStorage.setItem(LS_WRITING, JSON.stringify(writingDrafts)); } catch {} }, [writingDrafts, LS_WRITING]);
+  // ⚠️ Chỉ save khi data có nội dung — nếu vì lý do gì đó state bị reset về {},
+  // KHÔNG được wipe localStorage (sẽ làm mất dữ liệu thực sự đã lưu).
+  useEffect(() => {
+    if (!LS_ANSWERS) return;
+    try {
+      if (Object.keys(answers).length > 0) {
+        localStorage.setItem(LS_ANSWERS, JSON.stringify(answers));
+      }
+    } catch {}
+  }, [answers, LS_ANSWERS]);
+  useEffect(() => {
+    if (!LS_WRITING) return;
+    try {
+      if (Object.keys(writingDrafts).length > 0) {
+        localStorage.setItem(LS_WRITING, JSON.stringify(writingDrafts));
+      }
+    } catch {}
+  }, [writingDrafts, LS_WRITING]);
   useEffect(() => { if (submissionId) try { localStorage.setItem(`svstep_flags_sid_${submissionId}`, JSON.stringify(flagged)); } catch {} }, [flagged, submissionId]);
 
   /* ── Toggle flag on a question ─────────────────────── */
@@ -542,7 +572,9 @@ export function StudentVstepExamPage() {
             setExamDurationMinutes(Number(data.eDuration_minutes));
           }
           
-          // ✅ NEW: Restore saved answers from backend (F5 case)
+          // ✅ NEW: Restore saved answers from backend (F5 case) — MERGE, không replace
+          // Nếu state đã có data (vd từ localStorage useEffect chạy trước), giữ lại
+          // và bổ sung từ backend; tránh overwrite về dataset rỗng/thiếu.
           if (data.savedAnswers) {
             const mcqAnswers: Record<string, "A" | "B" | "C" | "D"> = {};
             const writingMap: Record<number, string> = {};
@@ -559,10 +591,10 @@ export function StudentVstepExamPage() {
             }
             
             if (Object.keys(mcqAnswers).length > 0) {
-              setAnswers(mcqAnswers);
+              setAnswers((prev) => ({ ...mcqAnswers, ...prev })); // prev có thì giữ
             }
             if (Object.keys(writingMap).length > 0) {
-              setWritingDrafts(writingMap);
+              setWritingDrafts((prev) => ({ ...writingMap, ...prev }));
             }
           }
         } else {
@@ -648,11 +680,13 @@ export function StudentVstepExamPage() {
   }, [skillTimeLeft, current.skill, listeningParts.length, readingParts.length, writingTasks.length, speakingParts.length]);
 
   /* ── Auto-submit on timeout ─────────────────────────────── */
+  // Dùng same robust flow như handleSubmit: bulk save có retry, nếu thất bại
+  // vẫn cố gắng submit để backend backfill blank rows; fallback navigate result.
   const handleAutoSubmit = useCallback(async () => {
     if (!submissionId || submittedRef.current) return;
     submittedRef.current = true;
 
-    // Force-flush all local answers before timeout submit (same as handleSubmit)
+    // Force-flush all local answers with retry
     try {
       const bulkPayload: Array<{ question_id: number; saAnswer_text: string }> = [];
       for (const [qIdStr, letter] of Object.entries(answers)) {
@@ -672,10 +706,17 @@ export function StudentVstepExamPage() {
           chunks.push(bulkPayload.slice(i, i + 100));
         }
         for (const chunk of chunks) {
-          try {
-            await studentApi.bulkSaveAnswers(submissionId, chunk);
-          } catch (err) {
-            console.warn("[VSTEP] auto-submit bulk flush failed", err);
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              await studentApi.bulkSaveAnswers(submissionId, chunk);
+              break;
+            } catch (err) {
+              if (attempt === 2) {
+                console.warn("[VSTEP] auto-submit bulk flush failed sau retry", err);
+              } else {
+                await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
+              }
+            }
           }
         }
       }
@@ -699,15 +740,26 @@ export function StudentVstepExamPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  /* ── Set MCQ answer + save to backend ────────────────── */
+  /* ── Set MCQ answer + save to backend (fire-and-forget với retry nội bộ) ── */
+  // Lưu ý: cuối cùng handleSubmit sẽ bulkSaveAnswers tất cả → đây chỉ là
+  // optimization để giảm tải submit. Nếu fail, không sao, bulkSave sẽ catch.
   const setAnswer = useCallback((_questionNumber: number, qId: number, letter: "A" | "B" | "C" | "D") => {
     if (reviewMode) return;
     setAnswers((prev) => ({ ...prev, [qId]: letter }));
     if (submissionId) {
-      studentApi.saveAnswer(submissionId, { question_id: qId, saAnswer_text: letter } as any)
-        .catch((err: any) => {
-          console.warn("[VSTEP] saveAnswer failed for qId", qId, err);
-        });
+      const trySave = async (attempt = 0) => {
+        try {
+          await studentApi.saveAnswer(submissionId, { question_id: qId, saAnswer_text: letter } as any);
+        } catch (err: any) {
+          if (attempt < 2) {
+            // Retry sau 500ms × (attempt+1)
+            setTimeout(() => { void trySave(attempt + 1); }, 500 * (attempt + 1));
+          } else {
+            console.warn("[VSTEP] saveAnswer failed sau retry cho qId", qId, err);
+          }
+        }
+      };
+      void trySave(0);
     }
   }, [submissionId, reviewMode]);
 
@@ -722,25 +774,22 @@ export function StudentVstepExamPage() {
   }, [submissionId]);
 
   /* ── Submit ─────────────────────────────────────────────── */
+  // Bulletproof submission: nhiều lần retry bulk save, verify saved count,
+  // KHÔNG navigate đi nếu lưu thất bại — để user còn cơ hội nộp lại.
   const handleSubmit = async () => {
     if (!submissionId) return;
-    submittedRef.current = true;
+    if (submittedRef.current) return;
     setSubmitting(true);
     try {
-      // Build a single bulk payload with ALL local answers (MCQ + writing drafts).
-      // This force-flushes everything to backend, so even if the per-answer
-      // /answer calls during the test failed silently (network blip, throttle,
-      // race), the answers in local state are still pushed before grading.
+      // ─── Build full bulk payload (MCQ + writing) ──────────────────────
       const bulkPayload: Array<{ question_id: number; saAnswer_text: string }> = [];
 
-      // MCQ answers from state ({ qId: "A"|"B"|"C"|"D" })
       for (const [qIdStr, letter] of Object.entries(answers)) {
         const qId = Number(qIdStr);
         if (!qId || !letter) continue;
         bulkPayload.push({ question_id: qId, saAnswer_text: letter });
       }
 
-      // Writing drafts (in case textarea was never blurred)
       for (const task of writingTasks) {
         const draft = writingDrafts[task.taskNumber] ?? "";
         if (task.questionId && draft.trim()) {
@@ -748,28 +797,68 @@ export function StudentVstepExamPage() {
         }
       }
 
+      // ─── Persist bulk with retry — chunks of 100, mỗi chunk retry 3 lần ──
+      let totalSaved = 0;
+      let totalSkipped = 0;
+      const failedChunks: typeof bulkPayload[] = [];
+
       if (bulkPayload.length > 0) {
-        // Chunk into batches of 100 to stay under the 200 max in backend validator
         const chunks: typeof bulkPayload[] = [];
         for (let i = 0; i < bulkPayload.length; i += 100) {
           chunks.push(bulkPayload.slice(i, i + 100));
         }
+
         for (const chunk of chunks) {
-          try {
-            await studentApi.bulkSaveAnswers(submissionId, chunk);
-          } catch (err) {
-            console.warn("[VSTEP] bulkSaveAnswers failed for chunk", err);
+          let saved = false;
+          let lastErr: any = null;
+          for (let attempt = 0; attempt < 3 && !saved; attempt++) {
+            try {
+              const res: any = await studentApi.bulkSaveAnswers(submissionId, chunk);
+              const body = res?.data?.data ?? res?.data ?? {};
+              totalSaved += Number(body?.saved ?? 0);
+              totalSkipped += Number(body?.skipped ?? 0);
+              saved = true;
+            } catch (err) {
+              lastErr = err;
+              // Backoff 250ms × (attempt+1)
+              await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
+            }
+          }
+          if (!saved) {
+            console.warn("[VSTEP] bulkSaveAnswers chunk failed after retries", lastErr);
+            failedChunks.push(chunk);
           }
         }
       }
 
+      // ─── Nếu có chunk thất bại → CHẶN submit, alert user, để user retry ──
+      if (failedChunks.length > 0) {
+        const lostCount = failedChunks.reduce((s, c) => s + c.length, 0);
+        const ok = window.confirm(
+          `Có ${lostCount} câu trả lời chưa lưu được lên server (mạng yếu hoặc server lỗi).\n\n` +
+          `• Bấm OK để thử nộp bài (server sẽ lưu lại từ những gì đã có).\n` +
+          `• Bấm Cancel để dừng và kiểm tra mạng rồi nộp lại.`
+        );
+        if (!ok) {
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      // ─── Submit ─────────────────────────────────────────────────────────
+      submittedRef.current = true;
       const res: any = await studentApi.submitTest(submissionId);
       const sid = res?.data?.data?.submissionId ?? submissionId;
-      localStorage.removeItem(LS_ANSWERS);
-      localStorage.removeItem(LS_WRITING);
+      // ✅ Chỉ remove localStorage SAU khi submit thành công
+      try { localStorage.removeItem(LS_ANSWERS!); } catch {}
+      try { localStorage.removeItem(LS_WRITING!); } catch {}
       navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${sid}`);
-    } catch {
-      navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${submissionId}`);
+    } catch (err: any) {
+      // Submit FAILED — KHÔNG navigate, KHÔNG xóa localStorage
+      submittedRef.current = false;
+      const msg = err?.response?.data?.message ?? "Không nộp bài được. Vui lòng thử lại.";
+      console.error("[VSTEP] submitTest failed", err);
+      window.alert(`${msg}\n\nDữ liệu của bạn vẫn được lưu lại trong trình duyệt. Hãy thử nộp lại sau ít phút.`);
     } finally {
       setSubmitting(false);
     }
