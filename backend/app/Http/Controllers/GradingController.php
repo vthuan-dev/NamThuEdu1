@@ -316,11 +316,43 @@ class GradingController extends Controller
                                                        ->where('question_id', $scoreData['question_id'])
                                                        ->first();
 
-                    if ($submissionAnswer) {
+                    if (!$submissionAnswer) continue;
+
+                    $newScore = (float) $scoreData['saPoints_awarded'];
+
+                    // ⚠️ DEFENSIVE: với writing/speaking, KHÔNG ghi đè 0 lên saPoints_awarded
+                    // nếu AI đã chấm > 0 và teacher chưa từng review.
+                    // Bug cũ: FE map points=0 (do saPoints_awarded null), bulk save ghi đè 0
+                    // → Task chưa chấm bị reset về 0. Chống lại bằng cách:
+                    // - Nếu newScore == 0 AND saPoints_awarded null AND saAi_score > 0
+                    //   → giữ saAi_score (coi như teacher chưa chạm).
+                    $q = $submissionAnswer->question;
+                    $sec = strtolower($q->qSkill ?? $q->qSection ?? '');
+                    $isSubjective = in_array($sec, ['writing', 'speaking'], true);
+
+                    if (
+                        $isSubjective
+                        && $newScore == 0.0
+                        && is_null($submissionAnswer->saPoints_awarded)
+                        && !is_null($submissionAnswer->saAi_score)
+                        && (float) $submissionAnswer->saAi_score > 0.0
+                    ) {
+                        // Sync saPoints_awarded với saAi_score (heal data) — KHÔNG ghi 0.
                         $submissionAnswer->update([
-                            'saPoints_awarded' => $scoreData['saPoints_awarded']
+                            'saPoints_awarded' => $submissionAnswer->saAi_score,
                         ]);
+                        \Log::info('[grading.update] guarded zero overwrite', [
+                            'submission_id' => $id,
+                            'question_id' => $scoreData['question_id'],
+                            'ai_score' => $submissionAnswer->saAi_score,
+                            'reason' => 'FE sent 0 but AI graded — preserved AI score',
+                        ]);
+                        continue;
                     }
+
+                    $submissionAnswer->update([
+                        'saPoints_awarded' => $newScore,
+                    ]);
                 }
             }
 
@@ -339,7 +371,13 @@ class GradingController extends Controller
                 foreach ($sub->answers as $ans) {
                     $sec = strtolower($ans->question->qSkill ?? $ans->question->qSection ?? '');
                     $qPoints = $ans->question->qPoints ?? 1;
-                    $pointsAwarded = $ans->saPoints_awarded ?? 0;
+                    // ⚠️ Self-heal: với writing/speaking, fallback saAi_score nếu
+                    // saPoints_awarded null. Bảo vệ submission cũ chưa được FE
+                    // ghi đúng saPoints_awarded vì AI grading job cũ không sync.
+                    $isSubjective = in_array($sec, ['writing', 'speaking'], true);
+                    $pointsAwarded = $isSubjective
+                        ? ($ans->saPoints_awarded ?? $ans->saAi_score ?? 0)
+                        : ($ans->saPoints_awarded ?? 0);
                     
                     if ($sec === 'listening') {
                         $listeningMax += $qPoints;
@@ -433,7 +471,11 @@ class GradingController extends Controller
                 foreach ($sub->answers as $ans) {
                     $sec = strtolower($ans->question->qSkill ?? $ans->question->qSection ?? '');
                     $qPoints = $ans->question->qPoints ?? 1;
-                    $pointsAwarded = $ans->saPoints_awarded ?? 0;
+                    // Self-heal cho IELTS: writing/speaking fallback saAi_score
+                    $isSubjective = in_array($sec, ['writing', 'speaking'], true);
+                    $pointsAwarded = $isSubjective
+                        ? ($ans->saPoints_awarded ?? $ans->saAi_score ?? 0)
+                        : ($ans->saPoints_awarded ?? 0);
 
                     if ($sec === 'listening') {
                         $listeningMax += $qPoints;
@@ -1343,7 +1385,11 @@ class GradingController extends Controller
                 if (!$ans->question) continue;
                 $sec = strtolower($ans->question->qSkill ?? $ans->question->qSection ?? '');
                 $qPoints = $ans->question->qPoints ?? 1;
-                $pointsAwarded = $ans->saPoints_awarded ?? 0;
+                // Self-heal: writing/speaking fallback saAi_score nếu saPoints null
+                $isSubjective = in_array($sec, ['writing', 'speaking'], true);
+                $pointsAwarded = $isSubjective
+                    ? ($ans->saPoints_awarded ?? $ans->saAi_score ?? 0)
+                    : ($ans->saPoints_awarded ?? 0);
                 
                 if ($sec === 'listening') {
                     $listeningMax += $qPoints;
