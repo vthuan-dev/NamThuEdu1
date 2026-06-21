@@ -286,7 +286,10 @@ function VstepGradingDetailInternal() {
             aiScore:       sa.saAi_score !== null && sa.saAi_score !== undefined
                              ? Number(sa.saAi_score)
                              : undefined,
-            points:        Number(sa.saPoints_awarded ?? 0),
+            // ⚠️ Default points = teacher's saPoints_awarded → fallback AI score → 0.
+            // Quan trọng: với câu chưa teacher chấm (saPoints_awarded null), giữ AI
+            // score để KHÔNG ghi đè 0 khi save. Bug cũ: T2 chưa chấm → 0 → save 0.
+            points:        Number(sa.saPoints_awarded ?? sa.saAi_score ?? 0),
             pointsAwarded: sa.saPoints_awarded !== null && sa.saPoints_awarded !== undefined ? Number(sa.saPoints_awarded) : null,
             maxPoints:     isSubjective ? 10 : (useRealPoints ? Number(q.qPoints ?? q.qScore ?? 1) : 1),
             isCorrect:     isCorrect as boolean | undefined,
