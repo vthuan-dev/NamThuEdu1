@@ -654,7 +654,8 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
 
   // ─── Hết giờ: tự động nộp → thông báo → rời trang (không giữ user ở lại) ──
   const handleTimeUp = useCallback(async () => {
-    if (timeUpHandledRef.current) return;
+    // ✅ CRITICAL FIX: Prevent timeout flow if user already submitted manually
+    if (timeUpHandledRef.current || submitting) return;
     timeUpHandledRef.current = true;
 
     setSubmitOpen(false);
@@ -711,12 +712,19 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
       setAnswers({});
       setFlagged({});
     }
-  }, [examId, currentSkill, submissionId, fullTest, skillIdx, skillSequence.length, navigate, toast, isPracticeMode, practiceSectionNumbers, session]);
+  }, [examId, currentSkill, submissionId, fullTest, skillIdx, skillSequence.length, navigate, toast, isPracticeMode, practiceSectionNumbers, session, submitting]);
 
   const handleConfirmSubmit = async () => {
     if (!submissionId) return;
     try {
       setSubmitting(true);
+
+      // ✅ CRITICAL FIX: Stop timer BEFORE clearing deadline to prevent
+      // race condition where timer triggers timeout warning after manual submit
+      if (timerRef.current) {
+        window.clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
 
       // Xoá deadline của skill vừa nộp để lần làm mới không dính giờ cũ
       clearDeadline(deadlineKeyRef.current ?? buildIeltsDeadlineKey(examId, currentSkill, isPracticeMode, practiceSectionNumbers));
