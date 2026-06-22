@@ -661,42 +661,123 @@ export function TestHistory() {
         {/* ── RIGHT Sidebar ── */}
         <div className="space-y-4">
 
-          {/* CEFR Breakdown */}
-          <div className="rounded-2xl bg-white p-5" style={{ border: "1.5px solid #F0F0F8", boxShadow: "0 2px 10px rgba(124,58,237,0.06)" }}>
-            <div className="flex items-center gap-2 mb-4">
-              <Target className="w-4 h-4" style={{ color: PURPLE }} />
-              <p style={{ fontSize: 13, fontWeight: 700, color: "#1F1344" }}>Phân bố CEFR</p>
-            </div>
-            {submitted.length === 0 ? (
-              <p style={{ fontSize: 12, color: "#9CA3AF", textAlign: "center", padding: "12px 0" }}>Chưa có dữ liệu</p>
-            ) : (
-              <div className="space-y-2.5">
-                {[
-                  { label: "C1", color: "#059669", bg: "#D1FAE5" },
-                  { label: "B2", color: "#2563EB", bg: "#DBEAFE" },
-                  { label: "B1", color: "#7C3AED", bg: "#EDE9FE" },
-                  { label: "A2", color: "#D97706", bg: "#FEF3C7" },
-                  { label: "A1", color: "#6B7280", bg: "#F3F4F6" },
-                ].map(lvl => {
-                  const count = cefrDist[lvl.label] ?? 0;
-                  const width = submitted.length > 0 ? (count / submitted.length) * 100 : 0;
-                  return (
-                    <div key={lvl.label} className="flex items-center gap-2.5">
-                      <span className="w-8 text-center text-xs font-bold rounded-md py-0.5 flex-shrink-0"
-                        style={{ background: lvl.bg, color: lvl.color }}>{lvl.label}</span>
-                      <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "#F3F4F6" }}>
-                        <div className="h-full rounded-full transition-all duration-700"
-                          style={{ width: `${width}%`, background: lvl.color }} />
+          {/* ── Student Level Classification ── */}
+          {(() => {
+            const LEVELS = [
+              { label: "A1", minPct: 0,  nextPct: 20, color: "#6B7280", bg: "#F3F4F6", gradient: "linear-gradient(135deg,#4B5563,#9CA3AF)", emoji: "🌱", desc: "Người mới bắt đầu",   tip: "Luyện Listening cơ bản mỗi ngày để tăng phản xạ." },
+              { label: "A2", minPct: 20, nextPct: 40, color: "#D97706", bg: "#FEF3C7", gradient: "linear-gradient(135deg,#B45309,#F59E0B)", emoji: "📗", desc: "Sơ cấp",               tip: "Tập trung vào Reading ngắn để mở rộng từ vựng." },
+              { label: "B1", minPct: 40, nextPct: 60, color: "#7C3AED", bg: "#EDE9FE", gradient: "linear-gradient(135deg,#6D28D9,#8B5CF6)", emoji: "📘", desc: "Trung cấp",            tip: "Luyện Writing để đẩy điểm lên B2!" },
+              { label: "B2", minPct: 60, nextPct: 80, color: "#2563EB", bg: "#DBEAFE", gradient: "linear-gradient(135deg,#1D4ED8,#3B82F6)", emoji: "📙", desc: "Khá — Trên trung cấp", tip: "Thử Full Test VSTEP để chinh phục C1." },
+              { label: "C1", minPct: 80, nextPct: 100, color: "#059669", bg: "#D1FAE5", gradient: "linear-gradient(135deg,#065F46,#10B981)", emoji: "🏆", desc: "Thành thạo",          tip: "Xuất sắc! Tiếp tục duy trì và hướng đến C2." },
+            ];
+            const currentPct = avgMax > 0 ? (avgScore / avgMax) * 100 : 0;
+            const curLevel   = LEVELS.slice().reverse().find(l => currentPct >= l.minPct) ?? LEVELS[0];
+            const nextLevel  = LEVELS[LEVELS.indexOf(curLevel) + 1] ?? null;
+            const progressToNext = nextLevel
+              ? Math.min(((currentPct - curLevel.minPct) / (curLevel.nextPct - curLevel.minPct)) * 100, 100)
+              : 100;
+            const ptsToNext = nextLevel ? Math.max(0, nextLevel.minPct - currentPct) : 0;
+
+            return (
+              <div className="rounded-2xl bg-white overflow-hidden" style={{ border: "1.5px solid #F0F0F8", boxShadow: "0 2px 10px rgba(124,58,237,0.06)" }}>
+
+                {/* Hero banner — current level */}
+                <div className="relative p-4 overflow-hidden" style={{ background: curLevel.gradient }}>
+                  <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full opacity-20"
+                    style={{ background: "radial-gradient(circle, #fff, transparent)" }} />
+
+                  <div className="flex items-start justify-between relative z-10">
+                    <div>
+                      <p style={{ fontSize: 10, color: "rgba(255,255,255,0.7)", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                        Trình độ hiện tại
+                      </p>
+                      <div className="flex items-end gap-2 mt-1">
+                        <span style={{ fontSize: 36, fontWeight: 900, color: "#fff", lineHeight: 1 }}>{curLevel.label}</span>
+                        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", fontWeight: 600, paddingBottom: 4 }}>{curLevel.desc}</span>
                       </div>
-                      <span style={{ fontSize: 11, color: "#6B7280", fontWeight: 600, minWidth: 14, textAlign: "right" }}>
-                        {count}
-                      </span>
+                      {submitted.length > 0 && (
+                        <p style={{ fontSize: 10.5, color: "rgba(255,255,255,0.65)", marginTop: 4 }}>
+                          Dựa trên {submitted.length} bài thi — TB {avgScore.toFixed(1)}/{Math.round(avgMax)}
+                        </p>
+                      )}
                     </div>
-                  );
-                })}
+                    <span style={{ fontSize: 28 }}>{curLevel.emoji}</span>
+                  </div>
+
+                  {/* Progress to next level */}
+                  {nextLevel && (
+                    <div className="mt-3 relative z-10">
+                      <div className="flex items-center justify-between mb-1">
+                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.7)", fontWeight: 600 }}>
+                          Tiến độ lên {nextLevel.label}
+                        </span>
+                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.9)", fontWeight: 700 }}>
+                          {Math.round(progressToNext)}%
+                        </span>
+                      </div>
+                      <div className="h-2 rounded-full" style={{ background: "rgba(255,255,255,0.2)" }}>
+                        <div className="h-full rounded-full transition-all duration-700"
+                          style={{ width: `${progressToNext}%`, background: "rgba(255,255,255,0.85)" }} />
+                      </div>
+                      <p style={{ fontSize: 9.5, color: "rgba(255,255,255,0.55)", marginTop: 3 }}>
+                        Cần tăng {ptsToNext.toFixed(0)}% nữa để đạt {nextLevel.label}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Quick stats row */}
+                <div className="flex divide-x" style={{ borderBottom: "1.5px solid #F0F0F8", divideColor: "#F0F0F8" }}>
+                  {[
+                    { label: "Bài đã thi", value: submitted.length },
+                    { label: "TB điểm", value: avgScore.toFixed(1) },
+                    { label: "Cao nhất", value: bestScore > 0 ? bestScore.toFixed(1) : "—" },
+                  ].map(st => (
+                    <div key={st.label} className="flex-1 py-2.5 text-center">
+                      <p style={{ fontSize: 15, fontWeight: 900, color: "#1F1344", lineHeight: 1 }}>{st.value}</p>
+                      <p style={{ fontSize: 9.5, color: "#9CA3AF", marginTop: 2 }}>{st.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Distribution bars */}
+                <div className="p-4 space-y-2">
+                  <p style={{ fontSize: 11, fontWeight: 700, color: "#6B7280", marginBottom: 8, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                    Phân bố kết quả
+                  </p>
+                  {LEVELS.slice().reverse().map(lvl => {
+                    const count = cefrDist[lvl.label] ?? 0;
+                    const width = submitted.length > 0 ? (count / submitted.length) * 100 : 0;
+                    const isCurrent = lvl.label === curLevel.label;
+                    return (
+                      <div key={lvl.label} className="flex items-center gap-2.5">
+                        <span className="w-8 text-center text-xs font-bold rounded-md py-0.5 flex-shrink-0"
+                          style={{ background: lvl.bg, color: lvl.color, outline: isCurrent ? `2px solid ${lvl.color}` : "none", outlineOffset: 1 }}>
+                          {lvl.label}
+                        </span>
+                        <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "#F3F4F6" }}>
+                          <div className="h-full rounded-full transition-all duration-700"
+                            style={{ width: `${width}%`, background: isCurrent ? lvl.color : `${lvl.color}70` }} />
+                        </div>
+                        <span style={{ fontSize: 11, color: isCurrent ? lvl.color : "#9CA3AF", fontWeight: isCurrent ? 800 : 600, minWidth: 16, textAlign: "right" }}>
+                          {count}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Tip */}
+                <div className="px-4 pb-4">
+                  <div className="rounded-xl px-3 py-2.5" style={{ background: curLevel.bg }}>
+                    <p style={{ fontSize: 10.5, color: curLevel.color, lineHeight: 1.6 }}>
+                      💡 {curLevel.tip}
+                    </p>
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
+            );
+          })()}
 
           {/* Score trend sparkline */}
           {recentScores.length >= 2 && (
