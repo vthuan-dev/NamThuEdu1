@@ -121,10 +121,6 @@ export function IeltsGradingDetail() {
   const [bandOverrides, setBandOverrides] = useState<Partial<Record<IeltsSkill, string>>>({});
   const [activeSkillTab, setActiveSkillTab] = useState<IeltsSkill | null>(null);
 
-  // AI status
-  const [aiTriggering, setAiTriggering] = useState(false);
-  const [aiPolling, setAiPolling] = useState(false);
-
   // Per-answer save state
   const [savingAnswerIds, setSavingAnswerIds] = useState<Record<string, boolean>>({});
 
@@ -314,32 +310,6 @@ export function IeltsGradingDetail() {
 
   const updateQuestionFeedback = (id: string, fb: string) =>
     setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, feedback: fb } : q)));
-
-  const triggerAiGrade = async () => {
-    if (!submissionId) return;
-    setAiTriggering(true);
-    try {
-      const res = await gradingApi.triggerAiGrade(parseInt(submissionId, 10), false);
-      toast.success(res.message ?? "AI đang chấm bài, vui lòng đợi…");
-      // Start polling
-      setAiPolling(true);
-      const pollId = setInterval(async () => {
-        try {
-          const status = await gradingApi.getAiStatus(parseInt(submissionId, 10));
-          if (status.submission_status !== "grading_subjective") {
-            clearInterval(pollId);
-            setAiPolling(false);
-            // Reload submission to get fresh AI scores
-            window.location.reload();
-          }
-        } catch { /* ignore polling errors */ }
-      }, 3000);
-    } catch (err: any) {
-      toast.error("Lỗi: " + (err?.response?.data?.message ?? err?.message));
-    } finally {
-      setAiTriggering(false);
-    }
-  };
 
   const acceptAiAnswer = async (q: Question) => {
     if (!submissionId || !q.aiScore) return;
@@ -585,16 +555,6 @@ export function IeltsGradingDetail() {
 
             <button
               type="button"
-              onClick={triggerAiGrade}
-              disabled={aiTriggering || aiPolling}
-              className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold bg-purple-100 text-purple-700 hover:bg-purple-200 disabled:opacity-50 transition-colors cursor-pointer"
-            >
-              <Bot className="w-3.5 h-3.5" />
-              {aiPolling ? "AI đang chấm…" : aiTriggering ? "Đang gửi…" : "Chấm bằng AI"}
-            </button>
-
-            <button
-              type="button"
               onClick={handleSaveAll}
               disabled={saveLoading}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm disabled:opacity-60 transition-colors cursor-pointer"
@@ -741,7 +701,8 @@ export function IeltsGradingDetail() {
               {isFullTest
                 ? <li>· Overall = trung bình 4 skills, làm tròn 0.5</li>
                 : <li>· Bài 1 kỹ năng: kết quả chính là band của kỹ năng đó</li>}
-              <li>· Click "Chấm bằng AI" để có gợi ý nhanh</li>
+              <li>· Speaking/Writing: AI đã chấm sẵn khi nộp, bạn chỉ cần xem lại</li>
+              <li>· Reading/Listening: bấm Đúng/Sai để chỉnh nếu cần</li>
             </ul>
           </div>
         </aside>
