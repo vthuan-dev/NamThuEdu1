@@ -109,6 +109,11 @@ export function ThptGradingDetail({ submissionId }: Props) {
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const tabBarRef = useRef<HTMLDivElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  // Container cuộn thật sự (layout dùng div.overflow-y-auto, không phải window).
+  const scrollParentRef = useRef<HTMLElement | null>(null);
+  // Chiều cao header dính (để bù khi cuộn tới phần).
+  const headerRef = useRef<HTMLElement | null>(null);
   // Phần đang hiển thị trong tầm nhìn (để sáng đèn tab tương ứng).
   const [activeSection, setActiveSection] = useState<string | null>(null);
   // Bỏ qua scroll-spy trong lúc đang cuộn tới phần được bấm.
@@ -299,6 +304,18 @@ export function ThptGradingDetail({ submissionId }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recompute?.weightedTotal, autoWeighted]);
 
+  // Tìm container cuộn thật sự bằng cách đi lên từ root cho tới phần tử overflow.
+  useEffect(() => {
+    if (page !== 'ready') return;
+    let el: HTMLElement | null = rootRef.current?.parentElement ?? null;
+    while (el) {
+      const oy = window.getComputedStyle(el).overflowY;
+      if (oy === 'auto' || oy === 'scroll' || oy === 'overlay') break;
+      el = el.parentElement;
+    }
+    scrollParentRef.current = el; // null → cuộn theo window
+  }, [page]);
+
   // Scroll-spy: sáng đèn tab của phần đang hiển thị trong tầm nhìn.
   useEffect(() => {
     if (page !== 'ready' || !data) return;
@@ -308,18 +325,19 @@ export function ThptGradingDetail({ submissionId }: Props) {
       .filter((el): el is HTMLElement => !!el);
     if (els.length === 0) return;
 
-    const visible = new Map<Element, number>();
+    const headerH = headerRef.current?.offsetHeight ?? 140;
+    const visible = new Set<Element>();
     const observer = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
-          if (e.isIntersecting) visible.set(e.target, e.intersectionRatio);
+          if (e.isIntersecting) visible.add(e.target);
           else visible.delete(e.target);
         }
         if (isClickScrolling.current) return;
         // Chọn phần đang hiển thị gần đỉnh nhất (top nhỏ nhất).
         let topEl: Element | null = null;
         let topPos = Infinity;
-        for (const el of visible.keys()) {
+        for (const el of visible) {
           const top = el.getBoundingClientRect().top;
           if (top < topPos) {
             topPos = top;
@@ -328,11 +346,15 @@ export function ThptGradingDetail({ submissionId }: Props) {
         }
         if (topEl) {
           const sid = (topEl as HTMLElement).dataset.sid;
-          if (sid) setActiveSection(sid);
+          if (sid) setActiveSection((prev) => (prev === sid ? prev : sid));
         }
       },
-      // rootMargin trừ chiều cao header (~140px) để xác định phần "đang xem".
-      { rootMargin: '-140px 0px -55% 0px', threshold: [0, 0.1, 0.5, 1] },
+      {
+        // root = container cuộn thật sự để toạ độ chính xác (tránh header nhảy).
+        root: scrollParentRef.current ?? null,
+        rootMargin: `-${headerH + 8}px 0px -55% 0px`,
+        threshold: 0,
+      },
     );
     els.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
@@ -404,7 +426,17 @@ export function ThptGradingDetail({ submissionId }: Props) {
     setActiveSection(sid);
     // Tạm khoá scroll-spy để tránh nhấp nháy khi đang cuộn mượt.
     isClickScrolling.current = true;
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const headerH = headerRef.current?.offsetHeight ?? 140;
+    const parent = scrollParentRef.current;
+    if (parent) {
+      // Cuộn riêng container — không động tới ancestor khác (tránh header nhảy).
+      const top =
+        el.getBoundingClientRect().top - parent.getBoundingClientRect().top + parent.scrollTop - headerH - 8;
+      parent.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    } else {
+      const top = el.getBoundingClientRect().top + window.scrollY - headerH - 8;
+      window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    }
     window.setTimeout(() => {
       isClickScrolling.current = false;
     }, 700);
@@ -485,9 +517,9 @@ export function ThptGradingDetail({ submissionId }: Props) {
     : recompute?.weightedTotal ?? 0;
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-16">
+    <div ref={rootRef} className="min-h-screen bg-slate-50 pb-16">
       {/* ─── Header ─────────────────────────────────────────────────────── */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-30">
+      <header ref={headerRef} className="bg-white border-b border-slate-200 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
           <button
             type="button"
