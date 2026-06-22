@@ -29,6 +29,12 @@ import {
   HelpCircle,
   RotateCcw,
   ChevronRight,
+  Sparkles,
+  Trophy,
+  FileText,
+  Volume2,
+  Mic,
+  PenLine,
 } from "lucide-react";
 import { studentApi } from "../../../../services/studentApi";
 import { getAuthUser } from "../../../../utils/authStorage";
@@ -89,19 +95,37 @@ function formatDeadline(deadline: string): string {
   return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function getExamTypeMeta(type?: string): { color: string; bg: string; light: string } {
+const PURPLE     = '#7C3AED';
+const PURPLE_MID = '#8B5CF6';
+
+function getExamTypeMeta(type?: string): { color: string; dark: string; bg: string; light: string } {
   const t = String(type || '').toUpperCase();
-  if (t === 'VSTEP')  return { color: '#7C3AED', bg: '#EDE9FE', light: '#F5F3FF' };
-  if (t === 'IELTS')  return { color: '#0284C7', bg: '#E0F2FE', light: '#F0F9FF' };
-  if (t === 'TOEIC')  return { color: '#059669', bg: '#D1FAE5', light: '#ECFDF5' };
-  if (t === 'THPT')   return { color: '#D97706', bg: '#FEF3C7', light: '#FFFBEB' };
-  return { color: '#6366F1', bg: '#EEF2FF', light: '#F5F3FF' };
+  if (t === 'VSTEP')  return { color: '#0EA5E9', dark: '#0369A1', bg: '#E0F2FE', light: '#F0F9FF' };
+  if (t === 'IELTS')  return { color: '#10B981', dark: '#065F46', bg: '#D1FAE5', light: '#ECFDF5' };
+  if (t === 'TOEIC')  return { color: '#F59E0B', dark: '#92400E', bg: '#FEF3C7', light: '#FFFBEB' };
+  if (t === 'THPT')   return { color: '#EF4444', dark: '#991B1B', bg: '#FEE2E2', light: '#FFF5F5' };
+  return { color: PURPLE, dark: '#5B21B6', bg: '#EDE9FE', light: '#F5F3FF' };
+}
+
+function getSkillChips(skill?: string, format?: string): { label: string; Icon: any; color: string }[] {
+  const s = String(skill || '').toLowerCase();
+  const f = String(format || '').toUpperCase();
+  if (s === 'mixed' || f === 'FULL_4_SKILLS') return [];
+  if (s === 'listening') return [{ label: 'Nghe', Icon: Volume2, color: '#0EA5E9' }];
+  if (s === 'reading')   return [{ label: 'Đọc', Icon: BookOpen, color: '#10B981' }];
+  if (s === 'writing')   return [{ label: 'Viết', Icon: PenLine, color: '#8B5CF6' }];
+  if (s === 'speaking')  return [{ label: 'Nói', Icon: Mic, color: '#F59E0B' }];
+  return [];
+}
+
+function getDaysRemaining(deadline: string): number {
+  return Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
 function getStatusMeta(status: string): { label: string; color: string; bg: string } {
-  if (status === 'in_progress') return { label: 'Đang làm', color: '#0284C7', bg: '#E0F2FE' };
-  if (status === 'completed')   return { label: 'Hoàn thành', color: '#059669', bg: '#D1FAE5' };
-  return { label: 'Chưa làm', color: '#7C3AED', bg: '#EDE9FE' };
+  if (status === 'in_progress') return { label: 'Đang làm', color: '#0EA5E9', bg: '#E0F2FE' };
+  if (status === 'completed')   return { label: 'Hoàn thành', color: '#10B981', bg: '#D1FAE5' };
+  return { label: 'Chưa làm', color: PURPLE, bg: '#EDE9FE' };
 }
 
 function getFormatMeta(format?: string) {
@@ -406,7 +430,7 @@ export function TestList() {
         </div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
-           {pagedTests.map((test) => {
+           {pagedTests.map((test, idx) => {
               const formatMeta = getFormatMeta(test.exam_format);
               const Icon = formatMeta.icon;
               const color = formatMeta.color;
@@ -503,134 +527,150 @@ export function TestList() {
               }
 
               {
-                const typeMeta = getExamTypeMeta(test.exam_type);
+                const typeMeta   = getExamTypeMeta(test.exam_type);
                 const statusMeta = getStatusMeta(test.status);
                 const attemptsLeft = Math.max(0, test.attempts_allowed - test.attempts_used);
+                const skillChips = getSkillChips(test.exam_skill, test.exam_format);
+                const isFullTest = skillChips.length === 0;
+                const daysLeft   = test.deadline && !isCompleted ? getDaysRemaining(test.deadline) : null;
                 return (
                   <div
                     key={test.assignment_id}
-                    className="group relative flex flex-col bg-white rounded-2xl overflow-hidden transition-all duration-200 hover:-translate-y-0.5"
-                    style={{ border: `1.5px solid ${typeMeta.bg}`, boxShadow: `0 2px 16px ${typeMeta.color}18` }}
+                    className="group relative flex flex-col rounded-3xl bg-white overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                    style={{ border: '1.5px solid #F0F0F8', boxShadow: `0 2px 12px ${typeMeta.color}10` }}
                   >
-                    {/* Colored top accent bar */}
-                    <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${typeMeta.color}, ${typeMeta.color}99)` }} />
+                    {/* ── Gradient card header (matches ExamCard) ── */}
+                    <div className="relative px-5 pt-5 pb-4 overflow-hidden"
+                      style={{ background: `linear-gradient(135deg, ${typeMeta.color}18 0%, ${PURPLE}10 100%)` }}
+                    >
+                      {/* Decorative orb */}
+                      <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full opacity-20"
+                        style={{ background: `radial-gradient(circle, ${typeMeta.color}, transparent)` }} />
 
-                    {/* Header: type badge + status badge */}
-                    <div className="flex items-center justify-between px-5 pt-4 pb-2">
-                      <span className="px-2.5 py-1 rounded-lg text-xs font-extrabold tracking-wide"
-                        style={{ background: typeMeta.bg, color: typeMeta.color }}>
-                        {test.exam_type}
-                      </span>
-                      <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold"
-                        style={{ background: statusMeta.bg, color: statusMeta.color }}>
-                        {test.status === 'in_progress' ? <Play className="w-3 h-3 fill-current" /> :
-                         test.status === 'completed'   ? <CheckCircle className="w-3 h-3" /> :
-                                                         <Clock className="w-3 h-3" />}
-                        {statusMeta.label}
-                      </span>
-                    </div>
-
-                    {/* Title */}
-                    <h3 className="px-5 text-base font-extrabold text-gray-900 line-clamp-2 leading-snug mb-3 min-h-[48px]">
-                      {test.exam_title}
-                    </h3>
-
-                    {/* Info grid - 2x2 with labels */}
-                    <div className="grid grid-cols-2 gap-2 px-5 mb-3">
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
-                        style={{ background: typeMeta.light, border: `1px solid ${typeMeta.bg}` }}>
-                        <Clock className="w-3.5 h-3.5 flex-shrink-0" style={{ color: typeMeta.color }} />
-                        <div className="min-w-0">
-                          <p className="text-xs text-gray-400">Thời gian</p>
-                          <p className="text-xs font-bold text-gray-800">{test.exam_duration} phút</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
-                        style={{ background: typeMeta.light, border: `1px solid ${typeMeta.bg}` }}>
-                        <FileCheck className="w-3.5 h-3.5 flex-shrink-0" style={{ color: typeMeta.color }} />
-                        <div className="min-w-0">
-                          <p className="text-xs text-gray-400">Câu hỏi</p>
-                          <p className="text-xs font-bold text-gray-800">{test.total_questions} câu</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
-                        style={{ background: typeMeta.light, border: `1px solid ${typeMeta.bg}` }}>
-                        <Target className="w-3.5 h-3.5 flex-shrink-0" style={{ color: typeMeta.color }} />
-                        <div className="min-w-0">
-                          <p className="text-xs text-gray-400">Kỹ năng</p>
-                          <p className="text-xs font-bold text-gray-800 capitalize">{test.exam_skill || 'Mixed'}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
-                        style={{ background: typeMeta.light, border: `1px solid ${typeMeta.bg}` }}>
-                        <RotateCcw className="w-3.5 h-3.5 flex-shrink-0" style={{ color: typeMeta.color }} />
-                        <div className="min-w-0">
-                          <p className="text-xs text-gray-400">Lượt thi</p>
-                          <p className="text-xs font-bold text-gray-800">
-                            <span style={{ color: typeMeta.color }}>{test.attempts_used}</span>/{test.attempts_allowed} lần
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Attempts progress bar */}
-                    {test.attempts_allowed > 0 && (
-                      <div className="px-5 mb-3">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-gray-400">Lượt dùng</span>
-                          <span className="text-xs font-semibold" style={{ color: attemptsLeft === 0 ? '#EF4444' : typeMeta.color }}>
-                            {attemptsLeft > 0 ? `Còn ${attemptsLeft} lượt` : 'Hết lượt'}
+                      {/* Type badge + status badge + index */}
+                      <div className="flex items-center justify-between mb-3 relative z-10">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold tracking-wide"
+                            style={{ background: typeMeta.bg, color: typeMeta.dark, border: `1px solid ${typeMeta.color}30` }}>
+                            <Sparkles className="w-3 h-3" />
+                            {test.exam_type}
+                          </span>
+                          <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold"
+                            style={{ background: statusMeta.bg, color: statusMeta.color, border: `1px solid ${statusMeta.color}30` }}>
+                            {test.status === 'in_progress' ? <Play className="w-2.5 h-2.5 fill-current" /> :
+                             test.status === 'completed'   ? <CheckCircle className="w-2.5 h-2.5" /> :
+                                                             <Clock className="w-2.5 h-2.5" />}
+                            {statusMeta.label}
                           </span>
                         </div>
-                        <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: typeMeta.bg }}>
+                        <span className="text-xs font-bold opacity-40 relative z-10" style={{ color: PURPLE }}>
+                          #{String(idx + 1).padStart(2, '0')}
+                        </span>
+                      </div>
+
+                      {/* Title */}
+                      <h3 className="font-extrabold leading-snug line-clamp-2 relative z-10 mb-2"
+                        style={{ fontSize: 16, color: '#1A1040', letterSpacing: '-0.01em' }}>
+                        {test.exam_title}
+                      </h3>
+
+                      {/* Skill chips */}
+                      <div className="flex items-center gap-1.5 flex-wrap relative z-10">
+                        {isFullTest ? (
+                          <span className="flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold text-white shadow-sm"
+                            style={{ background: 'linear-gradient(135deg, #FF6B6B 0%, #845EF7 100%)' }}>
+                            Full test
+                          </span>
+                        ) : skillChips.map(({ label, Icon, color }) => (
+                          <span key={label} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold"
+                            style={{ background: '#fff', color, border: `1px solid ${color}30` }}>
+                            <Icon className="w-2.5 h-2.5" />
+                            {label}
+                          </span>
+                        ))}
+                        {/* Deadline chip in header */}
+                        {daysLeft !== null && daysLeft <= 7 && (
+                          <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold"
+                            style={{
+                              background: daysLeft <= 2 ? '#FEF2F2' : '#FFF7ED',
+                              color: daysLeft <= 2 ? '#DC2626' : '#D97706',
+                              border: `1px solid ${daysLeft <= 2 ? '#FECACA' : '#FDE68A'}`,
+                            }}>
+                            <Calendar className="w-2.5 h-2.5" />
+                            {daysLeft <= 0 ? 'Hôm nay' : `Còn ${daysLeft} ngày`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* ── Card body ── */}
+                    <div className="px-5 py-3 flex-1 flex flex-col gap-2">
+                      {/* Deadline row (full date) */}
+                      {test.deadline && !isCompleted && (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                          style={{ background: isUrgent ? '#FEF3C7' : '#F9FAFB', border: `1px solid ${isUrgent ? '#FDE68A' : '#E5E7EB'}` }}>
+                          <Calendar className="w-3.5 h-3.5 flex-shrink-0" style={{ color: isUrgent ? '#D97706' : '#9CA3AF' }} />
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: isUrgent ? '#92400E' : '#6B7280' }}>
+                              {isUrgent ? '⚠️ Hạn nộp — Cần gấp!' : 'Hạn nộp'}
+                            </p>
+                            <p className="text-xs font-bold" style={{ color: isUrgent ? '#B45309' : '#374151' }}>
+                              {formatDeadline(test.deadline)}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Stats row */}
+                      <div className="flex items-center gap-3 mt-auto pt-1 flex-wrap">
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+                          <Clock className="w-3.5 h-3.5 text-gray-400" />
+                          {test.exam_duration} phút
+                        </span>
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+                          <FileText className="w-3.5 h-3.5 text-gray-400" />
+                          {test.total_questions} câu hỏi
+                        </span>
+                        <span className="ml-auto flex items-center gap-1 text-xs font-semibold" style={{ color: attemptsLeft === 0 ? '#EF4444' : typeMeta.color }}>
+                          <RotateCcw className="w-3 h-3" />
+                          {attemptsLeft > 0
+                            ? `Còn ${attemptsLeft}/${test.attempts_allowed} lượt`
+                            : 'Hết lượt'}
+                        </span>
+                      </div>
+
+                      {/* Attempts progress */}
+                      {test.attempts_allowed > 0 && (
+                        <div className="h-1 w-full rounded-full overflow-hidden" style={{ background: typeMeta.bg }}>
                           <div className="h-full rounded-full transition-all duration-500"
                             style={{ width: `${progress}%`, background: attemptsLeft === 0 ? '#EF4444' : typeMeta.color }} />
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
 
-                    {/* Deadline row */}
-                    {test.deadline && !isCompleted && (
-                      <div className="flex items-center gap-2 mx-5 mb-3 px-3 py-2 rounded-xl"
-                        style={{ background: isUrgent ? '#FEF3C7' : '#F9FAFB', border: `1px solid ${isUrgent ? '#FDE68A' : '#E5E7EB'}` }}>
-                        <Calendar className="w-3.5 h-3.5 flex-shrink-0" style={{ color: isUrgent ? '#D97706' : '#6B7280' }} />
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold" style={{ color: isUrgent ? '#92400E' : '#374151' }}>
-                            {isUrgent ? '⚠️ Hạn nộp — cần gấp!' : 'Hạn nộp'}
-                          </p>
-                          <p className="text-xs font-bold truncate" style={{ color: isUrgent ? '#B45309' : '#6B7280' }}>
-                            {formatDeadline(test.deadline)}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Action button */}
-                    <div className="mt-auto px-5 pb-5">
+                    {/* ── CTA ── */}
+                    <div className="px-5 pb-5">
                       {isCompleted ? (
-                        <Link
-                          to={resultUrlFor(test)}
-                          className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition-all hover:opacity-90"
-                          style={{ background: '#D1FAE5', color: '#065F46' }}
-                        >
+                        <Link to={resultUrlFor(test)}
+                          className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl font-bold text-sm transition-all duration-200 group-hover:gap-3"
+                          style={{ background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', color: '#fff', boxShadow: '0 4px 14px #10B98145' }}>
                           <CheckCircle className="w-4 h-4" />
                           Xem kết quả
+                          <ChevronRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                        </Link>
+                      ) : canStart ? (
+                        <Link to={`${BASE}/phong-cho/${test.assignment_id}`}
+                          className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl font-bold text-sm text-white transition-all duration-200 group-hover:gap-3"
+                          style={{ background: `linear-gradient(135deg, ${typeMeta.color} 0%, ${PURPLE_MID} 100%)`, boxShadow: `0 4px 14px ${typeMeta.color}45` }}>
+                          <Play className="w-4 h-4 fill-white" />
+                          {test.status === 'in_progress' ? 'Tiếp tục làm' : 'Bắt đầu làm bài'}
+                          <ChevronRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
                         </Link>
                       ) : (
-                        <Link
-                          to={`${BASE}/phong-cho/${test.assignment_id}`}
-                          onClick={(e) => !canStart && e.preventDefault()}
-                          className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-bold transition-all hover:opacity-90"
-                          style={{
-                            background: canStart ? `linear-gradient(135deg, ${typeMeta.color}, ${typeMeta.color}CC)` : '#F3F4F6',
-                            color: canStart ? '#fff' : '#9CA3AF',
-                            cursor: canStart ? 'pointer' : 'not-allowed',
-                          }}
-                        >
-                          {test.status === 'in_progress'
-                            ? <><Play className="w-4 h-4 fill-current" />Tiếp tục làm</>
-                            : <><ChevronRight className="w-4 h-4" />Vào làm bài</>}
-                        </Link>
+                        <div className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl font-bold text-sm cursor-not-allowed"
+                          style={{ background: '#F3F4F6', color: '#9CA3AF' }}>
+                          Hết lượt thi
+                        </div>
                       )}
                     </div>
                   </div>
