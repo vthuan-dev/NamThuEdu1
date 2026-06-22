@@ -382,6 +382,37 @@ export function IeltsGradingDetail() {
     }
   };
 
+  // Lật Đúng/Sai cho câu khách quan (Reading/Listening) khi máy chấm sai.
+  const setObjectiveCorrect = async (q: Question, correct: boolean) => {
+    if (!submissionId) return;
+    const newPoints = correct ? q.maxPoints : 0;
+    // Cập nhật lạc quan để band tính lại ngay.
+    setQuestions((prev) =>
+      prev.map((item) =>
+        item.id === q.id
+          ? { ...item, points: newPoints, isCorrect: correct, reviewStatus: "modified" }
+          : item,
+      ),
+    );
+    try {
+      setSavingAnswerIds((prev) => ({ ...prev, [q.id]: true }));
+      await gradingApi.teacherGrade(parseInt(submissionId, 10), q.answerId, {
+        score: newPoints,
+        feedback: q.feedback,
+      });
+    } catch (err: any) {
+      toast.error("Lỗi lưu: " + (err?.response?.data?.message ?? err?.message));
+      // Hoàn tác nếu lưu lỗi.
+      setQuestions((prev) =>
+        prev.map((item) =>
+          item.id === q.id ? { ...item, points: q.points, isCorrect: q.isCorrect } : item,
+        ),
+      );
+    } finally {
+      setSavingAnswerIds((prev) => ({ ...prev, [q.id]: false }));
+    }
+  };
+
   const handleSaveAll = async () => {
     if (!submissionId) return;
     try {
@@ -501,12 +532,12 @@ export function IeltsGradingDetail() {
     <div className="flex-1 min-h-0 flex flex-col bg-slate-50">
       {/* Header - compact (NẰM NGOÀI vùng cuộn → luôn cố định) */}
       <div className="flex-shrink-0 bg-white border-b border-slate-200 z-30">
-        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-6 py-2.5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
               onClick={() => navigate(-1)}
-              className="p-2 rounded-lg hover:bg-slate-100 cursor-pointer transition-colors"
+              className="p-2 rounded-lg hover:bg-slate-100 cursor-pointer transition-colors flex-shrink-0"
               aria-label="Back"
             >
               <ChevronLeft className="w-5 h-5 text-slate-600" />
@@ -520,19 +551,19 @@ export function IeltsGradingDetail() {
                   {exam.testType}
                 </span>
               </div>
-              <h1 className="text-base font-bold text-slate-900 truncate">{exam.title}</h1>
+              <h1 className="text-base font-bold text-slate-900 truncate leading-tight">{exam.title}</h1>
               <p className="text-xs text-slate-500 truncate">
                 {student.name} {student.id ? `· ${student.id}` : ""} · Lần thử {submissionMeta.attemptNumber}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {/* Overall / single-skill band display */}
             <div className="hidden sm:flex flex-col items-end pr-3 border-r border-slate-200">
               <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{resultLabel}</span>
               <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-bold tabular-nums" style={{ color: bandColor(overallBand) }}>
+                <span className="text-2xl font-bold tabular-nums leading-none" style={{ color: bandColor(overallBand) }}>
                   {overallBand.toFixed(1)}
                 </span>
                 <span className="text-xs text-slate-500">/ 9</span>
@@ -644,6 +675,7 @@ export function IeltsGradingDetail() {
               onUpdateFeedback={updateQuestionFeedback}
               onAcceptAi={acceptAiAnswer}
               onSaveAnswer={saveAnswer}
+              onSetCorrect={setObjectiveCorrect}
               savingAnswerIds={savingAnswerIds}
               bandOverride={bandOverrides[activeSkillTab] ?? ""}
               onChangeOverride={(v) =>
@@ -727,6 +759,7 @@ interface SkillSectionProps {
   onUpdateFeedback: (id: string, fb: string) => void;
   onAcceptAi: (q: Question) => void;
   onSaveAnswer: (q: Question) => void;
+  onSetCorrect: (q: Question, correct: boolean) => void;
   savingAnswerIds: Record<string, boolean>;
   bandOverride: string;
   onChangeOverride: (val: string) => void;
@@ -735,7 +768,7 @@ interface SkillSectionProps {
 
 function SkillSection({
   skill, questions, onUpdatePoints, onUpdateFeedback,
-  onAcceptAi, onSaveAnswer, savingAnswerIds,
+  onAcceptAi, onSaveAnswer, onSetCorrect, savingAnswerIds,
   bandOverride, onChangeOverride, computedBand,
 }: SkillSectionProps) {
   const meta = IELTS_SKILLS[skill];
@@ -828,6 +861,7 @@ function SkillSection({
                   onUpdateFeedback={onUpdateFeedback}
                   onAcceptAi={onAcceptAi}
                   onSaveAnswer={onSaveAnswer}
+                  onSetCorrect={onSetCorrect}
                   saving={!!savingAnswerIds[q.id]}
                 />
               ))}
@@ -842,7 +876,7 @@ function SkillSection({
 // ─── Question row ─────────────────────────────────────────────────────────────
 function QuestionRow({
   question, isSubjective, onUpdatePoints, onUpdateFeedback,
-  onAcceptAi, onSaveAnswer, saving,
+  onAcceptAi, onSaveAnswer, onSetCorrect, saving,
 }: {
   question: Question;
   isSubjective: boolean;
@@ -850,6 +884,7 @@ function QuestionRow({
   onUpdateFeedback: (id: string, fb: string) => void;
   onAcceptAi: (q: Question) => void;
   onSaveAnswer: (q: Question) => void;
+  onSetCorrect: (q: Question, correct: boolean) => void;
   saving: boolean;
 }) {
   const q = question;
@@ -997,27 +1032,43 @@ function QuestionRow({
         </div>
       )}
 
-      {/* Objective: just show points status */}
+      {/* Objective: toggle Đúng/Sai cho giáo viên sửa khi máy chấm sai */}
       {!isSubjective && (
-        <div className="pl-10 flex items-center justify-between text-xs text-slate-600">
-          <div className="flex items-center gap-1.5">
-            {isCorrect ? (
-              <>
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span className="text-emerald-700 font-semibold">Đúng</span>
-              </>
-            ) : isWrong ? (
-              <>
-                <AlertCircle className="w-3.5 h-3.5 text-red-600" />
-                <span className="text-red-700 font-semibold">Sai</span>
-              </>
-            ) : (
-              <span className="text-slate-500">Để trống</span>
-            )}
+        <div className="pl-10 flex items-center justify-between gap-3">
+          <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden bg-white">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => onSetCorrect(q, true)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-50 cursor-pointer ${
+                isCorrect
+                  ? "bg-emerald-600 text-white"
+                  : "text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"
+              }`}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Đúng
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => onSetCorrect(q, false)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold transition-colors disabled:opacity-50 cursor-pointer border-l border-slate-200 ${
+                !isCorrect && q.points < q.maxPoints
+                  ? "bg-red-600 text-white"
+                  : "text-slate-500 hover:bg-red-50 hover:text-red-700"
+              }`}
+            >
+              <AlertCircle className="w-3.5 h-3.5" />
+              Sai
+            </button>
           </div>
-          <span className="tabular-nums">
-            {q.points} / {q.maxPoints}
-          </span>
+          <div className="flex items-center gap-2 text-xs text-slate-600">
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
+            <span className="tabular-nums font-semibold">
+              {q.points} / {q.maxPoints}
+            </span>
+          </div>
         </div>
       )}
     </div>
