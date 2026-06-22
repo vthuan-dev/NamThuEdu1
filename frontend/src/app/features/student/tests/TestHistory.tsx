@@ -511,23 +511,33 @@ export function TestHistory() {
                             <div className="h-0.5" style={{ background: `linear-gradient(90deg,${PURPLE},${PURPLE_MID})` }} />
                           )}
 
-                          <div className="flex items-center gap-3 p-3.5">
-                            {/* Score badge */}
-                            <div className="w-[56px] h-[56px] rounded-xl flex-shrink-0 flex flex-col items-center justify-center"
-                              style={{ background: isPending || isInProg ? "#F5F3FF" : cefr.gradient }}>
+                          <div className="flex items-center gap-3.5 p-3.5">
+                            {/* Score badge — enlarged, shows X.X / max / CEFR */}
+                            <div className="w-[72px] h-[72px] rounded-2xl flex-shrink-0 flex flex-col items-center justify-center"
+                              style={{
+                                background: isPending || isInProg ? "#F5F3FF" : cefr.gradient,
+                                boxShadow: isPending || isInProg ? "none" : `0 6px 16px ${cefr.color}40`,
+                              }}>
                               {isPending ? (
-                                <Loader2 className="w-5 h-5 animate-spin" style={{ color: PURPLE }} />
+                                <>
+                                  <Loader2 className="w-5 h-5 animate-spin" style={{ color: PURPLE }} />
+                                  <span style={{ fontSize: 7, color: PURPLE, fontWeight: 800, marginTop: 4 }}>ĐANG CHẤM</span>
+                                </>
                               ) : isInProg ? (
                                 <>
                                   <PenLine className="w-4 h-4" style={{ color: PURPLE_MID }} />
-                                  <span style={{ fontSize: 7, color: PURPLE_MID, fontWeight: 800, letterSpacing: "0.04em", marginTop: 2 }}>LÀM DỞ</span>
+                                  <span style={{ fontSize: 7, color: PURPLE_MID, fontWeight: 800, letterSpacing: "0.04em", marginTop: 3 }}>LÀM DỞ</span>
                                 </>
                               ) : (
                                 <>
-                                  <span style={{ fontSize: 17, fontWeight: 900, color: "#fff", lineHeight: 1 }}>
-                                    {score.toFixed(0)}
+                                  <span style={{ fontSize: 22, fontWeight: 900, color: "#fff", lineHeight: 1 }}>
+                                    {score % 1 === 0 ? score.toFixed(0) : score.toFixed(1)}
                                   </span>
-                                  <span style={{ fontSize: 8, color: "rgba(255,255,255,0.85)", fontWeight: 800, letterSpacing: "0.04em" }}>
+                                  <span style={{ fontSize: 9, color: "rgba(255,255,255,0.65)", fontWeight: 600, lineHeight: 1.2 }}>
+                                    /{examMax}
+                                  </span>
+                                  <span className="mt-1 px-2 py-0.5 rounded-full"
+                                    style={{ fontSize: 8, fontWeight: 800, color: "#fff", letterSpacing: "0.05em", background: "rgba(255,255,255,0.22)" }}>
                                     {cefr.label}
                                   </span>
                                 </>
@@ -548,29 +558,59 @@ export function TestHistory() {
                                   style={{ background: status.bg, color: status.color }}>
                                   {status.label}
                                 </span>
-                                {!isPending && !isInProg && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold"
-                                    style={{ background: cefr.bg, color: cefr.color }}>
-                                    {cefr.label}
-                                  </span>
-                                )}
                               </div>
 
-                              {/* Score progress bar */}
+                              {/* Score row — prominent */}
                               {!isPending && !isInProg && examMax > 0 && (
-                                <div className="mt-2 flex items-center gap-2">
-                                  <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "#F0EEFF" }}>
+                                <div className="mt-2">
+                                  <div className="flex items-center gap-1.5 mb-1">
+                                    <span style={{ fontSize: 15, fontWeight: 900, color: cefr.color, lineHeight: 1 }}>
+                                      {score.toFixed(1)}
+                                    </span>
+                                    <span style={{ fontSize: 11, color: "#9CA3AF", fontWeight: 500 }}>/ {examMax} điểm</span>
+                                    <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold"
+                                      style={{ background: cefr.bg, color: cefr.color }}>
+                                      {Math.round(scorePct)}%
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                                      style={{ background: cefr.bg, color: cefr.color }}>
+                                      {cefr.label}
+                                    </span>
+                                  </div>
+                                  <div className="h-2 rounded-full overflow-hidden" style={{ background: "#F0EEFF" }}>
                                     <div className="h-full rounded-full transition-all duration-700"
                                       style={{ width: `${Math.min(scorePct, 100)}%`, background: cefr.gradient }} />
                                   </div>
-                                  <span style={{ fontSize: 10, color: "#9CA3AF", fontWeight: 600, flexShrink: 0 }}>
-                                    {score.toFixed(1)} / {examMax}
-                                  </span>
                                 </div>
                               )}
 
+                              {/* VSTEP 4-skill breakdown */}
+                              {isVstep && !isPending && !isInProg && (() => {
+                                const fb = s.sGemini_feedback;
+                                const vs = fb?.vstep_scores ?? fb?.scores;
+                                if (!vs) return null;
+                                const skills = [
+                                  { key: "listening", label: "L", color: "#0284C7" },
+                                  { key: "reading",   label: "R", color: "#059669" },
+                                  { key: "writing",   label: "W", color: "#D97706" },
+                                  { key: "speaking",  label: "S", color: "#DB2777" },
+                                ];
+                                const hasAny = skills.some(sk => vs[sk.key] != null);
+                                if (!hasAny) return null;
+                                return (
+                                  <div className="flex items-center gap-1 mt-1.5">
+                                    {skills.map(sk => (
+                                      <span key={sk.key} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold"
+                                        style={{ background: `${sk.color}18`, color: sk.color, border: `1px solid ${sk.color}30` }}>
+                                        {sk.label}: {vs[sk.key] != null ? Number(vs[sk.key]).toFixed(1) : "—"}
+                                      </span>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
+
                               {/* Meta row */}
-                              <div className="flex items-center gap-3 mt-1">
+                              <div className="flex items-center gap-3 mt-1.5">
                                 {(s.sSubmit_time ?? s.sStart_time) && (
                                   <span className="inline-flex items-center gap-1" style={{ fontSize: 10, color: "#B0AACC" }}>
                                     <Clock className="w-2.5 h-2.5" />
