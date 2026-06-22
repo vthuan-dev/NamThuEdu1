@@ -20,6 +20,9 @@ import {
   Send,
   Flag,
   Loader2,
+  FileText,
+  X,
+  Move,
 } from "lucide-react";
 import { studentApi } from "../../../../services/studentApi";
 import { api } from "../../../../services/api";
@@ -1422,6 +1425,91 @@ export function StudentVstepExamPage() {
 /* ============================================================
  *  LISTENING VIEW (identical to VstepExamPreview)
  * ============================================================ */
+/* ============================================================
+ *  TRANSCRIPT MODAL (draggable floating panel — review mode)
+ * ============================================================ */
+function TranscriptModal({
+  title,
+  transcript,
+  onClose,
+}: {
+  title: string;
+  transcript: string;
+  onClose: () => void;
+}) {
+  // Center the panel on first mount
+  const [pos, setPos] = useState<{ x: number; y: number }>(() => ({
+    x: typeof window !== "undefined" ? Math.max(16, window.innerWidth / 2 - 260) : 80,
+    y: typeof window !== "undefined" ? Math.max(16, window.innerHeight / 2 - 220) : 80,
+  }));
+  const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
+
+  const onDragStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragRef.current = { sx: e.clientX, sy: e.clientY, ox: pos.x, oy: pos.y };
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current) return;
+      const nx = dragRef.current.ox + (ev.clientX - dragRef.current.sx);
+      const ny = dragRef.current.oy + (ev.clientY - dragRef.current.sy);
+      // Keep panel within viewport bounds
+      const maxX = window.innerWidth - 80;
+      const maxY = window.innerHeight - 80;
+      setPos({
+        x: Math.min(Math.max(-200, nx), maxX),
+        y: Math.min(Math.max(0, ny), maxY),
+      });
+    };
+    const onUp = () => {
+      dragRef.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  return (
+    <div
+      className="fixed z-[70] w-[min(520px,calc(100vw-2rem))] rounded-2xl bg-white shadow-2xl border border-slate-200 flex flex-col overflow-hidden"
+      style={{ left: pos.x, top: pos.y, maxHeight: "min(70vh, 600px)" }}
+      role="dialog"
+      aria-label="Transcript"
+    >
+      {/* Drag handle / header */}
+      <div
+        onMouseDown={onDragStart}
+        className="flex items-center justify-between gap-3 px-4 py-3 bg-gradient-to-r from-sky-600 to-blue-600 text-white cursor-move select-none"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <FileText className="w-4 h-4 flex-shrink-0" />
+          <span className="text-sm font-bold truncate">Transcript · {title}</span>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <Move className="w-4 h-4 opacity-70" />
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded-md hover:bg-white/20 transition-colors cursor-pointer"
+            aria-label="Đóng transcript"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+      {/* Body */}
+      <div className="p-4 overflow-y-auto">
+        {transcript.trim() ? (
+          <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">
+            {transcript}
+          </p>
+        ) : (
+          <p className="text-sm text-slate-400 italic">Phần này chưa có transcript.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ListeningView({
   part, partNumber, answers, onAnswer, flagged, onFlag, reviewMode, correctAnswersMap,
 }: {
@@ -1434,6 +1522,9 @@ function ListeningView({
   reviewMode?: boolean;
   correctAnswersMap?: Record<number, string>;
 }) {
+  // Transcript modal state (review mode only): which section's transcript is open
+  const [openTranscript, setOpenTranscript] = useState<{ title: string; text: string } | null>(null);
+
   if (!part || !part.sections?.length) return <EmptyState skill="listening" />;
 
   const PART_INSTRUCTIONS: Record<number, { count: string; type: string; qPer: string }> = {
@@ -1471,11 +1562,27 @@ function ListeningView({
 
         {part.sections.map((sec) => (
           <section key={sec.sectionNumber} className="bg-white rounded-xl border border-slate-200 shadow-sm">
-            <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3">
               <h3 className="font-semibold text-slate-900">{sec.sectionName || `Section ${sec.sectionNumber}`}</h3>
-              <span className="text-xs text-slate-500">
-                Câu {sec.questions[0]?.questionNumber}–{sec.questions[sec.questions.length - 1]?.questionNumber}
-              </span>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                {reviewMode && (
+                  <button
+                    type="button"
+                    onClick={() => setOpenTranscript({
+                      title: sec.sectionName || `Section ${sec.sectionNumber}`,
+                      text: sec.transcript ?? "",
+                    })}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-sky-100 text-sky-700 hover:bg-sky-200 transition-colors cursor-pointer"
+                    title="Xem transcript bài nghe"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    Xem transcript
+                  </button>
+                )}
+                <span className="text-xs text-slate-500">
+                  Câu {sec.questions[0]?.questionNumber}–{sec.questions[sec.questions.length - 1]?.questionNumber}
+                </span>
+              </div>
             </div>
             {sec.instructions && (
               <div className="px-5 py-3 bg-sky-50/60 border-b border-sky-100">
@@ -1496,6 +1603,14 @@ function ListeningView({
           </section>
         ))}
       </div>
+
+      {reviewMode && openTranscript && (
+        <TranscriptModal
+          title={openTranscript.title}
+          transcript={openTranscript.text}
+          onClose={() => setOpenTranscript(null)}
+        />
+      )}
     </div>
   );
 }
