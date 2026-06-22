@@ -68,7 +68,7 @@ export function ThptPartNavigator({ config, answers, activeIdx, onSectionChange 
         <div className="h-full bg-teal-500 transition-all duration-300" style={{ width: `${total ? (answered / total) * 100 : 0}%` }} />
       </div>
 
-      <div className="space-y-1">
+      <div className="space-y-2 max-h-[calc(100vh-14rem)] overflow-y-auto pr-1">
         {config.sections.map((s, idx) => {
           const items = perSection[idx];
           const cnt = items.filter((x) => x.answered).length;
@@ -79,7 +79,7 @@ export function ThptPartNavigator({ config, answers, activeIdx, onSectionChange 
               <button
                 type="button"
                 onClick={() => onSectionChange(idx)}
-                className={`w-full text-left px-2 py-1.5 rounded-md text-xs font-bold transition-colors cursor-pointer ${
+                className={`w-full text-left px-2 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer ${
                   isActive ? 'bg-teal-50 text-teal-700' : 'text-slate-600 hover:bg-slate-50'
                 }`}
               >
@@ -94,24 +94,21 @@ export function ThptPartNavigator({ config, answers, activeIdx, onSectionChange 
                   </span>
                 </div>
               </button>
-              {/* Chỉ phần đang mở mới hiện lưới câu — gọn gàng, đỡ rối */}
-              {isActive && (
-                <div className="grid grid-cols-7 gap-1 mt-1.5 mb-1 px-1">
-                  {items.map((it) => (
-                    <button
-                      key={it.qn}
-                      type="button"
-                      onClick={() => onSectionChange(idx)}
-                      className={`aspect-square text-[11px] font-bold rounded-md transition-all cursor-pointer ${
-                        it.answered ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                      }`}
-                      title={`Câu ${it.qn}`}
-                    >
-                      {it.qn}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div className="grid grid-cols-8 gap-1 mt-1 px-1">
+                {items.map((it) => (
+                  <button
+                    key={it.qn}
+                    type="button"
+                    onClick={() => onSectionChange(idx)}
+                    className={`aspect-square text-[10px] font-bold rounded transition-all cursor-pointer ${
+                      it.answered ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                    }`}
+                    title={`Câu ${it.qn}`}
+                  >
+                    {it.qn}
+                  </button>
+                ))}
+              </div>
             </div>
           );
         })}
