@@ -31,6 +31,9 @@ interface Submission {
   examTitle: string;
   examType: string;
   examId: string;
+  classId: string;
+  className: string;
+  ageGroup: string; // kids | teens | adults | ''
   submissionTime: Date;
   status: "submitted" | "graded" | "partially_graded" | "grading_subjective";
   score?: number;
@@ -93,6 +96,9 @@ export function GradingQueue() {
 
   const [searchQuery, setSearchQuery]   = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [filterExam, setFilterExam]     = useState("");   // theo đề thi (examId)
+  const [filterClass, setFilterClass]   = useState("");   // theo lớp (classId)
+  const [filterRole, setFilterRole]     = useState("");   // theo role học viên (age_group)
   const [reviewTab, setReviewTab]       = useState<ReviewTab>("all");
   const [sortField, setSortField] = useState<'score' | 'time' | 'gradedTime' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -114,6 +120,9 @@ export function GradingQueue() {
     examTitle: sub.exam?.eTitle || "—",
     examType: sub.exam?.eType || "General",
     examId: String(sub.exam?.eId ?? sub.sExam_id ?? ""),
+    classId: String(sub.user?.class_id ?? sub.user?.class?.cId ?? ""),
+    className: sub.user?.class?.cName ?? "",
+    ageGroup: (sub.user?.age_group ?? "").toLowerCase(),
     submissionTime: new Date(sub.sSubmit_time ?? sub.sStart_time ?? Date.now()),
     status: sub.sStatus,
     score: sub.sScore !== undefined && sub.sScore !== null ? Number(sub.sScore) : undefined,
@@ -187,11 +196,34 @@ export function GradingQueue() {
 
   const baseList = reviewTab === "pending" ? pendingReview : reviewTab === "reviewed" ? reviewedList : submissions;
 
+  // ─── Tùy chọn cho bộ lọc (rút gọn từ dữ liệu đã tải) ───────────────────────
+  const examOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    submissions.forEach((s) => { if (s.examId) map.set(s.examId, s.examTitle); });
+    return Array.from(map, ([id, title]) => ({ id, title }));
+  }, [submissions]);
+
+  const classOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    submissions.forEach((s) => { if (s.classId) map.set(s.classId, s.className || `Lớp ${s.classId}`); });
+    return Array.from(map, ([id, name]) => ({ id, name }));
+  }, [submissions]);
+
+  const roleOptions = useMemo(() => {
+    const labels: Record<string, string> = { kids: "Trẻ em", teens: "Thiếu niên", adults: "Người lớn" };
+    const set = new Set<string>();
+    submissions.forEach((s) => { if (s.ageGroup) set.add(s.ageGroup); });
+    return Array.from(set, (key) => ({ key, label: labels[key] ?? key }));
+  }, [submissions]);
+
   const filtered = useMemo(() => baseList.filter((s) => {
+    if (filterExam && s.examId !== filterExam) return false;
+    if (filterClass && s.classId !== filterClass) return false;
+    if (filterRole && s.ageGroup !== filterRole) return false;
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return s.studentName.toLowerCase().includes(q) || s.examTitle.toLowerCase().includes(q);
-  }), [baseList, searchQuery]);
+  }), [baseList, searchQuery, filterExam, filterClass, filterRole]);
 
   const handleSort = (field: 'score' | 'time' | 'gradedTime') => {
     if (sortField === field) {
@@ -308,8 +340,8 @@ export function GradingQueue() {
             </div>
 
             {/* Search + filter */}
-            <div className="flex items-center gap-3 px-5 py-3">
-              <div className="relative flex-1 max-w-xs">
+            <div className="flex items-center flex-wrap gap-3 px-5 py-3">
+              <div className="relative flex-1 min-w-[200px] max-w-xs">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
@@ -319,6 +351,56 @@ export function GradingQueue() {
                   className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
                 />
               </div>
+
+              {/* Lọc theo đề thi */}
+              <div className="relative">
+                <select
+                  value={filterExam}
+                  onChange={(e) => setFilterExam(e.target.value)}
+                  className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 appearance-none max-w-[180px] truncate"
+                  title="Lọc theo đề thi"
+                >
+                  <option value="">Tất cả đề thi</option>
+                  {examOptions.map((e) => (
+                    <option key={e.id} value={e.id}>{e.title}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
+
+              {/* Lọc theo lớp */}
+              <div className="relative">
+                <select
+                  value={filterClass}
+                  onChange={(e) => setFilterClass(e.target.value)}
+                  className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 appearance-none max-w-[160px] truncate"
+                  title="Lọc theo lớp"
+                >
+                  <option value="">Tất cả lớp</option>
+                  {classOptions.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
+
+              {/* Lọc theo role học viên */}
+              <div className="relative">
+                <select
+                  value={filterRole}
+                  onChange={(e) => setFilterRole(e.target.value)}
+                  className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 appearance-none"
+                  title="Lọc theo nhóm học viên"
+                >
+                  <option value="">Tất cả học viên</option>
+                  {roleOptions.map((r) => (
+                    <option key={r.key} value={r.key}>{r.label}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
+
+              {/* Lọc theo trạng thái */}
               <div className="relative">
                 <select
                   value={filterStatus}
@@ -333,6 +415,20 @@ export function GradingQueue() {
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               </div>
+
+              {/* Xóa bộ lọc */}
+              {(filterExam || filterClass || filterRole || filterStatus || searchQuery) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterExam(""); setFilterClass(""); setFilterRole("");
+                    setFilterStatus(""); setSearchQuery("");
+                  }}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold text-violet-600 hover:bg-violet-50 transition-colors"
+                >
+                  Xóa lọc
+                </button>
+              )}
             </div>
           </div>
 
@@ -442,7 +538,17 @@ export function GradingQueue() {
                             />
                             <div>
                               <p className="text-sm font-semibold text-slate-800">{sub.studentName}</p>
-                              <p className="text-xs text-slate-400">{t("teacher.grading.queuePage.attempt")} {sub.attemptNumber}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                <span className="text-xs text-slate-400">{t("teacher.grading.queuePage.attempt")} {sub.attemptNumber}</span>
+                                {sub.className && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-600">{sub.className}</span>
+                                )}
+                                {sub.ageGroup && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-teal-50 text-teal-600">
+                                    {sub.ageGroup === "kids" ? "Trẻ em" : sub.ageGroup === "teens" ? "Thiếu niên" : sub.ageGroup === "adults" ? "Người lớn" : sub.ageGroup}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </td>

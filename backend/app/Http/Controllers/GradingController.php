@@ -50,7 +50,7 @@ class GradingController extends Controller
             ], 401);
         }
 
-        $query = Submission::with(['user', 'exam'])
+        $query = Submission::with(['user.class', 'exam'])
                           ->whereHas('exam', function($q) use ($user) {
                               $q->where('eTeacher_id', $user->uId);
                           });
