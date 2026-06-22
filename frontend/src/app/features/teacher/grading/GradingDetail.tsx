@@ -2130,5 +2130,15 @@ export function GradingDetail() {
     );
   }
 
+  if (examType === "STARTERS" || examType === "MOVERS" || examType === "FLYERS") {
+    // Kids grading: phân loại theo task type, toggle Đúng/Sai từng ô — tách hẳn khung VSTEP.
+    const LazyKids = lazy(() => import("./KidsGradingDetail").then((m) => ({ default: m.KidsGradingDetail })));
+    return (
+      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-slate-500">Đang tải trang chấm điểm…</div>}>
+        <LazyKids />
+      </Suspense>
+    );
+  }
+
   return <VstepGradingDetailInternal />;
 }
