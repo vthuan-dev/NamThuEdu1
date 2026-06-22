@@ -714,7 +714,28 @@ export function TestHistory() {
               { label: "B2", minPct: 60, nextPct: 80, color: "#2563EB", bg: "#DBEAFE", gradient: "linear-gradient(135deg,#1D4ED8,#3B82F6)", emoji: "📙", desc: "Khá — Trên trung cấp", tip: "Thử Full Test VSTEP để chinh phục C1." },
               { label: "C1", minPct: 80, nextPct: 100, color: "#059669", bg: "#D1FAE5", gradient: "linear-gradient(135deg,#065F46,#10B981)", emoji: "🏆", desc: "Thành thạo",          tip: "Xuất sắc! Tiếp tục duy trì và hướng đến C2." },
             ];
-            const currentPct = avgMax > 0 ? (avgScore / avgMax) * 100 : 0;
+            // Normalize per exam type to 0-100%:
+            //   VSTEP: sScore = overallAvg * 10 (0-100) → / 100 * 100 = sScore
+            //   IELTS: sScore = band * 10 (0-90)        → / 90 * 100
+            // Prefer VSTEP best, then IELTS best, then raw fallback
+            const vstepPct  = bestVstepRaw > 0 ? (bestVstepRaw / 100) * 100 : null;
+            const ieltsPct  = bestIeltsRaw > 0 ? (bestIeltsRaw / 90)  * 100 : null;
+            const currentPct = vstepPct ?? ieltsPct ?? (bestMax > 0 ? (bestScore / bestMax) * 100 : 0);
+
+            // Is data sufficient for reliable CEFR classification?
+            // Full = VSTEP mixed or any VSTEP; single-skill IELTS practice is flagged
+            const hasVstep  = vstepSubs.length > 0;
+            const hasFullIelts = ieltsSubs.some(
+              s => !s.exam?.eSkill || s.exam.eSkill === "mixed" || s.exam.eSkill === null
+            );
+            const onlySkillPractice = !hasVstep && ieltsSubs.length > 0 && !hasFullIelts;
+
+            // Basis label for hero
+            const basisLabel = hasVstep
+              ? `${vstepSubs.length} bài VSTEP — TB ${(avgVstepDisp ?? 0).toFixed(1)}/10`
+              : ieltsSubs.length > 0
+              ? `${ieltsSubs.length} bài IELTS — TB ${(avgIeltsDisp ?? 0).toFixed(1)}/9`
+              : `${submitted.length} bài — TB ${avgScore.toFixed(1)}`;
             const curLevel   = LEVELS.slice().reverse().find(l => currentPct >= l.minPct) ?? LEVELS[0];
             const nextLevel  = LEVELS[LEVELS.indexOf(curLevel) + 1] ?? null;
             const progressToNext = nextLevel
@@ -741,7 +762,7 @@ export function TestHistory() {
                       </div>
                       {submitted.length > 0 && (
                         <p style={{ fontSize: 10.5, color: "rgba(255,255,255,0.65)", marginTop: 4 }}>
-                          Dựa trên {submitted.length} bài thi — TB {avgScore.toFixed(1)}/{Math.round(avgMax)}
+                          {basisLabel}
                         </p>
                       )}
                     </div>
@@ -811,13 +832,21 @@ export function TestHistory() {
                   })}
                 </div>
 
-                {/* Tip */}
+                {/* Disclaimer / Tip */}
                 <div className="px-4 pb-4">
-                  <div className="rounded-xl px-3 py-2.5" style={{ background: curLevel.bg }}>
-                    <p style={{ fontSize: 10.5, color: curLevel.color, lineHeight: 1.6 }}>
-                      💡 {curLevel.tip}
-                    </p>
-                  </div>
+                  {onlySkillPractice ? (
+                    <div className="rounded-xl px-3 py-2.5" style={{ background: "#FEF9C3", border: "1px solid #FDE047" }}>
+                      <p style={{ fontSize: 10.5, color: "#92400E", lineHeight: 1.6 }}>
+                        ⚠️ Dữ liệu chỉ từ bài luyện <strong>1 kỹ năng</strong> — trình độ ước tính chưa phản ánh đầy đủ năng lực tổng thể. Hãy thử <strong>Full Test</strong> để đánh giá chính xác hơn.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl px-3 py-2.5" style={{ background: curLevel.bg }}>
+                      <p style={{ fontSize: 10.5, color: curLevel.color, lineHeight: 1.6 }}>
+                        💡 {curLevel.tip}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             );
