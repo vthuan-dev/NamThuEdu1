@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import {
-  Loader2, AlertCircle, ArrowLeft, Trophy, Clock, Target, Sparkles,
+  Loader2, AlertCircle, AlertTriangle, ArrowLeft, Trophy, Clock, Target, Sparkles,
   BookOpen, Headphones, PenLine, Mic, FileText, CheckCircle, XCircle,
 } from 'lucide-react';
 import { api } from '../../../../../services/api';
@@ -79,7 +79,9 @@ export function ThptResultPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [gradingPending, setGradingPending] = useState(false);
+  const [gradingStuck, setGradingStuck] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
+  const pollCountRef = useRef(0);
 
   useEffect(() => {
     let mounted = true;
@@ -94,6 +96,7 @@ export function ThptResultPage() {
           setError('Không tải được kết quả.');
           return;
         }
+        pollCountRef.current = 0;
         setExamTitle(data.exam_title || 'Đề thi');
         setAnswers(data.answers || {});
         setResult(data.result || null);
@@ -101,6 +104,7 @@ export function ThptResultPage() {
         setConfig(data.thpt_config || null);
         setDurationSec(data.duration_seconds || 0);
         setGradingPending(false);
+        setGradingStuck(false);
         setLoading(false);
 
         // Nếu đề có Speaking và AI chưa chấm → poll mỗi 8s đến khi xong
@@ -114,6 +118,13 @@ export function ThptResultPage() {
       } catch (err: any) {
         const msg: string = err?.response?.data?.message || '';
         if (msg.includes('chưa được chấm') || msg.includes('chưa chấm')) {
+          pollCountRef.current += 1;
+          if (pollCountRef.current > 20) {
+            setGradingStuck(true);
+            setGradingPending(false);
+            setLoading(false);
+            return;
+          }
           setGradingPending(true);
           setLoading(false);
           pollTimer = window.setTimeout(fetchResult, 6000);
@@ -148,6 +159,30 @@ export function ThptResultPage() {
           <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4" style={{ color: TEAL }} />
           <p className="text-base font-bold text-slate-800 mb-1">Đang chấm điểm...</p>
           <p className="text-sm text-slate-500">Bài thi của bạn đang được chấm tự động. Vui lòng đợi một chút.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (gradingStuck) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#F0FDFA' }}>
+        <div className="max-w-sm w-full rounded-2xl bg-white border border-amber-100 p-8 text-center shadow-sm">
+          <AlertTriangle className="w-10 h-10 text-amber-400 mx-auto mb-4" />
+          <p className="text-base font-bold text-slate-800 mb-1">Chấm điểm đang bị chậm</p>
+          <p className="text-sm text-slate-500 mb-5">Hệ thống chưa thể chấm xong bài thi này. Bạn có thể thử tải lại hoặc quay lại sau.</p>
+          <div className="flex items-center justify-center gap-3">
+            <button type="button" onClick={() => window.location.reload()}
+              className="px-5 py-2.5 rounded-xl text-white text-sm font-semibold cursor-pointer transition-opacity hover:opacity-90"
+              style={{ background: TEAL }}>
+              Tải lại trang
+            </button>
+            <button type="button" onClick={() => navigate('/hoc-vien')}
+              className="px-5 py-2.5 rounded-xl text-sm font-semibold cursor-pointer transition-colors hover:bg-slate-100"
+              style={{ border: '1px solid #E2E8F0', color: '#475569' }}>
+              Về trang chủ
+            </button>
+          </div>
         </div>
       </div>
     );
