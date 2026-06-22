@@ -155,6 +155,11 @@ export function TestHistory() {
     return max > 0 && toNum(s.sScore) / max >= 0.6;
   }).length;
   const passRate   = submitted.length > 0 ? Math.round(passed / submitted.length * 100) : 0;
+
+  /* ── Teacher-assigned completions ── */
+  const allAssigned       = allSubmissions.filter(s => s.assignment_id != null);
+  const completedAssigned = allAssigned.filter(s => s.sStatus !== "in_progress");
+  const assignRate        = allAssigned.length > 0 ? Math.round(completedAssigned.length / allAssigned.length * 100) : 0;
   const avgScore   = submitted.length > 0
     ? submitted.reduce((sum, s) => sum + toNum(s.sScore), 0) / submitted.length : 0;
   const bestEntry  = submitted.reduce((best: any, s) => {
@@ -302,18 +307,29 @@ export function TestHistory() {
           </div>
         </div>
 
-        {/* Pass */}
+        {/* Assignment completion rate */}
         <div className="flex-1 flex items-center gap-3 px-4 py-3.5">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ background: passRate >= 50 ? "#D1FAE5" : "#F3F4F6" }}>
-            <CheckCircle className="w-3.5 h-3.5" style={{ color: passRate >= 50 ? "#059669" : "#9CA3AF" }} />
+            style={{ background: allAssigned.length > 0 ? "#DBEAFE" : "#F3F4F6" }}>
+            <BookOpen className="w-3.5 h-3.5" style={{ color: allAssigned.length > 0 ? "#2563EB" : "#9CA3AF" }} />
           </div>
-          <div className="min-w-0">
-            <p style={{ fontSize: 20, fontWeight: 900, color: "#1F1344", lineHeight: 1 }}>{passed}</p>
-            <p style={{ fontSize: 10.5, color: "#9CA3AF", marginTop: 2 }}>Đạt ≥ 60%</p>
-            <p style={{ fontSize: 10, fontWeight: 600, marginTop: 1, color: passRate >= 50 ? "#059669" : "#9CA3AF" }}>
-              {passRate}% tỷ lệ đạt
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-1">
+              <p style={{ fontSize: 20, fontWeight: 900, color: "#1F1344", lineHeight: 1 }}>{completedAssigned.length}</p>
+              <span style={{ fontSize: 10, color: "#9CA3AF", fontWeight: 500 }}>/{allAssigned.length}</span>
+            </div>
+            <p style={{ fontSize: 10.5, color: "#9CA3AF", marginTop: 2 }}>Bài GV giao</p>
+            <p style={{ fontSize: 10, fontWeight: 600, marginTop: 1, color: assignRate >= 50 ? "#2563EB" : "#9CA3AF" }}>
+              {allAssigned.length > 0 ? `${assignRate}% hoàn thành` : "Chưa được giao"}
             </p>
+            {allAssigned.length > 0 && (
+              <div className="mt-1.5 h-1 rounded-full overflow-hidden" style={{ background: "#DBEAFE" }}>
+                <div className="h-full rounded-full transition-all duration-700" style={{
+                  width: `${assignRate}%`,
+                  background: "linear-gradient(90deg,#2563EB,#60A5FA)"
+                }} />
+              </div>
+            )}
           </div>
         </div>
 
