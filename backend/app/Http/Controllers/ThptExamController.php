@@ -625,10 +625,6 @@ class ThptExamController extends Controller
         if (!$submission) {
             return $this->error('Không tìm thấy bài làm.', 404);
         }
-        if ($submission->sStatus !== 'graded') {
-            return $this->error('Bài làm chưa được chấm.', 400);
-        }
-
         $exam = Exam::where('eId', $submission->exam_id)->first();
         if (!$exam || $exam->eType !== 'THPT') {
             return $this->error('Không tìm thấy đề thi.', 404);
@@ -644,7 +640,60 @@ class ThptExamController extends Controller
             ?? $this->blankConfig();
         $snapshotVersion = $payload['exam_snapshot']['version'] ?? null;
 
-        $result = $payload['result'] ?? $this->gradeSubmission($reviewConfig, $answers);
+        $result = $payload['result'] ?? null;
+
+        // ── SELF-HEAL ────────────────────────────────────────────────────────
+        // Nếu bài chưa ở trạng thái 'graded' (vd: final submit bị gián đoạn, mất
+        // mạng sau khi điều hướng, hoặc grade lỗi giữa chừng) thì chấm lại ngay
+        // khi đọc kết quả. Chấm khách quan THPT là hàm thuần & idempotent nên an
+        // toàn để chạy on-read, tránh kẹt "Đang chấm điểm..." vô hạn ở client.
+        if ($submission->sStatus !== 'graded') {
+            $hasAnswers = is_array($answers) && count($answers) > 0;
+            $hasGradableConfig = !empty($reviewConfig['sections'] ?? []);
+
+            if (!$hasAnswers && !$hasGradableConfig) {
+                // Không đủ dữ liệu để chấm → lỗi terminal (FE sẽ dừng poll).
+                return $this->error('Bài làm chưa có dữ liệu để chấm.', 422);
+            }
+
+            try {
+                $result = $this->gradeSubmission($reviewConfig, $answers);
+                $payload['result'] = $result;
+                $submission->submission_payload = $payload;
+                $submission->sScore = $result['scaled_score'] ?? 0;
+                $submission->sStatus = 'graded';
+                $submission->sSubmit_time = $submission->sSubmit_time ?? now();
+                $submission->sGraded_time = now();
+                if (!$submission->sTime_taken && $submission->sStart_time) {
+                    $submission->sTime_taken = now()->diffInSeconds($submission->sStart_time);
+                }
+                $submission->save();
+
+                // Nếu đề có phần Nói + đã ghi âm → AI chấm Nói chạy nền (blend sau).
+                $hasSpeakingSection = collect($reviewConfig['sections'] ?? [])
+                    ->contains(fn($s) => ($s['type'] ?? '') === 'speaking');
+                $rawFb = json_decode($submission->sGemini_feedback ?? '{}', true) ?: [];
+                if ($hasSpeakingSection && !empty($rawFb['speaking_audio'] ?? [])) {
+                    \App\Jobs\GradeThptSpeakingJob::dispatch((int) $submission->sId);
+                }
+
+                \Log::warning('THPT result self-healed (graded on read)', [
+                    'submission_id' => $submission->sId,
+                    'user_id' => $user->uId,
+                ]);
+            } catch (\Throwable $e) {
+                \Log::error('THPT self-heal grading failed', [
+                    'submission_id' => $submission->sId,
+                    'error' => $e->getMessage(),
+                ]);
+                return $this->error('Không thể chấm bài tự động. Vui lòng liên hệ giáo viên.', 422);
+            }
+        }
+
+        // Bài đã graded nhưng chưa cache result trong payload → chấm lại để hiển thị.
+        if ($result === null) {
+            $result = $this->gradeSubmission($reviewConfig, $answers);
+        }
 
         // Overlay điểm giáo viên (teacher_*) lên field AI khi đọc — KHÔNG sửa DB.
         // Học viên thấy điểm giáo viên ở các câu đã chấm lại (Req 6.7).

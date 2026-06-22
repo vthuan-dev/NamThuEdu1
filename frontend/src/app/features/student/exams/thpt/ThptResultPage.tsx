@@ -116,8 +116,16 @@ export function ThptResultPage() {
           pollTimer = window.setTimeout(fetchResult, 8000);
         }
       } catch (err: any) {
+        const status: number | undefined = err?.response?.status;
         const msg: string = err?.response?.data?.message || '';
-        if (msg.includes('chưa được chấm') || msg.includes('chưa chấm')) {
+
+        // Lỗi terminal (422/403/404...) → KHÔNG poll lại, hiển thị lỗi ngay.
+        // Backend tự chấm lại khi đọc kết quả nên 400 "chưa được chấm" gần như
+        // không còn xảy ra; chỉ giữ nhánh poll cho tương thích ngược.
+        const isStillGrading = status === 400
+          && (msg.includes('chưa được chấm') || msg.includes('chưa chấm'));
+
+        if (isStillGrading) {
           pollCountRef.current += 1;
           if (pollCountRef.current > 20) {
             setGradingStuck(true);
@@ -130,6 +138,7 @@ export function ThptResultPage() {
           pollTimer = window.setTimeout(fetchResult, 6000);
         } else {
           setError(msg || 'Không tải được kết quả.');
+          setGradingPending(false);
           setLoading(false);
         }
       }
