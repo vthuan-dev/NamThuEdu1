@@ -95,7 +95,7 @@ export function ThptPartNavigator({ config, answers, activeIdx, onSectionChange 
   return (
     <aside
       data-thpt-nav
-      className={`rounded-2xl bg-white border border-slate-200 p-4 ${pos ? 'fixed z-50 w-[280px]' : 'sticky top-24'}`}
+      className={`rounded-2xl bg-white border border-slate-200 p-4 ${pos ? 'fixed z-50 w-[280px]' : 'sticky top-24 self-start max-h-[calc(100vh-7rem)] overflow-y-auto'}`}
       style={pos ? { left: pos.x, top: pos.y, boxShadow: '0 12px 40px rgba(15,23,42,0.18)' } : undefined}
     >
       <div
