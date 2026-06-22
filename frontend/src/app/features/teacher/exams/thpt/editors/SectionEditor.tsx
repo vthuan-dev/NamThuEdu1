@@ -12,6 +12,7 @@ import {
   makeTransformItem,
   makeSpeakingItem,
   nextQuestionNumber,
+  sectionMeta,
 } from '../sections';
 import { SectionHeader, QuestionBadge, DeleteBtn, AddButton, OptionRow } from './shared';
 import { THPT_THEME, LETTERS } from '../sections';
@@ -23,16 +24,269 @@ interface Props {
 }
 
 /**
+ * Hướng dẫn nhập liệu chi tiết cho từng dạng câu hỏi.
+ *  - short: tóm tắt 1 dòng (hiện khi thu gọn)
+ *  - grading: nhãn cách chấm
+ *  - steps: các bước nhập liệu
+ *  - example: ví dụ layout minh họa (hiển thị dạng khối preview)
+ */
+interface GuideContent {
+  short: string;
+  grading: 'auto' | 'ai' | 'manual';
+  steps: string[];
+  example: string;
+}
+
+const SECTION_GUIDE: Record<string, GuideContent> = {
+  phonetics: {
+    short: 'Chọn từ có phần phát âm / trọng âm KHÁC với các từ còn lại.',
+    grading: 'auto',
+    steps: [
+      'Chọn dạng: "Phát âm" hoặc "Trọng âm".',
+      'Nhập 4 từ vào ô A, B, C, D.',
+      'Với "Phát âm": điền thêm phần gạch chân của mỗi từ (vd: ea).',
+      'Bấm nút chữ cái ở từ KHÁC BIỆT để đánh dấu đáp án đúng.',
+    ],
+    example:
+      'A. h(ea)d   B. br(ea)d   C. t(ea)   D. h(ea)vy\n→ Đáp án đúng: C (đọc /iː/, khác /e/)',
+  },
+  mc_questions: {
+    short: 'Câu hỏi 4 phương án A–D, chọn 1 đáp án đúng.',
+    grading: 'auto',
+    steps: [
+      'Chọn dạng câu (Ngữ pháp / Từ vựng / Đồng nghĩa / Trái nghĩa / Giao tiếp).',
+      'Nhập nội dung câu hỏi (dùng ____ cho chỗ trống nếu cần).',
+      'Điền 4 phương án vào A, B, C, D.',
+      'Bấm chữ cái ở phương án đúng.',
+    ],
+    example:
+      'She ____ to school every day.\nA. go   B. goes ✓   C. going   D. gone',
+  },
+  word_form: {
+    short: 'Cho từ gốc → học viên điền dạng đúng vào câu.',
+    grading: 'auto',
+    steps: [
+      'Nhập câu có chỗ trống ____.',
+      'Nhập TỪ GỐC viết hoa (vd: BEAUTY).',
+      'Ghi (các) đáp án đúng, cách nhau bằng dấu phẩy.',
+    ],
+    example:
+      'Câu: She has a ____ smile.   Từ gốc: BEAUTY\n→ Đáp án: beautiful  (không phân biệt hoa/thường)',
+  },
+  error_identification: {
+    short: '4 phần gạch chân A–D, chọn phần SAI cần sửa.',
+    grading: 'auto',
+    steps: [
+      'Nhập câu đầy đủ (tùy chọn — để hiển thị).',
+      'Điền 4 phần gạch chân vào A, B, C, D.',
+      'Bấm chữ cái ở phần SAI.',
+    ],
+    example:
+      'She (A)have (B)been (C)to (D)Paris.\n→ Phần sai: A (phải là "has")',
+  },
+  mc_cloze: {
+    short: 'Đoạn văn nhiều chỗ trống, mỗi chỗ chọn A/B/C/D.',
+    grading: 'auto',
+    steps: [
+      'Dán đoạn văn, đánh dấu chỗ trống bằng "(1) ____", "(2) ____"…',
+      'Bấm "Tự sinh chỗ trống".',
+      'Mỗi chỗ trống: điền 4 phương án và chọn đáp án đúng.',
+    ],
+    example:
+      'My family (1) ____ in Hanoi. We (2) ____ happy.\n(1) A. live ✓  B. lives  C. living  D. lived',
+  },
+  word_bank_cloze: {
+    short: 'Đoạn văn + ngân hàng từ cho sẵn để điền.',
+    grading: 'auto',
+    steps: [
+      'Nhập ngân hàng từ (cách nhau bằng dấu phẩy).',
+      'Dán đoạn văn với chỗ trống "(1) ____"…',
+      'Bấm "Tự sinh chỗ trống", ghi từ đúng cho mỗi chỗ.',
+    ],
+    example:
+      'Ngân hàng: however, because, although\nIt was cold, (1) ____ we went out.\n→ (1) although',
+  },
+  open_cloze: {
+    short: 'Đoạn văn, học viên tự điền 1 từ mỗi chỗ trống.',
+    grading: 'auto',
+    steps: [
+      'Dán đoạn văn với chỗ trống "(1) ____"…',
+      'Bấm "Tự sinh chỗ trống".',
+      'Ghi (các) đáp án chấp nhận cho mỗi chỗ, cách nhau bằng dấu phẩy.',
+    ],
+    example:
+      'I have lived here (1) ____ 2010.\n→ Đáp án: since',
+  },
+  tf_group: {
+    short: 'Ngữ cảnh + các nhận định Đúng/Sai.',
+    grading: 'auto',
+    steps: [
+      'Nhập ngữ cảnh (thông báo / quảng cáo / email…).',
+      'Viết các nhận định.',
+      'Tích True hoặc False cho mỗi nhận định.',
+    ],
+    example:
+      'Ngữ cảnh: "Library opens 8AM–9PM daily."\n• The library opens at 8AM. → TRUE\n• It closes on Sunday. → FALSE',
+  },
+  reading_mixed: {
+    short: 'Một đoạn đọc + nhiều dạng câu hỏi dùng chung.',
+    grading: 'auto',
+    steps: [
+      'Dán đoạn đọc.',
+      'Thêm câu hỏi: Đúng/Sai, trắc nghiệm, hoặc điền câu.',
+      'Tất cả câu hỏi dùng chung đoạn đọc này.',
+    ],
+    example:
+      'Passage: "Tom plays football after school…"\nQ1 (MC): What does Tom do? → plays football\nQ2 (T/F): Tom likes sports. → TRUE',
+  },
+  matching: {
+    short: 'Nối mỗi số (1–4) với một chữ cái (A–F).',
+    grading: 'auto',
+    steps: [
+      'Nhập danh sách bên trái (1–4).',
+      'Nhập danh sách bên phải (A–F) — thường dư 1–2 lựa chọn.',
+      'Chọn cặp nối đúng cho mỗi số.',
+    ],
+    example:
+      '1. Hello      A. Goodbye\n2. Thanks     B. You\'re welcome\n→ 1-?, 2-B …',
+  },
+  sentence_transformation: {
+    short: 'Viết lại câu giữ nguyên nghĩa.',
+    grading: 'auto',
+    steps: [
+      'Nhập câu gốc.',
+      'Nhập từ gợi ý / đầu câu (nếu có).',
+      'Ghi các cách viết lại được chấp nhận, cách nhau bằng dấu phẩy.',
+    ],
+    example:
+      'Gốc: "He is too young to drive."\nĐầu câu: "He isn\'t…"\n→ He isn\'t old enough to drive.',
+  },
+  listening: {
+    short: 'Tải audio + câu hỏi trắc nghiệm.',
+    grading: 'auto',
+    steps: [
+      'Tải file audio (mp3 / m4a / wav…).',
+      'Thêm transcript nếu muốn (ẩn với học viên).',
+      'Mỗi câu: nhập 4 phương án và chọn đáp án đúng.',
+    ],
+    example:
+      '[Audio] → "What time is the meeting?"\nA. 9AM   B. 10AM ✓   C. 11AM   D. 12PM',
+  },
+  speaking: {
+    short: 'Đề nói — học viên ghi âm, AI chấm.',
+    grading: 'ai',
+    steps: [
+      'Nhập đề nói rõ ràng.',
+      'Đặt thời gian chuẩn bị (giây) và thời gian nói (giây).',
+      'Học viên ghi âm khi làm; AI chấm phát âm + nội dung.',
+    ],
+    example:
+      'Describe your favourite hobby.\n• Chuẩn bị: 30s   • Nói: 120s',
+  },
+};
+
+const GRADING_LABEL: Record<GuideContent['grading'], { text: string; cls: string }> = {
+  auto: { text: 'Chấm tự động', cls: 'bg-emerald-100 text-emerald-700' },
+  ai: { text: 'AI chấm', cls: 'bg-violet-100 text-violet-700' },
+  manual: { text: 'Giáo viên chấm tay', cls: 'bg-amber-100 text-amber-700' },
+};
+
+const GUIDE_PREF_KEY = 'thpt_guide_expanded';
+
+function SectionGuide({ type, label }: { type: string; label: string }) {
+  const g = SECTION_GUIDE[type];
+  const [open, setOpen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(GUIDE_PREF_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  if (!g) return null;
+  const grade = GRADING_LABEL[g.grading];
+
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    try {
+      localStorage.setItem(GUIDE_PREF_KEY, next ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-blue-200 bg-blue-50/70 overflow-hidden">
+      {/* Thanh tiêu đề — luôn hiện, bấm để mở/đóng */}
+      <button
+        type="button"
+        onClick={toggle}
+        className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-blue-100/60 transition-colors cursor-pointer"
+      >
+        <span className="flex-shrink-0">💡</span>
+        <span className="text-xs font-semibold text-blue-800 flex-shrink-0">
+          Hướng dẫn nhập {label}
+        </span>
+        {!open && (
+          <span className="text-xs text-blue-700/80 truncate hidden sm:block">— {g.short}</span>
+        )}
+        <span className={`ml-auto flex-shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${grade.cls}`}>
+          {grade.text}
+        </span>
+        <span className="flex-shrink-0 text-blue-500 text-xs font-bold w-5 text-center">
+          {open ? '▲' : '▼'}
+        </span>
+      </button>
+
+      {/* Nội dung chi tiết — chỉ hiện khi mở */}
+      {open && (
+        <div className="px-4 pb-4 pt-1 grid gap-3 sm:grid-cols-2">
+          {/* Các bước */}
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-blue-600 mb-1.5">
+              Các bước
+            </p>
+            <ol className="space-y-1">
+              {g.steps.map((s, i) => (
+                <li key={i} className="flex gap-2 text-xs text-blue-900 leading-relaxed">
+                  <span className="flex-shrink-0 w-4 h-4 rounded-full bg-blue-200 text-blue-800 text-[10px] font-bold flex items-center justify-center mt-0.5">
+                    {i + 1}
+                  </span>
+                  <span>{s}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+          {/* Ví dụ minh họa */}
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-blue-600 mb-1.5">
+              Ví dụ
+            </p>
+            <pre className="text-[11px] leading-relaxed text-slate-700 bg-white border border-blue-100 rounded-lg p-3 whitespace-pre-wrap font-mono">
+              {g.example}
+            </pre>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * Dispatcher: render đúng editor theo section.type.
  */
 export function SectionEditor({ section, allSections, onChange }: Props) {
   const common = (
-    <SectionHeader
-      title={section.title}
-      instructions={section.instructions}
-      onTitleChange={(v) => onChange({ ...section, title: v } as ThptSection)}
-      onInstructionsChange={(v) => onChange({ ...section, instructions: v } as ThptSection)}
-    />
+    <>
+      <SectionHeader
+        title={section.title}
+        instructions={section.instructions}
+        onTitleChange={(v) => onChange({ ...section, title: v } as ThptSection)}
+        onInstructionsChange={(v) => onChange({ ...section, instructions: v } as ThptSection)}
+      />
+      <SectionGuide type={section.type} label={sectionMeta(section.type).label} />
+    </>
   );
 
   switch (section.type) {

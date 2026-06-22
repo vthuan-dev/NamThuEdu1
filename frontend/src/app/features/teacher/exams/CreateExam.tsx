@@ -1871,7 +1871,12 @@ Your response will be evaluated in terms of Task Fulfillment, Organization, Voca
           <div className="space-y-6">
             {/* Exam Type */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Loại đề thi</h3>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Loại đề thi</h3>
+              <div className="mb-4 p-3 rounded-lg border border-blue-200 bg-blue-50 text-sm text-blue-800 leading-relaxed">
+                <span className="font-semibold">💡 Hướng dẫn: </span>
+                Chọn định dạng đề phù hợp. <b>General</b> dùng cho đề trắc nghiệm tổng hợp (ngữ pháp, từ vựng, đọc hiểu) —
+                phù hợp nhất cho học viên Teens. <b>VSTEP/IELTS</b> theo chuẩn 4 kỹ năng, <b>Kids</b> chuyển sang trình tạo đề thiếu nhi riêng.
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {examTypeData.map((type: any) => (
                   <button
@@ -2014,6 +2019,11 @@ Your response will be evaluated in terms of Task Fulfillment, Organization, Voca
                 </div>
 
                 <div className="p-6 space-y-5">
+              <div className="p-3 rounded-lg border border-blue-200 bg-blue-50 text-sm text-blue-800 leading-relaxed">
+                <span className="font-semibold">💡 Hướng dẫn: </span>
+                Đặt <b>tên đề</b> rõ ràng để học viên dễ nhận biết. <b>Mô tả</b> giúp nêu mục tiêu/nội dung ôn.
+                <b> Thời gian</b> là tổng thời gian làm bài, <b>Độ khó</b> để phân loại — bấm "Tự động điền" để gợi ý nhanh tên & mô tả.
+              </div>
               {/* Title */}
               <div>
                 <label className="flex items-center justify-between text-sm font-semibold text-gray-700 mb-1.5">
@@ -2137,6 +2147,11 @@ Your response will be evaluated in terms of Task Fulfillment, Organization, Voca
             {examType && examSkill && (
             <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
               <h3 className="text-lg font-bold text-gray-900">Cài đặt</h3>
+              <div className="p-3 rounded-lg border border-blue-200 bg-blue-50 text-sm text-blue-800 leading-relaxed">
+                <span className="font-semibold">💡 Hướng dẫn: </span>
+                <b>Public</b> cho mọi giáo viên thấy & dùng chung; <b>Private</b> chỉ mình bạn.
+                Bật <b>"Cho phép xem trước"</b> nếu muốn học viên xem cấu trúc đề trước khi bắt đầu làm.
+              </div>
 
               {/* Visibility */}
               <div>
