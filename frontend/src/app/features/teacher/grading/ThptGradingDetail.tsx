@@ -110,8 +110,9 @@ export function ThptGradingDetail({ submissionId }: Props) {
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const tabBarRef = useRef<HTMLDivElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  // Container cuộn thật sự (layout dùng div.overflow-y-auto, không phải window).
+  // Container cuộn nội bộ của trang (header nằm NGOÀI container này nên không trôi).
   const scrollParentRef = useRef<HTMLElement | null>(null);
+  const scrollBodyRef = useRef<HTMLDivElement | null>(null);
   // Chiều cao header dính (để bù khi cuộn tới phần).
   const headerRef = useRef<HTMLElement | null>(null);
   // Phần đang hiển thị trong tầm nhìn (để sáng đèn tab tương ứng).
@@ -304,16 +305,10 @@ export function ThptGradingDetail({ submissionId }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recompute?.weightedTotal, autoWeighted]);
 
-  // Tìm container cuộn thật sự bằng cách đi lên từ root cho tới phần tử overflow.
+  // Vùng cuộn là div nội bộ của page (scrollBodyRef). Header nằm ngoài nên không trôi.
   useEffect(() => {
     if (page !== 'ready') return;
-    let el: HTMLElement | null = rootRef.current?.parentElement ?? null;
-    while (el) {
-      const oy = window.getComputedStyle(el).overflowY;
-      if (oy === 'auto' || oy === 'scroll' || oy === 'overlay') break;
-      el = el.parentElement;
-    }
-    scrollParentRef.current = el; // null → cuộn theo window
+    scrollParentRef.current = scrollBodyRef.current;
   }, [page]);
 
   // Scroll-spy: sáng đèn tab của phần đang ở đỉnh viewport (lắng nghe scroll trực tiếp).
@@ -508,9 +503,9 @@ export function ThptGradingDetail({ submissionId }: Props) {
     : recompute?.weightedTotal ?? 0;
 
   return (
-    <div ref={rootRef} className="min-h-screen bg-slate-50 pb-16">
-      {/* ─── Header ─────────────────────────────────────────────────────── */}
-      <header ref={headerRef} className="bg-white border-b border-slate-200 sticky top-0 z-30">
+    <div ref={rootRef} className="flex-1 min-h-0 flex flex-col bg-slate-50">
+      {/* ─── Header (NẰM NGOÀI vùng cuộn → luôn cố định) ──────────────────── */}
+      <header ref={headerRef} className="flex-shrink-0 bg-white border-b border-slate-200 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
           <button
             type="button"
@@ -603,8 +598,10 @@ export function ThptGradingDetail({ submissionId }: Props) {
         )}
       </header>
 
-      {/* ─── Body: 2-column layout ───────────────────────────────────────── */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      {/* ─── Vùng cuộn nội bộ (header ở trên không nằm trong đây) ─────────── */}
+      <div ref={scrollBodyRef} className="flex-1 min-h-0 overflow-y-auto">
+        {/* ─── Body: 2-column layout ───────────────────────────────────────── */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-16">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
           {/* LEFT: sections */}
           <div className="space-y-6 min-w-0">
@@ -668,7 +665,7 @@ export function ThptGradingDetail({ submissionId }: Props) {
           </div>
 
           {/* RIGHT: sticky score dashboard */}
-          <aside className="lg:sticky lg:top-[7.5rem] space-y-4">
+          <aside className="lg:sticky lg:top-4 space-y-4">
             <ScoreDashboard
               recompute={recompute}
               scaleMax={scaleMax}
@@ -690,7 +687,8 @@ export function ThptGradingDetail({ submissionId }: Props) {
             />
           </aside>
         </div>
-      </main>
+        </main>
+      </div>
 
       {confirmOpen && (
         <PublishConfirmDialog
