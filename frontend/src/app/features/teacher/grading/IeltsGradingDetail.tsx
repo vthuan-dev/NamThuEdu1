@@ -16,7 +16,7 @@
  *  • Reading   = 3 passages × ~13-14 (not 4 parts)
  *  • Speaking Part 2 has cue card UI
  */
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useToastContext } from "../../../../contexts/ToastContext";
 import { api } from "../../../../services/api";
@@ -127,6 +127,14 @@ export function IeltsGradingDetail() {
 
   // Per-answer save state
   const [savingAnswerIds, setSavingAnswerIds] = useState<Record<string, boolean>>({});
+
+  // Vùng cuộn nội bộ (header nằm NGOÀI vùng này nên luôn cố định, không trôi).
+  const scrollBodyRef = useRef<HTMLDivElement | null>(null);
+
+  // Khi đổi tab skill → cuộn nội dung về đầu cho gọn.
+  useEffect(() => {
+    if (scrollBodyRef.current) scrollBodyRef.current.scrollTo({ top: 0 });
+  }, [activeSkillTab]);
 
   // ── Load submission ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -490,9 +498,9 @@ export function IeltsGradingDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header - compact */}
-      <div className="sticky top-0 z-30 bg-white border-b border-slate-200">
+    <div className="flex-1 min-h-0 flex flex-col bg-slate-50">
+      {/* Header - compact (NẰM NGOÀI vùng cuộn → luôn cố định) */}
+      <div className="flex-shrink-0 bg-white border-b border-slate-200 z-30">
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <button
@@ -567,53 +575,64 @@ export function IeltsGradingDetail() {
         </div>
       </div>
 
-      {/* Skill summary bar */}
-      <div className="bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {availableSkills.map((sk) => {
-              const meta = IELTS_SKILLS[sk];
-              const Icon = meta.icon;
-              const band = skillBands[sk];
-              const isActive = activeSkillTab === sk;
-              const count = ieltsGroups[sk]?.length ?? 0;
+      {/* Skill tab bar — chỉ hiện cho full test (single-skill thì thừa) */}
+      {isFullTest && (
+        <div className="flex-shrink-0 bg-white border-b border-slate-200 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 py-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {availableSkills.map((sk) => {
+                const meta = IELTS_SKILLS[sk];
+                const Icon = meta.icon;
+                const band = skillBands[sk];
+                const isActive = activeSkillTab === sk;
+                const count = ieltsGroups[sk]?.length ?? 0;
 
-              return (
-                <button
-                  key={sk}
-                  type="button"
-                  onClick={() => setActiveSkillTab(sk)}
-                  className={`group relative flex items-center gap-3 p-3 rounded-lg border-2 transition-all cursor-pointer text-left ${
-                    isActive
-                      ? "shadow-md scale-[1.02]"
-                      : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                  }`}
-                  style={isActive ? { backgroundColor: meta.bg, borderColor: meta.color } : undefined}
-                >
-                  <div
-                    className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: meta.color }}
+                return (
+                  <button
+                    key={sk}
+                    type="button"
+                    onClick={() => setActiveSkillTab(sk)}
+                    aria-current={isActive ? "true" : undefined}
+                    className={`group relative flex items-center gap-3 p-3 rounded-lg border-2 transition-all cursor-pointer text-left ${
+                      isActive
+                        ? "shadow-md scale-[1.02]"
+                        : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                    }`}
+                    style={isActive ? { backgroundColor: meta.bg, borderColor: meta.color } : undefined}
                   >
-                    <Icon className="w-4.5 h-4.5 text-white" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-semibold text-slate-700 truncate">{meta.label}</div>
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-xl font-bold tabular-nums" style={{ color: bandColor(band) }}>
-                        {band.toFixed(1)}
-                      </span>
-                      <span className="text-[10px] text-slate-400">{count} Q</span>
+                    <div
+                      className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: meta.color }}
+                    >
+                      <Icon className="w-4.5 h-4.5 text-white" />
                     </div>
-                  </div>
-                </button>
-              );
-            })}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-semibold text-slate-700 truncate">{meta.label}</div>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-xl font-bold tabular-nums" style={{ color: bandColor(band) }}>
+                          {band.toFixed(1)}
+                        </span>
+                        <span className="text-[10px] text-slate-400">{count} Q</span>
+                      </div>
+                    </div>
+                    {isActive && (
+                      <span
+                        className="absolute -bottom-[1px] left-3 right-3 h-0.5 rounded-full"
+                        style={{ backgroundColor: meta.color }}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Main grid: questions left, sidebar right */}
-      <div className="max-w-7xl mx-auto px-4 py-5 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5">
+      {/* ─── Vùng cuộn nội bộ (header + tab bar ở trên KHÔNG nằm trong đây) ─── */}
+      <div ref={scrollBodyRef} className="flex-1 min-h-0 overflow-y-auto">
+        {/* Main grid: questions left, sidebar right */}
+        <div className="max-w-7xl mx-auto px-4 py-5 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5">
         {/* LEFT: per-skill questions */}
         <div className="space-y-5">
           {activeSkillTab && (
@@ -636,7 +655,7 @@ export function IeltsGradingDetail() {
         </div>
 
         {/* RIGHT: overall feedback + summary */}
-        <aside className="space-y-4 lg:sticky lg:top-32 self-start">
+        <aside className="space-y-4 lg:sticky lg:top-4 self-start">
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-3">
               <Award className="w-4 h-4 text-amber-500" />
@@ -694,6 +713,7 @@ export function IeltsGradingDetail() {
             </ul>
           </div>
         </aside>
+        </div>
       </div>
     </div>
   );
