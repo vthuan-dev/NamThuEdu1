@@ -42,24 +42,54 @@ interface Props {
 
 export function SectionView({ section, answers, correctAnswers, onAnswerChange, mode, submissionId, speakingParts, speakingAudio }: Props) {
   const typeLabel = TYPE_LABEL[section.type] ?? 'Phần thi';
+  // Chia đôi trái–phải cho dạng có bài đọc DÀI tách biệt khỏi câu hỏi
+  // (mc_cloze, reading_mixed). word_bank_cloze/open_cloze KHÔNG chia vì ô
+  // điền nằm ngay trong đoạn văn.
+  const passageText = (section as any).passage as string | undefined;
+  const isSplitReading =
+    (section.type === 'mc_cloze' || section.type === 'reading_mixed') &&
+    !!passageText && passageText.trim().length > 0;
+
+  const headerEl = (
+    <header className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 p-5 pl-6">
+      <span className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: THEME.primary }} />
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-teal-700 mb-1.5">
+        {typeLabel}
+      </span>
+      <h2 className="text-xl font-bold text-slate-900 tracking-tight leading-snug">{section.title}</h2>
+      {section.instructions && (
+        <p className="text-sm text-slate-500 mt-1.5 leading-relaxed max-w-2xl">{section.instructions}</p>
+      )}
+    </header>
+  );
+
+  if (isSplitReading) {
+    return (
+      <section className="space-y-5">
+        {headerEl}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:h-[calc(100vh-16rem)]">
+          {/* Cột bài đọc — cố định, cuộn riêng trên desktop */}
+          <div className="lg:overflow-y-auto lg:pr-1">
+            <PassageBox text={passageText!} markers={section.type === 'reading_mixed'} />
+          </div>
+          {/* Cột câu hỏi — cuộn riêng */}
+          <div className="lg:overflow-y-auto lg:pr-1 space-y-5">
+            <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} hidePassage />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="space-y-5">
-      <header className="relative overflow-hidden rounded-2xl bg-white border border-slate-200 p-5 pl-6">
-        <span className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: THEME.primary }} />
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-teal-700 mb-1.5">
-          {typeLabel}
-        </span>
-        <h2 className="text-xl font-bold text-slate-900 tracking-tight leading-snug">{section.title}</h2>
-        {section.instructions && (
-          <p className="text-sm text-slate-500 mt-1.5 leading-relaxed max-w-2xl">{section.instructions}</p>
-        )}
-      </header>
+      {headerEl}
       <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} />
     </section>
   );
 }
 
-function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissionId, speakingParts, speakingAudio }: Props) {
+function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissionId, speakingParts, speakingAudio, hidePassage }: Props & { hidePassage?: boolean }) {
   const isReview = mode === 'review';
   // Đề Nói: mỗi lần chỉ cho ghi âm 1 đề. activeSpeakingQ = số câu đang ghi (hoặc null).
   const [activeSpeakingQ, setActiveSpeakingQ] = useState<number | null>(null);
@@ -374,7 +404,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
     case 'mc_cloze':
       return (
         <>
-          <PassageBox text={section.passage} />
+          {!hidePassage && <PassageBox text={section.passage} />}
           {section.blanks.map((b) => {
             const key = `q${b.question_number}`;
             const userVal = String(answers[key] ?? '');
@@ -441,7 +471,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
     case 'reading_mixed':
       return (
         <>
-          <PassageBox text={section.passage} markers />
+          {!hidePassage && <PassageBox text={section.passage} markers />}
           {section.items.map((item: any) => (
             <QCard key={item.question_number} n={item.question_number}>
               {item.kind === 'tf_group' && (
