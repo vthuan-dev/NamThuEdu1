@@ -25,79 +25,23 @@ import { studentApi } from "../../../../services/studentApi";
 
 const STUDENT_BASE = "/hoc-vien";
 
-// ── Intro loading screen (3 s before results reveal) ─────────────────────────
+// ── Intro loading screen (3 s frosted overlay before results reveal) ──────────
 function ResultIntroScreen({ isIelts }: { isIelts: boolean }) {
-  const [progress, setProgress] = useState(0);
-  const [phaseIdx, setPhaseIdx] = useState(0);
-
-  const PHASES = [
-    { text: "Đang xử l\u00fd b\u00e0i l\u00e0m...",  icon: "\u{1F4DD}" },
-    { text: "Đang t\u00ednh đi\u1ec3m...",          icon: "\u{1F4CA}" },
-    { text: "S\u1eafp hi\u1ec7n k\u1ebft qu\u1ea3! \u{1F389}", icon: "\u{1F3C6}" },
-  ];
-
-  useEffect(() => {
-    const start = performance.now();
-    const DURATION = 3000;
-    let raf: number;
-    const tick = (now: number) => {
-      const pct = Math.min(((now - start) / DURATION) * 100, 99);
-      setProgress(pct);
-      if (now - start < DURATION) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    const t1 = setTimeout(() => setPhaseIdx(1), 1000);
-    const t2 = setTimeout(() => setPhaseIdx(2), 2100);
-    return () => { cancelAnimationFrame(raf); clearTimeout(t1); clearTimeout(t2); };
-  }, []);
-
-  const phase = PHASES[phaseIdx];
-  const grad = isIelts
-    ? "linear-gradient(135deg,#065F46 0%,#059669 50%,#10B981 100%)"
-    : "linear-gradient(135deg,#4C1D95 0%,#6D28D9 50%,#7C3AED 100%)";
-
-  const skills = ["L", "R", "W", "S"];
-
+  const accent = isIelts ? "#059669" : "#7C3AED";
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden"
-      style={{ background: grad }}>
-      <div className="absolute -top-24 -left-24 w-80 h-80 rounded-full opacity-20"
-        style={{ background: "radial-gradient(circle,#fff,transparent)" }} />
-      <div className="absolute -bottom-24 -right-24 w-80 h-80 rounded-full opacity-15"
-        style={{ background: "radial-gradient(circle,#fff,transparent)" }} />
-
-      <div className="relative z-10 text-center px-8 max-w-sm w-full">
-        <div className="w-28 h-28 rounded-full mx-auto mb-6 flex items-center justify-center"
-          style={{ background: "rgba(255,255,255,0.15)", border: "2px solid rgba(255,255,255,0.25)" }}>
-          <span style={{ fontSize: 52, lineHeight: 1 }}>{phase.icon}</span>
-        </div>
-
-        <h2 style={{ fontSize: 22, fontWeight: 800, color: "#fff", marginBottom: 8 }}>
-          K\u1ebft qu\u1ea3 b\u00e0i thi
-        </h2>
-        <p style={{ fontSize: 14, color: "rgba(255,255,255,0.75)", marginBottom: 32, minHeight: 24, transition: "all 0.4s" }}>
-          {phase.text}
-        </p>
-
-        <div className="w-full h-2.5 rounded-full overflow-hidden"
-          style={{ background: "rgba(255,255,255,0.2)" }}>
-          <div className="h-full rounded-full"
-            style={{ width: `${progress}%`, background: "rgba(255,255,255,0.9)", transition: "width 80ms linear" }} />
-        </div>
-        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 8 }}>
-          {Math.round(progress)}%
-        </p>
-
-        <div className="flex items-center justify-center gap-5 mt-7">
-          {skills.map((s, i) => (
-            <div key={s} className="flex flex-col items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full transition-all duration-300"
-                style={{ background: progress > (i + 1) * 20 ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.2)" }} />
-              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.45)", fontWeight: 700 }}>{s}</span>
-            </div>
-          ))}
-        </div>
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+      style={{ background: "rgba(255,255,255,0.75)", backdropFilter: "blur(12px)" }}>
+      <div className="relative w-16 h-16 mb-5">
+        <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
+        <div className="absolute inset-0 rounded-full border-4 border-transparent animate-spin"
+          style={{ borderTopColor: accent }} />
       </div>
+      <p style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>
+        Đang tải kết quả...
+      </p>
+      <p style={{ fontSize: 12, color: "#9CA3AF", marginTop: 4 }}>
+        {isIelts ? "IELTS" : "VSTEP"}
+      </p>
     </div>
   );
 }
