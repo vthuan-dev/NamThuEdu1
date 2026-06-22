@@ -93,6 +93,11 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
         ? `${BASE}/phong-cho/${item.assignmentId}`
         : `${BASE}/lam-bai/${item.examId}?autostart=1&direct=1`);
 
+  // Làm lại luôn đi đường direct (không vướng giới hạn assignment)
+  const redoTo = isThpt
+    ? `${BASE}/lam-bai-thpt/${item.examId}`
+    : `${BASE}/lam-bai/${item.examId}?autostart=1&direct=1`;
+
   return (
     <div className="group flex flex-col bg-white rounded-2xl border border-slate-200 p-5 transition-all duration-200 hover:border-teal-300 hover:shadow-[0_6px_20px_-8px_rgba(13,148,136,0.25)]">
       {/* Icon kỹ năng + trạng thái */}
@@ -143,14 +148,22 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
       {/* Action */}
       <div className="mt-auto">
         {isCompleted && item.submissionId ? (
-          <Link to={`${BASE}/ket-qua/${item.submissionId}`}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
-            style={{ background: '#10B981' }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = '#059669')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = '#10B981')}>
-            <CheckCircle className="w-4 h-4" /> Xem kết quả
-            <ArrowRight className="w-4 h-4 opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to={redoTo}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
+              style={{ background: TEAL }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#0B7E74')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = TEAL)}>
+              <RotateCcw className="w-4 h-4" /> Làm lại
+            </Link>
+            <Link to={`${BASE}/ket-qua/${item.submissionId}`}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
+              style={{ background: '#10B981' }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#059669')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = '#10B981')}>
+              <CheckCircle className="w-4 h-4" /> Xem kết quả
+            </Link>
+          </div>
         ) : isOverdue ? (
           <div className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold cursor-not-allowed"
             style={{ background: '#FEE2E2', color: '#DC2626' }}>
