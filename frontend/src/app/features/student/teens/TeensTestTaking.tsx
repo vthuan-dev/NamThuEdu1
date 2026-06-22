@@ -840,8 +840,8 @@ export function TeensTestTaking() {
         </main>
 
         {/* Cột navigator */}
-        <aside className="hidden lg:block">
-          <div className="sticky top-36 rounded-2xl bg-white border border-slate-200 p-4">
+        <aside className="hidden lg:block sticky top-36 self-start">
+          <div className="rounded-2xl bg-white border border-slate-200 p-4">
             <div className="flex items-center gap-2 mb-3">
               <ListChecks className="w-4 h-4" style={{ color: TEAL }} />
               <span className="text-sm font-bold text-slate-900">Danh sách câu</span>
