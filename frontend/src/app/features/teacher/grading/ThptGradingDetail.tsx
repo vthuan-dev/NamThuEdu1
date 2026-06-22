@@ -108,6 +108,7 @@ export function ThptGradingDetail({ submissionId }: Props) {
 
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const tabBarRef = useRef<HTMLDivElement | null>(null);
   // Phần đang hiển thị trong tầm nhìn (để sáng đèn tab tương ứng).
   const [activeSection, setActiveSection] = useState<string | null>(null);
   // Bỏ qua scroll-spy trong lúc đang cuộn tới phần được bấm.
@@ -338,11 +339,19 @@ export function ThptGradingDetail({ submissionId }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, data]);
 
-  // Tự cuộn tab đang active vào giữa thanh tab để giáo viên luôn thấy.
+  // Tự cuộn tab đang active vào giữa thanh tab (CHỈ cuộn ngang trong thanh tab,
+  // không dùng scrollIntoView vì nó cuộn cả trang theo chiều dọc → gây giật).
   useEffect(() => {
     if (!activeSection) return;
+    const bar = tabBarRef.current;
     const tab = tabRefs.current[activeSection];
-    if (tab) tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    if (!bar || !tab) return;
+    const target = tab.offsetLeft - bar.clientWidth / 2 + tab.clientWidth / 2;
+    const max = bar.scrollWidth - bar.clientWidth;
+    const next = Math.max(0, Math.min(target, max));
+    if (Math.abs(bar.scrollLeft - next) > 1) {
+      bar.scrollTo({ left: next, behavior: 'smooth' });
+    }
   }, [activeSection]);
 
   const totalOverrideCount =
@@ -530,7 +539,7 @@ export function ThptGradingDetail({ submissionId }: Props) {
 
         {/* Section navigation tabs */}
         {recompute && recompute.liveSections.length > 1 && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-2.5 flex items-center gap-2 overflow-x-auto scrollbar-thin">
+          <div ref={tabBarRef} className="max-w-7xl mx-auto px-4 sm:px-6 pb-2.5 flex items-center gap-2 overflow-x-auto scrollbar-thin">
             {recompute.liveSections.map((s, i) => {
               const isActive = activeSection === s.sid;
               return (
