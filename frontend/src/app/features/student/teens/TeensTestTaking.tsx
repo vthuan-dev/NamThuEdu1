@@ -659,8 +659,8 @@ export function TeensTestTaking() {
           {isReading ? (
             /* Danh sách câu cùng đoạn đọc — cuộn lên xuống */
             <PassageSplitLayout
-              heightClassName="min-h-[calc(100vh-11rem)] lg:h-[calc(100vh-11rem)]"
-              gridClassName="grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]"
+              heightClassName="h-[calc(100vh-12rem)]"
+              gridClassName="grid-cols-1 md:grid-cols-[45%_55%]"
               tone="teal"
               passageTitle="Đọc hiểu"
               passageContent={
