@@ -202,11 +202,11 @@ export function ExamLobby() {
         } else {
           navigate(`${STUDENT_BASE_PATH}/lam-bai/${assignmentId}?autostart=1&submissionId=${sid}`, { replace: true });
         }
-      } catch {
-        // Nếu tự động vào bài thất bại → hiện thông báo (không còn lobby thiết bị).
-        autoStartedRef.current = false;
+      } catch (err: any) {
+        // Giữ autoStartedRef = true để không retry loop. User phải tự bấm lại nếu muốn thử lại.
         setAutoStarting(false);
-        setStatusMessage(t("student.examLobby.sessionFailed"));
+        const msg = err?.response?.data?.message || err?.message || t("student.examLobby.sessionFailed");
+        setStatusMessage(msg);
       }
     })();
   }, [loadingExam, examInfo.examType, examInfo.title, examId, assignmentId, navigate, t]);

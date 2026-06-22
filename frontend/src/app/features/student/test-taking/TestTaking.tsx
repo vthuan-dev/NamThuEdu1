@@ -391,8 +391,11 @@ export function TestTaking() {
       }
       setStarted(true);
     },
-    onError: () => {
-      setLoadError("Không thể kết nối đến máy chủ. Vui lòng tải lại trang.");
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message
+        || err?.message
+        || "Không thể kết nối đến máy chủ. Vui lòng tải lại trang.";
+      setLoadError(msg);
     },
   });
 
@@ -620,9 +623,9 @@ export function TestTaking() {
   };
 
   useEffect(() => {
-    if (!autoStart || started || startMutation.isPending) return;
+    if (!autoStart || started || startMutation.isPending || !!loadError) return;
     startMutation.mutate();
-  }, [autoStart, started, startMutation]);
+  }, [autoStart, started, startMutation, loadError]);
 
   if (!started) {
     if (loadError) {
