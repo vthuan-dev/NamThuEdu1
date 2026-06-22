@@ -101,8 +101,27 @@ function isSpeakingQuestion(q: any): boolean {
 }
 
 // Đoạn đọc của câu (đọc hiểu). Rỗng nếu không phải dạng có bài đọc.
+// Hỗ trợ nhiều nguồn vì đề tạo từ nhiều luồng khác nhau lưu bài đọc ở field khác:
+//  - cột chuẩn: qPassage_text / qPassage
+//  - alias: passage / passage_text / reading_passage / context
+//  - lồng trong qData JSON: { passage } / { reading_passage } / { context }
 function getPassage(q: any): string {
-  return String(q?.qPassage_text ?? q?.qPassage ?? '').trim();
+  const direct =
+    q?.qPassage_text ?? q?.qPassage ??
+    q?.passage_text ?? q?.passage ??
+    q?.reading_passage ?? q?.context;
+  if (direct != null && String(direct).trim() !== '') return String(direct).trim();
+
+  let data = q?.qData;
+  if (typeof data === 'string') {
+    try { data = JSON.parse(data); } catch { data = null; }
+  }
+  if (data && typeof data === 'object') {
+    const fromData =
+      data.passage ?? data.passage_text ?? data.reading_passage ?? data.context;
+    if (fromData != null && String(fromData).trim() !== '') return String(fromData).trim();
+  }
+  return '';
 }
 
 const SECTION_LABELS: Record<string, string> = {
