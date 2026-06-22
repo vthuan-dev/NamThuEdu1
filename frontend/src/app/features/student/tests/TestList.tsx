@@ -224,8 +224,8 @@ export function TestList() {
 
   const hasActiveFilters = type !== 'all' || format !== 'all' || search !== '';
 
-  // ─── Phân trang: 12 bài / trang ───────────────────────────────────────────
-  const PAGE_SIZE = 12;
+  // ─── Phân trang: 10 bài / trang ───────────────────────────────────────────
+  const PAGE_SIZE = 10;
   const [page, setPage] = useState(1);
   useEffect(() => { setPage(1); }, [status, type, format, search]);
   const totalPages = Math.max(1, Math.ceil(filteredTests.length / PAGE_SIZE));
@@ -378,7 +378,8 @@ export function TestList() {
       </div>
 
       {/* ══ Content ═══════════════════════════════════════════════════════════ */}
-      <div className="px-8 lg:px-16 py-8">
+      <div className="px-4 lg:px-8 py-8">
+        <div className="max-w-screen-xl mx-auto">
         {/* Results count */}
         {!isLoading && (
           <p className="text-sm text-gray-500 mb-6">
@@ -391,7 +392,7 @@ export function TestList() {
       {/* Main Content */}
       {isLoading ? (
         <div className={viewMode === 'grid' 
-          ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5"
+          ? "grid grid-cols-2 lg:grid-cols-4 gap-4"
           : "space-y-4"}>
           {[1,2,3,4,5,6,7,8].map((i) => (
             <div key={i} className={`animate-pulse ${viewMode === 'grid' ? "h-80" : "h-32"}`} 
@@ -429,7 +430,7 @@ export function TestList() {
            )}
         </div>
       ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
            {pagedTests.map((test, idx) => {
               const formatMeta = getFormatMeta(test.exam_format);
               const Icon = formatMeta.icon;
@@ -442,84 +443,103 @@ export function TestList() {
               const overdueDays = testIsOverdue && test.deadline ? getOverdueDays(test.deadline) : 0;
 
               if (testIsOverdue) {
+                const skillChipsOD = getSkillChips(test.exam_skill, test.exam_format);
+                const isFullTestOD = skillChipsOD.length === 0;
                 return (
                   <div key={test.assignment_id}
-                    className="relative flex flex-col rounded-2xl overflow-hidden"
-                    style={{ border: '2px solid #FCA5A5', boxShadow: '0 4px 20px rgba(220,38,38,0.15)' }}
+                    className="group relative flex flex-col rounded-3xl bg-white overflow-hidden transition-all duration-300"
+                    style={{ border: '1.5px solid #FECACA', boxShadow: '0 2px 12px #DC262615' }}
                   >
-                    {/* Red gradient banner */}
-                    <div className="relative px-5 pt-4 pb-3"
-                      style={{ background: 'linear-gradient(135deg, #DC2626 0%, #EF4444 50%, #F87171 100%)' }}
+                    {/* ── Gradient header (red theme) ── */}
+                    <div className="relative px-5 pt-5 pb-4 overflow-hidden"
+                      style={{ background: 'linear-gradient(135deg, #DC262618 0%, #7C3AED10 100%)' }}
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="flex items-center gap-1.5 text-white font-black text-xs tracking-widest uppercase">
-                          <CalendarX className="w-3.5 h-3.5" />
-                          Quá Hạn
+                      {/* Decorative orb */}
+                      <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full opacity-20"
+                        style={{ background: 'radial-gradient(circle, #DC2626, transparent)' }} />
+
+                      {/* Type + status + index */}
+                      <div className="flex items-center justify-between mb-3 relative z-10">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold"
+                            style={{ background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A530' }}>
+                            <Sparkles className="w-3 h-3" />
+                            {test.exam_type}
+                          </span>
+                          <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold"
+                            style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA' }}>
+                            <CalendarX className="w-2.5 h-2.5" />
+                            Quá hạn
+                          </span>
+                        </div>
+                        <span className="text-xs font-bold opacity-40" style={{ color: '#DC2626' }}>
+                          #{String(idx + 1).padStart(2, '0')}
                         </span>
-                        <span className="bg-white/20 text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                      </div>
+
+                      {/* Title */}
+                      <h3 className="font-extrabold leading-snug line-clamp-2 relative z-10 mb-2"
+                        style={{ fontSize: 15, color: '#1A1040', letterSpacing: '-0.01em' }}>
+                        {test.exam_title}
+                      </h3>
+
+                      {/* Skill chips + overdue days chip */}
+                      <div className="flex items-center gap-1.5 flex-wrap relative z-10">
+                        {isFullTestOD ? (
+                          <span className="flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold text-white shadow-sm"
+                            style={{ background: 'linear-gradient(135deg, #FF6B6B 0%, #845EF7 100%)' }}>
+                            Full test
+                          </span>
+                        ) : skillChipsOD.map(({ label, Icon: SIcon, color: sc }) => (
+                          <span key={label} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold"
+                            style={{ background: '#fff', color: sc, border: `1px solid ${sc}30` }}>
+                            <SIcon className="w-2.5 h-2.5" />
+                            {label}
+                          </span>
+                        ))}
+                        <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold"
+                          style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA' }}>
+                          <CalendarX className="w-2.5 h-2.5" />
                           {overdueDays === 0 ? 'Hôm nay' : `${overdueDays} ngày trước`}
                         </span>
                       </div>
-                      <h3 className="text-base font-extrabold text-white leading-snug line-clamp-2">
-                        {test.exam_title}
-                      </h3>
                     </div>
 
-                    {/* Card body */}
-                    <div className="flex flex-col flex-1 p-4" style={{ background: '#FFF5F5' }}>
-                      {/* Deadline info */}
+                    {/* ── Body ── */}
+                    <div className="px-5 py-3 flex-1 flex flex-col gap-2">
                       {test.deadline && (
-                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl mb-3"
-                          style={{ background: '#FEE2E2', border: '1px solid #FECACA' }}
-                        >
-                          <Calendar className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#B91C1C' }} />
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                          style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
+                          <Calendar className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#DC2626' }} />
                           <div className="min-w-0">
-                            <p className="text-xs font-semibold" style={{ color: '#7F1D1D' }}>Hạn nộp</p>
-                            <p className="text-xs font-bold truncate" style={{ color: '#B91C1C' }}>{formatDeadline(test.deadline)}</p>
+                            <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#7F1D1D' }}>Hạn nộp</p>
+                            <p className="text-xs font-bold" style={{ color: '#B91C1C' }}>{formatDeadline(test.deadline)}</p>
                           </div>
                         </div>
                       )}
-
-                      {/* Meta info */}
-                      <div className="grid grid-cols-2 gap-2 mb-3">
-                        <div className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg" style={{ background: '#fff', border: '1px solid #FECACA' }}>
-                          <Timer className="w-3.5 h-3.5" style={{ color: '#EF4444' }} />
-                          <div>
-                            <p className="text-xs text-gray-400">Thời gian</p>
-                            <p className="text-xs font-bold text-gray-700">{test.exam_duration} phút</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg" style={{ background: '#fff', border: '1px solid #FECACA' }}>
-                          <BookOpen className="w-3.5 h-3.5" style={{ color: '#EF4444' }} />
-                          <div>
-                            <p className="text-xs text-gray-400">Câu hỏi</p>
-                            <p className="text-xs font-bold text-gray-700">{test.total_questions} câu</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Tags */}
-                      <div className="flex flex-wrap gap-1.5 mb-4">
-                        <span className="px-2.5 py-1 rounded-md text-xs font-bold" style={{ background: '#FEE2E2', color: '#991B1B' }}>
-                          {test.exam_type}
+                      <div className="flex items-center gap-3 mt-auto pt-1 flex-wrap">
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+                          <Clock className="w-3.5 h-3.5 text-gray-400" />
+                          {test.exam_duration} phút
                         </span>
-                        {test.exam_skill && (
-                          <span className="px-2.5 py-1 rounded-md text-xs font-semibold capitalize" style={{ background: '#FEE2E2', color: '#991B1B' }}>
-                            {test.exam_skill}
-                          </span>
-                        )}
-                        <span className="px-2.5 py-1 rounded-md text-xs font-semibold" style={{ background: '#FEE2E2', color: '#991B1B' }}>
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+                          <FileText className="w-3.5 h-3.5 text-gray-400" />
+                          {test.total_questions} câu hỏi
+                        </span>
+                        <span className="ml-auto flex items-center gap-1 text-xs font-semibold" style={{ color: '#9CA3AF' }}>
+                          <RotateCcw className="w-3 h-3" />
                           {test.attempts_used}/{test.attempts_allowed} lần
                         </span>
                       </div>
+                      <div className="h-1 w-full rounded-full" style={{ background: '#FEE2E2' }} />
+                    </div>
 
-                      <div className="mt-auto">
-                        <div className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold cursor-not-allowed"
-                          style={{ background: '#FEE2E2', color: '#B91C1C', border: '1.5px solid #FECACA' }}
-                        >
-                          <Ban className="w-4 h-4" />
-                          Không còn hạn nộp
-                        </div>
+                    {/* ── CTA disabled ── */}
+                    <div className="px-5 pb-5">
+                      <div className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl font-bold text-sm cursor-not-allowed"
+                        style={{ background: '#FEE2E2', color: '#B91C1C' }}>
+                        <Ban className="w-4 h-4" />
+                        Không còn hạn nộp
                       </div>
                     </div>
                   </div>
@@ -840,6 +860,7 @@ export function TestList() {
           </button>
         </div>
       )}
+        </div>
       </div>
     </div>
   );
