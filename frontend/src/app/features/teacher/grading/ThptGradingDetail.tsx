@@ -316,48 +316,39 @@ export function ThptGradingDetail({ submissionId }: Props) {
     scrollParentRef.current = el; // null → cuộn theo window
   }, [page]);
 
-  // Scroll-spy: sáng đèn tab của phần đang hiển thị trong tầm nhìn.
+  // Scroll-spy: sáng đèn tab của phần đang ở đỉnh viewport (lắng nghe scroll trực tiếp).
   useEffect(() => {
     if (page !== 'ready' || !data) return;
-    if (typeof IntersectionObserver === 'undefined') return;
-    const els = data.sections
-      .map((s, idx) => sectionRefs.current[s.section_id ?? s.type] ?? sectionRefs.current[`s-${idx}`])
-      .filter((el): el is HTMLElement => !!el);
-    if (els.length === 0) return;
 
-    const headerH = headerRef.current?.offsetHeight ?? 140;
-    const visible = new Set<Element>();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (e.isIntersecting) visible.add(e.target);
-          else visible.delete(e.target);
-        }
-        if (isClickScrolling.current) return;
-        // Chọn phần đang hiển thị gần đỉnh nhất (top nhỏ nhất).
-        let topEl: Element | null = null;
-        let topPos = Infinity;
-        for (const el of visible) {
-          const top = el.getBoundingClientRect().top;
-          if (top < topPos) {
-            topPos = top;
-            topEl = el;
-          }
-        }
-        if (topEl) {
-          const sid = (topEl as HTMLElement).dataset.sid;
-          if (sid) setActiveSection((prev) => (prev === sid ? prev : sid));
-        }
-      },
-      {
-        // root = container cuộn thật sự để toạ độ chính xác (tránh header nhảy).
-        root: scrollParentRef.current ?? null,
-        rootMargin: `-${headerH + 8}px 0px -55% 0px`,
-        threshold: 0,
-      },
-    );
-    els.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
+    const keys = data.sections.map((s, idx) => s.section_id ?? s.type ?? `s-${idx}`);
+
+    const computeActive = () => {
+      if (isClickScrolling.current) return;
+      const headerH = headerRef.current?.offsetHeight ?? 140;
+      // Ngưỡng = ngay dưới header chính (cộng đệm nhỏ).
+      const lineY = headerH + 16;
+      let current: string | null = null;
+      for (const key of keys) {
+        const el = sectionRefs.current[key];
+        if (!el) continue;
+        const top = el.getBoundingClientRect().top;
+        // Phần nào có đỉnh đã đi qua ngưỡng (top <= lineY) thì là phần đang xem.
+        if (top - lineY <= 0) current = key;
+        else break;
+      }
+      // Trước khi cuộn qua phần đầu tiên → mặc định phần đầu.
+      if (!current && keys.length) current = keys[0];
+      if (current) setActiveSection((prev) => (prev === current ? prev : current));
+    };
+
+    const target: HTMLElement | Window = scrollParentRef.current ?? window;
+    computeActive();
+    target.addEventListener('scroll', computeActive, { passive: true });
+    window.addEventListener('resize', computeActive);
+    return () => {
+      target.removeEventListener('scroll', computeActive);
+      window.removeEventListener('resize', computeActive);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, data]);
 
