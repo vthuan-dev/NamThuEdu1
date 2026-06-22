@@ -82,6 +82,9 @@ class ThptGradingController extends Controller
             'questions.*.teacher_criteria.*'  => 'nullable|numeric|min:0|max:10',
             'questions.*.teacher_feedback'    => 'nullable|string|max:5000',
             'overall_teacher_feedback'        => 'nullable|string|max:5000',
+            // Điểm tổng ghi đè của giáo viên (0–10). Áp dụng cho mọi đề THPT,
+            // kể cả đề toàn trắc nghiệm khách quan (không có phần Nói/Viết).
+            'teacher_override_score'          => 'nullable|numeric|min:0|max:10',
             'publish'                         => 'nullable|boolean',
         ]);
 
@@ -89,8 +92,11 @@ class ThptGradingController extends Controller
         $publish   = (bool) ($validated['publish'] ?? false);
         $questions = $validated['questions'] ?? [];
         $overall   = $validated['overall_teacher_feedback'] ?? null;
+        $overrideScore = array_key_exists('teacher_override_score', $validated)
+            ? $validated['teacher_override_score']
+            : null;
 
-        DB::transaction(function () use ($sub, $user, $publish, $questions, $overall) {
+        DB::transaction(function () use ($sub, $user, $publish, $questions, $overall, $overrideScore) {
             $payload = $sub->submission_payload ?? [];
             $result  = $payload['result'] ?? [];
             $speaking = is_array($result['speaking'] ?? null) ? $result['speaking'] : [];
@@ -154,12 +160,22 @@ class ThptGradingController extends Controller
                 $result['scaled_score'] = $combined;
             }
 
+            // ── Điểm tổng ghi đè của giáo viên (thắng mọi điểm tự động) ──────
+            // Lưu vào payload để hiển thị lại, và là điểm cuối khi phát hành.
+            $finalScore = $combined;
+            if ($overrideScore !== null) {
+                $result['teacher_override_score'] = round((float) $overrideScore, 2);
+                $finalScore = round((float) $overrideScore, 2);
+            } else {
+                unset($result['teacher_override_score']);
+            }
+
             $payload['result'] = $result;
 
             $updates = ['submission_payload' => $payload];
             if ($publish) {                                   // Req 6
-                if ($combined !== null) {
-                    $updates['sScore'] = $combined;
+                if ($finalScore !== null) {
+                    $updates['sScore'] = $finalScore;
                 }
                 $updates['sStatus']             = 'graded';
                 $updates['sGraded_time']        = now();
@@ -353,6 +369,9 @@ class ThptGradingController extends Controller
             ],
             'overall_teacher_feedback' => $sub->sTeacher_feedback,
             'current_total'            => $sub->sScore !== null ? (float) $sub->sScore : null,
+            // Điểm tổng ghi đè của giáo viên (nếu đã lưu) — cho UI prefill ô nhập.
+            'teacher_override_score'   => isset($result['teacher_override_score'])
+                ? (float) $result['teacher_override_score'] : null,
             // Raw maps — cho phép frontend tái dùng SectionView (review mode) y hệt trang học viên.
             'answers'                  => (object) $answers,
             'correct_answers'          => (object) $correctAnswers,

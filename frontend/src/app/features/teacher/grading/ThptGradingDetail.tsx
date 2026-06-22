@@ -15,6 +15,7 @@ import {
   RotateCcw,
   MessageSquare,
   Volume2,
+  Pencil,
   X,
 } from 'lucide-react';
 import { useToastContext } from '../../../../contexts/ToastContext';
@@ -66,6 +67,7 @@ export function ThptGradingDetail({ submissionId }: Props) {
   const [data, setData] = useState<GradingData | null>(null);
   const [draft, setDraft] = useState<Record<number, DraftEntry>>({});
   const [overallFeedback, setOverallFeedback] = useState('');
+  const [overrideScore, setOverrideScore] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -80,6 +82,11 @@ export function ThptGradingDetail({ submissionId }: Props) {
         }
         setData(d);
         setOverallFeedback(d.overall_teacher_feedback ?? '');
+        setOverrideScore(
+          d.teacher_override_score !== null && d.teacher_override_score !== undefined
+            ? String(d.teacher_override_score)
+            : '',
+        );
         setDraft(buildInitialDraft(d));
         setPage('ready');
       })
@@ -131,8 +138,10 @@ export function ThptGradingDetail({ submissionId }: Props) {
   };
 
   const hasInvalidScore = useMemo(
-    () => Object.values(draft).some((e) => e.score.trim() !== '' && !inRange0to10(e.score)),
-    [draft],
+    () =>
+      Object.values(draft).some((e) => e.score.trim() !== '' && !inRange0to10(e.score)) ||
+      (overrideScore.trim() !== '' && !inRange0to10(overrideScore)),
+    [draft, overrideScore],
   );
 
   const doPublish = async () => {
@@ -143,11 +152,16 @@ export function ThptGradingDetail({ submissionId }: Props) {
       toast.error('Điểm phải nằm trong khoảng 0–10.');
       return;
     }
+    if (overrideScore.trim() !== '' && !inRange0to10(overrideScore)) {
+      toast.error('Điểm tổng phải nằm trong khoảng 0–10.');
+      return;
+    }
     setSaving(true);
     try {
       const res = await thptGradingApi.saveGrading(submissionId, {
         questions: buildQuestionsPayload(),
         overall_teacher_feedback: overallFeedback,
+        teacher_override_score: overrideScore.trim() !== '' ? Number(overrideScore) : null,
         publish: true,
       });
       // Sync back from the server but keep local draft intact for safety.
@@ -259,6 +273,45 @@ export function ThptGradingDetail({ submissionId }: Props) {
                 <Loader2 className="w-3.5 h-3.5 animate-spin" /> AI đang chấm phần Nói
               </span>
             )}
+          </div>
+
+          {/* Điểm tổng ghi đè — giáo viên nhập điểm cuối (0–10), thắng điểm tự động.
+              Áp dụng cho mọi đề THPT kể cả đề toàn trắc nghiệm. */}
+          <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Pencil className="w-4 h-4 text-teal-600" />
+              <label className="text-sm font-semibold text-slate-700">Điểm tổng (ghi đè)</label>
+            </div>
+            <input
+              type="number"
+              min={0}
+              max={10}
+              step={0.25}
+              value={overrideScore}
+              onChange={(e) => setOverrideScore(e.target.value)}
+              placeholder={data.current_total != null ? String(Number(data.current_total).toFixed(2)) : 'Tự động'}
+              className={`w-28 rounded-lg border px-3 py-1.5 text-sm font-bold text-slate-800 tabular-nums focus:outline-none focus:ring-2 ${
+                overrideScore.trim() !== '' && !inRange0to10(overrideScore)
+                  ? 'border-red-300 focus:ring-red-200'
+                  : 'border-slate-200 focus:ring-teal-200'
+              }`}
+            />
+            <span className="text-xs text-slate-400">/ {obj.scale_max ?? 10}</span>
+            {overrideScore.trim() !== '' && (
+              <button
+                type="button"
+                onClick={() => setOverrideScore('')}
+                className="text-xs font-semibold text-slate-400 hover:text-teal-600 transition-colors cursor-pointer"
+              >
+                Dùng điểm tự động
+              </button>
+            )}
+            {overrideScore.trim() !== '' && !inRange0to10(overrideScore) && (
+              <span className="text-xs font-semibold text-red-500">Điểm phải trong khoảng 0–10</span>
+            )}
+            <p className="w-full text-[11px] text-slate-400 mt-0.5">
+              Để trống = dùng điểm hệ thống tự chấm. Nhập điểm để ghi đè điểm cuối cho học viên.
+            </p>
           </div>
         </section>
 

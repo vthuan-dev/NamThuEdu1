@@ -168,6 +168,8 @@ export interface GradingData {
   objective: ObjectiveSummary;
   overall_teacher_feedback: string | null;
   current_total: number | null;
+  /** Điểm tổng ghi đè của giáo viên (nếu đã lưu trước đó). */
+  teacher_override_score?: number | null;
   answers: Record<string, unknown>;
   correct_answers: Record<string, unknown>;
   subjective_questions: SubjectiveQuestion[];
@@ -188,6 +190,8 @@ export interface SaveQuestionPayload {
 export interface SaveGradingBody {
   questions: SaveQuestionPayload[];
   overall_teacher_feedback?: string;
+  /** Điểm tổng ghi đè (0–10). null/undefined = không ghi đè (dùng điểm tự động). */
+  teacher_override_score?: number | null;
   publish: boolean;
 }
 
