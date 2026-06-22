@@ -529,7 +529,9 @@ class ThptExamController extends Controller
 
         $validator = Validator::make($request->all(), [
             'submission_id' => 'required|integer',
-            'answers' => 'required|array',
+            // autosave (final=false) có thể gửi answers rỗng khi học viên chưa
+            // trả lời câu nào → dùng 'present' thay 'required' để không trả 400.
+            'answers' => 'present|array',
             'final' => 'nullable|boolean',
         ]);
         if ($validator->fails()) {

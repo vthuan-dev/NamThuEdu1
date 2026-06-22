@@ -185,16 +185,22 @@ export function StudentThptExamPage() {
   // Manual server auto-save every 30s via THPT-specific endpoint
   const saveDraft = useCallback(async () => {
     if (!submissionId || !examId) return;
+    // Bỏ qua autosave nếu đang nộp (tránh đua với handleSubmit final).
+    if (isSubmitting) return;
+    // Bỏ qua khi chưa có đáp án nào — tránh gửi {} rỗng khiến BE validate
+    // 'answers required' fail (400) và spam request liên tục mỗi 30s.
+    const answers = session.answers ?? {};
+    if (!answers || Object.keys(answers).length === 0) return;
     try {
       await api.post(`/student/thpt-exams/${examId}/submit`, {
         submission_id: submissionId,
-        answers: session.answers,
+        answers,
         final: false,
       });
     } catch (err) {
       console.warn('[thpt] autosave failed', err);
     }
-  }, [submissionId, examId, session.answers]);
+  }, [submissionId, examId, session.answers, isSubmitting]);
 
   useEffect(() => {
     if (!submissionId) return;
