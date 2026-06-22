@@ -148,6 +148,10 @@ export function KidsTestTaking() {
     startedAtServer,
     examType: exam?.exam_type ?? 'KIDS',
     role: 'kids',
+    // ✅ F5-resistant: KHÔNG auto-submit khi rời/đóng tab. pagehide cũng fire
+    // khi F5 → nếu để true, backend nộp & chấm bài, status rời 'in_progress',
+    // reload sau đó tạo submission MỚI rỗng → mất hết đáp án. Chỉ lưu nháp.
+    enableAutoSubmitOnUnload: false,
     onSubmitted: (res: any) => {
       const sid = res?.data?.data?.submissionId ?? submissionId;
       navigate(`${BASE}/ket-qua/${sid}`);

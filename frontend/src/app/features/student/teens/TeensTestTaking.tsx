@@ -18,7 +18,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import {
   ArrowLeft, ArrowRight, CheckCircle2, Volume2, AlertTriangle,
-  Flag, Clock, ListChecks, Loader2, PenLine, Send, Mic, Square,
+  Flag, Clock, ListChecks, Loader2, PenLine, Send, Mic, Square, BookOpen, GripVertical,
 } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
 import { useExamSession } from '../../../../hooks/exam/useExamSession';
@@ -30,7 +30,6 @@ import {
   TimeWarningBanner,
 } from '../../../../components/exam';
 import { examDraftStorage } from '../../../../lib/exam/examDraftStorage';
-import { PassageSplitLayout } from '../components/PassageSplitLayout';
 import { HighlightablePassage } from '../components/HighlightablePassage';
 import { useTextHighlight } from '../../../../hooks/exam/useTextHighlight';
 
@@ -428,6 +427,40 @@ export function TeensTestTaking() {
   const cardRefs = useRef<Record<number, HTMLElement | null>>({});
   const startAttemptedRef = useRef(false);
 
+  // ─── Navigator nổi kéo-thả được (giống VSTEP) ────────────────────────────────
+  // null = vị trí mặc định (góc phải, sticky). Khi user kéo, lưu toạ độ tuyệt đối.
+  const [navPos, setNavPos] = useState<{ x: number; y: number } | null>(null);
+  const [navDragging, setNavDragging] = useState(false);
+  const navDragRef = useRef<{ dx: number; dy: number } | null>(null);
+
+  const onNavDragStart = useCallback((e: React.MouseEvent) => {
+    // Chỉ kéo bằng thanh tiêu đề; bỏ qua khi bấm vào nút câu.
+    const panel = (e.currentTarget as HTMLElement).closest('[data-nav-panel]') as HTMLElement | null;
+    if (!panel) return;
+    const rect = panel.getBoundingClientRect();
+    navDragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+    setNavDragging(true);
+    e.preventDefault();
+  }, []);
+
+  useEffect(() => {
+    if (!navDragging) return;
+    const onMove = (e: MouseEvent) => {
+      if (!navDragRef.current) return;
+      const w = 280, h = 360; // kích thước ước lượng để giữ trong viewport
+      const x = Math.min(Math.max(8, e.clientX - navDragRef.current.dx), window.innerWidth - w);
+      const y = Math.min(Math.max(72, e.clientY - navDragRef.current.dy), window.innerHeight - 80);
+      setNavPos({ x, y });
+    };
+    const onUp = () => { setNavDragging(false); navDragRef.current = null; };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [navDragging]);
+
   const session = useExamSession({
     submissionId,
     examId: exam?.id ?? exam?.eId ?? (direct ? assignmentId : 0),
@@ -435,6 +468,12 @@ export function TeensTestTaking() {
     startedAtServer,
     examType: exam?.exam_type ?? 'TEENS',
     role: 'teens',
+    // ✅ F5-resistant: KHÔNG auto-submit khi rời/đóng tab (pagehide cũng fire khi F5).
+    // Nếu để true, F5 sẽ gọi /auto-submit → backend nộp & chấm bài luôn, status
+    // rời khỏi 'in_progress'; reload sau đó tạo submission MỚI rỗng → mất đáp án.
+    // Thay vào đó chỉ lưu nháp (saveDraftOnUnload). Việc nộp do nút Nộp, timeout
+    // (timer client + cron) hoặc cron phát hiện bỏ thi đảm nhiệm.
+    enableAutoSubmitOnUnload: false,
     onSubmitted: (res: any) => {
       const sid = res?.data?.data?.submissionId ?? submissionId;
       navigate(`${BASE}/ket-qua/${sid}`);
@@ -653,18 +692,44 @@ export function TeensTestTaking() {
         </div>
       </div>
 
-      <div className={`mt-5 grid grid-cols-1 gap-5 ${isReading ? 'lg:grid-cols-[minmax(0,1fr)_240px]' : 'lg:grid-cols-[1fr_260px]'}`}>
+      <div className={`mt-5 grid grid-cols-1 gap-5 ${isReading ? 'lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_240px]' : 'lg:grid-cols-[1fr_260px]'}`}>
+        {/* Cột đoạn đọc (chỉ khi reading) */}
+        {isReading && (
+          <section className="hidden lg:flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden h-[calc(100vh-12rem)]">
+            <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-teal-50 to-white flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-teal-600" />
+                <h2 className="text-sm font-bold text-slate-900">Đọc hiểu</h2>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
+              <HighlightablePassage
+                html={passage}
+                highlights={highlightHook.highlights}
+                selectedColor={highlightHook.selectedColor}
+                onAddHighlight={highlightHook.addHighlight}
+                onRemoveHighlight={highlightHook.removeHighlight}
+                onSelectColor={highlightHook.setSelectedColor}
+                colors={highlightHook.colors}
+                enabled={!!submissionId}
+              />
+            </div>
+          </section>
+        )}
+
         {/* Cột nội dung câu hỏi */}
-        <main>
+        <main className="min-w-0">
           {isReading ? (
-            /* Danh sách câu cùng đoạn đọc — cuộn lên xuống */
-            <PassageSplitLayout
-              heightClassName="h-[calc(100vh-12rem)]"
-              gridClassName="grid-cols-1 md:grid-cols-[45%_55%]"
-              tone="teal"
-              passageTitle="Đọc hiểu"
-              passageContent={
-                <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="lg:h-[calc(100vh-12rem)] lg:overflow-y-auto lg:space-y-4 space-y-4">
+              {/* Đoạn đọc cho mobile/tablet — desktop dùng cột riêng bên trái */}
+              <section className="lg:hidden bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-teal-50 to-white">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-teal-600" />
+                    <h2 className="text-sm font-bold text-slate-900">Đọc hiểu</h2>
+                  </div>
+                </div>
+                <div className="max-h-[40vh] overflow-y-auto px-5 py-4">
                   <HighlightablePassage
                     html={passage}
                     highlights={highlightHook.highlights}
@@ -676,82 +741,75 @@ export function TeensTestTaking() {
                     enabled={!!submissionId}
                   />
                 </div>
-              }
-              questionsTitle={`Câu ${groupIndices[0] + 1}-${groupIndices[groupIndices.length - 1] + 1}`}
-              questionsSubtitle={`${groupIndices.length} câu dùng chung đoạn đọc`}
-              questionsBodyClassName="space-y-4"
-              questionsContent={
-                <>
-                  {groupIndices.map((idx) => {
-                    const gq = questions[idx];
-                    const gid = getQuestionId(gq);
-                    const gSelected = String(session.answers[gid] ?? '');
-                    const gFlagged = !!flagged[gid];
-                    const isCur = idx === current;
-                    return (
-                      <section
-                        key={gid || idx}
-                        ref={(el) => { cardRefs.current[idx] = el; }}
-                        onMouseDown={() => setCurrent(idx)}
-                        className="rounded-2xl bg-white border p-5 sm:p-6 transition-shadow scroll-mt-36"
-                        style={{ borderColor: isCur ? TEAL : '#E2E8F0', boxShadow: isCur ? '0 0 0 3px #CCFBF1' : undefined }}
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-lg text-sm font-bold text-white"
-                            style={{ background: TEAL }}>
-                            Câu {idx + 1}
-                          </span>
-                          <button onClick={(e) => { e.stopPropagation(); toggleFlagFor(gq); }}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors"
-                            style={{ background: gFlagged ? '#FEF3C7' : '#F8FAFC', color: gFlagged ? '#B45309' : '#94A3B8' }}>
-                            <Flag className="w-3.5 h-3.5" style={gFlagged ? { fill: '#B45309' } : undefined} />
-                            {gFlagged ? 'Đã đánh dấu' : 'Đánh dấu'}
-                          </button>
-                        </div>
-
-                        {gq?.qMedia_url && (
-                          <button onClick={(e) => { e.stopPropagation(); const a = new Audio(gq.qMedia_url); a.play().catch(() => undefined); }}
-                            className="mb-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-white font-semibold text-sm"
-                            style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
-                            <Volume2 className="w-4 h-4" /> Nghe đoạn ghi âm
-                          </button>
-                        )}
-
-                        {gq?.qImage_url && (
-                          <img src={gq.qImage_url} alt="" className="w-full max-h-72 object-contain rounded-xl mb-4 bg-slate-50" />
-                        )}
-
-                        <h2 className="text-base font-bold leading-snug text-slate-900"
-                          dangerouslySetInnerHTML={{ __html: gq?.qContent ?? `Câu ${idx + 1}` }} />
-
-                        <QuestionRenderer q={gq} value={gSelected} onChange={(v) => setAnswerFor(gq, v)} />
-                      </section>
-                    );
-                  })}
-
-                  {/* Điều hướng dưới (desktop) */}
-                  <div className="hidden lg:flex items-center gap-3 pt-1">
-                    <button onClick={() => setCurrent(c => Math.max(0, c - 1))} disabled={current === 0}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors disabled:opacity-40">
-                      <ArrowLeft className="w-4 h-4" /> Câu trước
-                    </button>
-                    {isLast ? (
-                      <button onClick={() => setShowSubmit(true)}
-                        className="ml-auto inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-white transition-transform hover:scale-[1.02] active:scale-95"
-                        style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
-                        <Send className="w-4 h-4" /> Nộp bài
+              </section>
+              {groupIndices.map((idx) => {
+                const gq = questions[idx];
+                const gid = getQuestionId(gq);
+                const gSelected = String(session.answers[gid] ?? '');
+                const gFlagged = !!flagged[gid];
+                const isCur = idx === current;
+                return (
+                  <section
+                    key={gid || idx}
+                    ref={(el) => { cardRefs.current[idx] = el; }}
+                    onMouseDown={() => setCurrent(idx)}
+                    className="rounded-2xl bg-white border p-5 sm:p-6 transition-shadow scroll-mt-36"
+                    style={{ borderColor: isCur ? TEAL : '#E2E8F0', boxShadow: isCur ? '0 0 0 3px #CCFBF1' : undefined }}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-lg text-sm font-bold text-white"
+                        style={{ background: TEAL }}>
+                        Câu {idx + 1}
+                      </span>
+                      <button onClick={(e) => { e.stopPropagation(); toggleFlagFor(gq); }}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors"
+                        style={{ background: gFlagged ? '#FEF3C7' : '#F8FAFC', color: gFlagged ? '#B45309' : '#94A3B8' }}>
+                        <Flag className="w-3.5 h-3.5" style={gFlagged ? { fill: '#B45309' } : undefined} />
+                        {gFlagged ? 'Đã đánh dấu' : 'Đánh dấu'}
                       </button>
-                    ) : (
-                      <button onClick={() => setCurrent(c => Math.min(total - 1, c + 1))}
-                        className="ml-auto inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-white transition-transform hover:scale-[1.02] active:scale-95"
+                    </div>
+
+                    {gq?.qMedia_url && (
+                      <button onClick={(e) => { e.stopPropagation(); const a = new Audio(gq.qMedia_url); a.play().catch(() => undefined); }}
+                        className="mb-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-white font-semibold text-sm"
                         style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
-                        Câu tiếp <ArrowRight className="w-4 h-4" />
+                        <Volume2 className="w-4 h-4" /> Nghe đoạn ghi âm
                       </button>
                     )}
-                  </div>
-                </>
-              }
-            />
+
+                    {gq?.qImage_url && (
+                      <img src={gq.qImage_url} alt="" className="w-full max-h-72 object-contain rounded-xl mb-4 bg-slate-50" />
+                    )}
+
+                    <h2 className="text-base font-bold leading-snug text-slate-900"
+                      dangerouslySetInnerHTML={{ __html: gq?.qContent ?? `Câu ${idx + 1}` }} />
+
+                    <QuestionRenderer q={gq} value={gSelected} onChange={(v) => setAnswerFor(gq, v)} />
+                  </section>
+                );
+              })}
+
+              {/* Điều hướng dưới (desktop) */}
+              <div className="hidden lg:flex items-center gap-3 pt-1">
+                <button onClick={() => setCurrent(c => Math.max(0, c - 1))} disabled={current === 0}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors disabled:opacity-40">
+                  <ArrowLeft className="w-4 h-4" /> Câu trước
+                </button>
+                {isLast ? (
+                  <button onClick={() => setShowSubmit(true)}
+                    className="ml-auto inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-white transition-transform hover:scale-[1.02] active:scale-95"
+                    style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
+                    <Send className="w-4 h-4" /> Nộp bài
+                  </button>
+                ) : (
+                  <button onClick={() => setCurrent(c => Math.min(total - 1, c + 1))}
+                    className="ml-auto inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-white transition-transform hover:scale-[1.02] active:scale-95"
+                    style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
+                    Câu tiếp <ArrowRight className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
           ) : (
           <>
           <section className="rounded-2xl bg-white border border-slate-200 p-5 sm:p-7">
@@ -839,12 +897,32 @@ export function TeensTestTaking() {
           )}
         </main>
 
-        {/* Cột navigator */}
-        <aside className="hidden lg:block sticky top-36 self-start">
+        {/* Cột navigator — kéo-thả di chuyển được (giống VSTEP) */}
+        <aside
+          data-nav-panel
+          className={`hidden lg:block ${navPos ? 'fixed z-50' : 'sticky top-36 self-start'} max-h-[calc(100vh-10rem)] overflow-y-auto`}
+          style={navPos
+            ? { left: navPos.x, top: navPos.y, width: 260, boxShadow: '0 12px 40px rgba(15,23,42,0.18)' }
+            : undefined}
+        >
           <div className="rounded-2xl bg-white border border-slate-200 p-4">
-            <div className="flex items-center gap-2 mb-3">
+            <div
+              onMouseDown={onNavDragStart}
+              className={`flex items-center gap-2 mb-3 -mx-1 px-1 select-none ${navDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+              title="Kéo để di chuyển bảng câu"
+            >
+              <GripVertical className="w-4 h-4 text-slate-300" />
               <ListChecks className="w-4 h-4" style={{ color: TEAL }} />
               <span className="text-sm font-bold text-slate-900">Danh sách câu</span>
+              {navPos && (
+                <button
+                  onClick={() => setNavPos(null)}
+                  className="ml-auto text-[11px] font-semibold text-slate-400 hover:text-teal-600 transition-colors"
+                  title="Về vị trí mặc định"
+                >
+                  Ghim lại
+                </button>
+              )}
             </div>
             <div className="grid grid-cols-5 gap-2">
               {questions.map((_, i) => {
