@@ -139,6 +139,7 @@ export function KidsTestTaking() {
   const [resumeDraft, setResumeDraft] = useState<any>(null);
   const [startedAtServer, setStartedAtServer] = useState('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const startAttemptedRef = useRef(false);
 
   const session = useExamSession({
     submissionId,
@@ -174,13 +175,15 @@ export function KidsTestTaking() {
 
   const startMutation = useMutation({
     mutationFn: async () => {
-      // Đề chưa được giao → start/resume trực tiếp bằng examId
+      if (querySubmissionId) {
+        return studentApi.resumeTest(assignmentId);
+      }
       if (isDirect) {
         return studentApi.startKidsExamDirect(assignmentId);
       }
       const startRes: any = await studentApi.startTest(assignmentId);
       const startData = startRes?.data?.data;
-      if (!startData?.exam && (startData?.canResume || querySubmissionId)) {
+      if (!startData?.exam && startData?.canResume) {
         return studentApi.resumeTest(assignmentId);
       }
       return startRes;
@@ -245,10 +248,11 @@ export function KidsTestTaking() {
 
   // Auto-start when arriving from lobby
   useEffect(() => {
-    if (!autoStart || started || startMutation.isPending || startMutation.isError) return;
+    if (!autoStart || started || startMutation.isPending || startMutation.isError || !!loadError || startAttemptedRef.current) return;
+    startAttemptedRef.current = true;
     startMutation.mutate();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoStart, started, startMutation.isPending, startMutation.isError]);
+  }, [autoStart, started, startMutation.isPending, startMutation.isError, loadError]);
 
   const { setAnswer } = session;
 

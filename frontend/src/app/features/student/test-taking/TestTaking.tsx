@@ -240,6 +240,7 @@ export function TestTaking() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [exam, setExam] = useState<any>(null);
   const [startedAtServer, setStartedAtServer] = useState('');
+  const startAttemptedRef = useRef(false);
 
   const session = useExamSession({
     submissionId,
@@ -341,14 +342,13 @@ export function TestTaking() {
 
   const startMutation = useMutation({
     mutationFn: async () => {
+      if (querySubmissionId) {
+        return studentApi.resumeTest(assignmentId);
+      }
       const startRes: any = await studentApi.startTest(assignmentId);
       const startData = startRes?.data?.data;
 
       if (!startData?.exam && startData?.canResume) {
-        return studentApi.resumeTest(assignmentId);
-      }
-
-      if (!startData?.exam && querySubmissionId) {
         return studentApi.resumeTest(assignmentId);
       }
 
@@ -623,7 +623,8 @@ export function TestTaking() {
   };
 
   useEffect(() => {
-    if (!autoStart || started || startMutation.isPending || !!loadError) return;
+    if (!autoStart || started || startMutation.isPending || !!loadError || startAttemptedRef.current) return;
+    startAttemptedRef.current = true;
     startMutation.mutate();
   }, [autoStart, started, startMutation, loadError]);
 

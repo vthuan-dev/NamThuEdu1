@@ -426,6 +426,7 @@ export function TeensTestTaking() {
   const [startedAtServer, setStartedAtServer] = useState('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cardRefs = useRef<Record<number, HTMLElement | null>>({});
+  const startAttemptedRef = useRef(false);
 
   const session = useExamSession({
     submissionId,
@@ -456,13 +457,15 @@ export function TeensTestTaking() {
 
   const startMutation = useMutation({
     mutationFn: async () => {
-      // Đề tự do (browse, chưa giao) → start trực tiếp bằng examId, không cần assignment.
+      if (querySubmissionId) {
+        return studentApi.resumeTest(assignmentId);
+      }
       if (direct) {
         return studentApi.startTeensExamDirect(assignmentId);
       }
       const startRes: any = await studentApi.startTest(assignmentId);
       const startData = startRes?.data?.data;
-      if (!startData?.exam && (startData?.canResume || querySubmissionId)) {
+      if (!startData?.exam && startData?.canResume) {
         return studentApi.resumeTest(assignmentId);
       }
       return startRes;
@@ -495,7 +498,10 @@ export function TeensTestTaking() {
       }
       setStarted(true);
     },
-    onError: () => setLoadError('Không kết nối được máy chủ. Vui lòng tải lại trang.'),
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || err?.message || 'Không kết nối được máy chủ. Vui lòng tải lại trang.';
+      setLoadError(msg);
+    },
   });
 
   const submitMutation = useMutation({
@@ -511,9 +517,10 @@ export function TeensTestTaking() {
   }, [exam, assignmentId, submitMutation.isSuccess]);
 
   useEffect(() => {
-    if (!autoStart || started || startMutation.isPending) return;
+    if (!autoStart || started || startMutation.isPending || !!loadError || startAttemptedRef.current) return;
+    startAttemptedRef.current = true;
     startMutation.mutate();
-  }, [autoStart, started, startMutation]);
+  }, [autoStart, started, startMutation, loadError]);
 
   const { setAnswer: setSessionAnswer } = session;
 
