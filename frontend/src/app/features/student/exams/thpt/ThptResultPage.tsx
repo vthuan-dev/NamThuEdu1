@@ -78,6 +78,7 @@ export function ThptResultPage() {
   const [durationSec, setDurationSec] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [gradingPending, setGradingPending] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
 
   useEffect(() => {
@@ -99,6 +100,7 @@ export function ThptResultPage() {
         setSpeakingAudio(data.speaking_audio || {});
         setConfig(data.thpt_config || null);
         setDurationSec(data.duration_seconds || 0);
+        setGradingPending(false);
         setLoading(false);
 
         // Nếu đề có Speaking và AI chưa chấm → poll mỗi 8s đến khi xong
@@ -110,8 +112,15 @@ export function ThptResultPage() {
           pollTimer = window.setTimeout(fetchResult, 8000);
         }
       } catch (err: any) {
-        setError(err?.response?.data?.message || 'Không tải được kết quả.');
-        setLoading(false);
+        const msg: string = err?.response?.data?.message || '';
+        if (msg.includes('chưa được chấm') || msg.includes('chưa chấm')) {
+          setGradingPending(true);
+          setLoading(false);
+          pollTimer = window.setTimeout(fetchResult, 6000);
+        } else {
+          setError(msg || 'Không tải được kết quả.');
+          setLoading(false);
+        }
       }
     };
 
@@ -128,6 +137,18 @@ export function ThptResultPage() {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#F0FDFA' }}>
         <Loader2 className="w-8 h-8 animate-spin" style={{ color: TEAL }} />
+      </div>
+    );
+  }
+
+  if (gradingPending) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#F0FDFA' }}>
+        <div className="max-w-sm w-full rounded-2xl bg-white border border-teal-100 p-8 text-center shadow-sm">
+          <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4" style={{ color: TEAL }} />
+          <p className="text-base font-bold text-slate-800 mb-1">Đang chấm điểm...</p>
+          <p className="text-sm text-slate-500">Bài thi của bạn đang được chấm tự động. Vui lòng đợi một chút.</p>
+        </div>
       </div>
     );
   }
