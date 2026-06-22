@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { Loader2, AlertCircle, ArrowLeft, Trophy, Clock, Target, Sparkles } from 'lucide-react';
+import {
+  Loader2, AlertCircle, ArrowLeft, Trophy, Clock, Target, Sparkles,
+  BookOpen, Headphones, PenLine, Mic, FileText, CheckCircle, XCircle,
+} from 'lucide-react';
 import { api } from '../../../../../services/api';
 import type { ThptAnswers, ThptConfig } from './types';
 import { SectionView } from './views/SectionView';
@@ -25,9 +28,47 @@ interface ResultData {
   speaking?: { score: number; scale_max: number; parts: Record<string, any> };
 }
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+const TEAL = '#0D9488';
+
+// ── Section type meta ─────────────────────────────────────────────────────────
+const SECTION_META: Record<string, { label: string; color: string; bg: string; Icon: typeof FileText }> = {
+  reading:   { label: 'Đọc hiểu',  color: '#0284C7', bg: '#E0F2FE', Icon: BookOpen   },
+  listening: { label: 'Nghe hiểu', color: '#D97706', bg: '#FEF3C7', Icon: Headphones },
+  writing:   { label: 'Viết',      color: '#059669', bg: '#D1FAE5', Icon: PenLine    },
+  speaking:  { label: 'Nói',       color: '#7C3AED', bg: '#EDE9FE', Icon: Mic        },
+  grammar:   { label: 'Ngữ pháp',  color: '#2563EB', bg: '#DBEAFE', Icon: BookOpen   },
+  default:   { label: 'Phần thi',  color: '#0D9488', bg: '#CCFBF1', Icon: FileText   },
+};
+function getSectionMeta(type: string) {
+  return SECTION_META[type?.toLowerCase()] ?? SECTION_META.default;
+}
+
+// ── Intro loading overlay ─────────────────────────────────────────────────────
+function ResultIntroScreen() {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+      style={{ background: 'rgba(255,255,255,0.78)', backdropFilter: 'blur(14px)' }}>
+      <div className="relative w-14 h-14 mb-4">
+        <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
+        <div className="absolute inset-0 rounded-full border-4 border-transparent animate-spin"
+          style={{ borderTopColor: TEAL }} />
+      </div>
+      <p style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>Đang tải kết quả...</p>
+      <p style={{ fontSize: 12, color: '#9CA3AF', marginTop: 4 }}>Tiếng Anh</p>
+    </div>
+  );
+}
+
 export function ThptResultPage() {
   const { submissionId } = useParams<{ submissionId: string }>();
   const navigate = useNavigate();
+
+  const [showIntro, setShowIntro] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setShowIntro(false), 3000);
+    return () => clearTimeout(t);
+  }, []);
 
   const [examTitle, setExamTitle] = useState('Kết quả');
   const [config, setConfig] = useState<ThptConfig | null>(null);
@@ -81,25 +122,25 @@ export function ThptResultPage() {
     };
   }, [submissionId]);
 
+  if (showIntro) return <ResultIntroScreen />;
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#F0FDFA' }}>
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: TEAL }} />
       </div>
     );
   }
 
   if (error || !result || !config) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
-        <div className="max-w-md w-full rounded-2xl bg-white border border-red-200 p-6 text-center">
-          <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#F0FDFA' }}>
+        <div className="max-w-sm w-full rounded-2xl bg-white border border-red-100 p-6 text-center shadow-sm">
+          <AlertCircle className="w-9 h-9 text-red-400 mx-auto mb-3" />
           <p className="text-sm text-slate-600 mb-4">{error ?? 'Chưa có kết quả.'}</p>
-          <button
-            type="button"
-            onClick={() => navigate('/hoc-vien')}
-            className="px-4 py-2 rounded-lg bg-teal-600 text-white font-semibold text-sm hover:bg-teal-700 transition-colors cursor-pointer"
-          >
+          <button type="button" onClick={() => navigate('/hoc-vien')}
+            className="px-5 py-2.5 rounded-xl text-white text-sm font-semibold cursor-pointer transition-opacity hover:opacity-90"
+            style={{ background: TEAL }}>
             Về trang chủ
           </button>
         </div>
@@ -107,151 +148,240 @@ export function ThptResultPage() {
     );
   }
 
-  const totalCorrect = result.sections.reduce((s, p) => s + p.correct_count, 0);
+  const totalCorrect   = result.sections.reduce((s, p) => s + p.correct_count, 0);
   const totalQuestions = result.sections.reduce((s, p) => s + p.total_count, 0);
-  const accuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+  const accuracy       = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
   const minutes = Math.floor(durationSec / 60);
   const seconds = durationSec % 60;
-  const activeSection = config.sections[activeIdx];
-  // Đề có phần Nói nhưng AI chưa chấm xong → ẩn điểm tổng quát, show "đang chấm"
+  const activeSection  = config.sections[activeIdx];
   const hasSpeakingSection = result.sections.some((s) => s.type === 'speaking');
-  const speakingScored = !!result.speaking && typeof result.speaking.score === 'number';
-  const overallPending = hasSpeakingSection && !speakingScored;
+  const speakingScored     = !!result.speaking && typeof result.speaking.score === 'number';
+  const overallPending     = hasSpeakingSection && !speakingScored;
+
+  const scaledPct = result.scale_max > 0 ? (result.scaled_score / result.scale_max) * 100 : 0;
+  const scoreTone = scaledPct >= 70 ? { text: '#059669', label: 'Tốt lắm!' }
+    : scaledPct >= 50 ? { text: TEAL,    label: 'Khá tốt' }
+    : scaledPct >= 30 ? { text: '#D97706', label: 'Cần cố gắng' }
+    :                   { text: '#EF4444', label: 'Tiếp tục luyện tập' };
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-12">
-      <header className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate('/hoc-vien')}
-            className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4 text-slate-600" />
+    <div className="min-h-screen pb-12" style={{ background: '#F0FDFA' }}>
+
+      {/* ── Top bar ── */}
+      <header className="bg-white border-b border-slate-100 sticky top-0 z-10">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3.5 flex items-center gap-3">
+          <button type="button" onClick={() => navigate('/hoc-vien')}
+            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer flex-shrink-0">
+            <ArrowLeft className="w-4 h-4 text-slate-500" />
           </button>
           <div className="flex-1 min-w-0">
-            <h1 className="text-base font-bold text-slate-900 truncate">{examTitle}</h1>
-            <p className="text-xs text-slate-500">Chế độ xem lại</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-teal-600 leading-none">Kết quả bài thi</p>
+            <h1 className="text-sm font-bold text-slate-800 truncate mt-0.5">{examTitle}</h1>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-6 space-y-6">
-        {/* Score hero */}
-        <section className="rounded-2xl p-6 bg-gradient-to-br from-teal-50 via-white to-teal-50 border border-teal-100">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="md:col-span-2 flex items-center gap-4">
-              <div className={`w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 ${
-                overallPending ? 'bg-gradient-to-br from-amber-400 to-orange-500' : 'bg-teal-600'
-              }`}>
-                {overallPending ? <Clock className="w-10 h-10 text-white" /> : <Trophy className="w-10 h-10 text-white" />}
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+
+        {/* ── Hero: score + stats ── */}
+        <section className="rounded-2xl bg-white overflow-hidden" style={{ border: '1.5px solid #CCFBF1', boxShadow: '0 4px 16px rgba(13,148,136,0.08)' }}>
+          {/* Teal accent line */}
+          <div className="h-1" style={{ background: `linear-gradient(90deg,${TEAL},#5EEAD4)` }} />
+
+          <div className="p-5 sm:p-6">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+
+              {/* Score ring */}
+              <div className="relative flex-shrink-0">
+                <svg className="w-28 h-28 -rotate-90" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="42" fill="none" stroke="#F0FDFA" strokeWidth="8" />
+                  <circle cx="50" cy="50" r="42" fill="none" strokeWidth="8"
+                    stroke={overallPending ? '#FCD34D' : scoreTone.text}
+                    strokeLinecap="round"
+                    strokeDasharray={`${2 * Math.PI * 42}`}
+                    strokeDashoffset={`${2 * Math.PI * 42 * (1 - (overallPending ? 0.5 : scaledPct / 100))}`}
+                    style={{ transition: 'stroke-dashoffset 1s ease' }} />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  {overallPending ? (
+                    <Loader2 className="w-6 h-6 animate-spin" style={{ color: '#D97706' }} />
+                  ) : (
+                    <>
+                      <span style={{ fontSize: 24, fontWeight: 900, color: scoreTone.text, lineHeight: 1 }}>{result.scaled_score}</span>
+                      <span style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 500 }}>/{result.scale_max}</span>
+                    </>
+                  )}
+                </div>
               </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  {overallPending ? 'AI đang chấm phần Nói' : 'Điểm số'}
-                </p>
+
+              {/* Score info */}
+              <div className="flex-1 text-center sm:text-left">
                 {overallPending ? (
                   <>
-                    <p className="text-base font-bold text-amber-700 mt-1">Điểm tổng sẽ hiện sau khi AI chấm xong</p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Phần khách quan (TN): {result.raw_score}/{result.raw_score_max}
+                    <p style={{ fontSize: 18, fontWeight: 800, color: '#92400E' }}>Đang chấm phần Nói</p>
+                    <p style={{ fontSize: 12, color: '#9CA3AF', marginTop: 4 }}>
+                      Điểm thô (Trắc nghiệm): {result.raw_score}/{result.raw_score_max}
                     </p>
-                    <p className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600 mt-1.5">
-                      <Loader2 className="w-3 h-3 animate-spin" /> Đang chấm Speaking…
-                    </p>
+                    <span className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 rounded-full text-xs font-bold"
+                      style={{ background: '#FEF3C7', color: '#B45309' }}>
+                      <Loader2 className="w-3 h-3 animate-spin" /> AI đang chấm Speaking…
+                    </span>
                   </>
                 ) : (
                   <>
-                    <p className="text-4xl font-bold text-slate-900">
+                    <p style={{ fontSize: 22, fontWeight: 900, color: '#1F2937', lineHeight: 1.2 }}>
                       {result.scaled_score}
-                      <span className="text-lg text-slate-400">/{result.scale_max}</span>
+                      <span style={{ fontSize: 14, fontWeight: 500, color: '#9CA3AF' }}>/{result.scale_max} điểm</span>
                     </p>
-                    <p className="text-xs text-slate-500 mt-0.5">Điểm thô: {result.raw_score}/{result.raw_score_max}</p>
+                    <span className="inline-flex items-center gap-1 mt-1 px-2.5 py-0.5 rounded-full text-xs font-bold"
+                      style={{ background: `${scoreTone.text}18`, color: scoreTone.text }}>
+                      {scaledPct >= 50 ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                      {scoreTone.label}
+                    </span>
+                    <p style={{ fontSize: 11, color: '#6B7280', marginTop: 8 }}>
+                      Điểm thô: {result.raw_score}/{result.raw_score_max}
+                    </p>
                     {result.speaking && typeof result.speaking.score === 'number' && (
-                      <p className="inline-flex items-center gap-1 text-xs font-semibold text-teal-700 mt-1">
-                        <Sparkles className="w-3.5 h-3.5" /> Nói (AI): {Number(result.speaking.score).toFixed(1)}/{result.speaking.scale_max ?? 10}
+                      <p className="inline-flex items-center gap-1 mt-1" style={{ fontSize: 11, color: '#7C3AED', fontWeight: 700 }}>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Nói (AI): {Number(result.speaking.score).toFixed(1)}/{result.speaking.scale_max ?? 10}
                       </p>
                     )}
                   </>
                 )}
               </div>
+
+              {/* Quick stats */}
+              <div className="flex sm:flex-col gap-3 sm:gap-2 flex-shrink-0">
+                <div className="rounded-xl p-3 text-center min-w-[72px]" style={{ background: '#F0FDFA', border: '1px solid #CCFBF1' }}>
+                  <p style={{ fontSize: 18, fontWeight: 900, color: TEAL, lineHeight: 1 }}>{accuracy}%</p>
+                  <p style={{ fontSize: 9.5, color: '#6B7280', marginTop: 2 }}>Chính xác</p>
+                </div>
+                <div className="rounded-xl p-3 text-center min-w-[72px]" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                  <p style={{ fontSize: 18, fontWeight: 900, color: '#334155', lineHeight: 1 }}>
+                    {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+                  </p>
+                  <p style={{ fontSize: 9.5, color: '#6B7280', marginTop: 2 }}>Thời gian</p>
+                </div>
+              </div>
             </div>
-            <Stat icon={<Target className="w-5 h-5 text-emerald-600" />} label="Độ chính xác" value={`${accuracy}%`} sub={`${totalCorrect}/${totalQuestions} câu đúng`} tone="emerald" />
-            <Stat icon={<Clock className="w-5 h-5 text-teal-600" />} label="Thời gian" value={`${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`} sub="Đã làm bài" tone="blue" />
+          </div>
+
+          {/* ── Stats divider row ── */}
+          <div className="flex divide-x divide-slate-100 border-t border-slate-100">
+            {[
+              { label: 'Tổng câu', value: `${totalCorrect}/${totalQuestions}` },
+              { label: 'Câu đúng', value: totalCorrect },
+              { label: 'Câu sai', value: totalQuestions - totalCorrect },
+              { label: 'Số phần', value: result.sections.length },
+            ].map(st => (
+              <div key={st.label} className="flex-1 py-3 text-center">
+                <p style={{ fontSize: 15, fontWeight: 800, color: '#1F2937', lineHeight: 1 }}>{st.value}</p>
+                <p style={{ fontSize: 9.5, color: '#9CA3AF', marginTop: 2 }}>{st.label}</p>
+              </div>
+            ))}
           </div>
         </section>
 
-        {/* Per-section breakdown */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {result.sections.map((p, idx) => {
-            const isActive = activeIdx === idx;
-            const isSpeaking = p.type === 'speaking';
-            const spk = result.speaking;
-            const pct = isSpeaking
-              ? (spk ? Math.round((Number(spk.score) / (spk.scale_max ?? 10)) * 100) : 0)
-              : (p.total_count > 0 ? Math.round((p.correct_count / p.total_count) * 100) : 0);
-            return (
-              <button
-                key={p.section_id ?? idx}
-                type="button"
-                onClick={() => setActiveIdx(idx)}
-                className={`rounded-2xl border p-4 text-left transition-all cursor-pointer ${
-                  isActive ? 'border-teal-400 shadow-sm bg-teal-50' : 'border-slate-200 bg-white hover:border-teal-300'
-                }`}
-              >
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 truncate">{p.title}</p>
-                {isSpeaking ? (
-                  <div className="flex items-baseline gap-1 mt-1">
-                    {spk ? (
-                      <>
-                        <span className="text-2xl font-bold text-slate-900 tabular-nums">{Number(spk.score).toFixed(1)}</span>
-                        <span className="text-sm text-slate-400">/{spk.scale_max ?? 10}</span>
-                      </>
+        {/* ── Per-section breakdown ── */}
+        <section>
+          <p style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 10 }}>
+            Chi tiết từng phần
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {result.sections.map((sec, idx) => {
+              const isActive  = activeIdx === idx;
+              const isSpeaking = sec.type === 'speaking';
+              const spk = result.speaking;
+              const pct = isSpeaking
+                ? (spk ? Math.round((Number(spk.score) / (spk.scale_max ?? 10)) * 100) : 0)
+                : (sec.total_count > 0 ? Math.round((sec.correct_count / sec.total_count) * 100) : 0);
+              const meta = getSectionMeta(sec.type);
+              const { Icon } = meta;
+              return (
+                <button key={sec.section_id ?? idx} type="button" onClick={() => setActiveIdx(idx)}
+                  className="rounded-2xl text-left transition-all cursor-pointer overflow-hidden"
+                  style={{
+                    border: isActive ? `2px solid ${meta.color}` : '1.5px solid #E2E8F0',
+                    background: isActive ? `${meta.color}08` : '#fff',
+                    boxShadow: isActive ? `0 0 0 3px ${meta.color}20` : '0 1px 4px rgba(0,0,0,0.04)',
+                  }}>
+                  {/* Type accent */}
+                  <div className="px-3 pt-3 pb-2 flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ background: meta.bg }}>
+                      <Icon className="w-3.5 h-3.5" style={{ color: meta.color }} />
+                    </div>
+                    <span className="text-[10px] font-bold truncate" style={{ color: meta.color }}>
+                      {meta.label}
+                    </span>
+                  </div>
+
+                  <div className="px-3 pb-3">
+                    <p className="text-[11px] font-semibold text-slate-600 truncate mb-1.5">{sec.title}</p>
+
+                    {isSpeaking ? (
+                      <div className="flex items-baseline gap-0.5">
+                        {spk ? (
+                          <>
+                            <span style={{ fontSize: 20, fontWeight: 900, color: meta.color, lineHeight: 1 }}>{Number(spk.score).toFixed(1)}</span>
+                            <span style={{ fontSize: 10, color: '#9CA3AF' }}>/{spk.scale_max ?? 10}</span>
+                          </>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold" style={{ color: '#D97706' }}>
+                            <Loader2 className="w-2.5 h-2.5 animate-spin" />Đang chấm
+                          </span>
+                        )}
+                      </div>
                     ) : (
-                      <span className="text-sm font-semibold text-amber-600">Đang chấm…</span>
+                      <div className="flex items-baseline gap-0.5">
+                        <span style={{ fontSize: 20, fontWeight: 900, color: '#1F2937', lineHeight: 1 }}>{sec.correct_count}</span>
+                        <span style={{ fontSize: 10, color: '#9CA3AF' }}>/{sec.total_count} câu</span>
+                      </div>
                     )}
+
+                    <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: '#F1F5F9' }}>
+                      <div className="h-full rounded-full transition-all duration-700"
+                        style={{ width: `${pct}%`, background: pct >= 70 ? '#10B981' : pct >= 50 ? meta.color : '#F59E0B' }} />
+                    </div>
+                    <p style={{ fontSize: 9.5, color: '#9CA3AF', marginTop: 3 }}>
+                      {isSpeaking ? (spk ? `${pct}% điểm` : 'AI đang xử lý') : `${pct}% đúng`}
+                    </p>
                   </div>
-                ) : (
-                  <div className="flex items-baseline gap-1 mt-1">
-                    <span className="text-2xl font-bold text-slate-900">{p.correct_count}</span>
-                    <span className="text-sm text-slate-400">/{p.total_count}</span>
-                  </div>
-                )}
-                <div className="h-1.5 rounded-full bg-slate-100 mt-2 overflow-hidden">
-                  <div className="h-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
-                </div>
-                <p className="text-[11px] text-slate-500 mt-1">{isSpeaking ? (spk ? `${pct}% điểm` : 'AI đang chấm') : `${pct}% đúng`}</p>
-              </button>
-            );
-          })}
+                </button>
+              );
+            })}
+          </div>
         </section>
 
-        {/* Review */}
+        {/* ── Review section ── */}
         {activeSection && (
-          <SectionView
-            key={activeSection.id}
-            section={activeSection}
-            answers={answers}
-            correctAnswers={result.correct_answers}
-            onAnswerChange={() => {}}
-            mode="review"
-            speakingParts={result.speaking?.parts}
-            speakingAudio={speakingAudio}
-          />
+          <section className="rounded-2xl bg-white overflow-hidden"
+            style={{ border: '1.5px solid #E2E8F0', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
+            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2">
+              {(() => { const m = getSectionMeta(activeSection.type ?? ''); const I = m.Icon; return (
+                <><div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: m.bg }}>
+                  <I className="w-3.5 h-3.5" style={{ color: m.color }} />
+                </div>
+                <p style={{ fontSize: 13, fontWeight: 700, color: '#1F2937' }}>{activeSection.title ?? 'Xem lại'}</p></>
+              ); })()}
+            </div>
+            <div className="p-4">
+              <SectionView
+                key={activeSection.id}
+                section={activeSection}
+                answers={answers}
+                correctAnswers={result.correct_answers}
+                onAnswerChange={() => {}}
+                mode="review"
+                speakingParts={result.speaking?.parts}
+                speakingAudio={speakingAudio}
+              />
+            </div>
+          </section>
         )}
       </main>
     </div>
   );
 }
 
-function Stat({ icon, label, value, sub, tone }: { icon: React.ReactNode; label: string; value: string; sub: string; tone: 'emerald' | 'blue' }) {
-  const bg = tone === 'emerald' ? 'bg-emerald-50' : 'bg-teal-50';
-  return (
-    <div className="rounded-2xl p-4 bg-white border border-slate-200">
-      <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center mb-3`}>{icon}</div>
-      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{label}</p>
-      <p className="text-xl font-bold text-slate-900 mt-0.5">{value}</p>
-      <p className="text-[11px] text-slate-500 mt-0.5">{sub}</p>
-    </div>
-  );
-}
