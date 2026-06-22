@@ -107,6 +107,11 @@ export function ThptGradingDetail({ submissionId }: Props) {
   const [weightEditorOpen, setWeightEditorOpen] = useState(false);
 
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  // Phần đang hiển thị trong tầm nhìn (để sáng đèn tab tương ứng).
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+  // Bỏ qua scroll-spy trong lúc đang cuộn tới phần được bấm.
+  const isClickScrolling = useRef(false);
 
   const load = () => {
     setPage('loading');
@@ -293,6 +298,53 @@ export function ThptGradingDetail({ submissionId }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recompute?.weightedTotal, autoWeighted]);
 
+  // Scroll-spy: sáng đèn tab của phần đang hiển thị trong tầm nhìn.
+  useEffect(() => {
+    if (page !== 'ready' || !data) return;
+    if (typeof IntersectionObserver === 'undefined') return;
+    const els = data.sections
+      .map((s, idx) => sectionRefs.current[s.section_id ?? s.type] ?? sectionRefs.current[`s-${idx}`])
+      .filter((el): el is HTMLElement => !!el);
+    if (els.length === 0) return;
+
+    const visible = new Map<Element, number>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) visible.set(e.target, e.intersectionRatio);
+          else visible.delete(e.target);
+        }
+        if (isClickScrolling.current) return;
+        // Chọn phần đang hiển thị gần đỉnh nhất (top nhỏ nhất).
+        let topEl: Element | null = null;
+        let topPos = Infinity;
+        for (const el of visible.keys()) {
+          const top = el.getBoundingClientRect().top;
+          if (top < topPos) {
+            topPos = top;
+            topEl = el;
+          }
+        }
+        if (topEl) {
+          const sid = (topEl as HTMLElement).dataset.sid;
+          if (sid) setActiveSection(sid);
+        }
+      },
+      // rootMargin trừ chiều cao header (~140px) để xác định phần "đang xem".
+      { rootMargin: '-140px 0px -55% 0px', threshold: [0, 0.1, 0.5, 1] },
+    );
+    els.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, data]);
+
+  // Tự cuộn tab đang active vào giữa thanh tab để giáo viên luôn thấy.
+  useEffect(() => {
+    if (!activeSection) return;
+    const tab = tabRefs.current[activeSection];
+    if (tab) tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [activeSection]);
+
   const totalOverrideCount =
     Object.keys(answerOverride).length + Object.keys(correctOverride).length;
 
@@ -339,7 +391,14 @@ export function ThptGradingDetail({ submissionId }: Props) {
 
   const scrollToSection = (sid: string) => {
     const el = sectionRefs.current[sid];
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!el) return;
+    setActiveSection(sid);
+    // Tạm khoá scroll-spy để tránh nhấp nháy khi đang cuộn mượt.
+    isClickScrolling.current = true;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.setTimeout(() => {
+      isClickScrolling.current = false;
+    }, 700);
   };
 
   const doPublish = async () => {
@@ -472,22 +531,42 @@ export function ThptGradingDetail({ submissionId }: Props) {
         {/* Section navigation tabs */}
         {recompute && recompute.liveSections.length > 1 && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-2.5 flex items-center gap-2 overflow-x-auto scrollbar-thin">
-            {recompute.liveSections.map((s, i) => (
-              <button
-                key={s.sid}
-                type="button"
-                onClick={() => scrollToSection(s.sid)}
-                className="group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-200 text-xs font-semibold text-slate-600 hover:text-teal-700 transition-colors cursor-pointer flex-shrink-0"
-              >
-                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-200 group-hover:bg-teal-200 text-[10px] font-bold tabular-nums">
-                  {i + 1}
-                </span>
-                {TYPE_LABEL[s.type] ?? 'Phần'}
-                {s.overrideCount > 0 && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" title="Có chỉnh sửa" />
-                )}
-              </button>
-            ))}
+            {recompute.liveSections.map((s, i) => {
+              const isActive = activeSection === s.sid;
+              return (
+                <button
+                  key={s.sid}
+                  ref={(el) => {
+                    tabRefs.current[s.sid] = el;
+                  }}
+                  type="button"
+                  onClick={() => scrollToSection(s.sid)}
+                  aria-current={isActive ? 'true' : undefined}
+                  className={`group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all duration-200 cursor-pointer flex-shrink-0 ${
+                    isActive
+                      ? 'bg-teal-600 border-teal-600 text-white shadow-sm shadow-teal-600/30'
+                      : 'bg-slate-50 hover:bg-teal-50 border-slate-200 hover:border-teal-200 text-slate-600 hover:text-teal-700'
+                  }`}
+                >
+                  <span
+                    className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold tabular-nums transition-colors ${
+                      isActive
+                        ? 'bg-white/25 text-white'
+                        : 'bg-slate-200 group-hover:bg-teal-200 text-slate-600'
+                    }`}
+                  >
+                    {i + 1}
+                  </span>
+                  {TYPE_LABEL[s.type] ?? 'Phần'}
+                  {s.overrideCount > 0 && (
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-amber-300' : 'bg-amber-500'}`}
+                      title="Có chỉnh sửa"
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
       </header>
@@ -504,6 +583,7 @@ export function ThptGradingDetail({ submissionId }: Props) {
               return (
                 <section
                   key={sid}
+                  data-sid={section.section_id ?? section.type}
                   ref={(el) => {
                     sectionRefs.current[section.section_id ?? section.type] = el;
                   }}
