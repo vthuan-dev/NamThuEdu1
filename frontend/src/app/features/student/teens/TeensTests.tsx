@@ -15,7 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Clock, ListChecks, Search, Play, RotateCcw,
   Sparkles, Gift, ClipboardList, BookOpen, AlertTriangle,
-  Headphones, Mic, PenLine, FileText, ArrowRight,
+  Headphones, Mic, PenLine, FileText, ArrowRight, CheckCircle,
 } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
 import { usePageTitle, PAGE_TITLES } from '../../../../hooks/usePageTitle';
@@ -142,14 +142,20 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
 
       {/* Action */}
       <div className="mt-auto">
-        {isCompleted ? (
-          <Link to={startTo}
+        {isCompleted && item.submissionId ? (
+          <Link to={`${BASE}/ket-qua/${item.submissionId}`}
             className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
-            style={{ background: TEAL }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = '#0B7E74')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = TEAL)}>
-            <RotateCcw className="w-4 h-4" /> Làm lại
+            style={{ background: '#10B981' }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#059669')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = '#10B981')}>
+            <CheckCircle className="w-4 h-4" /> Xem kết quả
+            <ArrowRight className="w-4 h-4 opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
           </Link>
+        ) : isOverdue ? (
+          <div className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold cursor-not-allowed"
+            style={{ background: '#FEE2E2', color: '#DC2626' }}>
+            <AlertTriangle className="w-4 h-4" /> Quá hạn
+          </div>
         ) : (
           <Link to={startTo}
             className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
