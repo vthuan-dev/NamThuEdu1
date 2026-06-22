@@ -164,6 +164,18 @@ export function TestHistory() {
   const bestScore  = bestEntry ? toNum(bestEntry.sScore) : 0;
   const bestMax    = bestEntry ? toNum(bestEntry.exam?.eMax_score ?? 100) : 100;
 
+  /* ── Per-type records (VSTEP 0-10, IELTS band 0-9) ── */
+  const vstepSubs = submitted.filter(s => s.exam?.eType?.toUpperCase() === "VSTEP");
+  const ieltsSubs = submitted.filter(s => s.exam?.eType?.toUpperCase() === "IELTS");
+  // sScore for VSTEP = overallAvg * 10  →  display as sScore / 10 (0-10 scale)
+  // sScore for IELTS = band * 10        →  display as sScore / 10 (0-9 band)
+  const bestVstepRaw  = vstepSubs.reduce((b, s) => Math.max(b, toNum(s.sScore)), 0);
+  const bestIeltsRaw  = ieltsSubs.reduce((b, s) => Math.max(b, toNum(s.sScore)), 0);
+  const bestVstepDisp = vstepSubs.length > 0 && bestVstepRaw > 0 ? bestVstepRaw / 10 : null;
+  const bestIeltsDisp = ieltsSubs.length > 0 && bestIeltsRaw > 0 ? bestIeltsRaw / 10 : null;
+  const avgVstepDisp  = vstepSubs.length > 0 ? vstepSubs.reduce((s, x) => s + toNum(x.sScore), 0) / vstepSubs.length / 10 : null;
+  const avgIeltsDisp  = ieltsSubs.length > 0 ? ieltsSubs.reduce((s, x) => s + toNum(x.sScore), 0) / ieltsSubs.length / 10 : null;
+
   /* CEFR distribution */
   const cefrDist = useMemo(() => {
     const d: Record<string, number> = { C1: 0, B2: 0, B1: 0, A2: 0, A1: 0 };
@@ -305,45 +317,61 @@ export function TestHistory() {
           </div>
         </div>
 
-        {/* Avg */}
+        {/* VSTEP Record — 0-10 scale */}
         <div className="flex-1 flex items-center gap-3 px-4 py-3.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "#DBEAFE" }}>
-            <TrendingUp className="w-3.5 h-3.5" style={{ color: "#2563EB" }} />
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "#EDE9FE" }}>
+            <Trophy className="w-3.5 h-3.5" style={{ color: PURPLE }} />
           </div>
           <div className="min-w-0 flex-1">
-            <p style={{ fontSize: 20, fontWeight: 900, color: "#1F1344", lineHeight: 1 }}>
-              {avgScore.toFixed(1)}
-              <span style={{ fontSize: 11, fontWeight: 500, color: "#9CA3AF" }}> /{Math.round(avgMax)}</span>
-            </p>
-            <p style={{ fontSize: 10.5, color: "#9CA3AF", marginTop: 2 }}>Điểm trung bình</p>
-            <div className="mt-1.5 h-1 rounded-full overflow-hidden" style={{ background: "#DBEAFE" }}>
-              <div className="h-full rounded-full" style={{
-                width: `${avgMax > 0 ? Math.min(avgScore / avgMax * 100, 100) : 0}%`,
-                background: "linear-gradient(90deg,#2563EB,#60A5FA)"
-              }} />
+            <div className="flex items-baseline gap-1">
+              <p style={{ fontSize: 20, fontWeight: 900, color: "#1F1344", lineHeight: 1 }}>
+                {bestVstepDisp != null ? bestVstepDisp.toFixed(1) : "—"}
+              </p>
+              {bestVstepDisp != null && (
+                <span style={{ fontSize: 10, color: "#9CA3AF", fontWeight: 500 }}>/10.0</span>
+              )}
             </div>
+            <p style={{ fontSize: 10.5, color: "#9CA3AF", marginTop: 2 }}>Kỉ lục VSTEP</p>
+            <p style={{ fontSize: 10, color: PURPLE, fontWeight: 600, marginTop: 1 }}>
+              {vstepSubs.length} bài{avgVstepDisp != null ? ` · TB ${avgVstepDisp.toFixed(1)}` : ""}
+            </p>
+            {bestVstepDisp != null && (
+              <div className="mt-1.5 h-1 rounded-full overflow-hidden" style={{ background: "#EDE9FE" }}>
+                <div className="h-full rounded-full transition-all duration-700" style={{
+                  width: `${Math.min((bestVstepDisp / 10) * 100, 100)}%`,
+                  background: `linear-gradient(90deg,${PURPLE},${PURPLE_MID})`
+                }} />
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Best */}
+        {/* IELTS Record — band 0-9 scale */}
         <div className="flex-1 flex items-center gap-3 px-4 py-3.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "#FEF3C7" }}>
-            <Star className="w-3.5 h-3.5" style={{ color: "#D97706" }} />
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "#D1FAE5" }}>
+            <Trophy className="w-3.5 h-3.5" style={{ color: "#059669" }} />
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-1">
               <p style={{ fontSize: 20, fontWeight: 900, color: "#1F1344", lineHeight: 1 }}>
-                {bestScore > 0 ? bestScore.toFixed(1) : "—"}
+                {bestIeltsDisp != null ? bestIeltsDisp.toFixed(1) : "—"}
               </p>
-              {bestScore > 0 && (
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
-                  style={{ background: getCEFR(bestScore, bestMax).bg, color: getCEFR(bestScore, bestMax).color }}>
-                  {getCEFR(bestScore, bestMax).label}
-                </span>
+              {bestIeltsDisp != null && (
+                <span style={{ fontSize: 10, color: "#9CA3AF", fontWeight: 500 }}>/9.0</span>
               )}
             </div>
-            <p style={{ fontSize: 10.5, color: "#9CA3AF", marginTop: 2 }}>Điểm cao nhất</p>
-            <p style={{ fontSize: 10, color: "#D97706", fontWeight: 600, marginTop: 1 }}>kỷ lục cá nhân</p>
+            <p style={{ fontSize: 10.5, color: "#9CA3AF", marginTop: 2 }}>Kỉ lục IELTS</p>
+            <p style={{ fontSize: 10, color: "#059669", fontWeight: 600, marginTop: 1 }}>
+              {ieltsSubs.length} bài{avgIeltsDisp != null ? ` · TB ${avgIeltsDisp.toFixed(1)}` : ""}
+            </p>
+            {bestIeltsDisp != null && (
+              <div className="mt-1.5 h-1 rounded-full overflow-hidden" style={{ background: "#D1FAE5" }}>
+                <div className="h-full rounded-full transition-all duration-700" style={{
+                  width: `${Math.min((bestIeltsDisp / 9) * 100, 100)}%`,
+                  background: "linear-gradient(90deg,#059669,#10B981)"
+                }} />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -727,7 +755,7 @@ export function TestHistory() {
                 </div>
 
                 {/* Quick stats row */}
-                <div className="flex divide-x" style={{ borderBottom: "1.5px solid #F0F0F8", divideColor: "#F0F0F8" }}>
+                <div className="flex divide-x divide-[#F0F0F8]" style={{ borderBottom: "1.5px solid #F0F0F8" }}>
                   {[
                     { label: "Bài đã thi", value: submitted.length },
                     { label: "TB điểm", value: avgScore.toFixed(1) },
