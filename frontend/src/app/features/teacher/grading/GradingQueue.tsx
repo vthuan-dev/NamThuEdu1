@@ -353,8 +353,12 @@ export function GradingQueue() {
               ))}
               {/* Hover guide icon */}
               <div className="relative ml-1 pb-1 group/helpicon">
-                <button type="button" className="w-5 h-5 flex items-center justify-center text-slate-300 hover:text-violet-500 transition-colors">
+                <button type="button" className="relative w-5 h-5 flex items-center justify-center text-slate-300 hover:text-violet-500 transition-colors">
                   <HelpCircle className="w-4 h-4" />
+                  <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500" />
+                  </span>
                 </button>
                 {/* Popover */}
                 <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 hidden group-hover/helpicon:block w-[320px]">

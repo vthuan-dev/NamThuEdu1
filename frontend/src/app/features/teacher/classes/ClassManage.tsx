@@ -124,8 +124,12 @@ export function ClassManage() {
           <h1 className="text-2xl sm:text-3xl font-bold text-[#111827] tracking-tight">Lớp học của tôi</h1>
           {/* Hover guide */}
           <div className="relative group/classguide">
-            <button type="button" className="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-teal-500 transition-colors mt-0.5">
+            <button type="button" className="relative w-6 h-6 flex items-center justify-center text-slate-300 hover:text-teal-500 transition-colors mt-0.5">
               <HelpCircle className="w-5 h-5" />
+              <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500" />
+              </span>
             </button>
             <div className="pointer-events-none absolute top-full left-0 mt-2 z-50 hidden group-hover/classguide:block w-[340px]">
               <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden">
