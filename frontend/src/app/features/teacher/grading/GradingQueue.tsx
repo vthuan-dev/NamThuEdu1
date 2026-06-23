@@ -195,7 +195,10 @@ export function GradingQueue() {
     reviewRate:   submissions.length ? Math.round((reviewedList.length / submissions.length) * 100) : 0,
   };
 
-  const baseList = reviewTab === "pending" ? pendingReview : reviewTab === "reviewed" ? reviewedList : submissions;
+  // For practice tab: no review workflow — always show all
+  const baseList = sourceTab === 'practice'
+    ? submissions
+    : (reviewTab === "pending" ? pendingReview : reviewTab === "reviewed" ? reviewedList : submissions);
 
   // ─── Tùy chọn cho bộ lọc (rút gọn từ dữ liệu đã tải) ───────────────────────
   const examOptions = useMemo(() => {
@@ -318,15 +321,14 @@ export function GradingQueue() {
                   }`}
                 >
                   {label}
-                  {key === 'assigned' && (
-                    <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                      sourceTab === 'assigned' ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-500'
-                    }`}>{submissions.length}</span>
-                  )}
+                  <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                    sourceTab === key ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-500'
+                  }`}>{submissions.length}</span>
                 </button>
               ))}
             </div>
-            {/* Review sub-tabs */}
+            {/* Review sub-tabs — only for assigned */}
+            {sourceTab === 'assigned' && (
             <div className="flex items-center gap-1 px-5 pt-3 border-b border-slate-100">
               {TABS.map(({ key, label, count, icon: Icon }) => (
                 <button
@@ -345,20 +347,29 @@ export function GradingQueue() {
                   }`}>{count}</span>
                 </button>
               ))}
-              <div className="ml-auto pb-2 flex items-center gap-3">
-                {lastUpdated && (
-                  <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                    {isPolling && <RefreshCw className="w-3 h-3 animate-spin text-violet-400" />}
-                    {t("teacher.grading.queuePage.updatedAt")} {lastUpdated.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                  </span>
-                )}
-                <button
-                  onClick={() => fetchSubmissions(false)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:bg-slate-100 transition-colors"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" /> {t("teacher.grading.queuePage.refresh")}
-                </button>
               </div>
+            )}
+            {/* Practice tab: simple count line */}
+            {sourceTab === 'practice' && (
+              <div className="px-5 py-2.5 border-b border-slate-100 flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-500">Tất cả bài tự luyện</span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">{submissions.length}</span>
+              </div>
+            )}
+            {/* Refresh bar — always shown */}
+            <div className="flex items-center justify-end gap-3 px-5 py-2 border-b border-slate-100">
+              {lastUpdated && (
+                <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                  {isPolling && <RefreshCw className="w-3 h-3 animate-spin text-violet-400" />}
+                  {t("teacher.grading.queuePage.updatedAt")} {lastUpdated.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                </span>
+              )}
+              <button
+                onClick={() => fetchSubmissions(false)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:bg-slate-100 transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> {t("teacher.grading.queuePage.refresh")}
+              </button>
             </div>
 
             {/* Search + filter */}
@@ -521,9 +532,11 @@ export function GradingQueue() {
                         )}
                       </div>
                     </th>
+                    {sourceTab === 'assigned' && (
                     <th className="px-5 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                       {t("teacher.grading.table.review")}
                     </th>
+                    )}
                     <th className="px-5 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                       {t("teacher.grading.table.actions")}
                     </th>
@@ -631,7 +644,8 @@ export function GradingQueue() {
                             <span className="text-slate-300 text-sm">—</span>
                           )}
                         </td>
-                        {/* Review status */}
+                        {/* Review status — only for assigned */}
+                        {sourceTab === 'assigned' && (
                         <td className="px-5 py-4 whitespace-nowrap">
                           {isReviewed ? (
                             <div className="flex items-center gap-1.5">
@@ -645,6 +659,7 @@ export function GradingQueue() {
                             </div>
                           )}
                         </td>
+                        )}
                         {/* Actions */}
                         <td className="px-5 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
@@ -659,6 +674,7 @@ export function GradingQueue() {
                             >
                               <Eye className="w-4 h-4" />
                             </Link>
+                            {sourceTab === 'assigned' && (
                             <button
                               onClick={() => setReviewTarget(sub)}
                               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
@@ -670,6 +686,7 @@ export function GradingQueue() {
                               <UserCheck className="w-3.5 h-3.5" />
                               {isReviewed ? t("teacher.grading.queuePage.reviewAgain") : t("teacher.grading.queuePage.review")}
                             </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -684,8 +701,17 @@ export function GradingQueue() {
                   <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
                     <Inbox className="w-8 h-8 text-slate-300" />
                   </div>
-                  <p className="text-slate-500 font-semibold">{t("teacher.grading.queuePage.empty.title")}</p>
-                  <p className="text-slate-400 text-sm">{t("teacher.grading.queuePage.empty.subtitle")}</p>
+                  {sourceTab === 'practice' ? (
+                    <>
+                      <p className="text-slate-500 font-semibold">Chưa có bài tự luyện nào</p>
+                      <p className="text-slate-400 text-sm">Học viên chưa tự luyện bài nào trong hệ thống</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-slate-500 font-semibold">{t("teacher.grading.queuePage.empty.title")}</p>
+                      <p className="text-slate-400 text-sm">{t("teacher.grading.queuePage.empty.subtitle")}</p>
+                    </>
+                  )}
                 </div>
               )}
             </div>
