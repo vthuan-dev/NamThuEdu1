@@ -318,22 +318,34 @@ export function GradingQueue() {
           <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
             {/* Source tabs: Đề đã giao / Tự luyện + refresh inline */}
             <div className="flex items-center gap-0 px-5 pt-2 border-b border-slate-100">
-              {([{ key: 'assigned', label: 'Đề đã giao', color: 'violet' }, { key: 'practice', label: 'Tự luyện', color: 'slate' }] as const).map(({ key, label }) => (
+              {([
+                { key: 'assigned', label: 'Đề đã giao', hint: 'GV giao — cần chấm' },
+                { key: 'practice', label: 'Tự luyện',   hint: 'HV tự ôn tập' },
+              ] as const).map(({ key, label, hint }) => (
                 <button
                   key={key}
                   onClick={() => { setSourceTab(key); setReviewTab('all'); setSubmissions([]); setLoading(true); }}
-                  className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all ${
+                  className={`flex flex-col items-start px-4 py-2 border-b-2 transition-all ${
                     sourceTab === key
-                      ? 'border-violet-600 text-violet-700'
-                      : 'border-transparent text-slate-400 hover:text-slate-600'
+                      ? 'border-violet-600'
+                      : 'border-transparent hover:border-slate-300'
                   }`}
                 >
-                  {label}
-                  {sourceTab === key && !loading && submissions.length > 0 && (
-                    <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700">
-                      {submissions.length}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-sm transition-all ${
+                      sourceTab === key
+                        ? 'font-extrabold text-violet-700'
+                        : 'font-medium text-slate-400 hover:text-slate-600'
+                    }`}>{label}</span>
+                    {sourceTab === key && !loading && submissions.length > 0 && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700">
+                        {submissions.length}
+                      </span>
+                    )}
+                  </div>
+                  <span className={`text-[10px] mt-0.5 transition-all ${
+                    sourceTab === key ? 'text-violet-400' : 'text-slate-300'
+                  }`}>{hint}</span>
                 </button>
               ))}
               <div className="ml-auto flex items-center gap-2 pb-1">
