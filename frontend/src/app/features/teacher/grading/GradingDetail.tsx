@@ -623,16 +623,22 @@ function VstepGradingDetailInternal() {
             />
           ) : question.options && question.options.length > 0 ? (
             <div className="space-y-2 mt-2">
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Các đáp án lựa chọn</p>
+              <div className="flex items-center gap-3 mb-1">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Các đáp án lựa chọn</p>
+                <div className="flex items-center gap-2 text-[10px]">
+                  <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-100 text-rose-600 font-bold">👤 HV chọn</span>
+                  <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-600 font-bold">✓ Đáp án đúng</span>
+                </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {question.options.map((opt) => {
                   const isSelected = question.studentAnswer === opt.letter || question.studentAnswer === opt.content;
                   const isCorrect = opt.isCorrect;
                   let bgStyle = "bg-slate-50 border-slate-200 text-slate-700";
-                  if (isSelected) {
-                    bgStyle = isCorrect
-                      ? "bg-emerald-50 border-emerald-400 text-emerald-800"
-                      : "bg-rose-50 border-rose-400 text-rose-800";
+                  if (isSelected && !isCorrect) {
+                    bgStyle = "bg-rose-50 border-rose-400 text-rose-800 border-2";
+                  } else if (isSelected && isCorrect) {
+                    bgStyle = "bg-emerald-50 border-emerald-400 text-emerald-800 border-2";
                   } else if (isCorrect) {
                     bgStyle = "bg-emerald-50/50 border-emerald-300 text-emerald-700 border-dashed";
                   }
@@ -645,20 +651,22 @@ function VstepGradingDetailInternal() {
                           changeCorrectOption(question.id, opt.letter);
                         }
                       }}
-                      className={`flex items-start gap-2 px-3 py-2.5 rounded-xl border text-sm transition-all ${bgStyle} ${isClickable ? 'cursor-pointer hover:ring-2 hover:ring-orange-400' : ''}`}
+                      className={`relative flex items-start gap-2 px-3 py-2.5 rounded-xl border text-sm transition-all ${bgStyle} ${isClickable ? 'cursor-pointer hover:ring-2 hover:ring-orange-400' : ''}`}
                     >
                       <span className={`font-bold flex-shrink-0 ${isClickable ? 'bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded' : ''}`}>{opt.letter}.</span>
-                      <span className="leading-snug">{opt.content}</span>
-                      {isSelected && (
-                        <span className="ml-auto text-xs font-bold uppercase">
-                          {isCorrect ? "Đúng" : "Sai (Học sinh chọn)"}
-                        </span>
-                      )}
-                      {!isSelected && isCorrect && (
-                        <span className="ml-auto text-xs font-bold uppercase text-emerald-600">
-                          Đáp án đúng
-                        </span>
-                      )}
+                      <span className="leading-snug flex-1">{opt.content}</span>
+                      <div className="ml-auto flex flex-col items-end gap-1 flex-shrink-0">
+                        {isSelected && (
+                          <span className={`flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap ${isCorrect ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                            👤 HV chọn
+                          </span>
+                        )}
+                        {isCorrect && (
+                          <span className="flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 whitespace-nowrap">
+                            ✓ Đáp án đúng
+                          </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
