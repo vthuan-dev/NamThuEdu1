@@ -369,7 +369,19 @@ export function GradingQueue() {
                         </div>
                         <div>
                           <p className="text-xs font-bold text-slate-800 mb-0.5">Đề đã giao</p>
-                          <p className="text-[11px] text-slate-500 leading-relaxed">Bài làm từ đề GV giao. Các bài có <span className="font-semibold text-violet-600">Writing / Speaking</span> sẽ được AI chấm tự động — GV cần <span className="font-semibold text-violet-600">Xét duyệt</span> để kiểm tra lại, thêm nhận xét và xác nhận. Bài chỉ trắc nghiệm thì AI chấm ngay, không cần xét duyệt.</p>
+                          <p className="text-[11px] text-slate-500 leading-relaxed">
+                            Bài làm từ đề GV giao. Cách chấm tuỳ loại câu hỏi:
+                          </p>
+                          <ul className="mt-1.5 space-y-1 text-[11px] text-slate-500">
+                            <li className="flex items-start gap-1.5">
+                              <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+                              <span><span className="font-semibold text-slate-600">Trắc nghiệm / có đáp án sẵn</span> — hệ thống tự chấm ngay, không cần AI.</span>
+                            </li>
+                            <li className="flex items-start gap-1.5">
+                              <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0" />
+                              <span><span className="font-semibold text-violet-600">Writing / Speaking</span> — AI chấm tự động. GV cần <span className="font-semibold text-violet-600">Xét duyệt</span> để kiểm tra lại, thêm nhận xét và xác nhận.</span>
+                            </li>
+                          </ul>
                         </div>
                       </div>
                       <div className="flex gap-3">
