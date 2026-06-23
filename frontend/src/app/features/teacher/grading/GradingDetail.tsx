@@ -697,8 +697,27 @@ function VstepGradingDetailInternal() {
                 </div>
 
                 <div>
-                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Đánh giá kết quả của học viên</p>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Đánh giá kết quả</p>
+                    {!isOverrideKey && (
+                      <span className="text-[10px] text-slate-400 italic">
+                        · Nếu đề thi bị sai đáp án, dùng <span className="text-orange-500 font-semibold">Sửa lại đáp án đúng</span> để chỉnh
+                      </span>
+                    )}
+                  </div>
+                  {/* Step guide — chỉ hiện khi chưa vào override mode */}
+                  {!isOverrideKey && (
+                    <div className="mb-2 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-orange-50 border border-orange-100 text-[11px] text-orange-700">
+                      <Sparkles className="w-3.5 h-3.5 flex-shrink-0 text-orange-400" />
+                      <span>
+                        <span className="font-bold">Muốn sửa đáp án đúng?</span>
+                        {' '}Nhấn <span className="font-bold text-orange-600 bg-orange-100 px-1 rounded">Sửa lại đáp án đúng</span>
+                        {' '}→ Click chọn đáp án đúng (A/B/C/D) →
+                        {' '}Nhấn <span className="font-bold text-emerald-600 bg-emerald-50 px-1 rounded">Lưu lại đáp án</span>
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex gap-2 flex-wrap">
                     <button
                       onClick={() => resetToOriginalKey(question.id)}
                       className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all duration-300 ease-out border hover:scale-105 active:scale-[0.98] cursor-pointer ${
@@ -712,8 +731,6 @@ function VstepGradingDetailInternal() {
                     </button>
                     <button
                       onClick={() => {
-                        // Chỉ bật chế độ sửa — KHÔNG tự ý đổi đáp án đúng sang A.
-                        // Giữ nguyên đáp án hiện tại để giáo viên tự click chọn lại.
                         setOverrideKeyIds((prev) => { const s = new Set(prev); s.add(question.id); return s; });
                       }}
                       className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all duration-300 ease-out border hover:scale-105 active:scale-[0.98] cursor-pointer ${
@@ -745,9 +762,14 @@ function VstepGradingDetailInternal() {
               </div>
 
               {isOverrideKey && (
-                <p className="text-xs text-amber-600 font-semibold animate-pulse">
-                  ℹ️ Đang ở chế độ sửa đáp án đúng. Vui lòng click trực tiếp vào chữ A, B, C hoặc D của đáp án trên đây để chọn lại đáp án đúng cho câu này.
-                </p>
+                <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
+                  <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                  <div className="text-xs text-amber-700 leading-relaxed">
+                    <span className="font-bold">Đang ở chế độ sửa đáp án.</span>
+                    {' '}Click trực tiếp vào ô <span className="font-bold bg-orange-100 text-orange-700 px-1 rounded">A</span> / <span className="font-bold bg-orange-100 text-orange-700 px-1 rounded">B</span> / <span className="font-bold bg-orange-100 text-orange-700 px-1 rounded">C</span> / <span className="font-bold bg-orange-100 text-orange-700 px-1 rounded">D</span> bên trên để chọn đáp án đúng mới.
+                    {' '}Sau đó nhấn <span className="font-bold text-emerald-700">Lưu lại đáp án</span> để xác nhận.
+                  </div>
+                </div>
               )}
             </div>
           ) : (
