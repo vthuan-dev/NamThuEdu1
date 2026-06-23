@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Plus, Users, School, AlertCircle, Trash2, Pencil, ArrowRightLeft,
-  Loader2, GraduationCap, Layers, UserCog, Check, X,
+  Loader2, GraduationCap, Layers, UserCog, Check, X, HelpCircle,
+  ClipboardList, ArrowLeftRight, UserPlus2,
 } from "lucide-react";
 import { classMgmtApi, ClassItem, CoTeacherInvitation, ClassRequest } from "../../../../services/classMgmtApi";
 import { useToastContext } from "../../../../contexts/ToastContext";
@@ -119,7 +120,60 @@ export function ClassManage() {
   const Header = (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-[#111827] tracking-tight">Lớp học của tôi</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#111827] tracking-tight">Lớp học của tôi</h1>
+          {/* Hover guide */}
+          <div className="relative group/classguide">
+            <button type="button" className="w-6 h-6 flex items-center justify-center text-slate-300 hover:text-teal-500 transition-colors mt-0.5">
+              <HelpCircle className="w-5 h-5" />
+            </button>
+            <div className="pointer-events-none absolute top-full left-0 mt-2 z-50 hidden group-hover/classguide:block w-[340px]">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden">
+                <div className="px-4 py-3 bg-teal-50 border-b border-teal-100">
+                  <p className="text-xs font-bold text-teal-700 uppercase tracking-wider">Hướng dẫn — Quản lý lớp học</p>
+                </div>
+                <div className="p-4 space-y-3">
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Plus className="w-4 h-4 text-teal-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-800 mb-0.5">Tạo lớp mới</p>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">Nhấn nút <span className="font-semibold text-teal-600">+ Tạo lớp mới</span> để tạo lớp. Chọn độ tuổi (Kids / Teens / Adults) phù hợp với đối tượng học viên.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <ClipboardList className="w-4 h-4 text-teal-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-800 mb-0.5">Quản lý lớp</p>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">Nhấn <span className="font-semibold text-teal-600">Quản lý lớp</span> trên từng thẻ để vào trang chi tiết — thêm học viên, giao đề thi, xem tiến độ và gửi thông báo.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <ArrowLeftRight className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-800 mb-0.5">Bàn giao & Xóa lớp</p>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">Nhấn <span className="font-semibold text-amber-600">✏️</span> để sửa, <span className="font-semibold text-red-500">🗑</span> để gửi yêu cầu xóa. Cả hai thao tác cần <span className="font-semibold">admin duyệt</span> trước khi có hiệu lực.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-violet-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <UserPlus2 className="w-4 h-4 text-violet-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-800 mb-0.5">Đồng quản lý</p>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">GV khác có thể mời bạn cùng quản lý lớp của họ. Lời mời sẽ hiện ở đầu trang — chấp nhận để thêm lớp vào danh sách của bạn.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
         <p className="text-[#6B7280] text-sm mt-1">Quản lý lớp, học viên, giao đề, thông báo và mục tiêu</p>
       </div>
       <button onClick={openCreate} className={`${btnPrimary} px-5 py-3`}>
