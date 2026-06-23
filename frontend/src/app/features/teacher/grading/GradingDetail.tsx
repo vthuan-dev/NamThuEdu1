@@ -174,6 +174,7 @@ function VstepGradingDetailInternal() {
   // Toggle transcript visibility per speaking question (false = hidden by default)
   const [showTranscripts, setShowTranscripts] = useState<Record<string, boolean>>({});
   const [activeSkillTab, setActiveSkillTab] = useState<VstepSkill | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
 
   // ── Fetch submission from API ────────────────────────────────────────────
   useEffect(() => {
@@ -1643,6 +1644,75 @@ function VstepGradingDetailInternal() {
       ) : (
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto" style={{ background: "#EEEEF3" }}>
         <div className="px-6 py-5 space-y-5">
+
+          {/* ── Teacher guide banner ── */}
+          <div className="rounded-xl border border-blue-200 bg-blue-50 overflow-hidden">
+            <button
+              onClick={() => setShowGuide(g => !g)}
+              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-blue-100/60 transition-colors"
+            >
+              <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <BookOpen className="w-4 h-4 text-blue-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-blue-800">Hướng dẫn sử dụng trang chấm điểm</p>
+                <p className="text-[11px] text-blue-500">{showGuide ? 'Nhấn để thu gọn' : 'Nhấn để xem hướng dẫn chi tiết cho giáo viên'}</p>
+              </div>
+              {showGuide ? <ChevronUp className="w-4 h-4 text-blue-500 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-blue-500 flex-shrink-0" />}
+            </button>
+            {showGuide && (
+              <div className="px-4 pb-4 pt-1 grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[
+                  {
+                    icon: Eye,
+                    color: 'text-sky-600', bg: 'bg-sky-50',
+                    title: 'Xem bài làm học viên',
+                    desc: 'Cuộn xuống để xem từng câu hỏi. Tabs kỹ năng (Ngữ âm, Trắc nghiệm…) giúp điều hướng nhanh.',
+                  },
+                  {
+                    icon: Bot,
+                    color: 'text-violet-600', bg: 'bg-violet-50',
+                    title: 'Điểm AI tự chấm',
+                    desc: 'Các câu trắc nghiệm và writing/speaking đã được AI chấm. Biểu tượng 🤖 = điểm AI. Hãy kiểm tra lại trước khi xác nhận.',
+                  },
+                  {
+                    icon: Pencil,
+                    color: 'text-amber-600', bg: 'bg-amber-50',
+                    title: 'Chỉnh điểm thủ công',
+                    desc: 'Nhấn vào ô điểm cạnh mỗi câu → nhập điểm mới → nhấn "Lưu" để ghi đè điểm AI. Điểm override hiển thị màu cam.',
+                  },
+                  {
+                    icon: Save,
+                    color: 'text-emerald-600', bg: 'bg-emerald-50',
+                    title: 'Lưu & Phát hành',
+                    desc: 'Nhấn nút xanh "Lưu & phát hành" ở góc trên cùng bên phải để lưu toàn bộ thay đổi và thông báo kết quả cho học viên.',
+                  },
+                  {
+                    icon: MessageSquare,
+                    color: 'text-rose-600', bg: 'bg-rose-50',
+                    title: 'Thêm nhận xét',
+                    desc: 'Mỗi câu hỏi writing/speaking có ô nhận xét riêng. Nhận xét sẽ được gửi đến học viên cùng kết quả.',
+                  },
+                  {
+                    icon: ArrowLeft,
+                    color: 'text-slate-600', bg: 'bg-slate-100',
+                    title: 'Quay lại & Xét duyệt',
+                    desc: 'Sau khi xem xong, nhấn "←" để trở về danh sách. Dùng nút "Xét duyệt" ở danh sách để đánh dấu đã hoàn tất.',
+                  },
+                ].map(({ icon: Icon, color, bg, title, desc }) => (
+                  <div key={title} className="flex gap-3 bg-white rounded-xl p-3 border border-blue-100">
+                    <div className={`w-8 h-8 rounded-lg ${bg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                      <Icon className={`w-4 h-4 ${color}`} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-700 mb-0.5">{title}</p>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">{desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* ── Hero card ── */}
           <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
