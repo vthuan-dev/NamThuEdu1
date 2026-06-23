@@ -79,8 +79,22 @@ class GradingController extends Controller
             }
         }
 
+        // Filter by source: assigned (default) or practice (self-study)
+        $source = $request->get('source', 'assigned');
+        if ($source === 'practice') {
+            $query->whereNull('assignment_id');
+        } else {
+            $query->whereNotNull('assignment_id');
+        }
+
         $submissions = $query->orderBy('sSubmit_time', 'desc')->get();
 
+        if ($source !== 'practice') {
+            $submissions = $submissions
+                ->groupBy(fn($s) => $s->user_id . '-' . $s->assignment_id)
+                ->map(fn($g) => $g->first())
+                ->values();
+        }
         return response()->json([
             'status' => 'success',
             'data' => $submissions

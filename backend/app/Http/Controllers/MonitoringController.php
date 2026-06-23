@@ -404,4 +404,59 @@ class MonitoringController extends Controller
             ],
         ]);
     }
+    /**
+     * GET /teacher/dashboard/recent-submissions
+     * Bài đã nộp (assigned) trong 2 giờ gần nhất — dùng cho bell notification GV
+     */
+    public function recentSubmissions(Request $request)
+    {
+        $user = $request->user();
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized'], 401);
+        }
+
+        $since = Carbon::now()->subHours(2);
+
+        $submissions = Submission::with([
+                'user:uId,uName,age_group',
+                'exam:eId,eTitle,eType,eTeacher_id',
+            ])
+            ->whereNotNull('assignment_id')
+            ->whereIn('sStatus', ['submitted', 'grading_subjective', 'partially_graded'])
+            ->where('sSubmit_time', '>=', $since)
+            ->whereHas('exam', function ($q) use ($user) {
+                $q->where('eTeacher_id', $user->uId);
+            })
+            ->orderBy('sSubmit_time', 'desc')
+            ->limit(20)
+            ->get();
+
+        $now = Carbon::now();
+
+        $data = $submissions->map(function ($s) use ($now) {
+            $submittedAt = $s->sSubmit_time ? Carbon::parse($s->sSubmit_time) : $now;
+            $uName       = $s->user->uName ?? 'Unknown';
+            $words       = preg_split('/\s+/', trim($uName));
+            $avatar      = strtoupper(mb_substr(end($words), 0, 2));
+
+            $ageGroup    = $s->user->age_group ?? '';
+            $ageLabels = ['kids' => 'Trẻ em', 'teens' => 'Thiếu niên', 'adults' => 'Người lớn'];
+            $ageLabel  = $ageLabels[strtolower($ageGroup)] ?? $ageGroup;
+
+            return [
+                'id'             => $s->sId,
+                'student_name'   => $uName,
+                'avatar'         => $avatar,
+                'age_group'      => strtolower($ageGroup),
+                'age_label'      => $ageLabel,
+                'exam_title'     => $s->exam->eTitle ?? '—',
+                'exam_type'      => $s->exam->eType  ?? 'General',
+                'submitted_at'   => $submittedAt->toIso8601String(),
+                'elapsed_min'    => (int) $submittedAt->diffInMinutes($now),
+                'auto_submitted' => !is_null($s->auto_submit_reason),
+            ];
+        });
+
+        return response()->json(['status' => 'success', 'data' => $data]);
+    }
 }

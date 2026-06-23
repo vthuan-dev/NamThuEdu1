@@ -425,6 +425,7 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         Route::get('/dashboard/active-sessions', [MonitoringController::class, 'activeSessions']);
         Route::get('/dashboard/monitoring-stats', [MonitoringController::class, 'stats']);
         Route::get('/dashboard/recent-starts',   [MonitoringController::class, 'recentStarts']);
+        Route::get('/dashboard/recent-submissions', [MonitoringController::class, 'recentSubmissions']);
         Route::get('/dashboard/exams-ready',      [MonitoringController::class, 'examsReadyToPublish']);
         Route::post('/dashboard/cleanup-expired',  [MonitoringController::class, 'cleanupExpired']);
         Route::get('/dashboard/statistics',        [MonitoringController::class, 'statistics']);

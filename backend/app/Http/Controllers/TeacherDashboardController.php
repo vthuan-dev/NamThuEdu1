@@ -188,6 +188,7 @@ class TeacherDashboardController extends Controller
         $pendingGrading = Submission::whereIn('exam_id',
             \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId')
         )
+            ->whereNotNull('assignment_id')
             ->where('sStatus', 'submitted')
             ->whereNull('sGraded_time')
             ->count();

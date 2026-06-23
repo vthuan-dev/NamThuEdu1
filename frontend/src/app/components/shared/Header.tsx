@@ -38,6 +38,19 @@ interface ExamReadyNotification {
   created_at: string;
 }
 
+interface RecentSubmission {
+  id: number;
+  student_name: string;
+  avatar: string;
+  age_group: string;
+  age_label: string;
+  exam_title: string;
+  exam_type: string;
+  submitted_at: string;
+  elapsed_min: number;
+  auto_submitted: boolean;
+}
+
 function getInitials(name: string): string {
   return name.split(" ").map((w) => w.charAt(0)).join("").toUpperCase().slice(0, 2);
 }
@@ -70,6 +83,8 @@ export function Header({ breadcrumb, action }: HeaderProps) {
   const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
   const [newStudents, setNewStudents] = useState<any[]>([]);
   const seenStudentIdsRef = useRef<Set<number> | null>(null);
+  const [recentSubmissions, setRecentSubmissions] = useState<RecentSubmission[]>([]);
+  const seenSubmissionIdsRef = useRef<Set<number> | null>(null);
 
   // Co-teacher invitations (lời mời cùng quản lý lớp)
   const [coInvites, setCoInvites] = useState<CoTeacherInvitation[]>([]);
@@ -224,14 +239,39 @@ export function Header({ breadcrumb, action }: HeaderProps) {
       .catch(() => {});
   };
 
+  const fetchRecentSubmissions = () => {
+    if (userRole !== "teacher") return;
+    api.get("/teacher/dashboard/recent-submissions")
+      .then((res: any) => {
+        const items: RecentSubmission[] = res?.data?.data ?? res?.data ?? [];
+        if (!Array.isArray(items)) return;
+
+        if (seenSubmissionIdsRef.current === null) {
+          seenSubmissionIdsRef.current = new Set(items.map((i) => i.id));
+          return;
+        }
+
+        const newOnes = items.filter((i) => !seenSubmissionIdsRef.current!.has(i.id));
+        if (newOnes.length === 0) return;
+
+        newOnes.forEach((i) => seenSubmissionIdsRef.current!.add(i.id));
+        setUnread((c) => c + newOnes.length);
+        playSound();
+        setRecentSubmissions(items);
+      })
+      .catch(() => {});
+  };
+
   useEffect(() => {
     fetchRecentStarts();
     fetchExamsReady();
     fetchNewStudents();
+    fetchRecentSubmissions();
     pollRef.current = setInterval(() => {
       fetchRecentStarts();
       fetchExamsReady();
       fetchNewStudents();
+      fetchRecentSubmissions();
     }, 30000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
@@ -535,6 +575,53 @@ export function Header({ breadcrumb, action }: HeaderProps) {
                           <span className="inline-block mt-1 text-[9px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
                             {e.exam_type}
                           </span>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Section: Bài vừa nộp */}
+              {recentSubmissions.length > 0 && (
+                <div className="border-b border-slate-100">
+                  <div className="px-4 py-2.5 flex items-center justify-between bg-rose-50/60">
+                    <p className="text-[11px] font-bold text-rose-700 uppercase tracking-wide">Bài vừa nộp</p>
+                    <Link
+                      to="/giao-vien/cham-diem"
+                      onClick={() => setBellOpen(false)}
+                      className="text-[10px] font-semibold text-rose-600 hover:underline flex items-center gap-1"
+                    >
+                      Chấm điểm <ExternalLink className="w-2.5 h-2.5" />
+                    </Link>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-50">
+                    {recentSubmissions.slice(0, 6).map((s) => (
+                      <Link
+                        key={`sub-${s.id}`}
+                        to="/giao-vien/cham-diem"
+                        onClick={() => setBellOpen(false)}
+                        className="flex items-start gap-2.5 px-4 py-2.5 hover:bg-rose-50/40 transition-colors cursor-pointer"
+                      >
+                        <div className="w-7 h-7 bg-gradient-to-tr from-rose-500 to-pink-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 mt-0.5">
+                          {s.avatar || getInitials(s.student_name)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-slate-700 leading-snug">
+                            <span className="font-semibold text-slate-900">{s.student_name}</span>
+                            <span className="text-slate-500"> vừa nộp bài </span>
+                            <span className="font-medium text-slate-800 truncate block mt-0.5">{s.exam_title}</span>
+                          </p>
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <span className="text-[9px] font-semibold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">{s.exam_type}</span>
+                            {s.age_label && (
+                              <span className="text-[9px] font-semibold text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded">{s.age_label}</span>
+                            )}
+                            {s.auto_submitted && (
+                              <span className="text-[9px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Tự động nộp</span>
+                            )}
+                            <span className="text-[10px] text-slate-400">{fmtAgo(s.elapsed_min)}</span>
+                          </div>
                         </div>
                       </Link>
                     ))}

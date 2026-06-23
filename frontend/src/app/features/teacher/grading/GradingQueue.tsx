@@ -99,6 +99,7 @@ export function GradingQueue() {
   const [filterExam, setFilterExam]     = useState("");   // theo đề thi (examId)
   const [filterClass, setFilterClass]   = useState("");   // theo lớp (classId)
   const [filterRole, setFilterRole]     = useState("");   // theo role học viên (age_group)
+  const [sourceTab, setSourceTab]       = useState<'assigned' | 'practice'>('assigned');
   const [reviewTab, setReviewTab]       = useState<ReviewTab>("all");
   const [sortField, setSortField] = useState<'score' | 'time' | 'gradedTime' | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -140,7 +141,7 @@ export function GradingQueue() {
     else setIsPolling(true);
     if (!silent) setError(null);
     try {
-      const params: Record<string, string> = {};
+      const params: Record<string, string> = { source: sourceTab };
       if (filterStatus) params.status = filterStatus;
       const { data: result } = await api.get("/teacher/submissions", { params });
       if (result.status === "success") {
@@ -175,7 +176,7 @@ export function GradingQueue() {
       if (!silent) setLoading(false);
       else setIsPolling(false);
     }
-  }, [filterStatus]);
+  }, [filterStatus, sourceTab]);
 
   useEffect(() => {
     fetchSubmissions(false);
@@ -304,8 +305,29 @@ export function GradingQueue() {
 
           {/* ── Toolbar: tabs + search + filter ── */}
           <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-            {/* Tab bar */}
-            <div className="flex items-center gap-1 px-5 pt-4 border-b border-slate-100">
+            {/* Source tabs: Đề đã giao / Tự luyện */}
+            <div className="flex items-center gap-0 px-5 pt-3 border-b border-slate-100">
+              {([{ key: 'assigned', label: 'Đề đã giao', color: 'violet' }, { key: 'practice', label: 'Tự luyện', color: 'slate' }] as const).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => { setSourceTab(key); setReviewTab('all'); }}
+                  className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all ${
+                    sourceTab === key
+                      ? 'border-violet-600 text-violet-700'
+                      : 'border-transparent text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  {label}
+                  {key === 'assigned' && (
+                    <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                      sourceTab === 'assigned' ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-500'
+                    }`}>{submissions.length}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+            {/* Review sub-tabs */}
+            <div className="flex items-center gap-1 px-5 pt-3 border-b border-slate-100">
               {TABS.map(({ key, label, count, icon: Icon }) => (
                 <button
                   key={key}
