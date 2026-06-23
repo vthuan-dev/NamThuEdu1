@@ -514,21 +514,6 @@ export function GradingQueue() {
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               </div>
 
-              {/* Lọc theo trạng thái */}
-              <div className="relative">
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 appearance-none"
-                >
-                  <option value="">{t("teacher.grading.allStatuses")}</option>
-                  <option value="submitted">{t("teacher.grading.status.submitted")}</option>
-                  <option value="graded">{t("teacher.grading.status.graded")}</option>
-                  <option value="partially_graded">{t("teacher.grading.status.partiallyGraded")}</option>
-                  <option value="grading_subjective">{t("teacher.grading.status.gradingSubjective")}</option>
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-              </div>
 
               {/* Xóa bộ lọc */}
               {(filterExam || filterClass || filterRole || filterStatus || searchQuery) && (
