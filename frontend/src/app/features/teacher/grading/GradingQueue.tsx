@@ -369,7 +369,7 @@ export function GradingQueue() {
                         </div>
                         <div>
                           <p className="text-xs font-bold text-slate-800 mb-0.5">Đề đã giao</p>
-                          <p className="text-[11px] text-slate-500 leading-relaxed">Bài làm từ các đề giáo viên giao cho học viên. Sau khi AI chấm xong, giáo viên cần <span className="font-semibold text-violet-600">Xét duyệt</span> — kiểm tra điểm AI, thêm nhận xét và xác nhận kết quả.</p>
+                          <p className="text-[11px] text-slate-500 leading-relaxed">Bài làm từ đề GV giao. Các bài có <span className="font-semibold text-violet-600">Writing / Speaking</span> sẽ được AI chấm tự động — GV cần <span className="font-semibold text-violet-600">Xét duyệt</span> để kiểm tra lại, thêm nhận xét và xác nhận. Bài chỉ trắc nghiệm thì AI chấm ngay, không cần xét duyệt.</p>
                         </div>
                       </div>
                       <div className="flex gap-3">
