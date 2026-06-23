@@ -684,6 +684,7 @@ export function ThptGradingDetail({ submissionId }: Props) {
               aiPending={data.ai_speaking_pending}
               objRawScore={obj.raw_score}
               objRawMax={obj.raw_score_max}
+              onScrollToSection={scrollToSection}
             />
           </aside>
         </div>
@@ -772,6 +773,7 @@ function ScoreDashboard({
   aiPending,
   objRawScore,
   objRawMax,
+  onScrollToSection,
 }: {
   recompute: { liveSections: SectionLive[]; totalWeight: number; weightedTotal: number } | null;
   scaleMax: number;
@@ -787,6 +789,7 @@ function ScoreDashboard({
   aiPending: boolean;
   objRawScore: number | null;
   objRawMax: number | null;
+  onScrollToSection?: (sid: string) => void;
 }) {
   if (!recompute) return null;
   const { liveSections, totalWeight, weightedTotal } = recompute;
@@ -846,7 +849,14 @@ function ScoreDashboard({
             const contribution =
               totalWeight > 0 ? round2((s.scaled * s.weight) / totalWeight) : 0;
             return (
-              <div key={s.sid} className="rounded-xl border border-slate-100 bg-slate-50/60 p-2.5">
+              <div
+                key={s.sid}
+                onClick={() => onScrollToSection?.(s.sid)}
+                className={`rounded-xl border border-slate-100 bg-slate-50/60 p-2.5 transition-all ${
+                  onScrollToSection ? 'cursor-pointer hover:border-teal-300 hover:bg-teal-50/30 hover:shadow-sm' : ''
+                }`}
+                title="Nhấn để cuộn đến phần này"
+              >
                 <div className="flex items-center justify-between gap-2 mb-1.5">
                   <span className="text-xs font-semibold text-slate-700 truncate flex items-center gap-1.5">
                     {s.kind === 'subjective' ? (
