@@ -22,6 +22,7 @@ import {
   ListChecks,
   Type as TypeIcon,
   GraduationCap,
+  BookOpen,
 } from 'lucide-react';
 import { useToastContext } from '../../../../contexts/ToastContext';
 import { getFullMediaUrl } from '../../../../utils/mediaUtils';
@@ -1080,6 +1081,38 @@ function ObjectiveSectionBody({
 }) {
   const questions = section.questions as ObjectiveQuestion[];
   const sid = section.section_id ?? section.type;
+  const hasPassage = !!section.passage;
+
+  const questionList = (
+    <>
+      {section.word_bank && section.word_bank.length > 0 && (
+        <div className="rounded-2xl bg-white border border-slate-200 p-4">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Ngân hàng từ</p>
+          <div className="flex flex-wrap gap-2">
+            {section.word_bank.map((w, i) => (
+              <span key={i} className="px-3 py-1 rounded-full bg-teal-50 text-teal-700 text-sm font-semibold">
+                {w}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className={hasPassage ? "space-y-3" : "contents"}>
+        {questions.map((q) => (
+          <ObjectiveQuestionCard
+            key={`${sid}-${q.question_number}`}
+            q={q}
+            sid={sid}
+            answerOverride={answerOverride}
+            correctOverride={correctOverride}
+            onToggle={onToggle}
+            onSetCorrect={onSetCorrect}
+          />
+        ))}
+      </div>
+    </>
+  );
+
   return (
     <>
       {section.audio_url && (
@@ -1094,32 +1127,27 @@ function ObjectiveSectionBody({
         </div>
       )}
 
-      {section.passage && <PassageBox text={section.passage} />}
-
-      {section.word_bank && section.word_bank.length > 0 && (
-        <div className="rounded-2xl bg-white border border-slate-200 p-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Ngân hàng từ</p>
-          <div className="flex flex-wrap gap-2">
-            {section.word_bank.map((w, i) => (
-              <span key={i} className="px-3 py-1 rounded-full bg-teal-50 text-teal-700 text-sm font-semibold">
-                {w}
-              </span>
-            ))}
+      {hasPassage ? (
+        /* ── Split layout: passage left | questions right ── */
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+          {/* Left: sticky passage */}
+          <div className="lg:sticky lg:top-[80px] rounded-2xl bg-white border border-slate-200 overflow-hidden">
+            <div className="px-4 py-2.5 bg-teal-50 border-b border-teal-100 flex items-center gap-2">
+              <BookOpen className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-teal-700">Đoạn văn</span>
+            </div>
+            <div className="p-5 max-h-[70vh] overflow-y-auto">
+              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{section.passage}</p>
+            </div>
+          </div>
+          {/* Right: questions */}
+          <div className="space-y-3">
+            {questionList}
           </div>
         </div>
+      ) : (
+        questionList
       )}
-
-      {questions.map((q) => (
-        <ObjectiveQuestionCard
-          key={`${sid}-${q.question_number}`}
-          q={q}
-          sid={sid}
-          answerOverride={answerOverride}
-          correctOverride={correctOverride}
-          onToggle={onToggle}
-          onSetCorrect={onSetCorrect}
-        />
-      ))}
     </>
   );
 }
