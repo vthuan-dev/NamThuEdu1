@@ -281,12 +281,20 @@ export function GradingQueue() {
 
           {/* ── Stats ── */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {[
-              { label: t("teacher.grading.queuePage.statsCards.total"),      showBar: false, value: stats.total,              icon: Inbox,       color: "#6366F1", bg: "#EEF2FF" },
-              { label: t("teacher.grading.queuePage.statsCards.pending"),    showBar: false, value: stats.pending,            icon: Clock,       color: "#F59E0B", bg: "#FEF3C7" },
-              { label: t("teacher.grading.queuePage.statsCards.reviewed"),   showBar: false, value: stats.reviewed,           icon: UserCheck,   color: "#10B981", bg: "#D1FAE5" },
-              { label: t("teacher.grading.queuePage.statsCards.reviewRate"), showBar: true,  value: `${stats.reviewRate}%`,   icon: Award,       color: "#8B5CF6", bg: "#EDE9FE" },
-            ].map(({ label, value, showBar, icon: Icon, color, bg }) => (
+            {(sourceTab === 'practice'
+              ? [
+                  { label: 'Tổng bài tự luyện', showBar: false, value: stats.total,  icon: Inbox,   color: "#6366F1", bg: "#EEF2FF" },
+                  { label: 'Đã chấm',           showBar: false, value: submissions.filter(s => ['graded','partially_graded'].includes(s.status)).length, icon: CheckCircle2, color: "#10B981", bg: "#D1FAE5" },
+                  { label: 'Chờ chấm',          showBar: false, value: submissions.filter(s => s.status === 'submitted').length, icon: Clock, color: "#F59E0B", bg: "#FEF3C7" },
+                  { label: 'Đang chấm AI',       showBar: false, value: submissions.filter(s => s.status === 'grading_subjective').length, icon: Award, color: "#8B5CF6", bg: "#EDE9FE" },
+                ]
+              : [
+                  { label: t("teacher.grading.queuePage.statsCards.total"),      showBar: false, value: stats.total,              icon: Inbox,       color: "#6366F1", bg: "#EEF2FF" },
+                  { label: t("teacher.grading.queuePage.statsCards.pending"),    showBar: false, value: stats.pending,            icon: Clock,       color: "#F59E0B", bg: "#FEF3C7" },
+                  { label: t("teacher.grading.queuePage.statsCards.reviewed"),   showBar: false, value: stats.reviewed,           icon: UserCheck,   color: "#10B981", bg: "#D1FAE5" },
+                  { label: t("teacher.grading.queuePage.statsCards.reviewRate"), showBar: true,  value: `${stats.reviewRate}%`,   icon: Award,       color: "#8B5CF6", bg: "#EDE9FE" },
+                ]
+            ).map(({ label, value, showBar, icon: Icon, color, bg }) => (
               <div key={label} className="bg-white rounded-xl border border-slate-100 px-3.5 py-3 hover:shadow-sm transition-all">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: bg }}>
@@ -321,9 +329,11 @@ export function GradingQueue() {
                   }`}
                 >
                   {label}
-                  <span className={`ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                    sourceTab === key ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-500'
-                  }`}>{submissions.length}</span>
+                  {sourceTab === key && (
+                    <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700">
+                      {submissions.length}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
