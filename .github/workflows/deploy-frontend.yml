@@ -74,6 +74,8 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           source: dist.tar.gz
           target: /var/www/namthuedu-fe
+          timeout: 120s
+          command_timeout: 15m
 
       - name: Swap & reload nginx
         uses: appleboy/ssh-action@v1.2.0
