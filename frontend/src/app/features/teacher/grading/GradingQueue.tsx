@@ -684,29 +684,57 @@ export function GradingQueue() {
                         {/* Actions */}
                         <td className="px-5 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
-                            <Link
-                              to={
-                                sub.examType?.toLowerCase().includes("vstep") && sub.examId
-                                  ? `/giao-vien/xem-vstep/${sub.examId}?review=${sub.id}&teacher=1`
-                                  : `/giao-vien/cham-diem/${sub.id}`
-                              }
-                              className="p-2 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition-colors"
-                              title={t("teacher.grading.viewDetail")}
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Link>
+                            {/* Eye: view detail */}
+                            <div className="relative group/tip">
+                              <Link
+                                to={
+                                  sub.examType?.toLowerCase().includes("vstep") && sub.examId
+                                    ? `/giao-vien/xem-vstep/${sub.examId}?review=${sub.id}&teacher=1`
+                                    : `/giao-vien/cham-diem/${sub.id}`
+                                }
+                                className="p-2 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition-colors block"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Link>
+                              <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tip:flex flex-col items-center z-50">
+                                <div className="bg-slate-800 text-white text-[11px] rounded-lg px-3 py-2 whitespace-nowrap shadow-xl text-center leading-snug">
+                                  <p className="font-semibold">Xem chi tiết bài làm</p>
+                                  <p className="text-slate-300 mt-0.5">Kiểm tra đáp án, điểm AI chấm</p>
+                                </div>
+                                <div className="border-4 border-transparent border-t-slate-800" />
+                              </div>
+                            </div>
+                            {/* Review button */}
                             {sourceTab === 'assigned' && (
-                            <button
-                              onClick={() => setReviewTarget(sub)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                isReviewed
-                                  ? "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                                  : "bg-violet-600 text-white hover:bg-violet-700 shadow-sm shadow-violet-200"
-                              }`}
-                            >
-                              <UserCheck className="w-3.5 h-3.5" />
-                              {isReviewed ? t("teacher.grading.queuePage.reviewAgain") : t("teacher.grading.queuePage.review")}
-                            </button>
+                            <div className="relative group/rev">
+                              <button
+                                onClick={() => setReviewTarget(sub)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                  isReviewed
+                                    ? "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                    : "bg-violet-600 text-white hover:bg-violet-700 shadow-sm shadow-violet-200"
+                                }`}
+                              >
+                                <UserCheck className="w-3.5 h-3.5" />
+                                {isReviewed ? t("teacher.grading.queuePage.reviewAgain") : t("teacher.grading.queuePage.review")}
+                              </button>
+                              <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/rev:flex flex-col items-center z-50">
+                                <div className="bg-slate-800 text-white text-[11px] rounded-lg px-3 py-2 shadow-xl text-center leading-snug max-w-[180px]">
+                                  {isReviewed ? (
+                                    <>
+                                      <p className="font-semibold text-emerald-300">Đã xét duyệt ✓</p>
+                                      <p className="text-slate-300 mt-0.5">Nhấn để xem lại hoặc<br/>chỉnh sửa nhận xét</p>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <p className="font-semibold text-violet-300">Xét duyệt kết quả</p>
+                                      <p className="text-slate-300 mt-0.5">Xem lại điểm AI, thêm<br/>nhận xét & xác nhận</p>
+                                    </>
+                                  )}
+                                </div>
+                                <div className="border-4 border-transparent border-t-slate-800" />
+                              </div>
+                            </div>
                             )}
                           </div>
                         </td>
