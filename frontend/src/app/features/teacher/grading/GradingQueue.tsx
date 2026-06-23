@@ -14,6 +14,9 @@ import {
   Bot,
   Inbox,
   RefreshCw,
+  HelpCircle,
+  ClipboardCheck,
+  BookOpenCheck,
 } from "lucide-react";
 import { Header } from "../../../components/shared/Header";
 import { useHideTeacherHeader } from "../../../../contexts/TeacherHeaderContext";
@@ -317,7 +320,7 @@ export function GradingQueue() {
           {/* ── Toolbar: tabs + search + filter ── */}
           <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
             {/* Source tabs: Đề đã giao / Tự luyện + refresh inline */}
-            <div className="flex items-center gap-0 px-5 pt-2 border-b border-slate-100">
+            <div className="relative flex items-center gap-0 px-5 pt-2 border-b border-slate-100 group/tabguide">
               {([
                 { key: 'assigned', label: 'Đề đã giao', hint: 'GV giao — cần chấm' },
                 { key: 'practice', label: 'Tự luyện',   hint: 'HV tự ôn tập' },
@@ -348,6 +351,47 @@ export function GradingQueue() {
                   }`}>{hint}</span>
                 </button>
               ))}
+              {/* Hover guide icon */}
+              <div className="relative ml-1 pb-1 group/helpicon">
+                <button type="button" className="w-5 h-5 flex items-center justify-center text-slate-300 hover:text-violet-500 transition-colors">
+                  <HelpCircle className="w-4 h-4" />
+                </button>
+                {/* Popover */}
+                <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 hidden group-hover/helpicon:block w-[320px]">
+                  <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden">
+                    <div className="px-4 py-3 bg-violet-50 border-b border-violet-100">
+                      <p className="text-xs font-bold text-violet-700 uppercase tracking-wider">Hướng dẫn — Danh sách chấm điểm</p>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      <div className="flex gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <ClipboardCheck className="w-4 h-4 text-violet-600" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-800 mb-0.5">Đề đã giao</p>
+                          <p className="text-[11px] text-slate-500 leading-relaxed">Bài làm từ các đề giáo viên giao cho học viên. Sau khi AI chấm xong, giáo viên cần <span className="font-semibold text-violet-600">Xét duyệt</span> — kiểm tra điểm AI, thêm nhận xét và xác nhận kết quả.</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-sky-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <BookOpenCheck className="w-4 h-4 text-sky-600" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-800 mb-0.5">Tự luyện</p>
+                          <p className="text-[11px] text-slate-500 leading-relaxed">Bài làm từ đề học viên tự luyện tập ngoài giờ. <span className="font-semibold text-sky-600">Không cần xét duyệt</span> — chỉ theo dõi tiến độ và xem chi tiết bài làm khi cần.</p>
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t border-slate-100">
+                        <p className="text-[10px] text-slate-400 leading-relaxed">💡 <span className="font-semibold">Mẹo:</span> Nhấn vào từng tab để chuyển danh sách. Nhấn <span className="font-semibold">👁 Xem chi tiết</span> để xem toàn bộ bài làm, hoặc <span className="font-semibold">Xét duyệt</span> để xem lại và xác nhận điểm.</p>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Arrow */}
+                  <div className="flex justify-center -mt-px">
+                    <div className="border-4 border-transparent border-b-white" style={{ marginTop: -7 }} />
+                  </div>
+                </div>
+              </div>
               <div className="ml-auto flex items-center gap-2 pb-1">
                 {lastUpdated && (
                   <span className="text-[11px] text-slate-400 flex items-center gap-1">
