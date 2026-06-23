@@ -321,7 +321,7 @@ export function GradingQueue() {
               {([{ key: 'assigned', label: 'Đề đã giao', color: 'violet' }, { key: 'practice', label: 'Tự luyện', color: 'slate' }] as const).map(({ key, label }) => (
                 <button
                   key={key}
-                  onClick={() => { setSourceTab(key); setReviewTab('all'); }}
+                  onClick={() => { setSourceTab(key); setReviewTab('all'); setSubmissions([]); setLoading(true); }}
                   className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all ${
                     sourceTab === key
                       ? 'border-violet-600 text-violet-700'
@@ -329,7 +329,7 @@ export function GradingQueue() {
                   }`}
                 >
                   {label}
-                  {sourceTab === key && (
+                  {sourceTab === key && !loading && submissions.length > 0 && (
                     <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700">
                       {submissions.length}
                     </span>
