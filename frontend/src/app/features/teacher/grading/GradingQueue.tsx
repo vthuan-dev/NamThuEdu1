@@ -318,7 +318,7 @@ export function GradingQueue() {
           </div>
 
           {/* ── Toolbar: tabs + search + filter ── */}
-          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-100">
             {/* Source tabs: Đề đã giao / Tự luyện + refresh inline */}
             <div className="relative z-10 flex items-center gap-0 px-5 pt-2 border-b border-slate-100 group/tabguide">
               {([
