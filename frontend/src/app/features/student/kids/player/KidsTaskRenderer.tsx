@@ -17,6 +17,9 @@ interface RendererProps {
   taskData: any;
   answer: KidsAnswerMap;
   onChange: (map: KidsAnswerMap) => void;
+  readOnly?: boolean;
+  /** Trang chấm: khóa đáp án → đúng/sai (theo giáo viên chỉnh). Tô màu nhãn trên ảnh. */
+  gradeOverrides?: Record<string, boolean>;
 }
 
 const TONES = [
@@ -121,13 +124,14 @@ function OddOneOutTask({ taskData, answer, onChange }: RendererProps) {
 }
 
 // ─── B1. Word ↔ Definition matching ─────────────────────────────────────────
-function WordDefinitionTask({ taskData, answer, onChange }: RendererProps) {
+function WordDefinitionTask({ taskData, answer, onChange, readOnly }: RendererProps) {
   const words: any[] = taskData?.words ?? [];
   // Mỗi từ chọn 1 định nghĩa (theo nhãn A,B,C…). Định nghĩa hiển thị xáo trộn.
+  // Khi readOnly (trang chấm): giữ thứ tự gốc để nhãn A/B/C khớp đáp án đã lưu.
   const shuffledDefs = useMemo(() => {
     const defs = words.map((w, i) => ({ key: String.fromCharCode(65 + i), text: w.definition }));
-    return [...defs].sort(() => Math.random() - 0.5);
-  }, [words.length]);
+    return readOnly ? defs : [...defs].sort(() => Math.random() - 0.5);
+  }, [words.length, readOnly]);
 
   return (
     <div className="space-y-4">
@@ -502,7 +506,7 @@ function ListeningLetterMatchTask({ taskData, answer, onChange }: RendererProps)
 }
 
 // ─── G. Listen and draw lines (kéo tên vào đúng vị trí trên hình — kiểu Flyer) ──────
-function ListenAndDrawLinesTask({ taskData, answer, onChange }: RendererProps) {
+function ListenAndDrawLinesTask({ taskData, answer, onChange, gradeOverrides }: RendererProps) {
   const [dragOverHotspot, setDragOverHotspot] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
 
@@ -639,16 +643,29 @@ function ListenAndDrawLinesTask({ taskData, answer, onChange }: RendererProps) {
                 onClick={() => handleHotspotClick(i)}
               >
                 {placedName ? (
-                  <div
-                    className={`whitespace-nowrap rounded-xl border-2 px-3 py-1 text-sm font-bold shadow-md transition-all ${
-                      isExample
-                        ? 'border-sky-600 bg-sky-500 text-white'
-                        : 'cursor-pointer border-green-600 bg-green-500 text-white hover:border-red-400 hover:bg-red-400'
-                    }`}
-                    title={isExample ? '' : 'Nhấn để bỏ'}
-                  >
-                    {placedName}
-                  </div>
+                  (() => {
+                    // Trang chấm: tô màu theo giáo viên chỉnh (gradeOverrides theo chỉ số label).
+                    // Nhãn ở hotspot này thuộc label placedLabelIdx → tra trạng thái chấm của label đó.
+                    const graded =
+                      !isExample && gradeOverrides
+                        ? gradeOverrides[String(placedLabelIdx)]
+                        : undefined;
+                    const tone = isExample
+                      ? 'border-sky-600 bg-sky-500 text-white'
+                      : graded === false
+                      ? 'border-rose-600 bg-rose-500 text-white'
+                      : graded === true
+                      ? 'border-green-600 bg-green-500 text-white'
+                      : 'cursor-pointer border-green-600 bg-green-500 text-white hover:border-red-400 hover:bg-red-400';
+                    return (
+                      <div
+                        className={`whitespace-nowrap rounded-xl border-2 px-3 py-1 text-sm font-bold shadow-md transition-all ${tone}`}
+                        title={isExample ? '' : 'Nhấn để bỏ'}
+                      >
+                        {placedName}
+                      </div>
+                    );
+                  })()
                 ) : (
                   <div
                     className={`min-w-[52px] whitespace-nowrap rounded-xl border-2 border-dashed px-3 py-1 text-center text-sm font-bold shadow transition-all ${
@@ -738,14 +755,35 @@ export function KidsTaskRenderer({
   taskData,
   answer,
   onChange,
+  readOnly = false,
+  gradeOverrides,
 }: {
   taskType: string;
   taskData: any;
   answer: KidsAnswerMap;
   onChange: (map: KidsAnswerMap) => void;
+  readOnly?: boolean;
+  gradeOverrides?: Record<string, boolean>;
 }) {
   const Comp = RENDERERS[taskType] ?? GenericWritingFallback;
-  return <Comp taskData={taskData} answer={answer} onChange={onChange} />;
+  const inner = (
+    <Comp
+      taskData={taskData}
+      answer={answer}
+      onChange={onChange}
+      readOnly={readOnly}
+      gradeOverrides={gradeOverrides}
+    />
+  );
+  if (!readOnly) return inner;
+  // Chế độ chỉ đọc: khóa mọi tương tác (kéo-thả, bấm chọn) nhưng vẫn cho phép
+  // điều khiển audio. Lớp ngoài chặn pointer-events; lớp audio mở lại bằng CSS.
+  return (
+    <div className="kids-readonly" style={{ pointerEvents: 'none', userSelect: 'none' }}>
+      <style>{`.kids-readonly audio{pointer-events:auto}`}</style>
+      {inner}
+    </div>
+  );
 }
 
 export default KidsTaskRenderer;

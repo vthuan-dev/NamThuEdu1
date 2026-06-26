@@ -23,6 +23,8 @@ import {
   Award,
   Sparkles,
   Star,
+  ChevronDown,
+  Image as ImageIcon,
 } from "lucide-react";
 import { api } from "../../../../services/api";
 import { gradingApi } from "../../../../services/gradingApi";
@@ -33,6 +35,19 @@ import {
   MANUAL_REVIEW_TYPES,
   type ReviewRow,
 } from "../../student/kids/player/kidsAnswerKey";
+import { KidsTaskRenderer } from "../../student/kids/player/KidsTaskRenderer";
+
+// Các dạng có ảnh / nối ảnh / audio → mặc định MỞ panel "Bài làm của học viên".
+// Dạng thuần chữ (cloze, open_cloze...) mặc định THU cho gọn.
+const VISUAL_TASK_TYPES = new Set<string>([
+  "listen_and_draw_lines",
+  "listening_letter_match",
+  "odd_one_out",
+  "unscramble_words",
+  "picture_sentence_writing",
+  "picture_story_writing",
+  ...MANUAL_REVIEW_TYPES,
+]);
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface KidsTask {
@@ -48,6 +63,7 @@ interface KidsTask {
   maxPoints: number;
   feedback: string;
   isManual: boolean;
+  skill: string;           // listening | reading | writing | speaking | ""
 }
 
 interface ExamMeta {
@@ -87,6 +103,20 @@ const LEVEL_META: Record<string, { label: string; color: string; bg: string }> =
   FLYERS:   { label: "Flyers",   color: "#7C3AED", bg: "#EDE9FE" },
 };
 
+// Nhãn + thứ tự hiển thị các kỹ năng (part). Task không có skill rơi vào "other".
+const SKILL_META: Record<string, { label: string; icon: string }> = {
+  listening: { label: "Nghe",  icon: "🎧" },
+  reading:   { label: "Đọc",   icon: "📖" },
+  writing:   { label: "Viết",  icon: "✍️" },
+  speaking:  { label: "Nói",   icon: "🗣️" },
+  other:     { label: "Khác",  icon: "📝" },
+};
+const SKILL_ORDER = ["listening", "reading", "writing", "speaking", "other"];
+function normalizeSkill(raw: string): string {
+  const s = (raw ?? "").toString().toLowerCase().trim();
+  return SKILL_META[s] ? s : "other";
+}
+
 // Tính điểm task theo tỉ lệ ô đúng × điểm tối đa, làm tròn 0.5.
 function scoreFromRows(correctCount: number, total: number, maxPoints: number): number {
   if (total <= 0) return 0;
@@ -114,6 +144,9 @@ export function KidsGradingDetail() {
 
   // Override correctness per cell: taskId → boolean[] (theo thứ tự rows)
   const [cellCorrect, setCellCorrect] = useState<Record<string, boolean[]>>({});
+
+  // Kỹ năng (part) đang chọn trên thanh tab. "all" = xem tất cả.
+  const [activeSkill, setActiveSkill] = useState<string>("all");
 
   // ── Load submission ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -155,6 +188,7 @@ export function KidsGradingDetail() {
             maxPoints,
             feedback: sa.saTeacher_feedback ?? "",
             isManual: MANUAL_REVIEW_TYPES.has(taskType),
+            skill: normalizeSkill(cfg.skill),
           } satisfies KidsTask;
         });
         setTasks(mapped);
@@ -187,6 +221,37 @@ export function KidsGradingDetail() {
     }
     return { earned: Math.round(earned * 100) / 100, max };
   }, [tasks]);
+
+  // ── Gom nhóm theo kỹ năng (part) để dựng thanh tab điều hướng ─────────────
+  const skillGroups = useMemo(() => {
+    // skill → { tasks, earned, max }
+    const map: Record<string, { tasks: KidsTask[]; earned: number; max: number }> = {};
+    for (const t of tasks) {
+      const sk = t.skill || "other";
+      if (!map[sk]) map[sk] = { tasks: [], earned: 0, max: 0 };
+      map[sk].tasks.push(t);
+      map[sk].earned += t.points;
+      map[sk].max += t.maxPoints;
+    }
+    // Trả về theo thứ tự cố định, chỉ giữ skill có task.
+    return SKILL_ORDER.filter((sk) => map[sk]?.tasks.length).map((sk) => ({
+      skill: sk,
+      label: SKILL_META[sk]?.label ?? sk,
+      icon: SKILL_META[sk]?.icon ?? "📝",
+      tasks: map[sk].tasks,
+      earned: Math.round(map[sk].earned * 100) / 100,
+      max: map[sk].max,
+    }));
+  }, [tasks]);
+
+  // Chỉ hiện tab khi có từ 2 nhóm kỹ năng trở lên.
+  const showSkillTabs = skillGroups.length > 1;
+
+  // Danh sách task hiển thị theo tab đang chọn.
+  const visibleTasks = useMemo(() => {
+    if (!showSkillTabs || activeSkill === "all") return tasks;
+    return tasks.filter((t) => (t.skill || "other") === activeSkill);
+  }, [tasks, activeSkill, showSkillTabs]);
 
   // ── Lật Đúng/Sai 1 ô của task khách quan ──────────────────────────────────
   const toggleCell = async (task: KidsTask, rowIndex: number, correct: boolean) => {
@@ -345,12 +410,49 @@ export function KidsGradingDetail() {
         <div className="max-w-7xl mx-auto px-4 py-5 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5">
           {/* LEFT: danh sách task */}
           <div className="space-y-4">
+            {/* Thanh tab điều hướng theo kỹ năng — chỉ hiện khi đề có ≥2 nhóm */}
+            {showSkillTabs && (
+              <div className="bg-white border border-slate-200 rounded-xl p-1.5 flex items-center gap-1 flex-wrap shadow-sm sticky top-0 z-20">
+                <button
+                  type="button"
+                  onClick={() => setActiveSkill("all")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                    activeSkill === "all"
+                      ? "bg-slate-800 text-white"
+                      : "text-slate-500 hover:bg-slate-100"
+                  }`}
+                >
+                  Tất cả
+                  <span className="ml-1.5 tabular-nums opacity-70">
+                    {totals.earned}/{totals.max}
+                  </span>
+                </button>
+                {skillGroups.map((g) => (
+                  <button
+                    key={g.skill}
+                    type="button"
+                    onClick={() => setActiveSkill(g.skill)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                      activeSkill === g.skill
+                        ? "bg-slate-800 text-white"
+                        : "text-slate-500 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span className="mr-1">{g.icon}</span>
+                    {g.label}
+                    <span className="ml-1.5 tabular-nums opacity-70">
+                      {g.earned}/{g.max}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
             {tasks.length === 0 && (
               <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-slate-500">
                 Bài làm này chưa có câu trả lời để chấm.
               </div>
             )}
-            {tasks.map((task) => (
+            {visibleTasks.map((task) => (
               <KidsTaskCard
                 key={task.id}
                 task={task}
@@ -446,6 +548,25 @@ function KidsTaskCard({
     return Object.values(map).filter(Boolean).join("\n");
   }, [task.isManual, task.studentAnswerRaw]);
 
+  // Panel "Bài làm của học viên": dạng trực quan (ảnh/nối/audio) mặc định mở.
+  const isVisual = VISUAL_TASK_TYPES.has(task.taskType);
+  const [showWork, setShowWork] = useState(isVisual);
+  const studentAnswerMap = useMemo(
+    () => parseAnswerMap(task.studentAnswerRaw),
+    [task.studentAnswerRaw]
+  );
+
+  // Map khóa đáp án → đúng/sai (theo nguồn sự thật rowsCorrect mà giáo viên chỉnh).
+  // Renderer dùng để tô màu nhãn trên ảnh khớp với bảng Đúng/Sai bên dưới.
+  const gradeOverrides = useMemo(() => {
+    const out: Record<string, boolean> = {};
+    rows.forEach((r, i) => {
+      if (r.key == null) return;
+      out[r.key] = rowsCorrect?.[i] ?? r.isCorrect;
+    });
+    return out;
+  }, [rows, rowsCorrect]);
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       {/* Header */}
@@ -483,6 +604,34 @@ function KidsTaskCard({
         {task.instructions && (
           <p className="text-xs text-slate-500">{task.instructions}</p>
         )}
+
+        {/* ── Panel: Bài làm của học viên (ảnh / nối ảnh / audio) ── */}
+        <div className="rounded-xl border border-slate-200 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowWork((v) => !v)}
+            className="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+          >
+            <span className="flex items-center gap-1.5 text-xs font-bold text-slate-600 uppercase tracking-wider">
+              <ImageIcon className="w-3.5 h-3.5" /> Bài làm của học viên
+            </span>
+            <ChevronDown
+              className={`w-4 h-4 text-slate-400 transition-transform ${showWork ? "rotate-180" : ""}`}
+            />
+          </button>
+          {showWork && (
+            <div className="p-4 bg-white">
+              <KidsTaskRenderer
+                taskType={task.taskType}
+                taskData={task.taskData}
+                answer={studentAnswerMap}
+                onChange={() => {}}
+                readOnly
+                gradeOverrides={gradeOverrides}
+              />
+            </div>
+          )}
+        </div>
 
         {/* ── Dạng khách quan: bảng + toggle Đúng/Sai từng ô ── */}
         {!task.isManual && rows.length > 0 && (
@@ -577,6 +726,33 @@ function KidsTaskCard({
                   className="w-20 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-teal-400"
                 />
                 <span className="text-sm text-slate-400">/ {task.maxPoints}</span>
+                {/* Nút nhanh: Đạt = full điểm, Chưa đạt = 0 điểm */}
+                <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden bg-white ml-1">
+                  <button
+                    type="button"
+                    onClick={() => onChangePoints(task.maxPoints)}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold transition-colors cursor-pointer ${
+                      task.points >= task.maxPoints && task.maxPoints > 0
+                        ? "bg-emerald-600 text-white"
+                        : "text-slate-400 hover:bg-emerald-50 hover:text-emerald-700"
+                    }`}
+                    title="Cho điểm tối đa"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Đạt
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onChangePoints(0)}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold transition-colors cursor-pointer border-l border-slate-200 ${
+                      task.points === 0
+                        ? "bg-rose-600 text-white"
+                        : "text-slate-400 hover:bg-rose-50 hover:text-rose-700"
+                    }`}
+                    title="Cho 0 điểm"
+                  >
+                    <XCircle className="w-3.5 h-3.5" /> Chưa đạt
+                  </button>
+                </div>
               </div>
             </div>
           ) : (

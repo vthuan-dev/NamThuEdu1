@@ -2183,6 +2183,9 @@ function VstepGradingDetailInternal() {
 export function GradingDetail() {
   const { submissionId } = useParams();
   const [examType, setExamType] = useState<string | null>(null);
+  // Đề Kids có thể được tạo dưới eType=GENERAL nhưng câu hỏi mang kids_task_config.
+  // Phát hiện theo dữ liệu thật thay vì chỉ dựa eType.
+  const [isKids, setIsKids] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -2191,8 +2194,19 @@ export function GradingDetail() {
     (async () => {
       try {
         const res = await api.get(`/teacher/submissions/${submissionId}`);
-        const t = (res.data?.data?.exam?.eType ?? res.data?.exam?.eType ?? "").toString().toUpperCase();
-        if (!cancelled) setExamType(t);
+        const d = res.data?.data ?? res.data ?? {};
+        const t = (d.exam?.eType ?? "").toString().toUpperCase();
+        // Kids khi: eType là cấp độ Cambridge YL, HOẶC có câu mang kids_task_config.
+        const examQuestions = d.exam?.questions ?? [];
+        const answers = d.answers ?? [];
+        const hasKidsConfig =
+          examQuestions.some((q: any) => q?.kids_task_config) ||
+          answers.some((sa: any) => sa?.question?.kids_task_config);
+        const kidsByType = t === "STARTERS" || t === "MOVERS" || t === "FLYERS";
+        if (!cancelled) {
+          setExamType(t);
+          setIsKids(kidsByType || hasKidsConfig);
+        }
       } catch {
         if (!cancelled) setExamType("");
       } finally {
@@ -2230,8 +2244,9 @@ export function GradingDetail() {
     );
   }
 
-  if (examType === "STARTERS" || examType === "MOVERS" || examType === "FLYERS") {
+  if (isKids) {
     // Kids grading: phân loại theo task type, toggle Đúng/Sai từng ô — tách hẳn khung VSTEP.
+    // Nhận diện qua kids_task_config nên đề GENERAL chứa câu Kids vẫn vào đúng khung này.
     const LazyKids = lazy(() => import("./KidsGradingDetail").then((m) => ({ default: m.KidsGradingDetail })));
     return (
       <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-slate-500">Đang tải trang chấm điểm…</div>}>

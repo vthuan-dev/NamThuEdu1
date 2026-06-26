@@ -13,6 +13,8 @@ export interface ReviewRow {
   student: string;
   correct: string;
   isCorrect: boolean;
+  /** Khóa đáp án (vd chỉ số label/gap) — dùng để nối trạng thái chấm với renderer trực quan. */
+  key?: string;
 }
 
 const eq = (a: string, b: string) => {
@@ -179,6 +181,7 @@ export function buildReviewRows(
         const matchedName =
           matchedIdx >= 0 && allItems[matchedIdx] ? String(allItems[matchedIdx].name ?? '') : '';
         rows.push({
+          key: String(i),
           label: String(it?.name ?? `Mục ${i + 1}`),
           student: matchedName || '—',
           correct: String(it?.name ?? ''),
