@@ -1547,6 +1547,7 @@ class StudentTestController extends Controller
                     'saAnswer_text' => $studentAnswer->saAnswer_text,
                     'saIs_correct' => $studentAnswer->saIs_correct,
                     'saPoints_awarded' => $studentAnswer->saPoints_awarded,
+                    'saTeacher_feedback' => $studentAnswer->saTeacher_feedback,
                 ] : null,
                 'correct_answer' => $correctAnswer ? [
                     'aContent' => $correctAnswer->aContent,

@@ -64,7 +64,7 @@ class TeacherDashboardController extends Controller
                 $q->whereYear('uCreated_at', '<', now()->year);
             })->orWhere(function ($q) {
                 $q->whereYear('uCreated_at', '=', now()->year)
-                  ->whereMonth('uCreated_at', '<', now()->month);
+                    ->whereMonth('uCreated_at', '<', now()->month);
             });
         };
 
@@ -84,22 +84,22 @@ class TeacherDashboardController extends Controller
             ->whereMonth('uCreated_at', now()->subMonth()->month)
             ->whereYear('uCreated_at', now()->subMonth()->year)
             ->count();
-            
+
         // Calculate percentage changes
-        $totalChange = $totalStudentsLastMonth > 0 
-            ? round((($totalStudents - $totalStudentsLastMonth) / $totalStudentsLastMonth) * 100, 1) 
+        $totalChange = $totalStudentsLastMonth > 0
+            ? round((($totalStudents - $totalStudentsLastMonth) / $totalStudentsLastMonth) * 100, 1)
             : ($totalStudents > 0 ? 100 : 0);
-            
-        $activeChange = $activeStudentsLastMonth > 0 
-            ? round((($activeStudents - $activeStudentsLastMonth) / $activeStudentsLastMonth) * 100, 1) 
+
+        $activeChange = $activeStudentsLastMonth > 0
+            ? round((($activeStudents - $activeStudentsLastMonth) / $activeStudentsLastMonth) * 100, 1)
             : ($activeStudents > 0 ? 100 : 0);
-            
-        $inactiveChange = $inactiveStudentsLastMonth > 0 
-            ? round((($inactiveStudents - $inactiveStudentsLastMonth) / $inactiveStudentsLastMonth) * 100, 1) 
+
+        $inactiveChange = $inactiveStudentsLastMonth > 0
+            ? round((($inactiveStudents - $inactiveStudentsLastMonth) / $inactiveStudentsLastMonth) * 100, 1)
             : ($inactiveStudents > 0 ? 100 : 0);
-            
-        $newStudentsChange = $newStudentsLastMonth > 0 
-            ? round((($newStudentsThisMonth - $newStudentsLastMonth) / $newStudentsLastMonth) * 100, 1) 
+
+        $newStudentsChange = $newStudentsLastMonth > 0
+            ? round((($newStudentsThisMonth - $newStudentsLastMonth) / $newStudentsLastMonth) * 100, 1)
             : ($newStudentsThisMonth > 0 ? 100 : 0);
 
         return response()->json([
@@ -142,7 +142,7 @@ class TeacherDashboardController extends Controller
         $totalCourses = \App\Models\Course::where('cTeacher', $user->uId)->count();
         $totalClasses = \App\Models\Classes::where('cTeacher_id', $user->uId)->count();
         $totalExams = \App\Models\Exam::where('eTeacher_id', $user->uId)->count();
-        
+
         // Get total students - đếm số học viên distinct đã từng dùng exam của
         // teacher này (có submission >= 60s). Không phụ thuộc class vì hệ
         // thống mới student không thuộc class cố định, chỉ thuộc age_group.
@@ -151,10 +151,10 @@ class TeacherDashboardController extends Controller
             ->whereNotNull('sStart_time')
             ->where(function ($q) {
                 $q->whereRaw('TIMESTAMPDIFF(SECOND, sStart_time, sSubmit_time) >= 60')
-                  ->orWhere(function ($q2) {
-                      $q2->whereNull('sSubmit_time')
-                         ->whereRaw('TIMESTAMPDIFF(SECOND, sStart_time, NOW()) >= 60');
-                  });
+                    ->orWhere(function ($q2) {
+                        $q2->whereNull('sSubmit_time')
+                            ->whereRaw('TIMESTAMPDIFF(SECOND, sStart_time, NOW()) >= 60');
+                    });
             })
             ->distinct('user_id')
             ->count('user_id');
@@ -163,22 +163,23 @@ class TeacherDashboardController extends Controller
         $newCoursesThisMonth = \App\Models\Course::where('cTeacher', $user->uId)
             ->whereMonth('cCreateAt', now()->month)
             ->count();
-        
+
         $newClassesThisMonth = \App\Models\Classes::where('cTeacher_id', $user->uId)
             ->whereMonth('cCreated_at', now()->month)
             ->count();
-            
+
         $newStudentsThisMonth = \App\Models\User::where('uRole', 'student')
             ->whereNull('uDeleted_at')
             ->whereMonth('uCreated_at', now()->month)
             ->count();
-            
+
         $newExamsThisMonth = \App\Models\Exam::where('eTeacher_id', $user->uId)
             ->whereMonth('eCreated_at', now()->month)
             ->count();
 
         // Get today's classes (assignments with deadline today)
-        $classesToday = \App\Models\TestAssignment::whereIn('exam_id',
+        $classesToday = \App\Models\TestAssignment::whereIn(
+            'exam_id',
             \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId')
         )
             ->whereDate('taDeadline', today())
@@ -189,7 +190,8 @@ class TeacherDashboardController extends Controller
         // (sStatus='graded'). Bao gồm CẢ đề đã giao LẪN bài tự luyện.
         // Khớp với tab "Chờ xét duyệt" trong hàng chờ chấm điểm, để badge đỏ
         // trên sidebar phản ánh đúng tổng số bài giáo viên cần xử lý.
-        $pendingGrading = Submission::whereIn('exam_id',
+        $pendingGrading = Submission::whereIn(
+            'exam_id',
             \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId')
         )
             ->whereIn('sStatus', ['submitted', 'graded', 'partially_graded', 'grading_subjective'])
@@ -197,14 +199,16 @@ class TeacherDashboardController extends Controller
             ->count();
 
         // Get deadlines this week
-        $deadlinesThisWeek = \App\Models\TestAssignment::whereIn('exam_id',
+        $deadlinesThisWeek = \App\Models\TestAssignment::whereIn(
+            'exam_id',
             \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId')
         )
             ->whereBetween('taDeadline', [now()->startOfWeek(), now()->endOfWeek()])
             ->count();
 
         // Calculate average score
-        $avgScore = Submission::whereIn('exam_id',
+        $avgScore = Submission::whereIn(
+            'exam_id',
             \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId')
         )
             ->where('sStatus', 'graded')
@@ -212,14 +216,16 @@ class TeacherDashboardController extends Controller
             ->avg('sScore');
 
         // Calculate score improvement (compare last 2 weeks)
-        $lastWeekAvg = Submission::whereIn('exam_id',
+        $lastWeekAvg = Submission::whereIn(
+            'exam_id',
             \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId')
         )
             ->where('sStatus', 'graded')
             ->whereBetween('sSubmit_time', [now()->subWeeks(2), now()->subWeek()])
             ->avg('sScore');
-            
-        $thisWeekAvg = Submission::whereIn('exam_id',
+
+        $thisWeekAvg = Submission::whereIn(
+            'exam_id',
             \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId')
         )
             ->where('sStatus', 'graded')
@@ -327,20 +333,20 @@ class TeacherDashboardController extends Controller
         }
 
         $examIds = \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId');
-        
+
         $performanceData = [];
-        
+
         for ($i = 5; $i >= 0; $i--) {
             $weekStart = now()->subWeeks($i)->startOfWeek();
             $weekEnd = now()->subWeeks($i)->endOfWeek();
-            
+
             $submissions = Submission::whereIn('exam_id', $examIds)
                 ->where('sStatus', 'graded')
                 ->whereBetween('sSubmit_time', [$weekStart, $weekEnd])
                 ->get();
 
             $weekLabel = 'T' . (6 - $i);
-            
+
             $performanceData[] = [
                 'week' => $weekLabel,
                 'average' => round($submissions->avg('sScore') ?? 0, 1),
@@ -384,7 +390,7 @@ class TeacherDashboardController extends Controller
             ->orderBy('eCreated_at', 'desc')
             ->limit(2)
             ->get();
-            
+
         foreach ($recentExams as $exam) {
             $activities[] = [
                 'id' => 'exam_' . $exam->eId,
@@ -399,17 +405,18 @@ class TeacherDashboardController extends Controller
         }
 
         // Recent assignments
-        $recentAssignments = \App\Models\TestAssignment::whereIn('exam_id',
+        $recentAssignments = \App\Models\TestAssignment::whereIn(
+            'exam_id',
             \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId')
         )
             ->orderBy('taCreated_at', 'desc')
             ->limit(2)
             ->get();
-            
+
         foreach ($recentAssignments as $assignment) {
             // Class system deprecated — chỉ hiện label chung "Học viên" cho mọi target.
             $targetLabel = 'Học viên';
-            
+
             $activities[] = [
                 'id' => 'assignment_' . $assignment->id,
                 'type' => 'assigned',
@@ -423,19 +430,20 @@ class TeacherDashboardController extends Controller
         }
 
         // Recent grading
-        $recentGrading = Submission::whereIn('exam_id',
+        $recentGrading = Submission::whereIn(
+            'exam_id',
             \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId')
         )
             ->where('sStatus', 'graded')
             ->whereNotNull('sGraded_time')
             ->whereDate('sGraded_time', '>=', now()->subDays(2))
             ->count();
-            
+
         if ($recentGrading > 0) {
             $activities[] = [
                 'id' => 'grading_recent',
                 'type' => 'graded',
-                'detail' => (string)$recentGrading,
+                'detail' => (string) $recentGrading,
                 'detailType' => 'submissions',
                 'time' => '',
                 'timeUnit' => 'yesterday',
@@ -446,10 +454,10 @@ class TeacherDashboardController extends Controller
         }
 
         // Sort by timestamp and limit to 4
-        usort($activities, function($a, $b) {
+        usort($activities, function ($a, $b) {
             return $b['timestamp'] <=> $a['timestamp'];
         });
-        
+
         $activities = array_slice($activities, 0, 4);
 
         return response()->json([
@@ -487,10 +495,10 @@ class TeacherDashboardController extends Controller
             ->whereNotNull('sStart_time')
             ->where(function ($q) {
                 $q->whereRaw('TIMESTAMPDIFF(SECOND, sStart_time, sSubmit_time) >= 60')
-                  ->orWhere(function ($q2) {
-                      $q2->whereNull('sSubmit_time')
-                         ->whereRaw('TIMESTAMPDIFF(SECOND, sStart_time, NOW()) >= 60');
-                  });
+                    ->orWhere(function ($q2) {
+                        $q2->whereNull('sSubmit_time')
+                            ->whereRaw('TIMESTAMPDIFF(SECOND, sStart_time, NOW()) >= 60');
+                    });
             })
             ->select('user_id', \DB::raw('COUNT(*) as submission_count'), \DB::raw('AVG(sScore) as avg_score'))
             ->groupBy('user_id')
@@ -512,16 +520,17 @@ class TeacherDashboardController extends Controller
 
         $data = $rows->map(function ($r) use ($users, $maxCount) {
             $u = $users->get($r->user_id);
-            if (!$u) return null;
+            if (!$u)
+                return null;
             $count = (int) $r->submission_count;
             return [
-                'user_id'          => $u->uId,
-                'name'             => $u->uName,
-                'avatar'           => $u->avatar_url,
-                'age_group'        => $u->age_group, // adults | teen | kids
+                'user_id' => $u->uId,
+                'name' => $u->uName,
+                'avatar' => $u->avatar_url,
+                'age_group' => $u->age_group, // adults | teen | kids
                 'submission_count' => $count,
-                'avg_score'        => $r->avg_score !== null ? round((float) $r->avg_score / 10, 1) : null,
-                'progress_pct'     => $maxCount > 0 ? (int) round(($count / $maxCount) * 100) : 0,
+                'avg_score' => $r->avg_score !== null ? round((float) $r->avg_score / 10, 1) : null,
+                'progress_pct' => $maxCount > 0 ? (int) round(($count / $maxCount) * 100) : 0,
             ];
         })->filter()->values();
 
@@ -563,17 +572,17 @@ class TeacherDashboardController extends Controller
         // ────────────────────────────────────────────────────────────
         if ($mode === 'today') {
             $startOfDay = now()->startOfDay();
-            $endOfDay   = now()->endOfDay();
+            $endOfDay = now()->endOfDay();
 
             $buckets = [];
             for ($h = 0; $h < 24; $h++) {
                 $buckets[$h] = [
-                    'date'        => $startOfDay->copy()->addHours($h)->format('Y-m-d H:00'),
-                    'label'       => sprintf('%02dh', $h),
-                    'weekday'     => $startOfDay->isoFormat('dd'),
+                    'date' => $startOfDay->copy()->addHours($h)->format('Y-m-d H:00'),
+                    'label' => sprintf('%02dh', $h),
+                    'weekday' => $startOfDay->isoFormat('dd'),
                     'submissions' => 0,
-                    'avg_score'   => null,
-                    'students'    => 0,
+                    'avg_score' => null,
+                    'students' => 0,
                 ];
             }
 
@@ -583,10 +592,10 @@ class TeacherDashboardController extends Controller
                     ->whereBetween('sStart_time', [$startOfDay, $endOfDay])
                     ->where(function ($q) {
                         $q->whereRaw('TIMESTAMPDIFF(SECOND, sStart_time, sSubmit_time) >= 60')
-                          ->orWhere(function ($q2) {
-                              $q2->whereNull('sSubmit_time')
-                                 ->whereRaw('TIMESTAMPDIFF(SECOND, sStart_time, NOW()) >= 60');
-                          });
+                            ->orWhere(function ($q2) {
+                                $q2->whereNull('sSubmit_time')
+                                    ->whereRaw('TIMESTAMPDIFF(SECOND, sStart_time, NOW()) >= 60');
+                            });
                     })
                     ->selectRaw('HOUR(sStart_time) as h, COUNT(*) as cnt, AVG(sScore) as avg_score, COUNT(DISTINCT user_id) as students')
                     ->groupBy('h')
@@ -594,30 +603,32 @@ class TeacherDashboardController extends Controller
 
                 foreach ($rows as $r) {
                     $h = (int) $r->h;
-                    if (!isset($buckets[$h])) continue;
+                    if (!isset($buckets[$h]))
+                        continue;
                     $buckets[$h]['submissions'] = (int) $r->cnt;
-                    $buckets[$h]['students']    = (int) $r->students;
-                    $buckets[$h]['avg_score']   = $r->avg_score !== null
+                    $buckets[$h]['students'] = (int) $r->students;
+                    $buckets[$h]['avg_score'] = $r->avg_score !== null
                         ? round((float) $r->avg_score / 10, 1)
                         : null;
                 }
             }
 
-            $values     = array_values($buckets);
-            $total      = array_sum(array_column($values, 'submissions'));
-            $allScores  = array_filter(array_column($values, 'avg_score'), function ($v) { return $v !== null; });
+            $values = array_values($buckets);
+            $total = array_sum(array_column($values, 'submissions'));
+            $allScores = array_filter(array_column($values, 'avg_score'), function ($v) {
+                return $v !== null; });
             $overallAvg = !empty($allScores) ? round(array_sum($allScores) / count($allScores), 1) : null;
             $peakBucket = collect($values)->sortByDesc('submissions')->first();
 
             return response()->json([
                 'status' => 'success',
-                'data'   => $values,
-                'meta'   => [
-                    'mode'              => 'today',
+                'data' => $values,
+                'meta' => [
+                    'mode' => 'today',
                     'total_submissions' => $total,
                     'overall_avg_score' => $overallAvg,
-                    'peak_day'          => $peakBucket,
-                    'days'              => 1,
+                    'peak_day' => $peakBucket,
+                    'days' => 1,
                 ],
             ]);
         }
@@ -631,12 +642,12 @@ class TeacherDashboardController extends Controller
         for ($i = $days - 1; $i >= 0; $i--) {
             $date = now()->subDays($i)->startOfDay();
             $buckets[$date->format('Y-m-d')] = [
-                'date'         => $date->format('Y-m-d'),
-                'label'        => $date->format('d/m'),
-                'weekday'      => $date->isoFormat('dd'),
-                'submissions'  => 0,
-                'avg_score'    => null,
-                'students'     => 0,
+                'date' => $date->format('Y-m-d'),
+                'label' => $date->format('d/m'),
+                'weekday' => $date->isoFormat('dd'),
+                'submissions' => 0,
+                'avg_score' => null,
+                'students' => 0,
             ];
         }
 
@@ -651,10 +662,10 @@ class TeacherDashboardController extends Controller
             ->where('sStart_time', '>=', $start)
             ->where(function ($q) {
                 $q->whereRaw('TIMESTAMPDIFF(SECOND, sStart_time, sSubmit_time) >= 60')
-                  ->orWhere(function ($q2) {
-                      $q2->whereNull('sSubmit_time')
-                         ->whereRaw('TIMESTAMPDIFF(SECOND, sStart_time, NOW()) >= 60');
-                  });
+                    ->orWhere(function ($q2) {
+                        $q2->whereNull('sSubmit_time')
+                            ->whereRaw('TIMESTAMPDIFF(SECOND, sStart_time, NOW()) >= 60');
+                    });
             })
             ->selectRaw('DATE(sStart_time) as d, COUNT(*) as cnt, AVG(sScore) as avg_score, COUNT(DISTINCT user_id) as students')
             ->groupBy('d')
@@ -662,28 +673,30 @@ class TeacherDashboardController extends Controller
 
         foreach ($rows as $r) {
             $key = (string) $r->d;
-            if (!isset($buckets[$key])) continue;
+            if (!isset($buckets[$key]))
+                continue;
             $buckets[$key]['submissions'] = (int) $r->cnt;
-            $buckets[$key]['students']    = (int) $r->students;
-            $buckets[$key]['avg_score']   = $r->avg_score !== null
+            $buckets[$key]['students'] = (int) $r->students;
+            $buckets[$key]['avg_score'] = $r->avg_score !== null
                 ? round((float) $r->avg_score / 10, 1)
                 : null;
         }
 
         $total = array_sum(array_column($buckets, 'submissions'));
-        $allScores = array_filter(array_column($buckets, 'avg_score'), function ($v) { return $v !== null; });
+        $allScores = array_filter(array_column($buckets, 'avg_score'), function ($v) {
+            return $v !== null; });
         $overallAvg = !empty($allScores) ? round(array_sum($allScores) / count($allScores), 1) : null;
         $peakDay = collect($buckets)->sortByDesc('submissions')->first();
 
         return response()->json([
             'status' => 'success',
-            'data'   => array_values($buckets),
-            'meta'   => [
-                'mode'              => $mode,
+            'data' => array_values($buckets),
+            'meta' => [
+                'mode' => $mode,
                 'total_submissions' => $total,
                 'overall_avg_score' => $overallAvg,
-                'peak_day'          => $peakDay,
-                'days'              => $days,
+                'peak_day' => $peakDay,
+                'days' => $days,
             ],
         ]);
     }
@@ -773,9 +786,12 @@ class TeacherDashboardController extends Controller
         $type = strtoupper(trim($examType));
         $ageGroup = strtolower(trim($examAgeGroup));
 
-        if ($type === 'VSTEP') return ['vstep', 'VSTEP', 10];
-        if (str_starts_with($type, 'IELTS')) return ['ielts', 'IELTS', 20];
-        if ($type === 'THPT') return ['thpt', 'THPT', 30];
+        if ($type === 'VSTEP')
+            return ['vstep', 'VSTEP', 10];
+        if (str_starts_with($type, 'IELTS'))
+            return ['ielts', 'IELTS', 20];
+        if ($type === 'THPT')
+            return ['thpt', 'THPT', 30];
         if ($ageGroup === 'kids' || in_array($type, ['STARTERS', 'MOVERS', 'FLYERS'], true)) {
             return ['cambridge_yle', 'Cambridge YLE', 40];
         }
@@ -849,14 +865,14 @@ class TeacherDashboardController extends Controller
 
         // Get active submissions for teacher's exams
         $activeSessions = Submission::with(['user', 'exam', 'assignment'])
-            ->whereHas('exam', function($query) use ($user) {
+            ->whereHas('exam', function ($query) use ($user) {
                 $query->where('eTeacher_id', $user->uId);
             })
             ->where('sStatus', 'in_progress')
             ->get()
-            ->map(function($submission) {
+            ->map(function ($submission) {
                 $connectionKey = "test_session:{$submission->sId}";
-                
+
                 return [
                     'submission_id' => $submission->sId,
                     'student' => [
@@ -923,7 +939,7 @@ class TeacherDashboardController extends Controller
 
         $submission = Submission::with(['exam', 'user'])
             ->where('sId', $request->submission_id)
-            ->whereHas('exam', function($query) use ($user) {
+            ->whereHas('exam', function ($query) use ($user) {
                 $query->where('eTeacher_id', $user->uId);
             })
             ->first();
@@ -982,7 +998,7 @@ class TeacherDashboardController extends Controller
 
         $submission = Submission::with(['exam', 'user'])
             ->where('sId', $submissionId)
-            ->whereHas('exam', function($query) use ($user) {
+            ->whereHas('exam', function ($query) use ($user) {
                 $query->where('eTeacher_id', $user->uId);
             })
             ->first();

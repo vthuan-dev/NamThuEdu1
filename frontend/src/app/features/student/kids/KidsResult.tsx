@@ -97,9 +97,17 @@ export function KidsResult() {
   const totalQ = sub?.exam?.questions?.length ?? sub?.answers?.length ?? 0;
   const praise = getPraise(pct);
 
+  // Lời nhắn tổng quát của thầy/cô (sTeacher_feedback). Guard JSON (một số
+  // flow lưu feedback dạng JSON) — chỉ hiển thị khi là text thân thiện.
+  const rawTeacherFeedback = sub?.sTeacher_feedback;
+  const overallFeedback =
+    typeof rawTeacherFeedback === 'string' && rawTeacherFeedback.trim() && !rawTeacherFeedback.trim().startsWith('{')
+      ? rawTeacherFeedback.trim()
+      : '';
+
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(160deg, #FFF1F2 0%, #FFF7ED 50%, #F0FDF4 100%)' }}>
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-4 sm:pt-5 pb-4 space-y-3">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 sm:pt-5 pb-4 space-y-3">
 
         <button onClick={() => navigate(`${BASE}/bai-tap`)}
           className="inline-flex items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-sm font-bold text-rose-600 hover:bg-white transition-colors"
@@ -127,6 +135,11 @@ export function KidsResult() {
         ) : (
           /* ─── Đã chấm — compact inline ────────────────────────── */
           <>
+            {/* ─── Bố cục 2 cột: trái = khen + nhắn, phải = kết quả ─── */}
+            <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+
+            {/* ─── Cột trái: lời khen + lời nhắn ──────────────────── */}
+            <div className="space-y-3 lg:sticky lg:top-4">
             {/* Compact score header */}
             <section className="flex items-center gap-4 rounded-2xl p-4"
               style={{ background: praise.bg, boxShadow: '0 8px 24px rgba(0,0,0,0.06)', border: '2px solid rgba(255,255,255,0.9)' }}>
@@ -142,7 +155,26 @@ export function KidsResult() {
               <KidsScoreRing pct={pct} color={praise.c} />
             </section>
 
-            {/* Answer review — real UI for correct answers */}
+            {/* ─── Lời nhắn của thầy/cô ─────────────────────────────── */}
+            {overallFeedback && (
+              <section className="rounded-2xl p-4"
+                style={{ background: 'linear-gradient(135deg,#EEF2FF,#F5F3FF)', border: '2px solid #E0E7FF', boxShadow: '0 6px 18px rgba(99,102,241,0.12)' }}>
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-xl"
+                    style={{ background: 'rgba(255,255,255,0.85)', boxShadow: '0 2px 8px rgba(99,102,241,0.18)' }}>
+                    💌
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-extrabold" style={{ color: '#4338CA' }}>Lời nhắn của thầy/cô</p>
+                    <p className="mt-1 text-sm font-medium leading-relaxed text-slate-700 whitespace-pre-wrap">{overallFeedback}</p>
+                  </div>
+                </div>
+              </section>
+            )}
+            </div>
+            {/* ─── Hết cột trái ──────────────────────────────────── */}
+
+            {/* ─── Cột phải: kết quả từng câu ────────────────────── */}
             <div className="space-y-3">
               {rawItems.map((item: any, idx: number) => {
                 const q = item.question;
@@ -239,11 +271,30 @@ export function KidsResult() {
                           </div>
                         </>
                       )}
+
+                      {/* Nhận xét riêng của thầy/cô cho câu này */}
+                      {studentAns?.saTeacher_feedback &&
+                        typeof studentAns.saTeacher_feedback === 'string' &&
+                        studentAns.saTeacher_feedback.trim() &&
+                        !studentAns.saTeacher_feedback.trim().startsWith('{') && (
+                          <div className="mt-2 flex items-start gap-2 rounded-xl px-3 py-2"
+                            style={{ background: '#EEF2FF', border: '1px solid #E0E7FF' }}>
+                            <span className="text-base leading-none mt-0.5">🗣️</span>
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-extrabold" style={{ color: '#4338CA' }}>Thầy/cô nhận xét</p>
+                              <p className="text-xs font-medium leading-relaxed text-slate-700 whitespace-pre-wrap">{studentAns.saTeacher_feedback.trim()}</p>
+                            </div>
+                          </div>
+                        )}
                     </div>
                   </div>
                 );
               })}
             </div>
+            {/* ─── Hết cột phải ──────────────────────────────────── */}
+
+            </div>
+            {/* ─── Hết bố cục 2 cột ──────────────────────────────── */}
           </>
         )}
       </div>
