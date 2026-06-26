@@ -33,6 +33,18 @@ export function ClassManage() {
   const [saving, setSaving] = useState(false);
   const [invites, setInvites] = useState<CoTeacherInvitation[]>([]);
   const [requests, setRequests] = useState<ClassRequest[]>([]);
+  // Sau 3s hiện một note nhỏ nhắc giáo viên rê chuột vào icon để xem hướng dẫn.
+  // Bảng hướng dẫn đầy đủ vẫn chỉ hiện khi hover. Note tự ẩn sau vài giây.
+  const [showHint, setShowHint] = useState(false);
+
+  useEffect(() => {
+    const showTimer = setTimeout(() => setShowHint(true), 3000);
+    const hideTimer = setTimeout(() => setShowHint(false), 9000);
+    return () => {
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
+    };
+  }, []);
 
   const load = async () => {
     setLoading(true);
@@ -123,15 +135,26 @@ export function ClassManage() {
         <div className="flex items-center gap-2">
           <h1 className="text-2xl sm:text-3xl font-bold text-[#111827] tracking-tight">Lớp học của tôi</h1>
           {/* Hover guide */}
-          <div className="relative group/classguide">
-            <button type="button" className="relative w-6 h-6 flex items-center justify-center text-slate-300 hover:text-teal-500 transition-colors mt-0.5">
+          <div className="relative group/classguide" onMouseEnter={() => setShowHint(false)}>
+            <button type="button" className={`relative w-6 h-6 flex items-center justify-center transition-colors mt-0.5 ${showHint ? "text-teal-500" : "text-slate-300 hover:text-teal-500"}`}>
               <HelpCircle className="w-5 h-5" />
               <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500" />
               </span>
             </button>
-            <div className="pointer-events-none absolute top-full left-0 mt-2 z-50 hidden group-hover/classguide:block w-[340px]">
+
+            {/* Note nhắc nhở — tự hiện sau 3s, ẩn khi hover vào icon */}
+            {showHint && (
+              <div className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 whitespace-nowrap">
+                <div className="relative bg-teal-600 text-white text-[12px] font-semibold px-3 py-1.5 rounded-lg shadow-lg animate-bounce">
+                  Rê chuột vào để xem hướng dẫn
+                  <span className="absolute right-full top-1/2 -translate-y-1/2 border-[5px] border-transparent border-r-teal-600" />
+                </div>
+              </div>
+            )}
+
+            <div className="pointer-events-none absolute top-full left-0 mt-2 z-50 w-[340px] hidden group-hover/classguide:block">
               <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden">
                 <div className="px-4 py-3 bg-teal-50 border-b border-teal-100">
                   <p className="text-xs font-bold text-teal-700 uppercase tracking-wider">Hướng dẫn — Quản lý lớp học</p>

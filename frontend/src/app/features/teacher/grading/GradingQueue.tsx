@@ -113,8 +113,19 @@ export function GradingQueue() {
   const [lastUpdated, setLastUpdated]   = useState<Date | null>(null);
   const [changedIds, setChangedIds]     = useState<Set<string>>(new Set());
   const [isPolling, setIsPolling]       = useState(false);
+  // Sau 3s hiện note nhỏ nhắc giáo viên rê chuột vào icon để xem hướng dẫn.
+  const [showHint, setShowHint]         = useState(false);
   const pollingRef     = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevDataRef    = useRef<Submission[]>([]);
+
+  useEffect(() => {
+    const showTimer = setTimeout(() => setShowHint(true), 3000);
+    const hideTimer = setTimeout(() => setShowHint(false), 9000);
+    return () => {
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
+    };
+  }, []);
 
   const mapRaw = (sub: any): Submission => ({
     id: String(sub.sId),
@@ -352,14 +363,24 @@ export function GradingQueue() {
                 </button>
               ))}
               {/* Hover guide icon */}
-              <div className="relative ml-1 pb-1 group/helpicon">
-                <button type="button" className="relative w-5 h-5 flex items-center justify-center text-slate-300 hover:text-violet-500 transition-colors">
+              <div className="relative ml-1 pb-1 group/helpicon" onMouseEnter={() => setShowHint(false)}>
+                <button type="button" className={`relative w-5 h-5 flex items-center justify-center transition-colors ${showHint ? 'text-violet-500' : 'text-slate-300 hover:text-violet-500'}`}>
                   <HelpCircle className="w-4 h-4" />
                   <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500" />
                   </span>
                 </button>
+
+                {/* Note nhắc nhở — tự hiện sau 3s, ẩn khi hover vào icon */}
+                {showHint && (
+                  <div className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 whitespace-nowrap">
+                    <div className="relative bg-violet-600 text-white text-[12px] font-semibold px-3 py-1.5 rounded-lg shadow-lg animate-bounce">
+                      Rê chuột vào để xem hướng dẫn
+                      <span className="absolute right-full top-1/2 -translate-y-1/2 border-[5px] border-transparent border-r-violet-600" />
+                    </div>
+                  </div>
+                )}
                 {/* Popover */}
                 <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 hidden group-hover/helpicon:block w-[320px]">
                   <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden">

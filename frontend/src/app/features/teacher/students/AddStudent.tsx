@@ -232,6 +232,34 @@ export function AddStudent() {
     }
   };
 
+  // ── Enter chuyển sang ô tiếp theo ─────────────────────────────────────────
+  // Nhấn Enter trên input/select sẽ focus ô kế tiếp thay vì submit form.
+  // Textarea giữ nguyên hành vi xuống dòng; button (kể cả submit) không bị chặn.
+  const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key !== "Enter") return;
+    const target = e.target as HTMLElement;
+    const tag = target.tagName;
+    if (tag === "TEXTAREA" || tag === "BUTTON") return;
+    if (tag !== "INPUT" && tag !== "SELECT") return;
+
+    e.preventDefault();
+    const form = e.currentTarget;
+    const focusable = Array.from(
+      form.querySelectorAll<HTMLElement>(
+        'input:not([type="hidden"]):not([type="file"]):not([disabled]), select:not([disabled]), textarea:not([disabled])'
+      )
+    ).filter((el) => el.offsetParent !== null);
+
+    const idx = focusable.indexOf(target);
+    if (idx > -1 && idx < focusable.length - 1) {
+      const next = focusable[idx + 1] as HTMLInputElement;
+      next.focus();
+      if (typeof next.select === "function" && ["text", "tel", "email", "password"].includes(next.type)) {
+        next.select();
+      }
+    }
+  };
+
   // ── Reusable styles ───────────────────────────────────────────────────────
   const inputCls = "w-full px-3.5 py-2.5 text-[14px] border border-slate-200 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300 transition-colors";
   const labelCls = "block text-[12px] font-semibold text-slate-700 mb-1.5";
@@ -241,7 +269,7 @@ export function AddStudent() {
       <ToastContainer toasts={toasts} onClose={removeToast} />
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div className="mb-5 flex items-center justify-between">
+      <div className="max-w-5xl mx-auto mb-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link
             to="/giao-vien/students"
@@ -261,7 +289,7 @@ export function AddStudent() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="max-w-4xl">
+      <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="max-w-5xl mx-auto">
         {/* ── Section 1: Thông tin cá nhân ─────────────────────────────── */}
         <section className="bg-white rounded-xl border border-slate-200 p-5 mb-4">
           <header className="flex items-center gap-2 pb-4 mb-4 border-b border-slate-100">
