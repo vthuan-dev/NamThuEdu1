@@ -184,13 +184,16 @@ class TeacherDashboardController extends Controller
             ->whereDate('taDeadline', today())
             ->count();
 
-        // Get pending grading
+        // Get pending grading — đếm số bài giáo viên CHƯA xét duyệt
+        // (teacher_reviewed_at IS NULL), kể cả khi AI đã chấm xong
+        // (sStatus='graded'). Bao gồm CẢ đề đã giao LẪN bài tự luyện.
+        // Khớp với tab "Chờ xét duyệt" trong hàng chờ chấm điểm, để badge đỏ
+        // trên sidebar phản ánh đúng tổng số bài giáo viên cần xử lý.
         $pendingGrading = Submission::whereIn('exam_id',
             \App\Models\Exam::where('eTeacher_id', $user->uId)->pluck('eId')
         )
-            ->whereNotNull('assignment_id')
-            ->where('sStatus', 'submitted')
-            ->whereNull('sGraded_time')
+            ->whereIn('sStatus', ['submitted', 'graded', 'partially_graded', 'grading_subjective'])
+            ->whereNull('teacher_reviewed_at')
             ->count();
 
         // Get deadlines this week

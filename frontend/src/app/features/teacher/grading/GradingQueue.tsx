@@ -567,11 +567,11 @@ export function GradingQueue() {
 
           {/* ── Table ── */}
           {!loading && !error && (
-            <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+            <div className="bg-white rounded-2xl border border-slate-100">
               <table className="w-full">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100 select-none">
-                    <th className="px-5 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    <th className="px-5 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider rounded-tl-2xl">
                       {t("teacher.grading.table.student")}
                     </th>
                     <th className="px-5 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -624,7 +624,7 @@ export function GradingQueue() {
                       {t("teacher.grading.table.review")}
                     </th>
                     )}
-                    <th className="px-5 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    <th className="px-5 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider rounded-tr-2xl">
                       {t("teacher.grading.table.actions")}
                     </th>
                   </tr>

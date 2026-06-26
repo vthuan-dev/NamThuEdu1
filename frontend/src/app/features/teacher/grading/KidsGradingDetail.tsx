@@ -339,7 +339,7 @@ export function KidsGradingDetail() {
     <div className="flex-1 min-h-0 flex flex-col bg-slate-50">
       {/* ── Header (ngoài vùng cuộn → cố định) ── */}
       <div className="flex-shrink-0 bg-white border-b border-slate-200 z-30">
-        <div className="max-w-7xl mx-auto px-6 py-2.5 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto pl-2 pr-6 py-2.5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"

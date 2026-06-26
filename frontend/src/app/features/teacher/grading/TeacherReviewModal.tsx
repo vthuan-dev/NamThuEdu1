@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -16,6 +17,9 @@ import {
   BarChart3,
   Clock,
   AlertTriangle,
+  ListChecks,
+  ArrowRight,
+  Award,
 } from "lucide-react";
 import { api } from "../../../../services/api";
 import {
@@ -91,12 +95,16 @@ export function TeacherReviewModal({ submission, open, onClose, onReviewed }: Pr
   const { t } = useTranslation();
   const aiScores = parseVstepScores(submission?.sGemini_feedback);
 
+  const navigate = useNavigate();
+
   const [scores, setScores] = useState<Record<string, string>>({});
+  const [totalInput, setTotalInput] = useState("");   // tổng điểm cho đề không theo 4 kỹ năng (Kids/General/Cambridge)
   const [feedback, setFeedback] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Remember initial AI-filled values to detect whether teacher actually changed anything
   const initialScoresRef = useRef<Record<string, string>>({});
+  const initialTotalRef = useRef<string>("");
 
   useEffect(() => {
     if (!submission) return;
@@ -107,6 +115,12 @@ export function TeacherReviewModal({ submission, open, onClose, onReviewed }: Pr
     });
     initialScoresRef.current = initial;  // snapshot for dirty-check
     setScores(initial);
+
+    // Tổng điểm hiện tại (đề Kids/General/Cambridge dùng tổng điểm thay vì 4 kỹ năng)
+    const totalStr = submission.score !== undefined && submission.score !== null ? String(submission.score) : "";
+    initialTotalRef.current = totalStr;
+    setTotalInput(totalStr);
+
     setFeedback(submission.sTeacher_feedback ?? "");
     setError(null);
   }, [submission?.id]);
@@ -116,6 +130,9 @@ export function TeacherReviewModal({ submission, open, onClose, onReviewed }: Pr
   const isVstep = submission
     ? isVstepExam(submission.examType, submission.examTitle)
     : false;
+
+  // Chế độ chấm theo 4 kỹ năng (VSTEP) vs theo tổng điểm (Kids/General/Cambridge...).
+  const skillMode = isVstep;
 
   const aiTotalScore = calcVstepAvg(aiScores);
 
@@ -138,7 +155,14 @@ export function TeacherReviewModal({ submission, open, onClose, onReviewed }: Pr
     : null;
 
   const displayScore = displayData ? displayData.value.toFixed(2) : "—";
-  const displayMaxScore = displayData ? displayData.max : 10;
+  const displayMaxScore = displayData ? displayData.max : (submission?.maxScore ?? 10);
+
+  // Mở trang chấm chi tiết từng câu (đặc biệt hữu ích cho đề Kids / Cambridge).
+  const goToDetail = () => {
+    if (!submission) return;
+    onClose();
+    navigate(`/giao-vien/cham-diem/${submission.id}`);
+  };
 
 
   const handleSave = async () => {
@@ -151,23 +175,40 @@ export function TeacherReviewModal({ submission, open, onClose, onReviewed }: Pr
         sTeacher_feedback: feedback,
       };
 
-      // Only send score if teacher actually changed an input (avoid drift from toFixed(1) rounding)
-      const scoresDirty = SKILLS.some(({ key }) => scores[key] !== initialScoresRef.current[key]);
-      const rawScore = (scoresDirty && totalOverride !== null)
-        ? Math.round(totalOverride * 10)
-        : undefined;
-      if (rawScore !== undefined) {
-        payload.score = rawScore;
-      }
+      let rawScore: number | undefined;
 
-      // Send individual skill overrides so they are persisted in database
-      if (scoresDirty) {
-        payload.skill_overrides = {
-          listening: scores.listening ? parseFloat(scores.listening) : null,
-          reading: scores.reading ? parseFloat(scores.reading) : null,
-          writing: scores.writing ? parseFloat(scores.writing) : null,
-          speaking: scores.speaking ? parseFloat(scores.speaking) : null,
-        };
+      if (skillMode) {
+        // ── VSTEP: chấm theo 4 kỹ năng ──
+        // Only send score if teacher actually changed an input (avoid drift from toFixed(1) rounding)
+        const scoresDirty = SKILLS.some(({ key }) => scores[key] !== initialScoresRef.current[key]);
+        rawScore = (scoresDirty && totalOverride !== null)
+          ? Math.round(totalOverride * 10)
+          : undefined;
+        if (rawScore !== undefined) {
+          payload.score = rawScore;
+        }
+
+        // Send individual skill overrides so they are persisted in database
+        if (scoresDirty) {
+          payload.skill_overrides = {
+            listening: scores.listening ? parseFloat(scores.listening) : null,
+            reading: scores.reading ? parseFloat(scores.reading) : null,
+            writing: scores.writing ? parseFloat(scores.writing) : null,
+            speaking: scores.speaking ? parseFloat(scores.speaking) : null,
+          };
+        }
+      } else {
+        // ── Kids / General / Cambridge: chấm theo tổng điểm ──
+        const trimmed = totalInput.trim();
+        const totalDirty = trimmed !== initialTotalRef.current.trim();
+        if (totalDirty && trimmed !== "") {
+          const parsed = parseFloat(trimmed);
+          if (!isNaN(parsed)) {
+            // Kẹp trong khoảng [0, max] để tránh điểm vượt khung.
+            rawScore = Math.max(0, Math.min(displayMaxScore, parsed));
+            payload.score = rawScore;
+          }
+        }
       }
 
       await api.post(`/teacher/submissions/${submission.id}/grade`, payload);
@@ -281,7 +322,20 @@ export function TeacherReviewModal({ submission, open, onClose, onReviewed }: Pr
                       <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t("teacher.grading.reviewModal.aiScore")}</span>
                     </div>
 
-                    {hasAiScores ? (
+                    {!skillMode ? (
+                      <div className="rounded-2xl bg-white border border-slate-100 p-5 flex items-center gap-4 shadow-sm">
+                        <div className="w-16 h-16 rounded-2xl bg-violet-50 border border-violet-100 flex flex-col items-center justify-center flex-shrink-0">
+                          <span className="text-xl font-black text-violet-700 leading-none">{displayScore}</span>
+                          <span className="text-[9px] font-bold text-violet-400 mt-1">/ {displayMaxScore}</span>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-700">Điểm hệ thống chấm</p>
+                          <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                            Đề dạng chấm theo từng câu/từng phần. Mở trang chấm chi tiết để xem đáp án và chỉnh điểm từng câu.
+                          </p>
+                        </div>
+                      </div>
+                    ) : hasAiScores ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {SKILLS.map(({ key, labelKey, icon: Icon, color, weight }) => {
                           const n = aiScores[key as keyof typeof aiScores];
@@ -340,8 +394,9 @@ export function TeacherReviewModal({ submission, open, onClose, onReviewed }: Pr
                       <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t("teacher.grading.reviewModal.adjustScore")}</span>
                     </div>
 
+                    {skillMode ? (
                     <div className="space-y-3">
-                      {SKILLS.map(({ key, labelKey, icon: Icon, color }) => {
+                      {SKILLS.map(({ key, labelKey, icon: Icon }) => {
                         const aiN = aiScores[key as keyof typeof aiScores];
                         return (
                           <div key={key} className="flex items-center gap-3">
@@ -366,6 +421,43 @@ export function TeacherReviewModal({ submission, open, onClose, onReviewed }: Pr
                         );
                       })}
                     </div>
+                    ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center flex-shrink-0 text-violet-600">
+                          <Award className="w-4 h-4" />
+                        </div>
+                        <span className="text-sm font-bold text-slate-650 flex-shrink-0">Tổng điểm</span>
+                        <div className="flex-1 relative">
+                          <input
+                            type="number"
+                            min={0}
+                            max={displayMaxScore}
+                            step={0.5}
+                            value={totalInput}
+                            onChange={(e) => setTotalInput(e.target.value)}
+                            placeholder={`0 - ${displayMaxScore}`}
+                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-semibold text-slate-800 placeholder:text-slate-400"
+                          />
+                        </div>
+                        <span className="text-xs text-slate-400 w-12 text-right flex-shrink-0">/ {displayMaxScore}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={goToDetail}
+                        className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 hover:border-violet-200 transition-colors group"
+                      >
+                        <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                          <ListChecks className="w-4 h-4 text-violet-600" />
+                          Chấm chi tiết từng câu
+                        </span>
+                        <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 group-hover:text-violet-600 transition-all" />
+                      </button>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Đề này chấm theo từng câu. Bạn có thể nhập nhanh tổng điểm ở trên, hoặc mở trang chấm chi tiết để chỉnh từng câu rồi quay lại xác nhận.
+                      </p>
+                    </div>
+                    )}
                   </div>
 
                   {/* Feedback */}
