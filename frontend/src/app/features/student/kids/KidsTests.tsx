@@ -28,22 +28,30 @@ const STATUS_META: Record<Status, { label: string; c: string; soft: string }> = 
 
 // Card chung cho cả 2 tab. Điều hướng phụ thuộc trạng thái + đề có được giao hay không.
 function ExamCard({
-  title, skill, scope, partNumber, duration, questions, status, submissionId, assignmentId, examId, isAssigned, showAssignedBadge,
+  title, skill, scope, partNumber, duration, questions, status, submissionId, assignmentId, examId, isAssigned, showAssignedBadge, deadline,
 }: {
   title: string; skill?: string; scope?: string; partNumber?: number | null; duration?: number; questions?: number;
   status: Status; submissionId: number | null; assignmentId: number | null;
-  examId: number; isAssigned: boolean; showAssignedBadge: boolean;
+  examId: number; isAssigned: boolean; showAssignedBadge: boolean; deadline?: string | null;
 }) {
   const meta = STATUS_META[status] ?? STATUS_META.pending;
-  const isCompleted = status === 'completed';
-  const inProgress = status === 'in_progress';
   const normalizedScope = String(scope || (skill === 'mixed' ? 'full' : 'skill')).toLowerCase();
   const scopeLabel = normalizedScope === 'full' ? 'Full test' : normalizedScope === 'part' ? `Part ${partNumber ?? ''}`.trim() : 'Skill';
 
+  // Hết hạn = đề được giao có deadline đã qua. Khi đó "hạ cấp" về đề tự do:
+  // bỏ ràng buộc assignment, chỉ còn 1 nút "Làm bài" (làm mới qua đường direct).
+  const isExpired = !!deadline && isAssigned && new Date(deadline).getTime() < Date.now();
+  const effectiveAssigned = isAssigned && !isExpired;
+
+  // Khi hết hạn, ép trạng thái card về "pending" để chỉ hiện nút "Làm bài"
+  // (ẩn Kết quả + Làm lại); xem kết quả cũ chuyển sang tab Lịch sử.
+  const isCompleted = !isExpired && status === 'completed';
+  const inProgress = !isExpired && status === 'in_progress';
+
   // Link "Bắt đầu / Tiếp tục":
-  //  - được giao → vào phòng chờ qua assignmentId
-  //  - tự do     → làm trực tiếp bằng examId (direct=1)
-  const startTo = isAssigned && assignmentId
+  //  - được giao & còn hạn → vào phòng chờ qua assignmentId
+  //  - tự do / hết hạn      → làm trực tiếp bằng examId (direct=1)
+  const startTo = effectiveAssigned && assignmentId
     ? `${BASE}/phong-cho/${assignmentId}`
     : `${BASE}/lam-bai/${examId}?autostart=1&direct=1`;
 
@@ -59,7 +67,7 @@ function ExamCard({
           {isCompleted ? <CheckCircle2 className="w-3.5 h-3.5" /> : inProgress ? <RotateCcw className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
           {meta.label}
         </span>
-        {showAssignedBadge && isAssigned && (
+        {showAssignedBadge && effectiveAssigned && (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold"
             style={{ background: '#EDE9FE', color: '#7C3AED' }}>
             <Gift className="w-3.5 h-3.5" /> Giáo viên giao
@@ -152,6 +160,7 @@ export function KidsTests() {
       submissionId: e.submission_id ?? null,
       assignmentId: e.assignment_id ?? null,
       isAssigned: !!e.is_assigned,
+      deadline: e.deadline ?? null,
     }));
   }, [browseData]);
 
@@ -384,6 +393,7 @@ export function KidsTests() {
                 examId={t.examId}
                 isAssigned={t.isAssigned}
                 showAssignedBadge={tab === 'all'}
+                deadline={t.deadline}
               />
             ))}
           </div>

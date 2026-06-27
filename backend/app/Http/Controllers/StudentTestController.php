@@ -4320,6 +4320,7 @@ class StudentTestController extends Controller
                 'created_at'        => $exam->eCreated_at,
                 'is_assigned'       => (bool) $assignment,
                 'assignment_id'     => $assignment ? $assignment->taId : null,
+                'deadline'          => $assignment ? $assignment->taDeadline : null,
                 'submission_status' => $subStatus,
                 'submission_id'     => $relevant ? $relevant->sId : null,
                 'score'             => $finished ? (float) $finished->sScore : null,

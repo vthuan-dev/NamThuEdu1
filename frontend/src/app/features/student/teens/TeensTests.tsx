@@ -24,7 +24,7 @@ const BASE = '/hoc-vien';
 const TEAL = '#0D9488';
 const TEAL_MID = '#14B8A6';
 
-type Tab = 'all' | 'assigned' | 'overdue';
+type Tab = 'all' | 'assigned';
 type Status = 'pending' | 'in_progress' | 'completed';
 
 const SKILL_LABELS: Record<string, string> = {
@@ -66,17 +66,19 @@ interface TeensExamItem {
 
 // ─── Card ──────────────────────────────────────────────────────────────────────
 function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssignedBadge: boolean }) {
-  const isCompleted = item.status === 'completed';
-  const inProgress = item.status === 'in_progress';
   const SkillIcon = skillIcon(item.skill);
   const normalizedScope = String(item.scope || (item.skill === 'mixed' ? 'full' : 'skill')).toLowerCase();
   const scopeLabel = normalizedScope === 'full' ? 'Full test' : normalizedScope === 'part' ? `Part ${item.partNumber ?? ''}`.trim() : 'Skill';
 
-  // Check if overdue: deadline has passed and not completed
-  const isOverdue = useMemo(() => {
-    if (isCompleted || !item.deadline) return false;
-    return new Date(item.deadline) < new Date();
-  }, [item.deadline, isCompleted]);
+  // Hết hạn = đề được giao có deadline đã qua. Khi đó "hạ cấp" về đề tự do:
+  // bỏ ràng buộc assignment, chỉ còn 1 nút "Làm bài" (làm mới qua đường direct).
+  const isExpired = !!item.deadline && item.isAssigned && new Date(item.deadline).getTime() < Date.now();
+  const effectiveAssigned = item.isAssigned && !isExpired;
+
+  // Khi hết hạn, ép trạng thái card về "pending" để chỉ hiện nút "Làm bài"
+  // (ẩn Kết quả + Làm lại); xem kết quả cũ chuyển sang tab Lịch sử.
+  const isCompleted = !isExpired && item.status === 'completed';
+  const inProgress = !isExpired && item.status === 'in_progress';
 
   const dot = isCompleted ? '#10B981' : inProgress ? '#F59E0B' : '#94A3B8';
   const statusText = isCompleted ? 'Hoàn thành' : inProgress ? 'Đang làm' : 'Chưa làm';
@@ -86,10 +88,10 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
   const isThpt = String(item.type ?? '').toUpperCase() === 'THPT';
 
   const startTo = isThpt
-    ? (item.isAssigned && item.assignmentId
+    ? (effectiveAssigned && item.assignmentId
         ? `${BASE}/lam-bai-thpt/${item.examId}?assignmentId=${item.assignmentId}`
         : `${BASE}/lam-bai-thpt/${item.examId}`)
-    : (item.isAssigned && item.assignmentId
+    : (effectiveAssigned && item.assignmentId
         ? `${BASE}/phong-cho/${item.assignmentId}`
         : `${BASE}/lam-bai/${item.examId}?autostart=1&direct=1`);
 
@@ -106,13 +108,7 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
           <SkillIcon className="w-5 h-5" />
         </div>
         <div className="flex items-center gap-2.5">
-          {/* Overdue badge - highest priority */}
-          {isOverdue && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-white bg-red-500 border border-red-600 rounded-full px-2 py-0.5">
-              <AlertTriangle className="w-3.5 h-3.5" /> Quá hạn
-            </span>
-          )}
-          {showAssignedBadge && item.isAssigned && (
+          {showAssignedBadge && effectiveAssigned && (
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-700">
               <Gift className="w-3.5 h-3.5" /> GV giao
             </span>
@@ -163,11 +159,6 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
               onMouseLeave={(e) => (e.currentTarget.style.background = '#10B981')}>
               <CheckCircle className="w-4 h-4" /> Xem kết quả
             </Link>
-          </div>
-        ) : isOverdue ? (
-          <div className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold cursor-not-allowed"
-            style={{ background: '#FEE2E2', color: '#DC2626' }}>
-            <AlertTriangle className="w-4 h-4" /> Quá hạn
           </div>
         ) : (
           <Link to={startTo}
@@ -242,19 +233,15 @@ export function TeensTests() {
       isAssigned: true,
       deadline: t.deadline ?? null,
     }));
+    const isPastDeadline = (d?: string | null) => !!d && new Date(d).getTime() < Date.now();
     return [
       ...map(groups.in_progress, 'in_progress'),
       ...map(groups.pending, 'pending'),
       ...map(groups.completed, 'completed'),
-    ];
+    ].filter((t) => !isPastDeadline(t.deadline));
   }, [assignedData]);
 
-  const source = tab === 'all' ? allExams : tab === 'overdue' 
-    ? allExams.filter((e) => {
-        if (e.status === 'completed' || !e.deadline) return false;
-        return new Date(e.deadline) < new Date();
-      })
-    : assignedExams;
+  const source = tab === 'all' ? allExams : assignedExams;
   const isLoading = tab === 'all' ? browseLoading : assignedLoading;
 
   const visible = useMemo(() => {
@@ -275,10 +262,6 @@ export function TeensTests() {
   );
 
   const assignedCount = allExams.filter((e) => e.isAssigned).length;
-  const overdueCount = allExams.filter((e) => {
-    if (e.status === 'completed' || !e.deadline) return false;
-    return new Date(e.deadline) < new Date();
-  }).length;
   const stats = {
     total: allExams.length,
     pending: allExams.filter((e) => e.status === 'pending').length,
@@ -352,19 +335,6 @@ export function TeensTests() {
                 <span className="text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5 font-bold"
                   style={tab === 'assigned' ? { background: 'rgba(255,255,255,0.25)' } : { background: '#EEF2FF', color: '#4F46E5' }}>
                   {assignedCount}
-                </span>
-              )}
-            </button>
-            <button onClick={() => setTab('overdue')}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all"
-              style={tab === 'overdue'
-                ? { background: 'linear-gradient(135deg, #DC2626, #EF4444)', color: '#fff', boxShadow: '0 4px 14px rgba(220,38,38,0.3)' }
-                : { background: 'transparent', color: '#64748B' }}>
-              <AlertTriangle className="w-4 h-4" /> Quá hạn
-              {overdueCount > 0 && (
-                <span className="text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5 font-bold"
-                  style={tab === 'overdue' ? { background: 'rgba(255,255,255,0.25)' } : { background: '#FEE2E2', color: '#DC2626' }}>
-                  {overdueCount}
                 </span>
               )}
             </button>
