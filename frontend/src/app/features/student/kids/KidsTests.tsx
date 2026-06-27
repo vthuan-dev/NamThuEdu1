@@ -11,7 +11,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { Clock, ListChecks, Search, CheckCircle2, Play, RotateCcw, Sparkles, Gift, BookOpenCheck } from 'lucide-react';
+import {
+  Clock, ListChecks, Search, CheckCircle2, Play, RotateCcw, Sparkles, Gift, BookOpenCheck,
+  CalendarClock, Repeat2, AlertTriangle, Headphones, BookOpen, PenLine, Mic, Shuffle, ArrowRight,
+} from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
 import { usePageTitle, PAGE_TITLES } from '../../../../hooks/usePageTitle';
 
@@ -26,13 +29,102 @@ const STATUS_META: Record<Status, { label: string; c: string; soft: string }> = 
   completed:   { label: 'Hoàn thành', c: '#059669', soft: '#D1FAE5' },
 };
 
+// ─── Khu luyện tập (gộp từ trang Luyện tập cũ) ───────────────────────────────
+// Hiển thị NGAY DƯỚI danh sách bài thi để học viên không phải chuyển tab.
+const PRACTICE_SKILLS = [
+  { key: 'nghe', Icon: Headphones, label: 'Nghe', desc: 'Nghe và làm theo hướng dẫn.', link: `${BASE}/luyen-tap?skill=listening`, bg: 'linear-gradient(135deg, #FFF0F0, #FECDD3)', icon: '#E11D48', shadow: '0 8px 20px rgba(225,29,72,0.18)', emoji: '👂' },
+  { key: 'đọc',  Icon: BookOpen,   label: 'Đọc',  desc: 'Đọc chuyện ngắn, hình ảnh vui.', link: `${BASE}/luyen-tap?skill=reading`,   bg: 'linear-gradient(135deg, #EFF6FF, #BFDBFE)', icon: '#2563EB', shadow: '0 8px 20px rgba(37,99,235,0.18)', emoji: '📖' },
+  { key: 'viết', Icon: PenLine,    label: 'Viết', desc: 'Viết câu đơn giản, đúng chính tả.', link: `${BASE}/luyen-tap?skill=writing`, bg: 'linear-gradient(135deg, #F0FFF4, #BBF7D0)', icon: '#059669', shadow: '0 8px 20px rgba(5,150,105,0.18)', emoji: '✏️' },
+  { key: 'nói',  Icon: Mic,        label: 'Nói',  desc: 'Nói theo mẫu, phát âm chuẩn.', link: `${BASE}/luyen-tap?skill=speaking`,  bg: 'linear-gradient(135deg, #FEFCE8, #FEF08A)', icon: '#B45309', shadow: '0 8px 20px rgba(180,83,9,0.15)', emoji: '🎤' },
+] as const;
+
+const PRACTICE_MODES = [
+  { Icon: Shuffle,   label: 'Luyện ngẫu nhiên',    desc: '10 câu tổng hợp nhiều chủ đề', link: `${BASE}/luyen-tap/random?count=10`, bg: 'linear-gradient(135deg,#FFF1F2,#FFE4E6)', icon: '#E11D48' },
+  { Icon: RotateCcw, label: 'Ôn lại bài sai',      desc: 'Làm lại câu em đã sai gần đây', link: `${BASE}/luyen-tap/mistakes`,         bg: 'linear-gradient(135deg,#EFF6FF,#DBEAFE)', icon: '#2563EB' },
+  { Icon: Sparkles,  label: 'Khám phá chủ đề mới', desc: 'Học từ vựng theo chủ đề mới',   link: `${BASE}/luyen-tap/new`,              bg: 'linear-gradient(135deg,#F0FFF4,#DCFCE7)', icon: '#059669' },
+] as const;
+
+// Khối luyện tập tự do — đặt dưới danh sách bài thi.
+function KidsPracticeBlock() {
+  return (
+    <section className="mt-2 rounded-3xl p-5 sm:p-6"
+      style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)', boxShadow: '0 8px 32px rgba(251,113,133,0.10), 0 2px 8px rgba(0,0,0,0.04)', border: '2px solid rgba(255,255,255,0.9)' }}>
+      {/* Tiêu đề khu luyện tập */}
+      <header className="flex items-center gap-3 mb-5">
+        <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-md"
+          style={{ background: 'linear-gradient(135deg, #34D399, #10B981)' }}>
+          <Sparkles className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <h2 className="text-lg font-extrabold text-slate-900 leading-tight">Luyện tập tự do 🎲</h2>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Học một chút mỗi ngày — không tính điểm, thoải mái thử sức!</p>
+        </div>
+      </header>
+
+      {/* 4 kỹ năng */}
+      <p className="text-xs font-extrabold uppercase tracking-widest text-slate-400 mb-2">💪 4 Kỹ năng</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        {PRACTICE_SKILLS.map(s => (
+          <Link key={s.label} to={s.link}
+            className="group rounded-2xl p-4 transition-all duration-200 hover:-translate-y-1 active:scale-[0.97]"
+            style={{ background: s.bg, boxShadow: s.shadow, border: '2px solid rgba(255,255,255,0.85)' }}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/40 backdrop-blur-sm">
+                <s.Icon className="w-5 h-5" style={{ color: s.icon }} />
+              </div>
+              <span className="text-xl">{s.emoji}</span>
+            </div>
+            <h3 className="text-sm font-extrabold mb-1" style={{ color: s.icon }}>{s.label}</h3>
+            <p className="text-xs font-medium mb-3 leading-relaxed line-clamp-2" style={{ color: s.icon, opacity: 0.7 }}>{s.desc}</p>
+            <div className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-1 rounded-full bg-white/50" style={{ color: s.icon }}>
+              Bắt đầu <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      {/* 3 cách luyện */}
+      <p className="text-xs font-extrabold uppercase tracking-widest text-slate-400 mb-2">🎯 Cách luyện</p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {PRACTICE_MODES.map(m => (
+          <Link key={m.label} to={m.link}
+            className="group flex items-start gap-3 rounded-2xl p-4 transition-all duration-200 hover:-translate-y-1 active:scale-[0.97]"
+            style={{ background: m.bg, boxShadow: `0 6px 18px ${m.icon}22`, border: '2px solid rgba(255,255,255,0.85)' }}>
+            <div className="w-10 h-10 rounded-xl bg-white/50 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+              <m.Icon className="w-5 h-5" style={{ color: m.icon }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-extrabold" style={{ color: m.icon }}>{m.label}</p>
+              <p className="text-xs font-medium mt-0.5 leading-snug" style={{ color: m.icon, opacity: 0.75 }}>{m.desc}</p>
+            </div>
+            <ArrowRight className="w-4 h-4 flex-shrink-0 mt-1 transition-transform group-hover:translate-x-0.5" style={{ color: m.icon, opacity: 0.7 }} />
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// Định dạng hạn nộp ngắn gọn, thân thiện với trẻ: "20/12 lúc 17:00".
+function formatKidsDeadline(d: string): string {
+  const date = new Date(d);
+  if (Number.isNaN(date.getTime())) return '';
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const hh = String(date.getHours()).padStart(2, '0');
+  const mi = String(date.getMinutes()).padStart(2, '0');
+  return `${dd}/${mm} lúc ${hh}:${mi}`;
+}
+
 // Card chung cho cả 2 tab. Điều hướng phụ thuộc trạng thái + đề có được giao hay không.
 function ExamCard({
-  title, skill, scope, partNumber, duration, questions, status, submissionId, assignmentId, examId, isAssigned, showAssignedBadge, deadline,
+  title, skill, scope, partNumber, duration, questions, status, submissionId, assignmentId, examId,
+  isAssigned, showAssignedBadge, deadline, attemptsUsed, attemptsAllowed,
 }: {
   title: string; skill?: string; scope?: string; partNumber?: number | null; duration?: number; questions?: number;
   status: Status; submissionId: number | null; assignmentId: number | null;
   examId: number; isAssigned: boolean; showAssignedBadge: boolean; deadline?: string | null;
+  attemptsUsed?: number | null; attemptsAllowed?: number | null;
 }) {
   const meta = STATUS_META[status] ?? STATUS_META.pending;
   const normalizedScope = String(scope || (skill === 'mixed' ? 'full' : 'skill')).toLowerCase();
@@ -43,20 +135,27 @@ function ExamCard({
   const isExpired = !!deadline && isAssigned && new Date(deadline).getTime() < Date.now();
   const effectiveAssigned = isAssigned && !isExpired;
 
-  // Khi hết hạn, ép trạng thái card về "pending" để chỉ hiện nút "Làm bài"
-  // (ẩn Kết quả + Làm lại); xem kết quả cũ chuyển sang tab Lịch sử.
   const isCompleted = !isExpired && status === 'completed';
   const inProgress = !isExpired && status === 'in_progress';
 
+  // Số lần làm của bài giáo viên giao. allowed <= 0 (hoặc null) = không giới hạn.
+  const used = attemptsUsed ?? 0;
+  const allowed = attemptsAllowed ?? 0;
+  const hasAttemptsLeft = allowed <= 0 || used < allowed;
+
   // Link "Bắt đầu / Tiếp tục":
-  //  - được giao & còn hạn → vào phòng chờ qua assignmentId
+  //  - được giao & còn hạn → vào phòng chờ qua assignmentId (tôn trọng giới hạn lượt)
   //  - tự do / hết hạn      → làm trực tiếp bằng examId (direct=1)
   const startTo = effectiveAssigned && assignmentId
     ? `${BASE}/phong-cho/${assignmentId}`
     : `${BASE}/lam-bai/${examId}?autostart=1&direct=1`;
 
-  // "Làm lại": luôn đi đường direct để tạo lượt làm mới (không vướng giới hạn assignment)
-  const redoTo = `${BASE}/lam-bai/${examId}?autostart=1&direct=1`;
+  // "Làm lại":
+  //  - đề được giao & còn hạn → đi qua phòng chờ (đếm vào số lần làm của bài giao)
+  //  - đề tự do                → direct, làm mới thoải mái
+  const redoTo = effectiveAssigned && assignmentId
+    ? `${BASE}/phong-cho/${assignmentId}`
+    : `${BASE}/lam-bai/${examId}?autostart=1&direct=1`;
 
   return (
     <div className="flex flex-col bg-white rounded-3xl border-2 border-rose-100 p-5 transition-all hover:shadow-lg hover:-translate-y-0.5 hover:border-rose-200">
@@ -85,7 +184,7 @@ function ExamCard({
       </h3>
 
       {/* Meta */}
-      <div className="flex items-center gap-4 text-sm text-slate-500 mt-2 mb-4">
+      <div className="flex items-center gap-4 text-sm text-slate-500 mt-2 mb-3">
         {!!duration && duration > 0 && (
           <span className="inline-flex items-center gap-1.5">
             <Clock className="w-4 h-4 text-slate-400" /> {duration} phút
@@ -101,6 +200,29 @@ function ExamCard({
         )}
       </div>
 
+      {/* Thông tin bài giáo viên giao: hạn nộp + số lần làm — hiện rõ cho học viên */}
+      {effectiveAssigned && (
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          {deadline && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold"
+              style={{ background: '#EFF6FF', color: '#1D4ED8' }}>
+              <CalendarClock className="w-3.5 h-3.5" /> Hạn: {formatKidsDeadline(deadline)}
+            </span>
+          )}
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold"
+            style={{ background: '#F5F3FF', color: '#7C3AED' }}>
+            <Repeat2 className="w-3.5 h-3.5" />
+            {allowed > 0 ? `${used}/${allowed} lần` : `Đã làm ${used} lần`}
+          </span>
+          {allowed > 0 && !hasAttemptsLeft && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold"
+              style={{ background: '#FEF2F2', color: '#DC2626' }}>
+              <AlertTriangle className="w-3.5 h-3.5" /> Hết lượt
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Action */}
       <div className="mt-auto">
         {isCompleted && submissionId ? (
@@ -109,11 +231,14 @@ function ExamCard({
               className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3 rounded-2xl text-sm font-extrabold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors">
               <CheckCircle2 className="w-4 h-4" /> Kết quả 🌟
             </Link>
-            <Link to={redoTo}
-              className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3 rounded-2xl text-sm font-extrabold text-white transition-transform hover:scale-[1.02] active:scale-95"
-              style={{ background: 'linear-gradient(135deg, #FB7185 0%, #F97316 100%)' }}>
-              <RotateCcw className="w-4 h-4" /> Làm lại 🔄
-            </Link>
+            {/* Làm lại: đề tự do luôn cho phép; đề giao chỉ khi còn lượt */}
+            {(!isAssigned || hasAttemptsLeft) && (
+              <Link to={redoTo}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3 rounded-2xl text-sm font-extrabold text-white transition-transform hover:scale-[1.02] active:scale-95"
+                style={{ background: 'linear-gradient(135deg, #FB7185 0%, #F97316 100%)' }}>
+                <RotateCcw className="w-4 h-4" /> Làm lại 🔄
+              </Link>
+            )}
           </div>
         ) : (
           <Link to={startTo}
@@ -145,9 +270,14 @@ export function KidsTests() {
     enabled: tab === 'assigned',
   });
 
+  const isPastDeadline = useCallback((d: string | null | undefined) => {
+    if (!d) return false;
+    return new Date(d) < new Date();
+  }, []);
+
   const allExams = useMemo(() => {
     const list = (browseData as any)?.data?.data ?? [];
-    return list.map((e: any) => ({
+    const mapped = list.map((e: any) => ({
       key: `exam-${e.id}`,
       examId: e.id,
       title: e.title,
@@ -161,13 +291,22 @@ export function KidsTests() {
       assignmentId: e.assignment_id ?? null,
       isAssigned: !!e.is_assigned,
       deadline: e.deadline ?? null,
+      attemptsUsed: e.attempts_used ?? null,
+      attemptsAllowed: e.attempts_allowed ?? null,
     }));
-  }, [browseData]);
 
-  const isPastDeadline = useCallback((d: string | null | undefined) => {
-    if (!d) return false;
-    return new Date(d) < new Date();
-  }, []);
+    // Bài giáo viên giao ĐÃ làm xong (còn hạn) → quản lý ở tab "Giáo viên giao",
+    // không hiện lại ở tab "Tất cả" nữa. Bài giao quá hạn coi như đề tự do (giữ lại).
+    const filtered = mapped.filter((e: any) => {
+      const expired = isPastDeadline(e.deadline);
+      const assignedActive = e.isAssigned && !expired;
+      return !(assignedActive && e.status === 'completed');
+    });
+
+    // Đẩy bài giáo viên giao (còn hạn, chưa xong) lên ĐẦU để học viên dễ thấy.
+    const priority = (e: any) => (e.isAssigned && !isPastDeadline(e.deadline) ? 0 : 1);
+    return filtered.sort((a: any, b: any) => priority(a) - priority(b));
+  }, [browseData, isPastDeadline]);
 
   const assignedExams = useMemo(() => {
     const groups = (assignedData as any)?.data?.data;
@@ -190,6 +329,8 @@ export function KidsTests() {
       assignmentId: t.assignment_id ?? null,
       isAssigned: true,
       deadline: t.deadline ?? null,
+      attemptsUsed: t.attempts_used ?? null,
+      attemptsAllowed: t.attempts_allowed ?? null,
     }));
     return [
       ...map(groups.pending, 'pending'),
@@ -394,6 +535,8 @@ export function KidsTests() {
                 isAssigned={t.isAssigned}
                 showAssignedBadge={tab === 'all'}
                 deadline={t.deadline}
+                attemptsUsed={t.attemptsUsed}
+                attemptsAllowed={t.attemptsAllowed}
               />
             ))}
           </div>
@@ -427,6 +570,9 @@ export function KidsTests() {
             </button>
           </div>
         )}
+
+        {/* ─── Khu luyện tập tự do (chỉ ở tab "Tất cả") ─────────── */}
+        {tab === 'all' && !isLoading && <KidsPracticeBlock />}
       </div>
     </div>
   );

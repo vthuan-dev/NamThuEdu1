@@ -13,8 +13,6 @@ import { studentApi } from '../../services/studentApi';
 // ─── Age Group Dashboards ─────────────────────────────────────────────────────
 const KidsDashboard = lazy(() =>
   import('../features/student/kids/KidsDashboard').then(m => ({ default: m.KidsDashboard })));
-const KidsPractice = lazy(() =>
-  import('../features/student/kids/KidsPractice').then(m => ({ default: m.KidsPractice })));
 const KidsExamLobby = lazy(() =>
   import('../features/student/kids/KidsExamLobby').then(m => ({ default: m.KidsExamLobby })));
 const KidsTestTaking = lazy(() =>
@@ -185,11 +183,12 @@ function AdaptiveDashboard() {
   return <Suspense fallback={<LoadingFallback />}><AdultsDashboard /></Suspense>;
 }
 
-// Kids xem KidsPractice; còn lại xem PracticeList chung.
+// Kids: khu luyện tập đã gộp vào trang "Bài thi" (bai-tap) → redirect về đó.
+// Còn lại xem PracticeList chung.
 function AdaptivePractice() {
   const ageGroup = getSessionAgeGroup();
   if (ageGroup === 'kids') {
-    return <Suspense fallback={<LoadingFallback />}><KidsPractice /></Suspense>;
+    return <Navigate to="/hoc-vien/bai-tap" replace />;
   }
   return <Suspense fallback={<LoadingFallback />}><PracticeList /></Suspense>;
 }

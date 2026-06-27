@@ -15,7 +15,6 @@ import { NotificationPermissionBanner } from '../../components/NotificationPermi
 import {
   Home,
   ClipboardList,
-  Sparkles,
   History,
   Settings,
   LogOut,
@@ -74,7 +73,6 @@ export function KidsLayout() {
   const navItems: NavItem[] = [
     { icon: Home,          label: 'Trang chủ',  path: '/hoc-vien' },
     { icon: ClipboardList, label: 'Bài thi',    path: '/hoc-vien/bai-tap' },
-    { icon: Sparkles,      label: 'Luyện tập',  path: '/hoc-vien/luyen-tap' },
     { icon: History,       label: 'Lịch sử',    path: '/hoc-vien/lich-su' },
     { icon: Settings,      label: 'Cài đặt',    path: '/hoc-vien/cai-dat' },
   ];

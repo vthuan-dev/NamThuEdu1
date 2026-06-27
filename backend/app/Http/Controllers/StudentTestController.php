@@ -4305,6 +4305,12 @@ class StudentTestController extends Controller
             }
             $relevant = $inProgress ?? $finished;
 
+            // Số lần làm cho bài giáo viên giao: đếm submission gắn với assignment đó.
+            // Đề tự do (không assignment) không cần giới hạn nên để null.
+            $attemptsUsed = $assignment
+                ? $subs->where('assignment_id', $assignment->taId)->count()
+                : null;
+
             return [
                 'id'                => $exam->eId,
                 'title'             => $exam->eTitle,
@@ -4321,6 +4327,8 @@ class StudentTestController extends Controller
                 'is_assigned'       => (bool) $assignment,
                 'assignment_id'     => $assignment ? $assignment->taId : null,
                 'deadline'          => $assignment ? $assignment->taDeadline : null,
+                'attempts_used'     => $attemptsUsed,
+                'attempts_allowed'  => $assignment ? $assignment->taMax_attempt : null,
                 'submission_status' => $subStatus,
                 'submission_id'     => $relevant ? $relevant->sId : null,
                 'score'             => $finished ? (float) $finished->sScore : null,
