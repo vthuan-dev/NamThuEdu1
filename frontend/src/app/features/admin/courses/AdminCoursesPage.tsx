@@ -14,6 +14,7 @@ import {
 import { adminApi, AdminExam } from "@/services/adminApi";
 import { AdminStatsSkeleton } from "../components/AdminPageSkeleton";
 import { RejectReasonModal } from "../components/RejectReasonModal";
+import { useToastContext } from "@/contexts/ToastContext";
 import { ExamCard } from "./ExamCard";
 import { ExamQuickViewModal } from "./ExamQuickViewModal";
 import { ExamPreviewModal } from "./ExamPreviewModal";
@@ -46,6 +47,7 @@ const TYPE_TABS: { key: TypeTabKey; label: string }[] = [
 const PAGE_SIZE_OPTIONS = [12, 24, 48];
 
 export function AdminCoursesPage() {
+  const toast = useToastContext();
   const [exams, setExams] = useState<AdminExam[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,7 +134,10 @@ export function AdminCoursesPage() {
     try {
       setBusyId(id);
       await adminApi.approveExam(id);
+      toast.success("Duyệt đề thành công!");
       await loadExams();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Duyệt đề thất bại");
     } finally {
       setBusyId(null);
     }
@@ -144,8 +149,11 @@ export function AdminCoursesPage() {
     try {
       setBusyId(id);
       await adminApi.rejectExam(id, reason);
+      toast.success("Đã từ chối đề thi!");
       setRejectTarget(null);
       await loadExams();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Từ chối đề thất bại");
     } finally {
       setBusyId(null);
     }
@@ -160,7 +168,10 @@ export function AdminCoursesPage() {
     try {
       setBusyId(id);
       await adminApi.deleteExam(id);
+      toast.success("Xóa đề thi thành công!");
       await loadExams();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Xóa đề thi thất bại");
     } finally {
       setBusyId(null);
     }
