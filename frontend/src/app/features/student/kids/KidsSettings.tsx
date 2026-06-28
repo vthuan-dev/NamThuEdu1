@@ -22,12 +22,12 @@ const TABS: {
   desc: string;
   clay: { bg: string; c: string };
 }[] = [
-  { id: 'profile',  label: 'Thông tin của em', short: 'Thông tin', emoji: '🧒', icon: User,        desc: 'Tên, ngày sinh, ảnh đại diện của em', clay: { bg: 'linear-gradient(135deg,#FFF1F2,#FECDD3)', c: '#E11D48' } },
+  { id: 'profile',  label: 'Thông tin của bạn', short: 'Thông tin', emoji: '🧒', icon: User,        desc: 'Tên, ngày sinh, ảnh đại diện của bạn', clay: { bg: 'linear-gradient(135deg,#FFF1F2,#FECDD3)', c: '#E11D48' } },
   { id: 'security', label: 'Mật khẩu',          short: 'Mật khẩu',  emoji: '🔒', icon: ShieldCheck, desc: 'Đổi mật khẩu để giữ tài khoản an toàn', clay: { bg: 'linear-gradient(135deg,#EFF6FF,#BFDBFE)', c: '#2563EB' } },
 ];
 
 export function KidsSettings() {
-  usePageTitle('Cài đặt của em');
+  usePageTitle('Cài đặt của bạn');
   const [tab, setTab] = useState<Tab>('profile');
   const activeTab = TABS.find(t => t.id === tab)!;
 
@@ -48,7 +48,7 @@ export function KidsSettings() {
             <div>
               <p className="text-xs font-extrabold text-rose-400 uppercase tracking-widest">Tài khoản</p>
               <h1 className="text-2xl sm:text-3xl font-extrabold leading-tight" style={{ color: '#9F1239' }}>
-                Cài đặt của em
+                Cài đặt của bạn
               </h1>
               <p className="text-sm font-semibold text-orange-500/80 mt-0.5">Cập nhật thông tin và mật khẩu nhé!</p>
             </div>

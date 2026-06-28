@@ -51,7 +51,7 @@ export function KidsResult() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const submissionId = Number(id);
-  usePageTitle('Kết quả của em');
+  usePageTitle('Kết quả của bạn');
 
   const { data, isLoading } = useQuery({
     queryKey: ['kids-submission', submissionId],
@@ -172,9 +172,9 @@ export function KidsResult() {
           <section className="rounded-3xl p-7 sm:p-9 text-center"
             style={{ background: 'linear-gradient(135deg,#FFFFFF,#FFF7ED)', boxShadow: '0 12px 40px rgba(251,113,133,0.16)', border: '2px solid rgba(255,255,255,0.9)' }}>
             <div className="text-6xl mb-3">📨</div>
-            <h1 className="text-2xl font-extrabold" style={{ color: '#9F1239' }}>Em đã nộp bài rồi!</h1>
+            <h1 className="text-2xl font-extrabold" style={{ color: '#9F1239' }}>Bạn đã nộp bài rồi!</h1>
             <p className="mt-2 text-sm font-medium text-slate-500 max-w-sm mx-auto">
-              Thầy/cô đang chấm bài của em. Khi chấm xong, em sẽ nhận được thông báo
+              Thầy/cô đang chấm bài của bạn. Khi chấm xong, bạn sẽ nhận được thông báo
               <span className="inline-flex items-center"> 🔔</span> ngay nhé!
             </p>
             <div className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold text-amber-700"
@@ -429,10 +429,10 @@ export function KidsResult() {
                           )}
                           {/* Student answer card */}
                           <div className="rounded-xl bg-slate-50 p-3 border border-slate-100">
-                            <p className="text-[10px] font-bold text-slate-400 mb-1.5">📝 Bài làm của em</p>
+                            <p className="text-[10px] font-bold text-slate-400 mb-1.5">📝 Bài làm của bạn</p>
                             {(() => {
                               const ans = studentAns?.saAnswer_text;
-                              if (!ans) return <p className="text-xs text-slate-400 italic">Em chưa trả lời câu này.</p>;
+                              if (!ans) return <p className="text-xs text-slate-400 italic">Bạn chưa trả lời câu này.</p>;
                               if (ans.trim().startsWith('{')) {
                                 try {
                                   const obj = JSON.parse(ans);
@@ -456,7 +456,7 @@ export function KidsResult() {
                           {/* Pending / Not-answered badge */}
                           {!hasAnswer ? (
                             <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200">
-                              ✗ Em chưa trả lời câu này — 0 điểm
+                              ✗ Bạn chưa trả lời câu này — 0 điểm
                             </div>
                           ) : (
                             <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200">
@@ -472,7 +472,7 @@ export function KidsResult() {
                               {/* Header */}
                               <div className="grid grid-cols-2 text-[9px] font-extrabold uppercase tracking-wide"
                                 style={{ background: '#F8FAFC' }}>
-                                <div className="px-2.5 py-1.5 border-r border-slate-100 text-slate-400">📝 Bài làm của em</div>
+                                <div className="px-2.5 py-1.5 border-r border-slate-100 text-slate-400">📝 Bài làm của bạn</div>
                                 <div className="px-2.5 py-1.5 text-emerald-600">✓ Đáp án đúng</div>
                               </div>
                               {/* Rows */}
@@ -510,7 +510,7 @@ export function KidsResult() {
                             </div>
                           )}
                           {/* ── Full question preview — bài làm của em ─── */}
-                          <p className="text-[10px] font-bold text-slate-500 mb-1.5">📝 Bài làm của em trong bài</p>
+                          <p className="text-[10px] font-bold text-slate-500 mb-1.5">📝 Bài làm của bạn trong bài</p>
                           {/* Override layout của các question component (thiết kế cho trang thi full):
                               - Xoá max-height + overflow-y-auto → không cuộn nội tại
                               - Chuyển grid 2 cột → 1 cột

@@ -170,7 +170,7 @@ function FilterPill({
 
 // ─── Page ──────────────────────────────────────────────────────────────────
 export function KidsHistory() {
-  usePageTitle('Lịch sử của em');
+  usePageTitle('Lịch sử của bạn');
   const [filter, setFilter] = useState<Filter>('all');
 
   const { data, isLoading } = useQuery({
@@ -238,10 +238,10 @@ export function KidsHistory() {
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight">
-              Lịch sử của em 📚
+              Lịch sử của bạn 📚
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Tất cả những bài em đã thi — chạm vào để xem lại nhé!
+              Tất cả những bài bạn đã thi — chạm vào để xem lại nhé!
             </p>
           </div>
         </header>
@@ -269,7 +269,7 @@ export function KidsHistory() {
                 <Trophy className="w-8 h-8 sm:w-10 sm:h-10 text-yellow-200" fill="#FCD34D" />
               </div>
               <div className="text-white">
-                <p className="text-xs sm:text-sm font-bold text-white opacity-90">Em đã hoàn thành</p>
+                <p className="text-xs sm:text-sm font-bold text-white opacity-90">Bạn đã hoàn thành</p>
                 <p className="text-2xl sm:text-3xl font-extrabold text-white mt-0.5">
                   {stats.done} bài thi 🎉
                 </p>

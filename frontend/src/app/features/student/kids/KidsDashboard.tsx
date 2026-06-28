@@ -292,9 +292,9 @@ export function KidsDashboard() {
 
         {/* ─── Bài thi được giao ───────────────────────────────── */}
         <ClaySection
-          title="Bài thi của em"
+          title="Bài thi của bạn"
           emoji="📚"
-          subtitle={kidsTests.length > 0 ? `${kidsTests.length} bài đang chờ em làm` : undefined}
+          subtitle={kidsTests.length > 0 ? `${kidsTests.length} bài đang chờ bạn làm` : undefined}
           accentColor="#9F1239"
           action={
             <Link to="/hoc-vien/bai-tap"

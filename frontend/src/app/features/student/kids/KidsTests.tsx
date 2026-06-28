@@ -397,7 +397,7 @@ export function KidsTests() {
               <BookOpenCheck className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight">Bài thi của em 🎒</h1>
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight">Bài thi của bạn 🎒</h1>
               <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Chọn một bài thi và bắt đầu khám phá nhé!</p>
             </div>
           </div>

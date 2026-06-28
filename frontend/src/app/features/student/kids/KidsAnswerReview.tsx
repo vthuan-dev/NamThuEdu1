@@ -31,7 +31,7 @@ export function KidsAnswerReview() {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3">
         <Loader2 className="h-10 w-10 animate-spin" style={{ color: '#FB7185' }} />
-        <p className="text-sm font-bold text-slate-400">Đang tải bài làm của em…</p>
+        <p className="text-sm font-bold text-slate-400">Đang tải bài làm của bạn…</p>
       </div>
     );
   }
@@ -67,7 +67,7 @@ export function KidsAnswerReview() {
         </button>
         <div>
           <h1 className="text-xl font-extrabold" style={{ color: '#1A1040' }}>
-            Bài làm của em 🌟
+            Bài làm của bạn 🌟
           </h1>
           <p className="text-sm font-semibold text-slate-400">
             {raw?.submission_info?.exam_title ?? ''}
@@ -120,12 +120,12 @@ export function KidsAnswerReview() {
                       {answerMap['0'] ?? studentAns.saAnswer_text}
                     </div>
                   ) : (
-                    <p className="text-sm font-semibold text-slate-400">Em chưa trả lời câu này.</p>
+                    <p className="text-sm font-semibold text-slate-400">Bạn chưa trả lời câu này.</p>
                   )}
                   {isManualPending && (
                     <div className="flex items-center gap-2 rounded-2xl bg-amber-50 p-3 text-amber-700">
                       <Clock className="h-4 w-4 flex-shrink-0" />
-                      <span className="text-sm font-bold">Thầy/cô sẽ chấm phần này cho em.</span>
+                      <span className="text-sm font-bold">Thầy/cô sẽ chấm phần này cho bạn.</span>
                     </div>
                   )}
                 </div>
