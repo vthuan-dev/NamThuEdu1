@@ -4331,6 +4331,7 @@ class StudentTestController extends Controller
                 'attempts_allowed'  => $assignment ? $assignment->taMax_attempt : null,
                 'submission_status' => $subStatus,
                 'submission_id'     => $relevant ? $relevant->sId : null,
+                'submitted_at'      => $relevant ? ($relevant->sSubmit_time ?? $relevant->sStart_time) : null,
                 'score'             => $finished ? (float) $finished->sScore : null,
             ];
         });

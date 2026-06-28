@@ -119,20 +119,26 @@ function formatKidsDeadline(d: string): string {
 // Card chung cho cả 2 tab. Điều hướng phụ thuộc trạng thái + đề có được giao hay không.
 function ExamCard({
   title, skill, scope, partNumber, duration, questions, status, submissionId, assignmentId, examId,
-  isAssigned, showAssignedBadge, deadline, attemptsUsed, attemptsAllowed,
+  isAssigned, showAssignedBadge, deadline, attemptsUsed, attemptsAllowed, submittedAt,
 }: {
   title: string; skill?: string; scope?: string; partNumber?: number | null; duration?: number; questions?: number;
   status: Status; submissionId: number | null; assignmentId: number | null;
   examId: number; isAssigned: boolean; showAssignedBadge: boolean; deadline?: string | null;
   attemptsUsed?: number | null; attemptsAllowed?: number | null;
+  submittedAt?: string | null;
 }) {
   // Hết hạn = đề được giao có deadline đã qua. Khi đó "hạ cấp" về đề tự do:
   // bỏ ràng buộc assignment, chỉ còn 1 nút "Làm bài" (làm mới qua đường direct).
   const isExpired = !!deadline && isAssigned && new Date(deadline).getTime() < Date.now();
   const effectiveAssigned = isAssigned && !isExpired;
 
-  // Nếu bài thi giao đã hết hạn, hạ cấp thành đề tự luyện tự do chưa làm (pending)
-  const effectiveStatus = isExpired ? 'pending' : status;
+  // Đề tự luyện tự do (isAssigned === false) đã làm xong hơn 1 ngày (24 giờ) → reset về chưa làm
+  const isFreePracticeAndOld = !isAssigned && status === 'completed' && submittedAt && (
+    Date.now() - new Date(submittedAt).getTime() > 24 * 60 * 60 * 1000
+  );
+
+  // Nếu bài thi giao đã hết hạn HOẶC là đề tự luyện tự do đã quá 1 ngày → reset thành chưa làm (pending)
+  const effectiveStatus = (isExpired || isFreePracticeAndOld) ? 'pending' : status;
 
   const meta = STATUS_META[effectiveStatus] ?? STATUS_META.pending;
   const normalizedScope = String(scope || (skill === 'mixed' ? 'full' : 'skill')).toLowerCase();
@@ -296,6 +302,7 @@ export function KidsTests() {
       deadline: e.deadline ?? null,
       attemptsUsed: e.attempts_used ?? null,
       attemptsAllowed: e.attempts_allowed ?? null,
+      submittedAt: e.submitted_at ?? null,
     }));
 
     // Bài giáo viên giao ĐÃ làm xong (còn hạn) → quản lý ở tab "Giáo viên giao",
@@ -334,6 +341,7 @@ export function KidsTests() {
       deadline: t.deadline ?? null,
       attemptsUsed: t.attempts_used ?? null,
       attemptsAllowed: t.attempts_allowed ?? null,
+      submittedAt: t.submitted_at ?? null,
     }));
     return [
       ...map(groups.pending, 'pending'),
@@ -540,6 +548,7 @@ export function KidsTests() {
                 deadline={t.deadline}
                 attemptsUsed={t.attemptsUsed}
                 attemptsAllowed={t.attemptsAllowed}
+                submittedAt={t.submittedAt}
               />
             ))}
           </div>
