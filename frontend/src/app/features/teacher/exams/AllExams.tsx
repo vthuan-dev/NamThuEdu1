@@ -386,10 +386,10 @@ export function AllExams() {
   };
 
   const matchesStatusFn = (exam: KidsExam) => {
-    // eStatus có thể là 'draft', 'published', 'active', 'inactive', 'archived'
+    // eStatus có thể là 'draft', 'published', 'active', 'inactive', 'archived', 'pending'
     const status = (exam.eStatus || "").toLowerCase();
     if (filterStatus === "draft") return status === "draft";
-    return status === "published" || status === "active";
+    return status === "published" || status === "active" || status === "pending";
   };
 
   // Base cho badge nhóm tuổi: áp MỌI filter trừ nhóm tuổi → bấm "Người lớn" hiện đúng số trên badge
@@ -430,7 +430,7 @@ export function AllExams() {
     draft: exams.filter(e => (e.eStatus || "").toLowerCase() === "draft").length,
     published: exams.filter(e => {
       const s = (e.eStatus || "").toLowerCase();
-      return s === "published" || s === "active";
+      return s === "published" || s === "active" || s === "pending";
     }).length,
   };
 
@@ -1016,6 +1016,12 @@ export function AllExams() {
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100">
                             <span className="w-1 h-1 rounded-full bg-amber-500" />
                             Nháp
+                          </span>
+                        )}
+                        {exam.eStatus === "pending" && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                            <span className="w-1 h-1 rounded-full bg-blue-500 animate-pulse" />
+                            Chờ duyệt
                           </span>
                         )}
                         {(exam.eStatus === "published" || exam.eStatus === "active") && (

@@ -44,7 +44,7 @@ interface Exam {
   duration: number;
   questions: number;
   points: number;
-  status: "Draft" | "Published" | "Private";
+  status: "Draft" | "Published" | "Private" | "Pending";
   source: "Manual" | "Template" | "Upload";
   createdAt: string;
   modifiedAt: string;
@@ -66,9 +66,10 @@ interface Exam {
  * Map eStatus từ backend sang status UI.
  * Backend dùng: 'draft' | 'published' | 'active' | 'inactive' | 'archived' | 'private'
  */
-function deriveStatus(exam: any): "Draft" | "Published" | "Private" {
+function deriveStatus(exam: any): "Draft" | "Published" | "Private" | "Pending" {
   const s = (exam.eStatus || "").toLowerCase();
   if (s === "published" || s === "active") return "Published";
+  if (s === "pending") return "Pending";
   if (s === "private") return "Private";
   if (exam.eIs_private === true) return "Private";
   if (exam.eIs_published === true) return "Published";
@@ -107,6 +108,7 @@ const skillColorFallback = "text-gray-600";
 const statusColors: Record<string, string> = {
   Draft: "bg-orange-100 text-orange-700",
   Published: "bg-green-100 text-green-700",
+  Pending: "bg-blue-100 text-blue-700",
   Private: "bg-gray-100 text-gray-700",
 };
 
@@ -190,7 +192,7 @@ export function MyExams() {
   // Filter by tab
   const filterByTab = (exam: Exam) => {
     if (activeTab === "all") return true;
-    if (activeTab === "published") return exam.status === "Published";
+    if (activeTab === "published") return exam.status === "Published" || exam.status === "Pending";
     if (activeTab === "draft") return exam.status === "Draft";
     if (activeTab === "private") return exam.status === "Private";
     return true;
@@ -702,7 +704,9 @@ export function MyExams() {
                           ? "Bản nháp"
                           : exam.status === "Published"
                             ? "Đã xuất bản"
-                            : "Riêng tư"}
+                            : exam.status === "Pending"
+                              ? "Chờ duyệt"
+                              : "Riêng tư"}
                       </span>
                     </div>
 
@@ -864,7 +868,9 @@ export function MyExams() {
                               ? "Bản nháp"
                               : exam.status === "Published"
                                 ? "Đã xuất bản"
-                                : "Riêng tư"}
+                                : exam.status === "Pending"
+                                  ? "Chờ duyệt"
+                                  : "Riêng tư"}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
