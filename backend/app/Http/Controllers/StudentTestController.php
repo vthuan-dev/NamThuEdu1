@@ -1156,7 +1156,9 @@ class StudentTestController extends Controller
         $sortBy = $request->input('sort_by', 'sSubmit_time');
         $sortOrder = $request->input('sort_order', 'desc');
 
-        $query = Submission::with(['exam', 'assignment'])
+        $query = Submission::with(['exam' => function($q) {
+            $q->withCount('questions');
+        }, 'assignment', 'answers'])
             ->where('user_id', $user->uId);
 
         if ($request->filled('status')) {
@@ -1178,6 +1180,50 @@ class StudentTestController extends Controller
         $submissions = $query
             ->orderBy($sortBy, $sortOrder)
             ->paginate($perPage);
+
+        $submissions->getCollection()->transform(function ($sub) {
+            $maxScore = floatval($sub->exam->eTotal_score ?: 100);
+            $score = floatval($sub->sScore);
+            $accuracy = $maxScore > 0 ? round(($score / $maxScore) * 100) : 0;
+
+            $totalSubQ = 0;
+            $correctSubQ = 0;
+            foreach ($sub->answers as $ans) {
+                $ansText = $ans->saAnswer_text;
+                if ($ansText && (str_starts_with($ansText, '{') || str_starts_with($ansText, '['))) {
+                    $decoded = json_decode($ansText, true);
+                    if (is_array($decoded)) {
+                        foreach ($decoded as $k => $v) {
+                            $totalSubQ++;
+                            if ($v === '1' || $v === 1 || $v === true || $v === 'true' || $v === 'correct') {
+                                $correctSubQ++;
+                            }
+                        }
+                        continue;
+                    }
+                }
+                $totalSubQ++;
+                if ($ans->saIs_correct) {
+                    $correctSubQ++;
+                }
+            }
+
+            $examQuestionsCount = $sub->exam->questions_count ?: 1;
+            if ($totalSubQ < $examQuestionsCount) {
+                $totalSubQ = $examQuestionsCount;
+            }
+
+            $stats = [
+                'correct_answers' => $correctSubQ,
+                'total_questions' => $totalSubQ,
+                'accuracy' => $accuracy,
+                'grade' => $accuracy >= 90 ? 'Xuất sắc' : ($accuracy >= 75 ? 'Giỏi' : ($accuracy >= 50 ? 'Khá' : 'Cần luyện thêm')),
+            ];
+
+            $sub->setAttribute('stats', $stats);
+            $sub->unsetRelation('answers');
+            return $sub;
+        });
 
         return response()->json([
             'status' => 'success',
