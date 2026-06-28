@@ -88,7 +88,10 @@ export function KidsAnswerReview() {
           // Chuẩn hoá task_data (xử lý mọi kiểu lồng config/task_data) để build review.
           const taskData = cfg ? extractTaskData(q) : null;
           const answerMap = parseKidsAnswer(studentAns?.saAnswer_text);
-          const rows = taskData ? buildReviewRows(taskType, taskData, answerMap) : [];
+          let rows = taskData ? buildReviewRows(taskType, taskData, answerMap) : [];
+          if (studentAns?.saIs_correct === true || studentAns?.saIs_correct === 1) {
+            rows = rows.map((r: any) => ({ ...r, isCorrect: true }));
+          }
           const isManualType = MANUAL_REVIEW_TYPES.has(taskType);
 
           return (

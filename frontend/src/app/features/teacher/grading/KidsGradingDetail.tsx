@@ -198,8 +198,18 @@ export function KidsGradingDetail() {
         for (const t of mapped) {
           if (t.isManual) continue;
           try {
+            const sa = d.answers?.find((a: any) => Number(a.saId) === t.answerId);
+            const isFullScore = sa?.saPoints_awarded !== null && Number(sa?.saPoints_awarded) >= t.maxPoints;
+            const isCorrect = sa?.saIs_correct === true || sa?.saIs_correct === 1 || isFullScore;
+
             const rows = buildReviewRows(t.taskType, t.taskData, parseAnswerMap(t.studentAnswerRaw) as any);
-            if (rows.length > 0) initCorrect[t.id] = rows.map((r) => r.isCorrect);
+            if (rows.length > 0) {
+              if (isCorrect) {
+                initCorrect[t.id] = rows.map(() => true);
+              } else {
+                initCorrect[t.id] = rows.map((r) => r.isCorrect);
+              }
+            }
           } catch { /* ignore */ }
         }
         setCellCorrect(initCorrect);

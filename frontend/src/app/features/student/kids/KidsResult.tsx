@@ -365,7 +365,10 @@ export function KidsResult() {
                 const taskType: string = cfg?.task_type ?? '';
                 const taskData = cfg ? extractTaskData(q) : null;
                 const answerMap = parseKidsAnswer(studentAns?.saAnswer_text);
-                const rows = taskData ? buildReviewRows(taskType, taskData, answerMap) : [];
+                let rows = taskData ? buildReviewRows(taskType, taskData, answerMap) : [];
+                if (studentAns?.saIs_correct === true || studentAns?.saIs_correct === 1) {
+                  rows = rows.map((r: any) => ({ ...r, isCorrect: true }));
+                }
                 const isManual = MANUAL_REVIEW_TYPES.has(taskType);
                 const allCorrect = rows.length > 0 && rows.every((r: any) => r.isCorrect);
                 const anyWrong = rows.length > 0 && rows.some((r: any) => !r.isCorrect);

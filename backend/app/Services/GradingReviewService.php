@@ -41,10 +41,15 @@ class GradingReviewService
         $prev = $answer->saPoints_awarded;
 
         DB::transaction(function () use ($answer, $teacher, $prev) {
+            $exam = $answer->submission ? $answer->submission->exam : null;
+            $examType = $exam ? strtoupper($exam->eType ?? '') : '';
+            $isVstep = $examType === 'VSTEP' || $examType === 'IELTS';
+            $isCorrect = $isVstep ? ($answer->saAi_score >= 5.0) : ($answer->saAi_score >= floatval($answer->question->qPoints ?? 1) * 0.999);
+
             $answer->update([
                 'saPoints_awarded'    => $answer->saAi_score,
                 'saTeacher_feedback'  => $answer->saAi_feedback,
-                'saIs_correct'        => $answer->saAi_score >= 5.0,
+                'saIs_correct'        => $isCorrect,
                 'saReview_status'     => 'accepted',
                 'saReviewed_at'       => now(),
                 'saReviewed_by'       => $teacher->uId,
@@ -92,10 +97,15 @@ class GradingReviewService
                 }
             }
 
+            $exam = $answer->submission ? $answer->submission->exam : null;
+            $examType = $exam ? strtoupper($exam->eType ?? '') : '';
+            $isVstep = $examType === 'VSTEP' || $examType === 'IELTS';
+            $isCorrect = $isVstep ? ($score >= 5.0) : ($score >= floatval($answer->question->qPoints ?? 1) * 0.999);
+
             $answer->update([
                 'saPoints_awarded'   => $score,
                 'saTeacher_feedback' => $feedback,
-                'saIs_correct'       => $score >= 5.0,
+                'saIs_correct'       => $isCorrect,
                 'saReview_status'    => 'modified',
                 'saReviewed_at'      => now(),
                 'saReviewed_by'      => $teacher->uId,
@@ -207,64 +217,105 @@ class GradingReviewService
         DB::transaction(function () use ($submission, $data, $teacher) {
             $examType = strtoupper($submission->exam->eType ?? '');
             $isIelts  = $examType === 'IELTS';
+            $isVstep  = $examType === 'VSTEP' || $isIelts;
 
-            $raw = $submission->sGemini_feedback
-                ? (json_decode($submission->sGemini_feedback, true) ?: [])
-                : [];
+            if ($isVstep) {
+                $raw = $submission->sGemini_feedback
+                    ? (json_decode($submission->sGemini_feedback, true) ?: [])
+                    : [];
 
-            // Pick scores key + max range based on exam type
-            $scoresKey  = $isIelts ? 'ielts_scores' : 'vstep_scores';
-            $maxScore   = $isIelts ? 9.0 : 10.0;
-            $skillScores = $raw[$scoresKey] ?? [];
+                // Pick scores key + max range based on exam type
+                $scoresKey  = $isIelts ? 'ielts_scores' : 'vstep_scores';
+                $maxScore   = $isIelts ? 9.0 : 10.0;
+                $skillScores = $raw[$scoresKey] ?? [];
 
-            // Apply teacher overrides (clamped + IELTS rounded to 0.5)
-            $overrides = $data['skill_overrides'] ?? [];
-            foreach (['listening', 'reading', 'writing', 'speaking'] as $skill) {
-                if (isset($overrides[$skill]) && is_numeric($overrides[$skill])) {
-                    $val = (float) $overrides[$skill];
-                    $val = max(0.0, min($maxScore, $val));
-                    $skillScores[$skill] = $isIelts ? (round($val * 2) / 2) : round($val, 2);
+                // Apply teacher overrides (clamped + IELTS rounded to 0.5)
+                $overrides = $data['skill_overrides'] ?? [];
+                foreach (['listening', 'reading', 'writing', 'speaking'] as $skill) {
+                    if (isset($overrides[$skill]) && is_numeric($overrides[$skill])) {
+                        $val = (float) $overrides[$skill];
+                        $val = max(0.0, min($maxScore, $val));
+                        $skillScores[$skill] = $isIelts ? (round($val * 2) / 2) : round($val, 2);
+                    }
                 }
+                $raw[$scoresKey] = $skillScores;
+
+                // Overall = average of available skills (IELTS rounds to 0.5)
+                $available = array_filter([
+                    $skillScores['listening'] ?? null,
+                    $skillScores['reading']   ?? null,
+                    $skillScores['writing']   ?? null,
+                    $skillScores['speaking']  ?? null,
+                ], fn($v) => !is_null($v));
+
+                $overallAvg = null;
+                if (count($available) > 0) {
+                    $avg = array_sum($available) / count($available);
+                    $overallAvg = $isIelts ? (round($avg * 2) / 2) : round($avg, 2);
+                }
+
+                $update = [
+                    'sGemini_feedback'    => json_encode($raw),
+                    'sStatus'             => 'graded',
+                    'sGraded_time'        => now(),
+                    'teacher_reviewed_at' => now(),
+                ];
+                if (!empty($data['sTeacher_feedback'])) {
+                    $update['sTeacher_feedback'] = $data['sTeacher_feedback'];
+                }
+                if (!is_null($overallAvg)) {
+                    $update['sScore'] = round($overallAvg * 10, 2);
+                }
+
+                $submission->update($update);
+
+                GradingHistory::create([
+                    'submission_id' => $submission->sId,
+                    'answer_id'     => null,
+                    'ghAction'      => GradingHistory::ACTION_TEACHER_SAVE,
+                    'ghActor_id'    => $teacher->uId,
+                    'ghNew_score'   => $overallAvg,
+                    'ghMetadata'    => [$scoresKey => $skillScores],
+                ]);
+            } else {
+                // Non-VSTEP/Kids/General logic
+                $totalPoints = 0;
+                $maxPoints = 0;
+
+                // Load answers with question if not loaded
+                if (!$submission->relationLoaded('answers') || $submission->answers->isEmpty()) {
+                    $submission->load(['answers.question']);
+                }
+
+                foreach ($submission->answers as $answer) {
+                    if (!$answer->question) continue;
+                    $maxPoints += floatval($answer->question->qPoints ?: 1);
+                    $totalPoints += floatval($answer->saPoints_awarded ?? 0);
+                }
+
+                $finalScore = $maxPoints > 0 ? round(($totalPoints / $maxPoints) * 100, 2) : 0;
+
+                $update = [
+                    'sStatus'             => 'graded',
+                    'sGraded_time'        => now(),
+                    'teacher_reviewed_at' => now(),
+                    'sScore'              => $finalScore,
+                ];
+                if (!empty($data['sTeacher_feedback'])) {
+                    $update['sTeacher_feedback'] = $data['sTeacher_feedback'];
+                }
+
+                $submission->update($update);
+
+                GradingHistory::create([
+                    'submission_id' => $submission->sId,
+                    'answer_id'     => null,
+                    'ghAction'      => GradingHistory::ACTION_TEACHER_SAVE,
+                    'ghActor_id'    => $teacher->uId,
+                    'ghNew_score'   => $finalScore,
+                    'ghMetadata'    => ['score' => $finalScore],
+                ]);
             }
-            $raw[$scoresKey] = $skillScores;
-
-            // Overall = average of available skills (IELTS rounds to 0.5)
-            $available = array_filter([
-                $skillScores['listening'] ?? null,
-                $skillScores['reading']   ?? null,
-                $skillScores['writing']   ?? null,
-                $skillScores['speaking']  ?? null,
-            ], fn($v) => !is_null($v));
-
-            $overallAvg = null;
-            if (count($available) > 0) {
-                $avg = array_sum($available) / count($available);
-                $overallAvg = $isIelts ? (round($avg * 2) / 2) : round($avg, 2);
-            }
-
-            $update = [
-                'sGemini_feedback'    => json_encode($raw),
-                'sStatus'             => 'graded',
-                'sGraded_time'        => now(),
-                'teacher_reviewed_at' => now(),
-            ];
-            if (!empty($data['sTeacher_feedback'])) {
-                $update['sTeacher_feedback'] = $data['sTeacher_feedback'];
-            }
-            if (!is_null($overallAvg)) {
-                $update['sScore'] = round($overallAvg * 10, 2);
-            }
-
-            $submission->update($update);
-
-            GradingHistory::create([
-                'submission_id' => $submission->sId,
-                'answer_id'     => null,
-                'ghAction'      => GradingHistory::ACTION_TEACHER_SAVE,
-                'ghActor_id'    => $teacher->uId,
-                'ghNew_score'   => $overallAvg,
-                'ghMetadata'    => [$scoresKey => $skillScores],
-            ]);
 
             // Push notification khi giáo viên chấm xong
             try {
