@@ -58,7 +58,8 @@ export function KidsResult() {
     enabled: !!submissionId,
     refetchInterval: (query) => {
       const s: any = (query.state.data as any)?.data?.data ?? (query.state.data as any)?.data;
-      return s?.sStatus && s.sStatus !== 'graded' ? 8000 : false;
+      const done = s?.sStatus === 'graded' || s?.sStatus === 'auto_submitted' || s?.sStatus === 'partially_graded';
+      return done ? false : 8000;
     },
   });
 
@@ -92,18 +93,22 @@ export function KidsResult() {
   const maxScore = typeof sub?.exam?.eMax_score === 'number' ? sub.exam.eMax_score : parseFloat(sub?.exam?.eMax_score) || 100;
   const rawScore = typeof sub?.sScore === 'number' ? sub.sScore : parseFloat(sub?.sScore) || 0;
   const pct = maxScore > 0 ? Math.round((rawScore / maxScore) * 100) : 0;
-  const isGraded = sub?.sStatus === 'graded';
+  const isGraded = sub?.sStatus === 'graded' || sub?.sStatus === 'auto_submitted' || sub?.sStatus === 'partially_graded';
   const correct = sub?.answers?.filter((a: any) => a.saIs_correct)?.length ?? 0;
   const totalQ = sub?.exam?.questions?.length ?? sub?.answers?.length ?? 0;
   const praise = getPraise(pct);
 
-  // Lời nhắn tổng quát của thầy/cô (sTeacher_feedback). Guard JSON (một số
-  // flow lưu feedback dạng JSON) — chỉ hiển thị khi là text thân thiện.
+  // Lời nhắn tổng quát của thầy/cô (sTeacher_feedback). Guard JSON + lọc message tự động nộp.
   const rawTeacherFeedback = sub?.sTeacher_feedback;
+  const isAutoSubmitMsg = typeof rawTeacherFeedback === 'string' &&
+    (rawTeacherFeedback.includes('tự động nộp') || rawTeacherFeedback.includes('auto_submitted'));
   const overallFeedback =
-    typeof rawTeacherFeedback === 'string' && rawTeacherFeedback.trim() && !rawTeacherFeedback.trim().startsWith('{')
+    typeof rawTeacherFeedback === 'string' && rawTeacherFeedback.trim() &&
+    !rawTeacherFeedback.trim().startsWith('{') && !isAutoSubmitMsg
       ? rawTeacherFeedback.trim()
       : '';
+  const isAutoSubmitted = sub?.sStatus === 'auto_submitted' || sub?.auto_submit_reason;
+
 
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(160deg, #FFF1F2 0%, #FFF7ED 50%, #F0FDF4 100%)' }}>
@@ -136,10 +141,10 @@ export function KidsResult() {
           /* ─── Đã chấm — compact inline ────────────────────────── */
           <>
             {/* ─── Bố cục 2 cột: trái = khen + nhắn, phải = kết quả ─── */}
-            <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+            <div className="grid gap-4 sm:grid-cols-[280px_1fr] sm:items-start">
 
             {/* ─── Cột trái: lời khen + lời nhắn ──────────────────── */}
-            <div className="space-y-3 lg:sticky lg:top-4">
+            <div className="space-y-3 sm:sticky sm:top-4">
             {/* Compact score header */}
             <section className="flex items-center gap-4 rounded-2xl p-4"
               style={{ background: praise.bg, boxShadow: '0 8px 24px rgba(0,0,0,0.06)', border: '2px solid rgba(255,255,255,0.9)' }}>
@@ -147,9 +152,12 @@ export function KidsResult() {
                 <div className="text-3xl leading-none mb-1">{praise.emoji}</div>
                 <h1 className="text-lg font-extrabold leading-tight" style={{ color: praise.c }}>{praise.title}</h1>
                 <p className="text-xs font-bold mt-0.5" style={{ color: praise.c, opacity: 0.85 }}>{praise.msg}</p>
-                <div className="flex items-center gap-3 mt-2">
+                <div className="flex flex-wrap items-center gap-2 mt-2">
                   <span className="text-xs font-extrabold tabular-nums rounded-lg px-2 py-1" style={{ background: 'rgba(255,255,255,0.7)', color: '#059669' }}>{correct}/{totalQ} đúng 🎯</span>
                   <span className="text-xs font-extrabold tabular-nums rounded-lg px-2 py-1" style={{ background: 'rgba(255,255,255,0.7)', color: '#2563EB' }}>{pct}% ⭐</span>
+                  {isAutoSubmitted && (
+                    <span className="text-xs font-extrabold rounded-lg px-2 py-1" style={{ background: 'rgba(255,255,255,0.7)', color: '#B45309' }}>⏰ Hết giờ tự nộp</span>
+                  )}
                 </div>
               </div>
               <KidsScoreRing pct={pct} color={praise.c} />
@@ -261,7 +269,17 @@ export function KidsResult() {
                       ) : (
                         <>
                           <p className="text-[10px] font-bold text-emerald-600 mb-1.5">✓ Đáp án đúng</p>
-                          <div className="max-w-lg mx-auto">
+                          {/* Override layout của các question component (thiết kế cho trang thi full):
+                              - Xoá max-height + overflow-y-auto → không cuộn nội tại
+                              - Chuyển grid 2 cột → 1 cột
+                              - Bỏ sticky để không bị kẹt */}
+                          <style>{`
+                            .qr-review [class*="max-h-["] { max-height: none !important; }
+                            .qr-review .overflow-y-auto { overflow: visible !important; }
+                            .qr-review .sticky { position: relative !important; top: auto !important; }
+                            .qr-review [class*="grid-cols-[4"] { grid-template-columns: 1fr !important; }
+                          `}</style>
+                          <div className="qr-review w-full">
                             <QuestionRenderer
                               question={q}
                               mode="preview"
