@@ -126,17 +126,20 @@ function ExamCard({
   examId: number; isAssigned: boolean; showAssignedBadge: boolean; deadline?: string | null;
   attemptsUsed?: number | null; attemptsAllowed?: number | null;
 }) {
-  const meta = STATUS_META[status] ?? STATUS_META.pending;
-  const normalizedScope = String(scope || (skill === 'mixed' ? 'full' : 'skill')).toLowerCase();
-  const scopeLabel = normalizedScope === 'full' ? 'Full test' : normalizedScope === 'part' ? `Part ${partNumber ?? ''}`.trim() : 'Skill';
-
   // Hết hạn = đề được giao có deadline đã qua. Khi đó "hạ cấp" về đề tự do:
   // bỏ ràng buộc assignment, chỉ còn 1 nút "Làm bài" (làm mới qua đường direct).
   const isExpired = !!deadline && isAssigned && new Date(deadline).getTime() < Date.now();
   const effectiveAssigned = isAssigned && !isExpired;
 
-  const isCompleted = status === 'completed';
-  const inProgress = !isExpired && status === 'in_progress';
+  // Nếu bài thi giao đã hết hạn, hạ cấp thành đề tự luyện tự do chưa làm (pending)
+  const effectiveStatus = isExpired ? 'pending' : status;
+
+  const meta = STATUS_META[effectiveStatus] ?? STATUS_META.pending;
+  const normalizedScope = String(scope || (skill === 'mixed' ? 'full' : 'skill')).toLowerCase();
+  const scopeLabel = normalizedScope === 'full' ? 'Full test' : normalizedScope === 'part' ? `Part ${partNumber ?? ''}`.trim() : 'Skill';
+
+  const isCompleted = effectiveStatus === 'completed';
+  const inProgress = effectiveStatus === 'in_progress';
 
   // Số lần làm của bài giáo viên giao. allowed <= 0 (hoặc null) = không giới hạn.
   const used = attemptsUsed ?? 0;
