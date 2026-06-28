@@ -101,76 +101,86 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
     : `${BASE}/lam-bai/${item.examId}?autostart=1&direct=1`;
 
   return (
-    <div className="group flex flex-col bg-white rounded-2xl border border-slate-200 p-5 transition-all duration-200 hover:border-teal-300 hover:shadow-[0_6px_20px_-8px_rgba(13,148,136,0.25)]">
-      {/* Icon kỹ năng + trạng thái */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-teal-50 text-teal-700 ring-1 ring-teal-100">
-          <SkillIcon className="w-5 h-5" />
-        </div>
-        <div className="flex items-center gap-2.5">
-          {showAssignedBadge && effectiveAssigned && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-700">
-              <Gift className="w-3.5 h-3.5" /> GV giao
-            </span>
-          )}
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-700 bg-cyan-50 border border-cyan-100 rounded-full px-2 py-0.5">
-            {scopeLabel}
-          </span>
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: dot }} />
-            {statusText}
-          </span>
-        </div>
-      </div>
-
-      {/* Title */}
-      <h3 className="text-[15px] font-bold text-slate-900 leading-snug line-clamp-2 min-h-[42px]">
-        {item.title}
-      </h3>
-
-      {/* Meta */}
-      <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-[13px] text-slate-400 mt-2 mb-4">
-        {!!item.duration && item.duration > 0 && (
-          <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {item.duration} phút</span>
-        )}
-        {!!item.questions && item.questions > 0 && (
-          <span className="inline-flex items-center gap-1.5"><ListChecks className="w-3.5 h-3.5" /> {item.questions} câu</span>
-        )}
-        {item.skill && (
-          <span className="font-medium text-slate-500">{skillLabel(item.skill)}</span>
-        )}
-      </div>
-
-      {/* Action */}
-      <div className="mt-auto">
-        {isCompleted && item.submissionId ? (
-          <div className="flex items-center gap-2">
-            <Link to={redoTo}
-              className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
-              style={{ background: TEAL }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#0B7E74')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = TEAL)}>
-              <RotateCcw className="w-4 h-4" /> Làm lại
-            </Link>
-            <Link to={`${BASE}/ket-qua/${item.submissionId}`}
-              className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
-              style={{ background: '#10B981' }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#059669')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = '#10B981')}>
-              <CheckCircle className="w-4 h-4" /> Xem kết quả
-            </Link>
+    <div className="group relative flex flex-col bg-white rounded-2xl border border-slate-200 overflow-hidden transition-all duration-300 hover:border-teal-300 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_-10px_rgba(13,148,136,0.18)]">
+      {/* Decorative gradient overlay in the background of the card */}
+      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" 
+        style={{
+          background: 'radial-gradient(circle at 100% 0%, rgba(13, 148, 136, 0.04) 0%, transparent 60%)'
+        }} 
+      />
+      
+      {/* Top bar with subtle gradient background */}
+      <div className="relative px-5 pt-5 pb-3 bg-gradient-to-b from-slate-50/80 to-transparent border-b border-slate-100/50">
+        {/* Subtle background orb */}
+        <div className="absolute -top-10 -right-10 w-24 h-24 rounded-full opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-300 pointer-events-none"
+          style={{ background: 'radial-gradient(circle, #0D9488, transparent)' }} />
+          
+        {/* Icon kỹ năng + trạng thái */}
+        <div className="flex items-center justify-between mb-2.5 relative z-10">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-teal-50 text-teal-700 ring-1 ring-teal-100/80 transition-transform duration-300 group-hover:scale-105">
+            <SkillIcon className="w-5 h-5" />
           </div>
-        ) : (
-          <Link to={startTo}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
-            style={{ background: TEAL }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = '#0B7E74')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = TEAL)}>
-            {inProgress ? <RotateCcw className="w-4 h-4" /> : <Play className="w-4 h-4 fill-white" />}
-            {inProgress ? 'Làm tiếp' : 'Bắt đầu'}
-            <ArrowRight className="w-4 h-4 opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
-          </Link>
-        )}
+          <div className="flex items-center gap-2.5">
+            {showAssignedBadge && effectiveAssigned && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-700 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-full">
+                <Gift className="w-3.5 h-3.5" /> GV giao
+              </span>
+            )}
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-cyan-700 bg-cyan-50 border border-cyan-100 rounded-full px-2 py-0.5">
+              {scopeLabel}
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: dot }} />
+              {statusText}
+            </span>
+          </div>
+        </div>
+
+        {/* Title */}
+        <h3 className="text-[15px] font-bold text-slate-900 leading-snug line-clamp-2 min-h-[42px] relative z-10 mt-1">
+          {item.title}
+        </h3>
+      </div>
+
+      {/* Card Content / Body */}
+      <div className="px-5 pb-5 pt-3 flex flex-col flex-1 relative z-10">
+        {/* Meta */}
+        <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-[13px] text-slate-400 mb-4">
+          {!!item.duration && item.duration > 0 && (
+            <span className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-lg text-slate-500"><Clock className="w-3.5 h-3.5 text-slate-400" /> {item.duration} phút</span>
+          )}
+          {!!item.questions && item.questions > 0 && (
+            <span className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-lg text-slate-500"><ListChecks className="w-3.5 h-3.5 text-slate-400" /> {item.questions} câu</span>
+          )}
+          {item.skill && (
+            <span className="font-semibold text-[11px] uppercase tracking-wider text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded-full ml-auto">{skillLabel(item.skill)}</span>
+          )}
+        </div>
+
+        {/* Action */}
+        <div className="mt-auto pt-2">
+          {isCompleted && item.submissionId ? (
+            <div className="flex items-center gap-2">
+              <Link to={redoTo}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-bold text-teal-700 bg-teal-50 border border-teal-200 hover:bg-teal-100/50 transition-colors">
+                <RotateCcw className="w-4 h-4" /> Làm lại
+              </Link>
+              <Link to={`${BASE}/ket-qua/${item.submissionId}`}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-sm hover:shadow"
+                style={{ background: `linear-gradient(135deg, #10B981 0%, #059669 100%)` }}>
+                <CheckCircle className="w-4 h-4" /> Kết quả
+              </Link>
+            </div>
+          ) : (
+            <Link to={startTo}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-sm hover:shadow"
+              style={{ background: `linear-gradient(135deg, ${TEAL} 0%, ${TEAL_MID} 100%)` }}>
+              {inProgress ? <RotateCcw className="w-4 h-4" /> : <Play className="w-4 h-4 fill-white" />}
+              {inProgress ? 'Làm tiếp' : 'Bắt đầu'}
+              <ArrowRight className="w-4 h-4 opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
+            </Link>
+          )}
+        </div>
       </div>
     </div>
   );

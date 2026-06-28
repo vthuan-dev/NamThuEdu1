@@ -195,4 +195,42 @@ class Exam extends Model
         return $this->belongsTo(\stdClass::class, 'kids_exam_type_id', 'id')
             ->from('kids_exam_types');
     }
+
+    /**
+     * Dynamically count questions for THPT exams from JSON config, fallback to Eloquent count for others.
+     */
+    public function getQuestionsCount(): int
+    {
+        if ($this->eType === 'THPT' && is_array($this->thpt_config)) {
+            $count = 0;
+            foreach ($this->thpt_config['sections'] ?? [] as $s) {
+                $type = $s['type'] ?? '';
+                if ($type === 'mc_cloze' || $type === 'word_bank_cloze' || $type === 'open_cloze') {
+                    $count += count($s['blanks'] ?? []);
+                } elseif ($type === 'tf_group') {
+                    foreach ($s['items'] ?? [] as $it) {
+                        $count += count($it['statements'] ?? []);
+                    }
+                } elseif ($type === 'reading_mixed') {
+                    foreach ($s['items'] ?? [] as $it) {
+                        $kind = $it['kind'] ?? '';
+                        if ($kind === 'tf_group') {
+                            $count += count($it['statements'] ?? []);
+                        } else {
+                            $count += 1;
+                        }
+                    }
+                } elseif ($type === 'matching') {
+                    foreach ($s['items'] ?? [] as $it) {
+                        $count += count($it['answers'] ?? []);
+                    }
+                } else {
+                    $count += count($s['items'] ?? []);
+                }
+            }
+            return $count;
+        }
+
+        return $this->questions_count ?? $this->questions()->count();
+    }
 }

@@ -619,6 +619,24 @@ export function TeensTestTaking() {
     audioRef.current.play().catch(() => undefined);
   };
 
+  // ─── Chế độ đọc hiểu: gom các câu cùng đoạn đọc, hiển thị bài đọc cố định
+  // bên trái + danh sách câu cuộn bên phải. ──────────────────────────────────
+  const passage = q ? getPassage(q) : '';
+  const isReading = passage.length > 0;
+  const groupIndices: number[] = [];
+  if (isReading) {
+    for (let i = 0; i < total; i++) {
+      if (getPassage(questions[i]) === passage) groupIndices.push(i);
+    }
+  }
+
+  // Text highlighting hook for reading passages - MUST be called before early return
+  const highlightHook = useTextHighlight({
+    submissionId: submissionId || 0,
+    passageId: isReading ? groupIndices[0] || 0 : 0,
+    enabled: isReading && !!submissionId,
+  });
+
   // ─── Chưa bắt đầu / loading ─────────────────────────────────────────────────
   if (!started) {
     return (
@@ -651,24 +669,6 @@ export function TeensTestTaking() {
   const selected = String(session.answers[qid] ?? '');
   const isLast = current >= total - 1;
   const isFlagged = !!flagged[qid];
-
-  // ─── Chế độ đọc hiểu: gom các câu cùng đoạn đọc, hiển thị bài đọc cố định
-  // bên trái + danh sách câu cuộn bên phải. ──────────────────────────────────
-  const passage = q ? getPassage(q) : '';
-  const isReading = passage.length > 0;
-  const groupIndices: number[] = [];
-  if (isReading) {
-    for (let i = 0; i < total; i++) {
-      if (getPassage(questions[i]) === passage) groupIndices.push(i);
-    }
-  }
-
-  // Text highlighting hook for reading passages
-  const highlightHook = useTextHighlight({
-    submissionId: submissionId || 0,
-    passageId: isReading ? groupIndices[0] || 0 : 0,
-    enabled: isReading && !!submissionId,
-  });
 
   const statusOf = (i: number): 'answered' | 'flagged' | 'current' | 'empty' => {
     const id = getQuestionId(questions[i]);

@@ -31,9 +31,8 @@ export type HighlightColor = keyof typeof HIGHLIGHT_COLORS;
 
 export function useTextHighlight({ submissionId, passageId, enabled = true }: UseTextHighlightOptions) {
   const storageKey = `ielts_highlights_${submissionId}_${passageId}`;
-  
+
   const [highlights, setHighlights] = useState<TextHighlight[]>(() => {
-    if (!enabled) return [];
     try {
       const stored = localStorage.getItem(storageKey);
       return stored ? JSON.parse(stored) : [];

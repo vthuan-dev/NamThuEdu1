@@ -206,7 +206,7 @@ class StudentTestController extends Controller
                 'exam_type'        => $exam->eType,
                 'exam_skill'       => $exam->eSkill,
                 'exam_duration'    => $exam->eDuration_minutes ?? $exam->eDuration ?? 0,
-                'total_questions'  => $exam->questions_count ?? 0,
+                'total_questions'  => $exam->getQuestionsCount(),
                 'max_score'        => $exam->eTotal_score ?? 100,
                 'start_time'       => $assignment->taCreated_at,
                 'end_time'         => $assignment->taDeadline,
@@ -1208,7 +1208,7 @@ class StudentTestController extends Controller
                 }
             }
 
-            $examQuestionsCount = $sub->exam->questions_count ?: 1;
+            $examQuestionsCount = $sub->exam->getQuestionsCount() ?: 1;
             if ($totalSubQ < $examQuestionsCount) {
                 $totalSubQ = $examQuestionsCount;
             }
@@ -4285,7 +4285,7 @@ class StudentTestController extends Controller
                 'duration'        => $exam->eDuration_minutes,
                 'description'     => $exam->eDescription,
                 'age_group'       => $exam->age_group,
-                'questions_count' => $exam->questions_count,
+                'questions_count' => $exam->getQuestionsCount(),
                 'created_at'      => $exam->eCreated_at,
             ];
         });
@@ -4368,7 +4368,7 @@ class StudentTestController extends Controller
                 'duration'          => $exam->eDuration_minutes,
                 'description'       => $exam->eDescription,
                 'age_group'         => $exam->age_group,
-                'questions_count'   => $exam->questions_count,
+                'questions_count'   => $exam->getQuestionsCount(),
                 'created_at'        => $exam->eCreated_at,
                 'is_assigned'       => (bool) $assignment,
                 'assignment_id'     => $assignment ? $assignment->taId : null,
@@ -4531,7 +4531,7 @@ class StudentTestController extends Controller
                 'duration'          => $exam->eDuration_minutes,
                 'description'       => $exam->eDescription,
                 'age_group'         => $exam->age_group,
-                'questions_count'   => $exam->questions_count,
+                'questions_count'   => $exam->getQuestionsCount(),
                 'created_at'        => $exam->eCreated_at,
                 'is_assigned'       => (bool) $assignment,
                 'assignment_id'     => $assignment ? $assignment->taId : null,
