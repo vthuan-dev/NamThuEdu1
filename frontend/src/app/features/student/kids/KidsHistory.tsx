@@ -269,11 +269,11 @@ export function KidsHistory() {
                 <Trophy className="w-8 h-8 sm:w-10 sm:h-10 text-yellow-200" fill="#FCD34D" />
               </div>
               <div className="text-white">
-                <p className="text-xs sm:text-sm font-bold opacity-90">Em đã hoàn thành</p>
-                <p className="text-2xl sm:text-3xl font-extrabold mt-0.5">
+                <p className="text-xs sm:text-sm font-bold text-white opacity-90">Em đã hoàn thành</p>
+                <p className="text-2xl sm:text-3xl font-extrabold text-white mt-0.5">
                   {stats.done} bài thi 🎉
                 </p>
-                <p className="text-xs sm:text-sm opacity-90 mt-1">
+                <p className="text-xs sm:text-sm text-white opacity-90 mt-1">
                   {stats.excellent > 0
                     ? `Tuyệt vời, có ${stats.excellent} bài xuất sắc! Cố lên nhé! 💖`
                     : 'Cố gắng thêm để đạt thành tích cao nhé! 💖'}
