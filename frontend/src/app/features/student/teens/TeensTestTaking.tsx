@@ -711,56 +711,56 @@ export function TeensTestTaking() {
         </div>
       </div>
 
-      <div className={`mt-5 grid grid-cols-1 gap-5 ${isReading ? 'lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_240px]' : 'lg:grid-cols-[1fr_260px]'}`}>
-        {/* Cột đoạn đọc (chỉ khi reading) */}
-        {isReading && (
-          <section className="hidden lg:flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden h-[calc(100vh-12rem)]">
-            <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-teal-50 to-white flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-teal-600" />
-                <h2 className="text-sm font-bold text-slate-900">Đọc hiểu</h2>
-              </div>
+      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_240px]">
+        {/* Cột đoạn đọc (luôn render để tránh hook order violation, chỉ hiển thị khi reading) */}
+        <section className={`hidden lg:flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden h-[calc(100vh-12rem)] ${!isReading ? 'invisible' : ''}`}>
+          <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-teal-50 to-white flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-teal-600" />
+              <h2 className="text-sm font-bold text-slate-900">Đọc hiểu</h2>
             </div>
-            <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
-              <HighlightablePassage
-                html={passage}
-                highlights={highlightHook.highlights}
-                selectedColor={highlightHook.selectedColor}
-                onAddHighlight={highlightHook.addHighlight}
-                onRemoveHighlight={highlightHook.removeHighlight}
-                onSelectColor={highlightHook.setSelectedColor}
-                colors={highlightHook.colors}
-                enabled={!!submissionId}
-              />
-            </div>
-          </section>
-        )}
+          </div>
+          <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
+            <HighlightablePassage
+              html={passage}
+              highlights={highlightHook.highlights}
+              selectedColor={highlightHook.selectedColor}
+              onAddHighlight={highlightHook.addHighlight}
+              onRemoveHighlight={highlightHook.removeHighlight}
+              onSelectColor={highlightHook.setSelectedColor}
+              colors={highlightHook.colors}
+              enabled={isReading && !!submissionId}
+            />
+          </div>
+        </section>
 
         {/* Cột nội dung câu hỏi */}
         <main className="min-w-0">
-          {isReading ? (
-            <div className="lg:h-[calc(100vh-12rem)] lg:overflow-y-auto lg:space-y-4 space-y-4">
-              {/* Đoạn đọc cho mobile/tablet — desktop dùng cột riêng bên trái */}
-              <section className="lg:hidden bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-teal-50 to-white">
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="w-4 h-4 text-teal-600" />
-                    <h2 className="text-sm font-bold text-slate-900">Đọc hiểu</h2>
-                  </div>
+          <div className="lg:h-[calc(100vh-12rem)] lg:overflow-y-auto lg:space-y-4 space-y-4">
+            {/* Đoạn đọc cho mobile/tablet — desktop dùng cột riêng bên trái */}
+            <section className={`lg:hidden bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden ${!isReading ? 'hidden' : ''}`}>
+              <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-teal-50 to-white">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-teal-600" />
+                  <h2 className="text-sm font-bold text-slate-900">Đọc hiểu</h2>
                 </div>
-                <div className="max-h-[40vh] overflow-y-auto px-5 py-4">
-                  <HighlightablePassage
-                    html={passage}
-                    highlights={highlightHook.highlights}
-                    selectedColor={highlightHook.selectedColor}
-                    onAddHighlight={highlightHook.addHighlight}
-                    onRemoveHighlight={highlightHook.removeHighlight}
-                    onSelectColor={highlightHook.setSelectedColor}
-                    colors={highlightHook.colors}
-                    enabled={!!submissionId}
-                  />
-                </div>
-              </section>
+              </div>
+              <div className="max-h-[40vh] overflow-y-auto px-5 py-4">
+                <HighlightablePassage
+                  html={passage}
+                  highlights={highlightHook.highlights}
+                  selectedColor={highlightHook.selectedColor}
+                  onAddHighlight={highlightHook.addHighlight}
+                  onRemoveHighlight={highlightHook.removeHighlight}
+                  onSelectColor={highlightHook.setSelectedColor}
+                  colors={highlightHook.colors}
+                  enabled={isReading && !!submissionId}
+                />
+              </div>
+            </section>
+
+            {/* Reading mode questions list */}
+            <div className={`${!isReading ? 'hidden' : ''}`}>
               {groupIndices.map((idx) => {
                 const gq = questions[idx];
                 const gid = getQuestionId(gq);
@@ -829,8 +829,9 @@ export function TeensTestTaking() {
                 )}
               </div>
             </div>
-          ) : (
-          <>
+
+            {/* Non-reading mode single question */}
+            <div className={`${isReading ? 'hidden' : ''}`}>
           <section className="rounded-2xl bg-white border border-slate-200 p-5 sm:p-7">
             {/* Section + flag */}
             <div className="flex items-center justify-between mb-4">
@@ -912,8 +913,8 @@ export function TeensTestTaking() {
               </button>
             )}
           </div>
-          </>
-          )}
+            </div>
+          </div>
         </main>
 
         {/* Cột navigator — kéo-thả di chuyển được (giống VSTEP) */}
