@@ -32,10 +32,10 @@ const STATUS_META: Record<Status, { label: string; c: string; soft: string }> = 
 // ─── Khu luyện tập (gộp từ trang Luyện tập cũ) ───────────────────────────────
 // Hiển thị NGAY DƯỚI danh sách bài thi để học viên không phải chuyển tab.
 const PRACTICE_SKILLS = [
-  { key: 'nghe', Icon: Headphones, label: 'Nghe', desc: 'Nghe và làm theo hướng dẫn.', link: `${BASE}/luyen-tap?skill=listening`, bg: 'linear-gradient(135deg, #FFF0F0, #FECDD3)', icon: '#E11D48', shadow: '0 8px 20px rgba(225,29,72,0.18)', emoji: '👂' },
-  { key: 'đọc',  Icon: BookOpen,   label: 'Đọc',  desc: 'Đọc chuyện ngắn, hình ảnh vui.', link: `${BASE}/luyen-tap?skill=reading`,   bg: 'linear-gradient(135deg, #EFF6FF, #BFDBFE)', icon: '#2563EB', shadow: '0 8px 20px rgba(37,99,235,0.18)', emoji: '📖' },
-  { key: 'viết', Icon: PenLine,    label: 'Viết', desc: 'Viết câu đơn giản, đúng chính tả.', link: `${BASE}/luyen-tap?skill=writing`, bg: 'linear-gradient(135deg, #F0FFF4, #BBF7D0)', icon: '#059669', shadow: '0 8px 20px rgba(5,150,105,0.18)', emoji: '✏️' },
-  { key: 'nói',  Icon: Mic,        label: 'Nói',  desc: 'Nói theo mẫu, phát âm chuẩn.', link: `${BASE}/luyen-tap?skill=speaking`,  bg: 'linear-gradient(135deg, #FEFCE8, #FEF08A)', icon: '#B45309', shadow: '0 8px 20px rgba(180,83,9,0.15)', emoji: '🎤' },
+  { key: 'nghe', Icon: Headphones, label: 'Nghe', desc: 'Nghe và làm theo hướng dẫn.', link: `${BASE}/ky-nang/listening`, bg: 'linear-gradient(135deg, #FFF0F0, #FECDD3)', icon: '#E11D48', shadow: '0 8px 20px rgba(225,29,72,0.18)', emoji: '👂' },
+  { key: 'đọc',  Icon: BookOpen,   label: 'Đọc',  desc: 'Đọc chuyện ngắn, hình ảnh vui.', link: `${BASE}/ky-nang/reading`,   bg: 'linear-gradient(135deg, #EFF6FF, #BFDBFE)', icon: '#2563EB', shadow: '0 8px 20px rgba(37,99,235,0.18)', emoji: '📖' },
+  { key: 'viết', Icon: PenLine,    label: 'Viết', desc: 'Viết câu đơn giản, đúng chính tả.', link: `${BASE}/ky-nang/writing`, bg: 'linear-gradient(135deg, #F0FFF4, #BBF7D0)', icon: '#059669', shadow: '0 8px 20px rgba(5,150,105,0.18)', emoji: '✏️' },
+  { key: 'nói',  Icon: Mic,        label: 'Nói',  desc: 'Nói theo mẫu, phát âm chuẩn.', link: `${BASE}/ky-nang/speaking`,  bg: 'linear-gradient(135deg, #FEFCE8, #FEF08A)', icon: '#B45309', shadow: '0 8px 20px rgba(180,83,9,0.15)', emoji: '🎤' },
 ] as const;
 
 const PRACTICE_MODES = [

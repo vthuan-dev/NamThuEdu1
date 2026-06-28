@@ -27,6 +27,8 @@ const KidsHistory = lazy(() =>
   import('../features/student/kids/KidsHistory').then(m => ({ default: m.KidsHistory })));
 const KidsAnswerReview = lazy(() =>
   import('../features/student/kids/KidsAnswerReview').then(m => ({ default: m.KidsAnswerReview })));
+const KidsSkillGuide = lazy(() =>
+  import('../features/student/kids/KidsSkillGuide').then(m => ({ default: m.KidsSkillGuide })));
 const TeensDashboard = lazy(() =>
   import('../features/student/teens/TeensDashboard').then(m => ({ default: m.TeensDashboard })));
 const TeensTestTaking = lazy(() =>
@@ -401,6 +403,10 @@ export const studentRoutes: RouteObject = {
     {
       path: 'luyen-tap',
       element: <AdaptivePractice />,
+    },
+    {
+      path: 'ky-nang/:skill',
+      element: <Suspense fallback={<LoadingFallback />}><KidsSkillGuide /></Suspense>,
     },
     {
       path: 'luyen-tap/:id',

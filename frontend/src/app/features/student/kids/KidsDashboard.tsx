@@ -89,13 +89,6 @@ const CLAY_FLYERS = {
   text:   '#4C1D95', badge: '#8B5CF6', badgeBg: 'rgba(237,233,254,0.7)',
 };
 
-const SKILL_CLAY: Record<string, { bg: string; icon: string; shadow: string }> = {
-  nghe:  { bg: 'linear-gradient(135deg, #FFF0F0, #FECDD3)', icon: '#E11D48', shadow: '0 8px 20px rgba(225,29,72,0.18)' },
-  đọc:   { bg: 'linear-gradient(135deg, #F0FFF4, #BBF7D0)', icon: '#059669', shadow: '0 8px 20px rgba(5,150,105,0.18)' },
-  viết:  { bg: 'linear-gradient(135deg, #FEFCE8, #FEF08A)', icon: '#B45309', shadow: '0 8px 20px rgba(180,83,9,0.15)'  },
-  nói:   { bg: 'linear-gradient(135deg, #EFF6FF, #BFDBFE)', icon: '#2563EB', shadow: '0 8px 20px rgba(37,99,235,0.18)' },
-};
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 const ClaySection = ({ title, subtitle, emoji, action, children, accentColor }:
@@ -355,40 +348,6 @@ export function KidsDashboard() {
                 </div>
               );
             })}
-          </div>
-        </ClaySection>
-
-        {/* ─── Luyện kỹ năng ───────────────────────────────────── */}
-        <ClaySection
-          title="Luyện kỹ năng"
-          emoji="💪"
-          subtitle="4 kỹ năng — luyện theo nhịp riêng của bạn"
-          accentColor="#1E3A8A"
-        >
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {([
-              { label: 'Nghe', clay: SKILL_CLAY['nghe'], Icon: Headphones, desc: 'Luyện nghe hiểu', emoji: '👂', link: '/hoc-vien/luyen-tap' },
-              { label: 'Đọc',  clay: SKILL_CLAY['đọc'],  Icon: BookOpen,   desc: 'Luyện đọc hiểu', emoji: '📖', link: '/hoc-vien/luyen-tap' },
-              { label: 'Viết', clay: SKILL_CLAY['viết'], Icon: PenLine,    desc: 'Luyện viết câu', emoji: '✏️', link: '/hoc-vien/luyen-tap' },
-              { label: 'Nói',  clay: SKILL_CLAY['nói'],  Icon: Mic,        desc: 'Luyện phát âm',  emoji: '🎤', link: '/hoc-vien/luyen-tap' },
-            ]).map(s => (
-              <Link key={s.label} to={s.link}
-                className="group rounded-2xl p-4 sm:p-5 transition-all duration-200 hover:-translate-y-1 active:scale-[0.97]"
-                style={{ background: s.clay.bg, boxShadow: s.clay.shadow, border: '2px solid rgba(255,255,255,0.85)' }}>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/40 backdrop-blur-sm">
-                    <s.Icon className="w-5 h-5" style={{ color: s.clay.icon }} />
-                  </div>
-                  <span className="text-xl">{s.emoji}</span>
-                </div>
-                <h3 className="text-sm font-extrabold mb-1" style={{ color: s.clay.icon }}>{s.label}</h3>
-                <p className="text-xs font-medium mb-3" style={{ color: s.clay.icon, opacity: 0.7 }}>{s.desc}</p>
-                <div className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-1 rounded-full bg-white/50"
-                  style={{ color: s.clay.icon }}>
-                  Bắt đầu <ArrowRight className="w-3 h-3" />
-                </div>
-              </Link>
-            ))}
           </div>
         </ClaySection>
 
