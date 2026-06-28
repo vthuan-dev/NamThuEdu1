@@ -21,7 +21,7 @@ export function KidsExamLobby() {
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState('');
-  const [info, setInfo] = useState<LobbyInfo>({ title: 'Bài thi của em', durationMinutes: null, totalQuestions: null });
+  const [info, setInfo] = useState<LobbyInfo>({ title: 'Bài thi của bạn', durationMinutes: null, totalQuestions: null });
 
   useEffect(() => {
     if (!assignmentId) { setLoading(false); return; }
@@ -34,12 +34,12 @@ export function KidsExamLobby() {
         const exam = assignment?.exam ?? data?.exam;
         if (!alive) return;
         setInfo({
-          title: String(exam?.eTitle ?? assignment?.exam_title ?? data?.exam_title ?? 'Bài thi của em'),
+          title: String(exam?.eTitle ?? assignment?.exam_title ?? data?.exam_title ?? 'Bài thi của bạn'),
           durationMinutes: Number(exam?.eDuration_minutes ?? assignment?.exam_duration ?? data?.exam_duration ?? 0) || null,
           totalQuestions: Number(exam?.questions?.length ?? assignment?.total_questions ?? data?.total_questions ?? 0) || null,
         });
       } catch {
-        if (alive) setError('Không tải được bài thi. Em thử lại nhé!');
+        if (alive) setError('Không tải được bài thi. Bạn thử lại nhé!');
       } finally {
         if (alive) setLoading(false);
       }
@@ -59,7 +59,7 @@ export function KidsExamLobby() {
       catch { try { await studentApi.reconnectTestWebsocket(sid); } catch { /* non-fatal */ } }
       navigate(`${BASE}/lam-bai/${assignmentId}?autostart=1&submissionId=${sid}`);
     } catch {
-      setError('Chưa bắt đầu được. Em thử lại sau một chút nhé!');
+      setError('Chưa bắt đầu được. Bạn thử lại sau một chút nhé!');
       setStarting(false);
     }
   };
@@ -113,10 +113,10 @@ export function KidsExamLobby() {
                 <div className="mt-6 rounded-2xl px-5 py-4 text-left mx-auto max-w-md"
                   style={{ background: 'rgba(251,146,60,0.10)', border: '1.5px solid rgba(251,146,60,0.22)' }}>
                   <p className="flex items-center gap-2 text-sm font-bold text-orange-700">
-                    <Sparkles className="w-4 h-4 flex-shrink-0" /> Mẹo nhỏ cho em
+                    <Sparkles className="w-4 h-4 flex-shrink-0" /> Mẹo nhỏ cho bạn
                   </p>
                   <p className="text-xs sm:text-sm text-orange-700/80 mt-1 leading-relaxed font-medium">
-                    Đọc kỹ từng câu, chọn đáp án em nghĩ là đúng. Không sao nếu chưa chắc —
+                    Đọc kỹ từng câu, chọn đáp án bạn nghĩ là đúng. Không sao nếu chưa chắc —
                     cứ cố gắng hết sức nhé! 💪
                   </p>
                 </div>
