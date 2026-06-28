@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -20,6 +20,8 @@ export function AnswerReview() {
   const navigate = useNavigate();
   const submissionId = Number(id);
   const [filter, setFilter] = useState<FilterType>("all");
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const questionRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["answers", submissionId],
@@ -75,6 +77,40 @@ export function AnswerReview() {
     { key: "unanswered", label: "Chưa trả lời", count: unansweredCount, color: "#F59E0B" },
   ];
 
+  // Scroll detection for current question
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY + window.innerHeight / 2;
+      let newCurrent = 0;
+
+      for (let i = 0; i < filtered.length; i++) {
+        const el = questionRefs.current[i];
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          const absoluteTop = rect.top + window.scrollY;
+          if (absoluteTop <= scrollPosition) {
+            newCurrent = i;
+          }
+        }
+      }
+
+      setCurrentQuestion(newCurrent);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll(); // Initial check
+
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [filtered]);
+
+  const scrollToQuestion = (index: number) => {
+    const el = questionRefs.current[index];
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      setCurrentQuestion(index);
+    }
+  };
+
   if (isLoading || shouldRedirect) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3">
@@ -114,21 +150,90 @@ export function AnswerReview() {
   }
 
   return (
-    <div className="py-6 max-w-2xl mx-auto space-y-5">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <button onClick={() => navigate(-1)}
-          className="p-2 rounded-xl transition-colors hover:bg-sky-50"
-          style={{ color: PRIMARY }}>
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 800, color: "#1F1344" }}>Xem đáp án</h1>
-          <p style={{ fontSize: 13, color: "#9CA3AF" }}>
-            {correctCount}/{items.length} câu đúng · Submission #{submissionId}
-          </p>
+    <div className="flex gap-6 py-6 px-4 max-w-7xl mx-auto">
+      {/* Sidebar - Question list */}
+      <aside className="hidden lg:block w-64 flex-shrink-0">
+        <div className="sticky top-6 space-y-4">
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <h3 className="text-sm font-bold text-slate-900 mb-3">Danh sách câu hỏi</h3>
+            <p className="text-xs text-slate-500 mb-4">Tổng: {filtered.length} câu</p>
+            <div className="grid grid-cols-5 gap-2">
+              {filtered.map((item: any, idx: number) => {
+                const studentAns = item.student_answer;
+                const isCorrect = studentAns?.saIs_correct === true;
+                const isWrong = studentAns && !isCorrect;
+                const isUnanswered = !studentAns;
+                const isCurrent = idx === currentQuestion;
+
+                const bgColor = isCorrect ? "#10B981" : isWrong ? "#EF4444" : isUnanswered ? "#F59E0B" : "#E5E7EB";
+                const textColor = isCorrect || isWrong || isUnanswered ? "#fff" : "#6B7280";
+
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => scrollToQuestion(idx)}
+                    className={`aspect-square rounded-lg text-xs font-bold transition-all hover:opacity-80 ${
+                      isCurrent ? "ring-2 ring-offset-1" : ""
+                    }`}
+                    style={{
+                      background: bgColor,
+                      color: textColor,
+                      ...(isCurrent ? { ringColor: PRIMARY } : {}),
+                    }}
+                    title={`Câu ${idx + 1}`}
+                  >
+                    {idx + 1}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <h3 className="text-xs font-bold text-slate-900 mb-2">Chú thích</h3>
+            <div className="space-y-2 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded" style={{ background: "#10B981" }}></div>
+                <span className="text-slate-600">Đúng</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded" style={{ background: "#EF4444" }}></div>
+                <span className="text-slate-600">Sai</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded" style={{ background: "#F59E0B" }}></div>
+                <span className="text-slate-600">Chưa trả lời</span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => navigate("/hoc-vien/bai-tap")}
+            className="w-full px-4 py-2.5 rounded-xl font-bold text-white text-sm transition-all hover:opacity-90"
+            style={{ background: `linear-gradient(135deg, ${PRIMARY}, #38BDF8)` }}
+          >
+            Chấp nhận
+          </button>
         </div>
-      </div>
+      </aside>
+
+      {/* Main content */}
+      <div className="flex-1 max-w-3xl space-y-5">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate(-1)}
+            className="p-2 rounded-xl transition-colors hover:bg-sky-50"
+            style={{ color: PRIMARY }}>
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h1 style={{ fontSize: 20, fontWeight: 800, color: "#1F1344" }}>Xem đáp án</h1>
+            <p style={{ fontSize: 13, color: "#9CA3AF" }}>
+              {correctCount}/{items.length} câu đúng · Submission #{submissionId}
+            </p>
+          </div>
+        </div>
 
       {/* Score summary bar */}
       <div className="rounded-2xl p-4 bg-white flex items-center gap-4 flex-wrap"
@@ -186,7 +291,10 @@ export function AnswerReview() {
             const StatusIcon = isCorrect ? CheckCircle : isWrong ? XCircle : MinusCircle;
 
             return (
-              <div key={q?.qId ?? idx} className="rounded-2xl p-5 bg-white"
+              <div
+                key={q?.qId ?? idx}
+                ref={(el) => { questionRefs.current[idx] = el; }}
+                className="rounded-2xl p-5 bg-white"
                 style={{
                   border: `1.5px solid ${isCorrect ? "#D1FAE5" : isWrong ? "#FECACA" : "#FDE68A"}`,
                   boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
@@ -257,6 +365,7 @@ export function AnswerReview() {
           })}
         </div>
       )}
+      </div>
     </div>
   );
 }
