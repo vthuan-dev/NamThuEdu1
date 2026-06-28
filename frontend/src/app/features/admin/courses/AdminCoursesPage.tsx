@@ -131,6 +131,10 @@ export function AdminCoursesPage() {
   const pageItems = filtered.slice(pageStart, pageEnd);
 
   const handleApprove = async (id: number) => {
+    const target = exams.find((e) => getExamId(e) === id);
+    const ok = window.confirm(`Bạn có chắc chắn muốn duyệt đề thi "${target ? getExamTitle(target) : `#${id}`}" không?`);
+    if (!ok) return;
+
     try {
       setBusyId(id);
       await adminApi.approveExam(id);
