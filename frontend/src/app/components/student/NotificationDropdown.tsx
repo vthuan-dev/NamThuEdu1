@@ -44,7 +44,7 @@ function resolveStudentActionUrl(actionUrl?: string): string | null {
   return `${STUDENT_BASE_PATH}${normalized}`;
 }
 
-export function NotificationDropdown() {
+export function NotificationDropdown({ activeColor = "#7C3AED", hoverBg = "hover:bg-purple-50" }: { activeColor?: string; hoverBg?: string }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
@@ -295,10 +295,10 @@ export function NotificationDropdown() {
       <button
         type="button"
         onClick={() => (open ? handleClose() : handleOpen())}
-        className="relative p-2 rounded-xl transition-colors duration-200 hover:bg-purple-50"
+        className={`relative p-2 rounded-xl transition-colors duration-200 ${hoverBg}`}
         aria-label="Thông báo"
       >
-        <Bell className="w-5 h-5" style={{ color: open ? PURPLE : "#6B7280" }} />
+        <Bell className="w-5 h-5" style={{ color: open ? activeColor : "#6B7280" }} />
         {unreadCount > 0 && (
           <span
             className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center text-[10px] font-bold text-white tabular-nums"
@@ -376,7 +376,7 @@ export function NotificationDropdown() {
               <div className="py-12 text-center">
                 <div
                   className="w-8 h-8 border-2 rounded-full animate-spin mx-auto"
-                  style={{ borderColor: "#EDE9FE", borderTopColor: PURPLE }}
+                  style={{ borderColor: "#EDE9FE", borderTopColor: activeColor }}
                 />
                 <p className="mt-3 text-xs text-gray-400">Đang tải...</p>
               </div>

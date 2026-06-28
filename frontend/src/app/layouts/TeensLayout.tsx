@@ -14,8 +14,9 @@ import { ExamReminderPopup } from '../../components/student/ExamReminderPopup';
 import { DailyMotivationPopup } from '../../components/student/DailyMotivationPopup';
 import {
   Home, BookOpen, TrendingUp,
-  LogOut, Menu, X, Bell, Clock, User, ChevronDown,
+  LogOut, Menu, X, Clock, User, ChevronDown,
 } from 'lucide-react';
+import { NotificationDropdown } from '../components/student/NotificationDropdown';
 
 // ─── Teens theme tokens (Teal/Cyan — distinct from Adults' purple) ───────────
 const TEAL = '#0D9488';
@@ -243,13 +244,10 @@ export function TeensLayout() {
             {/* Right actions */}
             <div className="flex items-center gap-2 flex-shrink-0">
               {/* Notification (moved slightly left with margin) */}
-              <button
-                onClick={() => navigate('/hoc-vien/thong-bao')}
-                className="hidden sm:flex items-center justify-center w-9 h-9 mr-1 rounded-lg text-slate-500 hover:text-teal-700 hover:bg-slate-100 transition-colors"
-                aria-label="Thông báo"
-              >
-                <Bell className="w-[18px] h-[18px]" />
-              </button>
+              {/* Notification dropdown dropdown like FB */}
+              <div className="hidden sm:block mr-1">
+                <NotificationDropdown activeColor="#0D9488" hoverBg="hover:bg-teal-50/50" />
+              </div>
 
               {/* Profile dropdown */}
               <div
