@@ -5,6 +5,7 @@
  * vòng tròn điểm to, sao thưởng, và trạng thái "Chờ thầy/cô chấm" thân thiện.
  * Dùng chung studentApi.getSubmissionDetail để lấy dữ liệu.
  */
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Clock, RefreshCw } from 'lucide-react';
@@ -79,6 +80,41 @@ export function KidsResult() {
         ? sub.answers.map((a: any) => ({ question: a.question ?? {}, student_answer: a }))
         : [];
 
+  // ── Pre-compute câu hỏi nav (trạng thái đúng/sai/chờ) ─────────────────
+  const questionNavData = rawItems.map((item: any, idx: number) => {
+    const q = item.question;
+    const cfg = q?.kids_task_config;
+    const taskType: string = cfg?.task_type ?? '';
+    const taskData = cfg ? extractTaskData(q) : null;
+    const answerMap = parseKidsAnswer(item.student_answer?.saAnswer_text);
+    const rows = taskData ? buildReviewRows(taskType, taskData, answerMap) : [];
+    const allCorrect = rows.length > 0 && rows.every((r: any) => r.isCorrect);
+    const anyWrong  = rows.length > 0 && rows.some((r: any) => !r.isCorrect);
+    const correctCount = rows.filter((r: any) => r.isCorrect).length;
+    return { qId: q?.qId ?? idx, idx, allCorrect, anyWrong, rowCount: rows.length, correctCount };
+  });
+
+  // ── Scroll spy: câu nào đang trong viewport ──────────────────────────
+  const [activeQIdx, setActiveQIdx] = useState(0);
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (questionNavData.length === 0) return;
+    const observers: IntersectionObserver[] = [];
+    questionNavData.forEach(({ qId, idx }) => {
+      const el = document.getElementById(`kq-${qId}`);
+      if (!el) return;
+      const obs = new IntersectionObserver(
+        ([entry]) => { if (entry.isIntersecting) setActiveQIdx(idx); },
+        { threshold: 0.15, rootMargin: '-70px 0px -55% 0px' }
+      );
+      obs.observe(el);
+      observers.push(obs);
+    });
+    return () => observers.forEach(o => o.disconnect());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawItems.length]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(160deg, #FFF1F2 0%, #FFF7ED 50%, #F0FDF4 100%)' }}>
@@ -144,7 +180,7 @@ export function KidsResult() {
             <div className="grid gap-4 sm:grid-cols-[280px_1fr] sm:items-start">
 
             {/* ─── Cột trái: lời khen + lời nhắn ──────────────────── */}
-            <div className="space-y-3 sm:sticky sm:top-4">
+            <div className="space-y-3 sm:sticky sm:top-16">
             {/* Compact score header */}
             <section className="flex items-center gap-4 rounded-2xl p-4"
               style={{ background: praise.bg, boxShadow: '0 8px 24px rgba(0,0,0,0.06)', border: '2px solid rgba(255,255,255,0.9)' }}>
@@ -179,6 +215,73 @@ export function KidsResult() {
                 </div>
               </section>
             )}
+
+            {/* ─── Danh sách câu hỏi (scroll spy nav) ──────────────── */}
+            {questionNavData.length > 0 && (
+              <section className="rounded-2xl overflow-hidden"
+                style={{ background: 'rgba(255,255,255,0.92)', border: '1.5px solid #F1F5F9', boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
+                {/* Header */}
+                <div className="flex items-center gap-2 px-3 py-2.5"
+                  style={{ background: 'linear-gradient(90deg,#FFF1F2,#FFF7ED)', borderBottom: '1px solid #FFE4E6' }}>
+                  <span className="text-base">📋</span>
+                  <p className="text-[11px] font-extrabold" style={{ color: '#9F1239' }}>Danh sách câu hỏi</p>
+                  <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                    style={{ background: '#FFF1F2', color: '#E11D48' }}>
+                    {questionNavData.length} câu
+                  </span>
+                </div>
+                {/* List */}
+                <div className="flex flex-col gap-0.5 p-1.5 max-h-[42vh] overflow-y-auto">
+                  {questionNavData.map(({ qId, idx, allCorrect, anyWrong, rowCount, correctCount }) => {
+                    const isActive = activeQIdx === idx;
+                    const dotColor = allCorrect ? '#059669' : anyWrong ? '#E11D48' : '#94A3B8';
+                    const dotBg   = allCorrect ? '#F0FDF4' : anyWrong ? '#FFF1F2' : '#F8FAFC';
+                    const label   = allCorrect ? 'Đúng hết 🎉' : anyWrong ? `${correctCount}/${rowCount} đúng` : 'Chờ chấm ⏳';
+                    return (
+                      <button
+                        key={qId}
+                        onClick={() => {
+                          document.getElementById(`kq-${qId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          setActiveQIdx(idx);
+                        }}
+                        onMouseEnter={() => setHoverIdx(idx)}
+                        onMouseLeave={() => setHoverIdx(null)}
+                        className="flex items-center gap-2 w-full text-left rounded-xl px-2.5 py-2 transition-all duration-150"
+                        style={{
+                          background: isActive
+                            ? dotBg
+                            : hoverIdx === idx
+                              ? (allCorrect ? '#ECFDF5' : anyWrong ? '#FFF1F2' : '#F1F5F9')
+                              : 'transparent',
+                          border: isActive
+                            ? `1.5px solid ${dotColor}40`
+                            : hoverIdx === idx
+                              ? `1.5px solid ${dotColor}25`
+                              : '1.5px solid transparent',
+                          transform: hoverIdx === idx && !isActive ? 'translateX(2px)' : 'none',
+                        }}
+                      >
+                        {/* Số thứ tự */}
+                        <span className="flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-extrabold text-white"
+                          style={{ background: dotColor }}>
+                          {idx + 1}
+                        </span>
+                        {/* Label trạng thái */}
+                        <span className="text-[11px] font-bold truncate flex-1"
+                          style={{ color: isActive ? dotColor : '#64748B' }}>
+                          Câu {idx + 1} — {label}
+                        </span>
+                        {/* Active indicator */}
+                        {isActive && (
+                          <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full"
+                            style={{ background: dotColor }} />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
             </div>
             {/* ─── Hết cột trái ──────────────────────────────────── */}
 
@@ -199,7 +302,7 @@ export function KidsResult() {
                 const correctAnswer = taskData ? buildCorrectAnswerMap(taskType, taskData) : {};
 
                 return (
-                  <div key={q?.qId ?? idx} className="rounded-2xl bg-white overflow-hidden"
+                  <div key={q?.qId ?? idx} id={`kq-${q?.qId ?? idx}`} className="rounded-2xl bg-white overflow-hidden"
                     style={{ border: '1.5px solid #F1F5F9', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
                     {/* Header */}
                     <div className="flex items-center gap-2 px-3 py-2"
