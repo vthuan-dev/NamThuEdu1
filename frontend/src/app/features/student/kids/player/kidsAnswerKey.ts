@@ -59,11 +59,12 @@ export function buildReviewRows(
       const dialogues: any[] = taskData?.dialogues ?? [];
       return dialogues.map((d, i) => {
         const student = get(String(i));
+        const corr = String(d.correct_answer ?? d.correctAnswer ?? d.answer ?? '');
         return {
           label: d.question ?? `Câu ${i + 1}`,
           student: student || '—',
-          correct: String(d.correct_answer ?? ''),
-          isCorrect: student === String(d.correct_answer ?? ''),
+          correct: corr,
+          isCorrect: student === corr,
         };
       });
     }
@@ -87,20 +88,22 @@ export function buildReviewRows(
       const rows: ReviewRow[] = gaps.map((g, i) => {
         const key = String(g.gap_id ?? i + 1);
         const student = get(key);
+        const corr = String(g.correct_answer ?? g.correctAnswer ?? g.answer ?? '');
         return {
           label: `Chỗ trống ${g.gap_id ?? i + 1}`,
           student: student || '—',
-          correct: String(g.correct_answer ?? ''),
-          isCorrect: eq(student, g.correct_answer ?? ''),
+          correct: corr,
+          isCorrect: eq(student, corr),
         };
       });
       if (taskData?.story_title_question) {
         const student = get('title');
+        const corrTitle = String(taskData.story_title_question.correct_answer ?? taskData.story_title_question.correctAnswer ?? taskData.story_title_question.answer ?? '');
         rows.push({
           label: 'Tên câu chuyện',
           student: student || '—',
-          correct: String(taskData.story_title_question.correct_answer ?? ''),
-          isCorrect: eq(student, taskData.story_title_question.correct_answer ?? ''),
+          correct: corrTitle,
+          isCorrect: eq(student, corrTitle),
         });
       }
       return rows;
@@ -110,7 +113,7 @@ export function buildReviewRows(
       return gaps.map((g, i) => {
         const key = String(g.gap_id ?? i + 1);
         const student = get(key);
-        const accepts: string[] = g.correct_answers ?? [];
+        const accepts: string[] = g.correct_answers ?? g.correctAnswers ?? [];
         return {
           label: `Chỗ trống ${g.gap_id ?? i + 1}`,
           student: student || '—',
@@ -123,11 +126,12 @@ export function buildReviewRows(
       const sentences: any[] = taskData?.completion_sentences ?? [];
       return sentences.map((s, i) => {
         const student = get(String(i));
+        const corr = String(s.correct_answer ?? s.correctAnswer ?? s.answer ?? '');
         return {
           label: `Câu ${i + 1}`,
           student: student || '—',
-          correct: String(s.correct_answer ?? ''),
-          isCorrect: eq(student, s.correct_answer ?? ''),
+          correct: corr,
+          isCorrect: eq(student, corr),
         };
       });
     }
@@ -135,11 +139,12 @@ export function buildReviewRows(
       const items: any[] = (taskData?.items ?? []).filter((it: any) => !it.isExample);
       return items.map((it, i) => {
         const student = get(String(i));
+        const corr = String(it.correct_answer ?? it.correctAnswer ?? it.answer ?? '');
         return {
           label: `Từ ${i + 1}`,
           student: student || '—',
-          correct: String(it.correct_answer ?? ''),
-          isCorrect: eq(student, it.correct_answer ?? ''),
+          correct: corr,
+          isCorrect: eq(student, corr),
         };
       });
     }
@@ -148,11 +153,12 @@ export function buildReviewRows(
       return gaps.map((g, i) => {
         const key = String(g.gap_number ?? i + 1);
         const student = get(key);
+        const corr = String(g.correct_word ?? g.correctWord ?? '');
         return {
           label: `Chỗ trống ${g.gap_number ?? i + 1}`,
           student: student || '—',
-          correct: String(g.correct_word ?? ''),
-          isCorrect: eq(student, g.correct_word ?? ''),
+          correct: corr,
+          isCorrect: eq(student, corr),
         };
       });
     }
@@ -160,11 +166,12 @@ export function buildReviewRows(
       const questions: any[] = taskData?.questions ?? [];
       return questions.map((qq, i) => {
         const student = get(String(i));
+        const corr = String(qq.correct_answer ?? qq.correctAnswer ?? qq.answer ?? '');
         return {
           label: qq.question ?? `Câu ${i + 1}`,
           student: student || '—',
-          correct: String(qq.answer ?? ''),
-          isCorrect: eq(student, qq.answer ?? ''),
+          correct: corr,
+          isCorrect: eq(student, corr),
         };
       });
     }
@@ -252,7 +259,7 @@ export function buildReviewRows(
         if (q?.isExample || q?.is_example) return;
         const qType = String(q?.question_type ?? q?.questionType ?? '');
         if (qType === 'free_write') return; // tự luận → giáo viên chấm
-        const corr = String(q?.correct_answer ?? q?.correctAnswer ?? '');
+        const corr = String(q?.correct_answer ?? q?.correctAnswer ?? q?.answer ?? '');
         const student = get(String(i));
         rows.push({
           label: String(q?.question ?? q?.text ?? q?.questionText ?? `Câu ${i + 1}`),
@@ -315,31 +322,31 @@ export function buildCorrectAnswerMap(taskType: string, taskData: any): KidsAnsw
         if (q?.isExample || q?.is_example) return;
         const qType = String(q?.question_type ?? q?.questionType ?? '');
         if (qType === 'free_write') return;
-        out[String(i)] = String(q?.correct_answer ?? q?.correctAnswer ?? '');
+        out[String(i)] = String(q?.correct_answer ?? q?.correctAnswer ?? q?.answer ?? '');
       });
       break;
     }
     case 'word_bank_fill': {
       const gaps: any[] = (taskData?.gaps ?? []).filter((g: any) => !g.isExample);
       gaps.forEach((g: any, i: number) => {
-        out[String(g.gap_number ?? i + 1)] = String(g.correct_word ?? '');
+        out[String(g.gap_number ?? i + 1)] = String(g.correct_word ?? g.correctWord ?? '');
       });
       break;
     }
     case 'cloze_test': {
       const gaps: any[] = taskData?.gaps ?? [];
       gaps.forEach((g: any) => {
-        out[String(g.gap_id ?? '')] = String(g.correct_answer ?? '');
+        out[String(g.gap_id ?? '')] = String(g.correct_answer ?? g.correctAnswer ?? g.answer ?? '');
       });
       if (taskData?.story_title_question) {
-        out['title'] = String(taskData.story_title_question.correct_answer ?? '');
+        out['title'] = String(taskData.story_title_question.correct_answer ?? taskData.story_title_question.correctAnswer ?? taskData.story_title_question.answer ?? '');
       }
       break;
     }
     case 'open_cloze': {
       const gaps: any[] = taskData?.gaps ?? [];
       gaps.forEach((g: any) => {
-        const accepts: string[] = g.correct_answers ?? [];
+        const accepts: string[] = g.correct_answers ?? g.correctAnswers ?? [];
         out[String(g.gap_id ?? '')] = accepts[0] ?? '';
       });
       break;
@@ -347,21 +354,21 @@ export function buildCorrectAnswerMap(taskType: string, taskData: any): KidsAnsw
     case 'unscramble_words': {
       const items: any[] = (taskData?.items ?? []).filter((it: any) => !it.isExample);
       items.forEach((it: any, i: number) => {
-        out[String(i)] = String(it.correct_answer ?? '');
+        out[String(i)] = String(it.correct_answer ?? it.correctAnswer ?? it.answer ?? '');
       });
       break;
     }
     case 'reading_comprehension': {
       const questions: any[] = taskData?.questions ?? [];
       questions.forEach((qq: any, i: number) => {
-        out[String(i)] = String(qq.answer ?? '');
+        out[String(i)] = String(qq.correct_answer ?? qq.correctAnswer ?? qq.answer ?? '');
       });
       break;
     }
     case 'dialogue_matching': {
       const dialogues: any[] = taskData?.dialogues ?? [];
       dialogues.forEach((d: any, i: number) => {
-        out[String(i)] = String(d.correct_answer ?? '');
+        out[String(i)] = String(d.correct_answer ?? d.correctAnswer ?? d.answer ?? '');
       });
       break;
     }
@@ -386,7 +393,7 @@ export function buildCorrectAnswerMap(taskType: string, taskData: any): KidsAnsw
     case 'story_completion': {
       const sentences: any[] = taskData?.completion_sentences ?? [];
       sentences.forEach((s: any, i: number) => {
-        out[String(i)] = String(s.correct_answer ?? '');
+        out[String(i)] = String(s.correct_answer ?? s.correctAnswer ?? s.answer ?? '');
       });
       break;
     }

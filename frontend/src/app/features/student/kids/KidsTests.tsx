@@ -135,7 +135,7 @@ function ExamCard({
   const isExpired = !!deadline && isAssigned && new Date(deadline).getTime() < Date.now();
   const effectiveAssigned = isAssigned && !isExpired;
 
-  const isCompleted = !isExpired && status === 'completed';
+  const isCompleted = status === 'completed';
   const inProgress = !isExpired && status === 'in_progress';
 
   // Số lần làm của bài giáo viên giao. allowed <= 0 (hoặc null) = không giới hạn.
@@ -232,7 +232,7 @@ function ExamCard({
               <CheckCircle2 className="w-4 h-4" /> Kết quả 🌟
             </Link>
             {/* Làm lại: đề tự do luôn cho phép; đề giao chỉ khi còn lượt */}
-            {(!isAssigned || hasAttemptsLeft) && (
+            {(!effectiveAssigned || hasAttemptsLeft) && (
               <Link to={redoTo}
                 className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-3 rounded-2xl text-sm font-extrabold text-white transition-transform hover:scale-[1.02] active:scale-95"
                 style={{ background: 'linear-gradient(135deg, #FB7185 0%, #F97316 100%)' }}>

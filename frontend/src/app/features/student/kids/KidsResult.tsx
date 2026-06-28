@@ -86,12 +86,15 @@ export function KidsResult() {
     const cfg = q?.kids_task_config;
     const taskType: string = cfg?.task_type ?? '';
     const taskData = cfg ? extractTaskData(q) : null;
-    const answerMap = parseKidsAnswer(item.student_answer?.saAnswer_text);
+    const answerText = item.student_answer?.saAnswer_text;
+    const hasAnswer = !!(answerText && String(answerText).trim());
+    const isManual = MANUAL_REVIEW_TYPES.has(taskType);
+    const answerMap = parseKidsAnswer(answerText);
     const rows = taskData ? buildReviewRows(taskType, taskData, answerMap) : [];
     const allCorrect = rows.length > 0 && rows.every((r: any) => r.isCorrect);
     const anyWrong  = rows.length > 0 && rows.some((r: any) => !r.isCorrect);
     const correctCount = rows.filter((r: any) => r.isCorrect).length;
-    return { qId: q?.qId ?? idx, idx, allCorrect, anyWrong, rowCount: rows.length, correctCount };
+    return { qId: q?.qId ?? idx, idx, allCorrect, anyWrong, rowCount: rows.length, correctCount, hasAnswer, isManual };
   });
 
   // ── Scroll spy: câu nào đang trong viewport ──────────────────────────
@@ -114,6 +117,14 @@ export function KidsResult() {
     return () => observers.forEach(o => o.disconnect());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawItems.length]);
+
+  // ── Tự động cuộn danh sách câu hỏi bên trái để giữ câu đang xem luôn hiện diện ──
+  useEffect(() => {
+    const activeEl = document.getElementById(`nav-item-${activeQIdx}`);
+    if (activeEl) {
+      activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [activeQIdx]);
 
   if (isLoading) {
     return (
@@ -232,14 +243,56 @@ export function KidsResult() {
                 </div>
                 {/* List */}
                 <div className="flex flex-col gap-0.5 p-1.5 max-h-[42vh] overflow-y-auto">
-                  {questionNavData.map(({ qId, idx, allCorrect, anyWrong, rowCount, correctCount }) => {
+                  {questionNavData.map(({ qId, idx, allCorrect, anyWrong, rowCount, correctCount, hasAnswer, isManual }) => {
                     const isActive = activeQIdx === idx;
-                    const dotColor = allCorrect ? '#059669' : anyWrong ? '#E11D48' : '#94A3B8';
-                    const dotBg   = allCorrect ? '#F0FDF4' : anyWrong ? '#FFF1F2' : '#F8FAFC';
-                    const label   = allCorrect ? 'Đúng hết 🎉' : anyWrong ? `${correctCount}/${rowCount} đúng` : 'Chờ chấm ⏳';
+                    
+                    const isSkipped = !hasAnswer;
+                    const isCorrectAll = allCorrect;
+                    const isPartial = rowCount > 0 && correctCount > 0 && correctCount < rowCount;
+                    const isWrongAll = rowCount > 0 && correctCount === 0 && hasAnswer;
+                    const isPending = isManual && hasAnswer;
+
+                    let themeColor = '#94A3B8';
+                    let themeBg = '#F8FAFC';
+                    let labelText = '';
+                    let badgeBg = '#FFFFFF';
+                    let badgeTextColor = '#64748B';
+                    let badgeBorder = '1.5px solid #CBD5E1';
+
+                    if (isCorrectAll) {
+                      themeColor = '#059669';
+                      themeBg = '#F0FDF4';
+                      badgeBg = '#059669';
+                      badgeTextColor = '#FFFFFF';
+                      badgeBorder = 'none';
+                      labelText = 'Đúng hết 🎉';
+                    } else if (isPartial || isPending) {
+                      themeColor = '#D97706';
+                      themeBg = '#FFFBEB';
+                      badgeBg = '#D97706';
+                      badgeTextColor = '#FFFFFF';
+                      badgeBorder = 'none';
+                      labelText = isPending ? 'Chờ chấm ⏳' : `${correctCount}/${rowCount} đúng`;
+                    } else if (isWrongAll) {
+                      themeColor = '#E11D48';
+                      themeBg = '#FFF1F2';
+                      badgeBg = '#E11D48';
+                      badgeTextColor = '#FFFFFF';
+                      badgeBorder = 'none';
+                      labelText = `0/${rowCount} đúng ✗`;
+                    } else {
+                      themeColor = '#94A3B8';
+                      themeBg = '#FFFFFF';
+                      badgeBg = '#FFFFFF';
+                      badgeTextColor = '#64748B';
+                      badgeBorder = '1.5px solid #E2E8F0';
+                      labelText = 'Không trả lời ✗';
+                    }
+
                     return (
                       <button
                         key={qId}
+                        id={`nav-item-${idx}`}
                         onClick={() => {
                           document.getElementById(`kq-${qId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                           setActiveQIdx(idx);
@@ -249,32 +302,37 @@ export function KidsResult() {
                         className="flex items-center gap-2 w-full text-left rounded-xl px-2.5 py-2 transition-all duration-150"
                         style={{
                           background: isActive
-                            ? dotBg
+                            ? (isSkipped ? '#F1F5F9' : themeBg)
                             : hoverIdx === idx
-                              ? (allCorrect ? '#ECFDF5' : anyWrong ? '#FFF1F2' : '#F1F5F9')
+                              ? (isSkipped ? '#F8FAFC' : themeBg)
                               : 'transparent',
                           border: isActive
-                            ? `1.5px solid ${dotColor}40`
+                            ? `1.5px solid ${themeColor}`
                             : hoverIdx === idx
-                              ? `1.5px solid ${dotColor}25`
+                              ? `1.5px solid ${themeColor}40`
                               : '1.5px solid transparent',
                           transform: hoverIdx === idx && !isActive ? 'translateX(2px)' : 'none',
                         }}
                       >
                         {/* Số thứ tự */}
-                        <span className="flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-extrabold text-white"
-                          style={{ background: dotColor }}>
+                        <span className="flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-extrabold"
+                          style={{
+                            background: badgeBg,
+                            color: badgeTextColor,
+                            border: badgeBorder,
+                            boxShadow: isSkipped ? 'none' : '0 2px 4px rgba(0,0,0,0.05)'
+                          }}>
                           {idx + 1}
                         </span>
                         {/* Label trạng thái */}
                         <span className="text-[11px] font-bold truncate flex-1"
-                          style={{ color: isActive ? dotColor : '#64748B' }}>
-                          Câu {idx + 1} — {label}
+                          style={{ color: isActive ? themeColor : '#64748B' }}>
+                          Câu {idx + 1} — {labelText}
                         </span>
                         {/* Active indicator */}
                         {isActive && (
                           <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full"
-                            style={{ background: dotColor }} />
+                            style={{ background: themeColor }} />
                         )}
                       </button>
                     );
@@ -282,6 +340,19 @@ export function KidsResult() {
                 </div>
               </section>
             )}
+
+            {/* Nút Chấp nhận */}
+            <button
+              onClick={() => navigate(`${BASE}/bai-tap`)}
+              className="w-full py-3 px-6 rounded-2xl text-sm font-black text-white transition-all duration-150 active:scale-95 flex items-center justify-center gap-2 hover:brightness-105"
+              style={{
+                background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                boxShadow: '0 6px 20px rgba(16,185,129,0.3)',
+                border: '2px solid rgba(255,255,255,0.2)'
+              }}
+            >
+              Chấp nhận
+            </button>
             </div>
             {/* ─── Hết cột trái ──────────────────────────────────── */}
 
@@ -298,26 +369,44 @@ export function KidsResult() {
                 const isManual = MANUAL_REVIEW_TYPES.has(taskType);
                 const allCorrect = rows.length > 0 && rows.every((r: any) => r.isCorrect);
                 const anyWrong = rows.length > 0 && rows.some((r: any) => !r.isCorrect);
-                const summaryColor = anyWrong ? '#E11D48' : allCorrect ? '#059669' : '#64748B';
+                const hasAnswer = !!(studentAns?.saAnswer_text && String(studentAns.saAnswer_text).trim());
+                const summaryColor = anyWrong ? '#F43F5E' : allCorrect ? '#10B981'
+                  : !hasAnswer ? '#94A3B8' : '#F59E0B';
                 const correctAnswer = taskData ? buildCorrectAnswerMap(taskType, taskData) : {};
 
                 return (
                   <div key={q?.qId ?? idx} id={`kq-${q?.qId ?? idx}`} className="rounded-2xl bg-white overflow-hidden"
                     style={{ border: '1.5px solid #F1F5F9', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
                     {/* Header */}
-                    <div className="flex items-center gap-2 px-3 py-2"
-                      style={{ background: allCorrect ? '#F0FFF4' : anyWrong ? '#FFF1F2' : '#F8FAFC' }}>
-                      <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md text-[10px] font-bold text-white"
+                    <div className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-100"
+                      style={{
+                        background: allCorrect
+                          ? 'linear-gradient(90deg, #F0FDF4 0%, #FFFFFF 100%)'
+                          : anyWrong
+                            ? 'linear-gradient(90deg, #FFF1F2 0%, #FFFFFF 100%)'
+                            : !hasAnswer
+                              ? 'linear-gradient(90deg, #F8FAFC 0%, #FFFFFF 100%)'
+                              : 'linear-gradient(90deg, #FFFBEB 0%, #FFFFFF 100%)'
+                      }}>
+                      <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg text-xs font-black text-white shadow-sm"
                         style={{ background: summaryColor }}>
                         {idx + 1}
                       </span>
-                      <span className="text-[11px] font-extrabold" style={{ color: summaryColor }}>
-                        {allCorrect ? 'Đúng hết 🎉' : anyWrong ? 'Có câu sai' : 'Chưa chấm'}
+                      <span className="text-[12px] font-black uppercase tracking-wider" style={{ color: summaryColor }}>
+                        Câu {idx + 1} — {allCorrect ? 'Đúng hết 🎉'
+                          : anyWrong ? 'Có câu sai'
+                          : !hasAnswer ? 'Không trả lời ✗'
+                          : 'Chờ thầy/cô chấm ⏳'}
                       </span>
                       {rows.length > 0 && (
-                        <span className="ml-auto text-[10px] font-extrabold tabular-nums px-1.5 py-0.5 rounded"
-                          style={{ background: 'rgba(255,255,255,0.8)', color: summaryColor }}>
-                          {rows.filter((r: any) => r.isCorrect).length}/{rows.length}
+                        <span className="ml-auto text-[11px] font-extrabold tabular-nums px-2 py-0.5 rounded-lg border"
+                          style={{
+                            background: 'rgba(255,255,255,0.9)',
+                            borderColor: `${summaryColor}30`,
+                            color: summaryColor,
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                          }}>
+                          {rows.filter((r: any) => r.isCorrect).length}/{rows.length} đúng
                         </span>
                       )}
                     </div>
@@ -364,14 +453,64 @@ export function KidsResult() {
                               return <p className="text-xs text-slate-700 whitespace-pre-wrap">{ans}</p>;
                             })()}
                           </div>
-                          {/* Pending badge */}
-                          <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200">
-                            <Clock className="w-3 h-3" /> Thầy/Cô đang chấm phần này
-                          </div>
+                          {/* Pending / Not-answered badge */}
+                          {!hasAnswer ? (
+                            <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200">
+                              ✗ Em chưa trả lời câu này — 0 điểm
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200">
+                              <Clock className="w-3 h-3" /> Thầy/Cô đang chấm phần này
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <>
-                          <p className="text-[10px] font-bold text-emerald-600 mb-1.5">✓ Đáp án đúng</p>
+                          {/* ── So sánh bài làm vs đáp án ────────────────── */}
+                          {rows.length > 0 && (
+                            <div className="mb-2 rounded-xl overflow-hidden border border-slate-100">
+                              {/* Header */}
+                              <div className="grid grid-cols-2 text-[9px] font-extrabold uppercase tracking-wide"
+                                style={{ background: '#F8FAFC' }}>
+                                <div className="px-2.5 py-1.5 border-r border-slate-100 text-slate-400">📝 Bài làm của em</div>
+                                <div className="px-2.5 py-1.5 text-emerald-600">✓ Đáp án đúng</div>
+                              </div>
+                              {/* Rows */}
+                              {rows.map((row: any, ri: number) => (
+                                <div key={ri}
+                                  className="grid grid-cols-2 border-t border-slate-100 text-xs"
+                                  style={{ background: row.isCorrect ? '#F0FFF4' : ri % 2 === 0 ? '#FFFFFF' : '#FAFAFA' }}>
+                                  {/* Student answer */}
+                                  <div className="flex items-center gap-1.5 px-2.5 py-2 border-r border-slate-100 min-w-0">
+                                    <span className="flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-extrabold text-white"
+                                      style={{ background: row.isCorrect ? '#059669' : '#E11D48' }}>
+                                      {row.isCorrect ? '✓' : '✗'}
+                                    </span>
+                                    <span className="font-semibold truncate"
+                                      style={{ color: row.isCorrect ? '#059669' : '#E11D48' }}>
+                                      {!row.student || row.student === '—' ? (
+                                        <em className="text-slate-400 font-normal">Bỏ trống</em>
+                                      ) : (
+                                        row.student
+                                      )}
+                                    </span>
+                                  </div>
+                                  {/* Correct answer */}
+                                  <div className="flex items-center px-2.5 py-2 min-w-0">
+                                    {row.isCorrect ? (
+                                      <span className="text-emerald-600 font-semibold truncate">{row.correct}</span>
+                                    ) : (
+                                      <span className="font-extrabold truncate" style={{ color: '#059669' }}>
+                                        {row.correct}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {/* ── Full question preview — bài làm của em ─── */}
+                          <p className="text-[10px] font-bold text-slate-500 mb-1.5">📝 Bài làm của em trong bài</p>
                           {/* Override layout của các question component (thiết kế cho trang thi full):
                               - Xoá max-height + overflow-y-auto → không cuộn nội tại
                               - Chuyển grid 2 cột → 1 cột
@@ -382,14 +521,27 @@ export function KidsResult() {
                             .qr-review .sticky { position: relative !important; top: auto !important; }
                             .qr-review [class*="grid-cols-[4"] { grid-template-columns: 1fr !important; }
                           `}</style>
-                          <div className="qr-review w-full">
-                            <QuestionRenderer
-                              question={q}
-                              mode="preview"
-                              answer={correctAnswer}
-                              onAnswer={() => {}}
-                            />
-                          </div>
+                          {(() => {
+                            // studentDisplayMap: bài học sinh, ô trống → hiện placeholder + đáp án đúng
+                            const studentDisplayMap: Record<string, string> = { ...answerMap };
+                            Object.keys(correctAnswer).forEach(key => {
+                              const v = studentDisplayMap[key];
+                              if (!v || !String(v).trim()) {
+                                const ans = correctAnswer[key] ? ` → ✅ ${correctAnswer[key]}` : '';
+                                studentDisplayMap[key] = `✗ Bỏ trống${ans}`;
+                              }
+                            });
+                            return (
+                              <div className="qr-review w-full">
+                                <QuestionRenderer
+                                  question={q}
+                                  mode="preview"
+                                  answer={studentDisplayMap}
+                                  onAnswer={() => {}}
+                                />
+                              </div>
+                            );
+                          })()}
                         </>
                       )}
 
