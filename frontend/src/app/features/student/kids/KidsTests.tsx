@@ -137,15 +137,20 @@ function ExamCard({
     Date.now() - new Date(submittedAt).getTime() > 24 * 60 * 60 * 1000
   );
 
-  // Nếu bài thi giao đã hết hạn HOẶC là đề tự luyện tự do đã quá 1 ngày → reset thành chưa làm (pending)
-  const effectiveStatus = (isExpired || isFreePracticeAndOld) ? 'pending' : status;
+  // Chỉ reset trạng thái về 'pending' (Chưa làm) nếu là đề tự luyện tự do quá 24h.
+  // Đề giáo viên giao thì giữ nguyên trạng thái gốc của học viên, kể cả khi hết hạn!
+  const effectiveStatus = isFreePracticeAndOld ? 'pending' : status;
 
   const meta = STATUS_META[effectiveStatus] ?? STATUS_META.pending;
   const normalizedScope = String(scope || (skill === 'mixed' ? 'full' : 'skill')).toLowerCase();
   const scopeLabel = normalizedScope === 'full' ? 'Full test' : normalizedScope === 'part' ? `Part ${partNumber ?? ''}`.trim() : 'Skill';
 
-  const isCompleted = effectiveStatus === 'completed';
-  const inProgress = effectiveStatus === 'in_progress';
+  // Điều kiện để hiện Kết quả / Làm lại:
+  // - Trạng thái gốc phải là completed
+  // - Chưa quá 24h đối với đề tự luyện tự do
+  // - Chưa hết hạn nộp đối với đề giáo viên giao
+  const isCompleted = status === 'completed' && !isFreePracticeAndOld && !isExpired;
+  const inProgress = status === 'in_progress' && !isExpired;
 
   // Số lần làm của bài giáo viên giao. allowed <= 0 (hoặc null) = không giới hạn.
   const used = attemptsUsed ?? 0;
