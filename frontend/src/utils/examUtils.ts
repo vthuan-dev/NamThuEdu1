@@ -24,6 +24,13 @@ export const sanitizePassageHtml = (html: string): string => {
     html
       // Remove invisible break characters (soft hyphen, zero-width spaces, BOM)
       .replace(/[\u00AD\u200B\u200C\u200D\u2060\uFEFF]/g, "")
+      // Convert non-breaking spaces (&nbsp;, &#160;, U+00A0, narrow/figure NBSP)
+      // to normal spaces. This is the primary cause of mid-word breaking:
+      // with `white-space: pre-wrap`, the browser refuses to wrap at a NBSP, so
+      // whole phrases become one unbreakable token and get broken mid-character.
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&#160;|&#xA0;/gi, " ")
+      .replace(/[\u00A0\u202F\u2007]/g, " ")
       // Remove <wbr> word-break opportunity tags
       .replace(/<wbr\s*\/?>/gi, "")
       // Neutralize inline declarations that force mid-word breaks.
