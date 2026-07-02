@@ -2424,14 +2424,147 @@ function formatPartContent(part: SpeakingPart, partNumber: number): React.ReactN
     );
   }
   if (partNumber === 3 && part.part3Data) {
+    const ideas = part.part3Data.suggestedIdeas || [];
+    const mainTopic = part.part3Data.mainTopic;
+    const followUp = part.part3Data.followUpQuestions || [];
+
     return (
-      <>{Header}<div className="text-[14px] text-slate-700 leading-[1.9]">
-        <p className="italic text-slate-500">Your topic is:</p>
-        <p className="font-semibold mb-1">{part.part3Data.mainTopic}.</p>
-        {part.part3Data.suggestedIdeas?.length > 0 && (<><p className="italic text-slate-500 mt-2">Some ideas you may consider:</p><ul>{part.part3Data.suggestedIdeas.map((idea, i) => <li key={i}>- {idea}</li>)}</ul></>)}
-        <p className="italic text-slate-500 mt-2">Please address the following questions:</p>
-        {part.part3Data.followUpQuestions.map((q, i) => <p key={i}>{i + 1}. {q}</p>)}
-      </div></>
+      <>
+        {Header}
+        <div className="flex flex-col items-center gap-6 w-full max-w-3xl mx-auto my-6">
+          {/* Mindmap Container */}
+          <div className="relative w-full min-h-[360px] flex items-center justify-center bg-slate-50/50 rounded-2xl border border-slate-100 p-6 overflow-hidden">
+            {/* SVG Arrows Layer */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }}>
+              <defs>
+                <marker
+                  id="arrowhead-purple-student"
+                  markerWidth="8"
+                  markerHeight="8"
+                  refX="7"
+                  refY="3"
+                  orient="auto"
+                >
+                  <polygon points="0 0, 8 3, 0 6" fill="#8b5cf6" />
+                </marker>
+              </defs>
+              
+              {/* Top Arrow */}
+              {ideas[0] && (
+                <line
+                  x1="50%"
+                  y1="50%"
+                  x2="50%"
+                  y2="18%"
+                  stroke="#c084fc"
+                  strokeWidth="2"
+                  markerEnd="url(#arrowhead-purple-student)"
+                />
+              )}
+              
+              {/* Right Arrow */}
+              {ideas[1] && (
+                <line
+                  x1="50%"
+                  y1="50%"
+                  x2="82%"
+                  y2="50%"
+                  stroke="#c084fc"
+                  strokeWidth="2"
+                  markerEnd="url(#arrowhead-purple-student)"
+                />
+              )}
+              
+              {/* Bottom Arrow */}
+              {ideas[2] && (
+                <line
+                  x1="50%"
+                  y1="50%"
+                  x2="50%"
+                  y2="82%"
+                  stroke="#c084fc"
+                  strokeWidth="2"
+                  markerEnd="url(#arrowhead-purple-student)"
+                />
+              )}
+              
+              {/* Left Arrow */}
+              {ideas[3] && (
+                <line
+                  x1="50%"
+                  y1="50%"
+                  x2="18%"
+                  y2="50%"
+                  stroke="#c084fc"
+                  strokeWidth="2"
+                  markerEnd="url(#arrowhead-purple-student)"
+                />
+              )}
+            </svg>
+
+            {/* Top Idea */}
+            {ideas[0] && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 w-36 sm:w-44 text-center z-10">
+                <div className="px-3 py-2.5 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
+                  {ideas[0]}
+                </div>
+              </div>
+            )}
+
+            {/* Center - Main Topic */}
+            <div className="relative z-20 w-44 sm:w-52 text-center">
+              <div className="px-4 py-3 text-sm sm:text-base font-extrabold text-white bg-purple-600 border-2 border-purple-500 rounded-2xl shadow-md uppercase tracking-wider">
+                {mainTopic}
+              </div>
+            </div>
+
+            {/* Right Idea */}
+            {ideas[1] && (
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 w-36 sm:w-44 text-center z-10">
+                <div className="px-3 py-2.5 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
+                  {ideas[1]}
+                </div>
+              </div>
+            )}
+
+            {/* Bottom Idea */}
+            {ideas[2] && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-36 sm:w-44 text-center z-10">
+                <div className="px-3 py-2.5 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
+                  {ideas[2]}
+                </div>
+              </div>
+            )}
+
+            {/* Left Idea */}
+            {ideas[3] && (
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 w-36 sm:w-44 text-center z-10">
+                <div className="px-3 py-2.5 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
+                  {ideas[3]}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Follow-up Questions */}
+          {followUp.length > 0 && (
+            <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 mt-2 shadow-sm text-left">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                Please address the following questions:
+              </p>
+              <div className="space-y-2 text-sm text-slate-700 font-medium">
+                {followUp.map((q, i) => (
+                  <p key={i} className="flex gap-2">
+                    <span className="text-slate-400">{i + 1}.</span>
+                    <span>{q}</span>
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </>
     );
   }
   return null;
