@@ -3,6 +3,40 @@
  */
 
 /**
+ * Sanitize imported passage HTML (from docx/PDF paste) so text wraps by whole
+ * words instead of breaking mid-character.
+ *
+ * Root cause of the "chữ bị cắt" bug: the stored HTML carries inline styles on
+ * child elements such as `style="word-break:break-all"` (sometimes with
+ * `!important`) plus invisible break characters and `<wbr>` tags. An inline
+ * `!important` declaration beats any stylesheet rule, so our CSS fix in
+ * index.css (`.vstep-passage * { word-break: normal !important }`) cannot win.
+ * The only reliable fix is to strip the offending markup from the HTML string
+ * itself before rendering.
+ *
+ * @param html - Raw passage HTML
+ * @returns Cleaned HTML safe to render with dangerouslySetInnerHTML
+ */
+export const sanitizePassageHtml = (html: string): string => {
+  if (!html) return "";
+
+  return (
+    html
+      // Remove invisible break characters (soft hyphen, zero-width spaces, BOM)
+      .replace(/[\u00AD\u200B\u200C\u200D\u2060\uFEFF]/g, "")
+      // Remove <wbr> word-break opportunity tags
+      .replace(/<wbr\s*\/?>/gi, "")
+      // Neutralize inline declarations that force mid-word breaks.
+      // Matches e.g. `word-break:break-all;`, `overflow-wrap: anywhere !important;`,
+      // `hyphens:auto;` inside any style="..." attribute.
+      .replace(
+        /(word-break|word-wrap|overflow-wrap|-webkit-hyphens|hyphens|line-break)\s*:\s*[^;"']*(\s*!important)?\s*;?/gi,
+        ""
+      )
+  );
+};
+
+/**
  * Calculate total points for a question, excluding example items
  * @param config - Question config containing items array
  * @param basePoints - Base points per item (default: 1)

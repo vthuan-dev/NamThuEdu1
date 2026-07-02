@@ -26,6 +26,7 @@ import {
   loadVstepSpeakingExam,
 } from "../../../../services/vstepApi";
 import { api } from "../../../../services/api";
+import { sanitizePassageHtml } from "../../../../utils/examUtils";
 
 /* ============================================================
  *  TYPES
@@ -690,7 +691,7 @@ function ReadingView({
         <div className="flex-1 overflow-y-auto px-6 py-5">
           <article
             className="vstep-passage prose prose-sm max-w-none text-slate-800 leading-relaxed whitespace-pre-wrap"
-            dangerouslySetInnerHTML={{ __html: (part.passage || "").replace(/[\u00AD\u200B\u200C\u200D\u2060\uFEFF]/g, "") }}
+            dangerouslySetInnerHTML={{ __html: sanitizePassageHtml(part.passage || "") }}
           />
         </div>
       </div>
