@@ -841,6 +841,23 @@
   border-radius: 0.5rem;
 }
 
+/*
+ * VSTEP reading passage: keep whole words intact.
+ * The passage HTML is imported (docx/PDF paste) and often carries inline
+ * `word-break: break-all` on child elements plus invisible break characters.
+ * A parent Tailwind class cannot beat inline styles on children, so we force
+ * normal word-breaking on the container AND every descendant with !important.
+ * A word that doesn't fit wraps whole to the next line; only truly long
+ * tokens (e.g. URLs) may break, via overflow-wrap.
+ */
+.vstep-passage,
+.vstep-passage * {
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  -webkit-hyphens: none !important;
+  hyphens: none !important;
+}
+
 .prose-lg {
   font-size: 1.125em;
   line-height: 1.7777778;
