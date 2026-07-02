@@ -16,6 +16,7 @@ import {
 } from '../sections';
 import { SectionHeader, QuestionBadge, DeleteBtn, AddButton, OptionRow } from './shared';
 import { THPT_THEME, LETTERS } from '../sections';
+import { splitPhoneticWord } from '../../../../../../utils/examUtils';
 
 interface Props {
   section: ThptSection;
@@ -424,21 +425,39 @@ function PhoneticsEditor({ section, all, onChange }: { section: Extract<ThptSect
                     placeholder="từ"
                     className="w-full text-sm border border-slate-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-200"
                   />
-                  {section.variant === 'pronunciation' && (
-                    <input
-                      type="text"
-                      value={w.underline ?? ''}
-                      onChange={(e) => {
-                        const items = [...section.items];
-                        const words = [...item.words];
-                        words[wi] = { ...w, underline: e.target.value };
-                        items[idx] = { ...item, words };
-                        update(items);
-                      }}
-                      placeholder="phần gạch chân"
-                      className="w-full text-[11px] mt-1 border border-slate-200 rounded-md px-2 py-1 text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                    />
-                  )}
+                  {section.variant === 'pronunciation' && (() => {
+                    const { before, mark, after } = splitPhoneticWord(w.text, w.underline);
+                    return (
+                      <>
+                        {w.text.trim() && (
+                          <div className="mt-1 text-sm text-slate-700 text-center">
+                            {mark ? (
+                              <span>
+                                {before}
+                                <span className="italic underline underline-offset-2 decoration-2 font-semibold text-teal-700">{mark}</span>
+                                {after}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">{w.text}</span>
+                            )}
+                          </div>
+                        )}
+                        <input
+                          type="text"
+                          value={w.underline ?? ''}
+                          onChange={(e) => {
+                            const items = [...section.items];
+                            const words = [...item.words];
+                            words[wi] = { ...w, underline: e.target.value };
+                            items[idx] = { ...item, words };
+                            update(items);
+                          }}
+                          placeholder="phần gạch chân (tự động)"
+                          className="w-full text-[11px] mt-1 border border-slate-200 rounded-md px-2 py-1 text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        />
+                      </>
+                    );
+                  })()}
                 </div>
               );
             })}

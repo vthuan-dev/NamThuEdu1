@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { CheckCircle2, XCircle, Headphones, Mic, Sparkles, Loader2 } from 'lucide-react';
 import type { ThptAnswers, ThptSection, ViewMode } from '../types';
 import { ThptSpeakingRecorder } from '../components/ThptSpeakingRecorder';
+import { splitPhoneticWord } from '../../../../../../utils/examUtils';
 
 const THEME = {
   primary: '#0D9488',
@@ -107,19 +108,30 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             return (
               <QCard key={key} n={item.question_number}>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {item.words.map((w) => (
-                    <ChoiceButton
-                      key={w.id}
-                      letter={w.id}
-                      label={w.text}
-                      sub={section.variant === 'pronunciation' ? w.underline : undefined}
-                      picked={userVal === w.id}
-                      correct={isReview && correctVal === w.id}
-                      wrong={isReview && userVal === w.id && correctVal !== w.id}
-                      disabled={isReview}
-                      onClick={() => onAnswerChange(key, w.id)}
-                    />
-                  ))}
+                  {item.words.map((w) => {
+                    const { before, mark, after } = splitPhoneticWord(w.text, w.underline);
+                    const wordLabel = mark ? (
+                      <span>
+                        {before}
+                        <span className="italic underline underline-offset-2 decoration-2 font-semibold text-teal-700">{mark}</span>
+                        {after}
+                      </span>
+                    ) : (
+                      w.text
+                    );
+                    return (
+                      <ChoiceButton
+                        key={w.id}
+                        letter={w.id}
+                        label={wordLabel}
+                        picked={userVal === w.id}
+                        correct={isReview && correctVal === w.id}
+                        wrong={isReview && userVal === w.id && correctVal !== w.id}
+                        disabled={isReview}
+                        onClick={() => onAnswerChange(key, w.id)}
+                      />
+                    );
+                  })}
                 </div>
               </QCard>
             );
@@ -682,7 +694,7 @@ function ChoiceButton({
   block,
 }: {
   letter: string;
-  label: string;
+  label: ReactNode;
   sub?: string;
   picked: boolean;
   correct?: boolean;

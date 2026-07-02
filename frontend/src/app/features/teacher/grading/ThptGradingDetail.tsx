@@ -39,6 +39,7 @@ import {
   type SentenceInsertionQuestion,
   type SaveQuestionPayload,
 } from '../../../../services/thptGradingApi';
+import { splitPhoneticWord } from '../../../../utils/examUtils';
 
 interface Props {
   submissionId: number;
@@ -1345,10 +1346,20 @@ function McqReview({
                 {opt.id}
               </span>
               <span className="flex-1 min-w-0 text-sm text-slate-800">
-                {opt.text || <span className="text-slate-300">…</span>}
-                {opt.underline && (
-                  <span className="block text-[11px] text-slate-500">[{opt.underline}]</span>
-                )}
+                {opt.text ? (() => {
+                  // Render phần gạch chân của từ ngữ âm với italic+teal (nhất quán với student view)
+                  const parts = splitPhoneticWord(opt.text, opt.underline);
+                  if (!parts.mark) return <>{opt.text}</>;
+                  return (
+                    <>
+                      {parts.before}
+                      <span className="italic underline underline-offset-2 decoration-2 font-semibold text-teal-700">
+                        {parts.mark}
+                      </span>
+                      {parts.after}
+                    </>
+                  );
+                })() : <span className="text-slate-300">…</span>}
               </span>
               {isCorrect && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 flex-shrink-0">

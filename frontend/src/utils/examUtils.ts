@@ -106,3 +106,49 @@ export const getExampleItemsCount = (items: any[]): number => {
   
   return items.filter((item: any) => item.isExample).length;
 };
+
+/**
+ * Ngữ âm (phonetics): tự động phát hiện đuôi biến đổi của từ để nhấn mạnh.
+ * Ưu tiên các đuôi phổ biến trong đề THPT: -ed, -es, -s.
+ *
+ * @param word - Từ cần phân tích (ví dụ "walked", "boxes", "cats")
+ * @returns Phần đuôi cần gạch chân (ví dụ "ed", "es", "s"). Rỗng nếu không có.
+ */
+export const detectPhoneticEnding = (word: string): string => {
+  const w = (word ?? "").trim();
+  const lower = w.toLowerCase();
+  if (lower.length < 2) return "";
+  if (lower.endsWith("ed")) return w.slice(-2);
+  if (lower.endsWith("es")) return w.slice(-2);
+  if (lower.endsWith("s")) return w.slice(-1);
+  return "";
+};
+
+/**
+ * Tách 1 từ thành 3 phần [before, mark, after] để render phần "mark"
+ * (phần phát âm khác biệt) với gạch chân + in nghiêng.
+ *
+ * - Nếu giáo viên đã nhập `underline` → dùng đúng phần đó (khớp cuối từ trước).
+ * - Nếu chưa nhập → tự động phát hiện đuôi ed/s/es.
+ *
+ * @param text - Từ đầy đủ
+ * @param underline - Phần gạch chân do giáo viên chỉ định (tùy chọn)
+ */
+export const splitPhoneticWord = (
+  text: string,
+  underline?: string,
+): { before: string; mark: string; after: string } => {
+  const word = text ?? "";
+  let target = (underline ?? "").trim();
+  if (!target) target = detectPhoneticEnding(word);
+  if (!target) return { before: word, mark: "", after: "" };
+
+  const idx = word.toLowerCase().lastIndexOf(target.toLowerCase());
+  if (idx === -1) return { before: word, mark: "", after: "" };
+
+  return {
+    before: word.slice(0, idx),
+    mark: word.slice(idx, idx + target.length),
+    after: word.slice(idx + target.length),
+  };
+};
