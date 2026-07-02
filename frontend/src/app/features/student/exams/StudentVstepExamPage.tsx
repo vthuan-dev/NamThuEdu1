@@ -1370,93 +1370,94 @@ export function StudentVstepExamPage() {
       {/* ─── BOTTOM PARTS BAR ─────────────────────────────────── */}
       {bottomVisible && (
         <footer className="flex-shrink-0 bg-white border-t border-slate-200 shadow-[0_-2px_8px_rgba(0,0,0,0.04)] overflow-visible">
-          <div className="relative px-8 py-3 flex items-center justify-center gap-6 overflow-visible">
-            {skillsInExam.map((s) => {
-              const meta = SKILL_META[s];
-              const Icon = meta.icon;
-              const totalSkillQs =
-                s === "listening" ? stats.lq
-                : s === "reading" ? stats.rq
-                : s === "writing" ? stats.wq
-                : stats.sq;
-              const sIdx = SKILL_ORDER.indexOf(s);
-              const pastSkill = !reviewMode && sIdx < maxSkillIdx;
-              return (
-                <div key={s} className="flex flex-col items-center gap-1 flex-shrink-0">
-                  <div className="flex items-center gap-1">
-                    {(partsInExam[s].length > 0 ? partsInExam[s] : PARTS_PER_SKILL[s]).map((pn) => {
-                      const isActive = current.skill === s && current.partNumber === pn;
-                      const isVisited = visitedParts[s]?.has(pn);
-                      const sameSkill = s === current.skill;
-                      const canClick = reviewMode || (!pastSkill && (sameSkill || isVisited));
-                      const tooltip = !reviewMode && pastSkill
-                        ? "Không thể quay lại skill đã hoàn thành"
-                        : !reviewMode && (!isVisited && !sameSkill)
-                        ? "Nhấn Tiếp tục để chuyển đến phần này"
-                        : undefined;
-                      return (
-                        <div key={pn} className="relative group">
-                          <button
-                            onClick={() => canClick && navigate2(s, pn)}
-                            disabled={!canClick}
-                            className={`relative px-3 py-1.5 rounded-md text-xs font-semibold transition-all whitespace-nowrap ${
-                              reviewMode
-                                ? (isActive
-                                  ? `${meta.bg} ${meta.color} ring-1 ring-slate-400`
-                                  : `${meta.bg} ${meta.color} hover:brightness-95 cursor-pointer`)
-                                : isActive
-                                ? "bg-amber-400 text-slate-900 shadow-sm scale-105"
-                                : pastSkill
-                                ? `${meta.bg} ${meta.color} opacity-40 cursor-not-allowed`
-                                : canClick
-                                ? `${meta.bg} ${meta.color} hover:brightness-95 cursor-pointer`
-                                : `${meta.bg} ${meta.color} opacity-50 cursor-not-allowed`
-                            }`}
-                          >
-                            Part {pn}
-                            {isPartComplete(s, pn) && (
-                              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-emerald-500 text-white rounded-full flex items-center justify-center text-[9px] font-bold leading-none">
-                                ✓
-                              </span>
-                            )}
-                          </button>
-                          {tooltip && !isActive && (
-                            <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[200] invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-150">
-                              <div className="bg-slate-800 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-md whitespace-nowrap shadow-lg">
-                                {tooltip}
+          <div className="px-4 lg:px-8 py-3 flex flex-col lg:flex-row items-center lg:justify-center gap-4 lg:gap-6 overflow-visible relative">
+            <div className="flex items-center justify-start lg:justify-center gap-4 lg:gap-6 overflow-x-auto w-full lg:w-auto scrollbar-none py-1">
+              {skillsInExam.map((s) => {
+                const meta = SKILL_META[s];
+                const Icon = meta.icon;
+                const totalSkillQs =
+                  s === "listening" ? stats.lq
+                  : s === "reading" ? stats.rq
+                  : s === "writing" ? stats.wq
+                  : stats.sq;
+                const sIdx = SKILL_ORDER.indexOf(s);
+                const pastSkill = !reviewMode && sIdx < maxSkillIdx;
+                return (
+                  <div key={s} className="flex flex-col items-center gap-1 flex-shrink-0">
+                    <div className="flex items-center gap-1">
+                      {(partsInExam[s].length > 0 ? partsInExam[s] : PARTS_PER_SKILL[s]).map((pn) => {
+                        const isActive = current.skill === s && current.partNumber === pn;
+                        const isVisited = visitedParts[s]?.has(pn);
+                        const sameSkill = s === current.skill;
+                        const canClick = reviewMode || (!pastSkill && (sameSkill || isVisited));
+                        const tooltip = !reviewMode && pastSkill
+                          ? "Không thể quay lại skill đã hoàn thành"
+                          : !reviewMode && (!isVisited && !sameSkill)
+                          ? "Nhấn Tiếp tục để chuyển đến phần này"
+                          : undefined;
+                        return (
+                          <div key={pn} className="relative group">
+                            <button
+                              onClick={() => canClick && navigate2(s, pn)}
+                              disabled={!canClick}
+                              className={`relative px-3 py-1.5 rounded-md text-xs font-semibold transition-all whitespace-nowrap ${
+                                reviewMode
+                                  ? (isActive
+                                    ? `${meta.bg} ${meta.color} ring-1 ring-slate-400`
+                                    : `${meta.bg} ${meta.color} hover:brightness-95 cursor-pointer`)
+                                  : isActive
+                                  ? "bg-amber-400 text-slate-900 shadow-sm scale-105"
+                                  : pastSkill
+                                  ? `${meta.bg} ${meta.color} opacity-40 cursor-not-allowed`
+                                  : canClick
+                                  ? `${meta.bg} ${meta.color} hover:brightness-95 cursor-pointer`
+                                  : `${meta.bg} ${meta.color} opacity-50 cursor-not-allowed`
+                              }`}
+                            >
+                              Part {pn}
+                              {isPartComplete(s, pn) && (
+                                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-emerald-500 text-white rounded-full flex items-center justify-center text-[9px] font-bold leading-none">
+                                  ✓
+                                </span>
+                              )}
+                            </button>
+                            {tooltip && !isActive && (
+                              <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[200] invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-150">
+                                <div className="bg-slate-800 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-md whitespace-nowrap shadow-lg">
+                                  {tooltip}
+                                </div>
+                                <div className="w-2 h-2 bg-slate-800 rotate-45 mx-auto -mt-1" />
                               </div>
-                              <div className="w-2 h-2 bg-slate-800 rotate-45 mx-auto -mt-1" />
-                            </div>
-                          )}
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {(() => {
+                      const answered = s === 'listening' ? stats.answeredListening
+                        : s === 'reading' ? stats.answeredReading
+                        : s === 'writing' ? stats.answeredWriting
+                        : stats.answeredSpeaking;
+                      const pct = totalSkillQs > 0 ? answered / totalSkillQs : 0;
+                      const chipColor = pct === 0 ? '' : pct >= 1 ? 'ring-1 ring-emerald-400' : 'ring-1 ring-amber-400';
+                      return (
+                        <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold ${meta.bg} ${meta.color} ${chipColor}`}>
+                          <Icon className="w-3 h-3" />
+                          {meta.label}
+                          <span className="opacity-60">·</span>
+                          <span className={pct >= 1 ? 'text-emerald-600 font-bold' : pct > 0 ? 'text-amber-600 font-bold' : ''}>
+                            {answered}/{totalSkillQs}
+                          </span>
+                          <span className="opacity-60">·</span>
+                          <span className="opacity-70">{SKILL_TIME[s]}m</span>
                         </div>
                       );
-                    })}
+                    })()}
                   </div>
-                  {(() => {
-                    const answered = s === 'listening' ? stats.answeredListening
-                      : s === 'reading' ? stats.answeredReading
-                      : s === 'writing' ? stats.answeredWriting
-                      : stats.answeredSpeaking;
-                    const pct = totalSkillQs > 0 ? answered / totalSkillQs : 0;
-                    const chipColor = pct === 0 ? '' : pct >= 1 ? 'ring-1 ring-emerald-400' : 'ring-1 ring-amber-400';
-                    return (
-                      <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold ${meta.bg} ${meta.color} ${chipColor}`}>
-                        <Icon className="w-3 h-3" />
-                        {meta.label}
-                        <span className="opacity-60">·</span>
-                        <span className={pct >= 1 ? 'text-emerald-600 font-bold' : pct > 0 ? 'text-amber-600 font-bold' : ''}>
-                          {answered}/{totalSkillQs}
-                        </span>
-                        <span className="opacity-60">·</span>
-                        <span className="opacity-70">{SKILL_TIME[s]}m</span>
-                      </div>
-                    );
-                  })()}
-                </div>
-              );
-            })}
-
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 flex-shrink-0">
+                );
+              })}
+            </div>
+            <div className="flex items-center justify-center sm:justify-end gap-2 w-full lg:w-auto lg:absolute lg:right-4 lg:top-1/2 lg:-translate-y-1/2 flex-shrink-0">
               <button
                 onClick={isLastPart && !reviewMode ? () => setShowSubmit(true) : goNext}
                 disabled={isLastPart && !reviewMode && !submitGate.canSubmit}
@@ -2454,6 +2455,155 @@ function buildSpeakingPrompt(_part: SpeakingPart, partNumber: number): string {
   return `${intro} You have ${minutes} minute${minutes > 1 ? "s" : ""}. Please read the question on the screen, then start speaking after the beep.`;
 }
 
+function SpeakingMindmap({ part }: { part: SpeakingPart }) {
+  const [scale, setScale] = useState(1);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    const updateScale = () => {
+      if (!wrapperRef.current) return;
+      const width = wrapperRef.current.clientWidth;
+      if (width < 600) {
+        setScale(width / 600);
+      } else {
+        setScale(1);
+      }
+    };
+    
+    updateScale();
+    window.addEventListener("resize", updateScale);
+    return () => window.removeEventListener("resize", updateScale);
+  }, []);
+
+  if (!part.part3Data) return null;
+  const ideas = part.part3Data.suggestedIdeas || [];
+  const mainTopic = part.part3Data.mainTopic;
+
+  return (
+    <div ref={wrapperRef} className="w-full flex justify-center overflow-hidden" style={{ height: `${340 * scale}px` }}>
+      {/* Mindmap Container with Locked Dimensions to prevent overlapping */}
+      <div 
+        className="relative w-[600px] h-[340px] flex items-center justify-center flex-shrink-0 bg-slate-50/50 rounded-2xl border border-slate-100 p-6 overflow-hidden"
+        style={{
+          transform: `scale(${scale})`,
+          transformOrigin: "top center"
+        }}
+      >
+        {/* SVG Arrows Layer */}
+        <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }}>
+          <defs>
+            <marker
+              id="arrowhead-purple-student"
+              markerWidth="8"
+              markerHeight="8"
+              refX="7"
+              refY="3"
+              orient="auto"
+            >
+              <polygon points="0 0, 8 3, 0 6" fill="#8b5cf6" />
+            </marker>
+          </defs>
+          
+          {/* Top Arrow */}
+          {ideas[0] && (
+            <line
+              x1="50%"
+              y1="50%"
+              x2="50%"
+              y2="20%"
+              stroke="#c084fc"
+              strokeWidth="2"
+              markerEnd="url(#arrowhead-purple-student)"
+            />
+          )}
+          
+          {/* Right Arrow */}
+          {ideas[1] && (
+            <line
+              x1="50%"
+              y1="50%"
+              x2="69%"
+              y2="50%"
+              stroke="#c084fc"
+              strokeWidth="2"
+              markerEnd="url(#arrowhead-purple-student)"
+            />
+          )}
+          
+          {/* Bottom Arrow */}
+          {ideas[2] && (
+            <line
+              x1="50%"
+              y1="50%"
+              x2="50%"
+              y2="80%"
+              stroke="#c084fc"
+              strokeWidth="2"
+              markerEnd="url(#arrowhead-purple-student)"
+            />
+          )}
+          
+          {/* Left Arrow */}
+          {ideas[3] && (
+            <line
+              x1="50%"
+              y1="50%"
+              x2="31%"
+              y2="50%"
+              stroke="#c084fc"
+              strokeWidth="2"
+              markerEnd="url(#arrowhead-purple-student)"
+            />
+          )}
+        </svg>
+
+        {/* Top Idea */}
+        {ideas[0] && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 w-40 text-center z-10">
+            <div className="px-3 py-2 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
+              {ideas[0]}
+            </div>
+          </div>
+        )}
+
+        {/* Center - Main Topic */}
+        <div className="relative z-20 w-44 text-center">
+          <div className="px-4 py-3 text-sm sm:text-base font-extrabold text-white bg-purple-600 border-2 border-purple-500 rounded-2xl shadow-md uppercase tracking-wider">
+            {mainTopic}
+          </div>
+        </div>
+
+        {/* Right Idea */}
+        {ideas[1] && (
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 w-40 text-center z-10">
+            <div className="px-3 py-2 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
+              {ideas[1]}
+            </div>
+          </div>
+        )}
+
+        {/* Bottom Idea */}
+        {ideas[2] && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-40 text-center z-10">
+            <div className="px-3 py-2 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
+              {ideas[2]}
+            </div>
+          </div>
+        )}
+
+        {/* Left Idea */}
+        {ideas[3] && (
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 w-40 text-center z-10">
+            <div className="px-3 py-2 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
+              {ideas[3]}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function formatPartContent(part: SpeakingPart, partNumber: number): React.ReactNode {
   const inst = SPEAKING_INSTRUCTIONS[partNumber];
   const Header = inst && (
@@ -2486,130 +2636,13 @@ function formatPartContent(part: SpeakingPart, partNumber: number): React.ReactN
     );
   }
   if (partNumber === 3 && part.part3Data) {
-    const ideas = part.part3Data.suggestedIdeas || [];
-    const mainTopic = part.part3Data.mainTopic;
     const followUp = part.part3Data.followUpQuestions || [];
 
     return (
       <>
         {Header}
         <div className="flex flex-col items-center gap-6 w-full max-w-3xl mx-auto my-6">
-          {/* Mindmap Container Wrapper with Horizontal Scroll if screen is too narrow */}
-          <div className="w-full overflow-x-auto py-2 scrollbar-thin flex md:justify-center">
-            {/* Mindmap Container with Locked Dimensions to prevent overlapping */}
-            <div className="relative w-[600px] h-[340px] flex items-center justify-center flex-shrink-0 bg-slate-50/50 rounded-2xl border border-slate-100 p-6 overflow-hidden">
-              {/* SVG Arrows Layer */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }}>
-                <defs>
-                  <marker
-                    id="arrowhead-purple-student"
-                    markerWidth="8"
-                    markerHeight="8"
-                    refX="7"
-                    refY="3"
-                    orient="auto"
-                  >
-                    <polygon points="0 0, 8 3, 0 6" fill="#8b5cf6" />
-                  </marker>
-                </defs>
-                
-                {/* Top Arrow */}
-                {ideas[0] && (
-                  <line
-                    x1="50%"
-                    y1="50%"
-                    x2="50%"
-                    y2="20%"
-                    stroke="#c084fc"
-                    strokeWidth="2"
-                    markerEnd="url(#arrowhead-purple-student)"
-                  />
-                )}
-                
-                {/* Right Arrow */}
-                {ideas[1] && (
-                  <line
-                    x1="50%"
-                    y1="50%"
-                    x2="69%"
-                    y2="50%"
-                    stroke="#c084fc"
-                    strokeWidth="2"
-                    markerEnd="url(#arrowhead-purple-student)"
-                  />
-                )}
-                
-                {/* Bottom Arrow */}
-                {ideas[2] && (
-                  <line
-                    x1="50%"
-                    y1="50%"
-                    x2="50%"
-                    y2="80%"
-                    stroke="#c084fc"
-                    strokeWidth="2"
-                    markerEnd="url(#arrowhead-purple-student)"
-                  />
-                )}
-                
-                {/* Left Arrow */}
-                {ideas[3] && (
-                  <line
-                    x1="50%"
-                    y1="50%"
-                    x2="31%"
-                    y2="50%"
-                    stroke="#c084fc"
-                    strokeWidth="2"
-                    markerEnd="url(#arrowhead-purple-student)"
-                  />
-                )}
-              </svg>
-
-              {/* Top Idea */}
-              {ideas[0] && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 w-40 text-center z-10">
-                  <div className="px-3 py-2 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
-                    {ideas[0]}
-                  </div>
-                </div>
-              )}
-
-              {/* Center - Main Topic */}
-              <div className="relative z-20 w-44 text-center">
-                <div className="px-4 py-3 text-sm sm:text-base font-extrabold text-white bg-purple-600 border-2 border-purple-500 rounded-2xl shadow-md uppercase tracking-wider">
-                  {mainTopic}
-                </div>
-              </div>
-
-              {/* Right Idea */}
-              {ideas[1] && (
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 w-40 text-center z-10">
-                  <div className="px-3 py-2 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
-                    {ideas[1]}
-                  </div>
-                </div>
-              )}
-
-              {/* Bottom Idea */}
-              {ideas[2] && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-40 text-center z-10">
-                  <div className="px-3 py-2 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
-                    {ideas[2]}
-                  </div>
-                </div>
-              )}
-
-              {/* Left Idea */}
-              {ideas[3] && (
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 w-40 text-center z-10">
-                  <div className="px-3 py-2 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
-                    {ideas[3]}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          <SpeakingMindmap part={part} />
 
           {/* Follow-up Questions */}
           {followUp.length > 0 && (
@@ -2667,6 +2700,7 @@ function SpeakingQuestionScreen({ part, partNumber, submissionId, onComplete, re
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [micStream, setMicStream] = useState<MediaStream | null>(null);
   const [ttsProgress, setTtsProgress] = useState(0);
+  const [isTtsPaused, setIsTtsPaused] = useState(false);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -2676,17 +2710,17 @@ function SpeakingQuestionScreen({ part, partNumber, submissionId, onComplete, re
 
   useEffect(() => {
     if (reviewMode) { window.speechSynthesis?.cancel(); setPhase("done"); setTtsProgress(0); return; }
-    setPhase("intro"); setAudioUrl(null); setTtsProgress(0);
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) { setPhase("countdown3"); return; }
+    setPhase("intro"); setAudioUrl(null); setTtsProgress(0); setIsTtsPaused(false);
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) { return; }
     const text = buildSpeakingPrompt(part, partNumber);
-    if (!text) { setPhase("countdown3"); return; }
+    if (!text) { return; }
     const total = Math.max(1, text.length);
     window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(text);
     utt.lang = "en-US"; utt.rate = 0.95;
     utt.onboundary = (e: SpeechSynthesisEvent) => setTtsProgress(Math.min(1, e.charIndex / total));
-    utt.onend = async () => { setTtsProgress(1); await playBeep(); setPhase("countdown3"); };
-    utt.onerror = () => setPhase("countdown3");
+    utt.onend = async () => { setTtsProgress(1); await playBeep(); };
+    utt.onerror = () => {};
     window.speechSynthesis.speak(utt);
     return () => { window.speechSynthesis.cancel(); };
   }, [partNumber, reviewMode]);
@@ -2694,18 +2728,63 @@ function SpeakingQuestionScreen({ part, partNumber, submissionId, onComplete, re
   useEffect(() => {
     if (phase !== "countdown3") return;
     setCount3(3);
-    const id = setInterval(() => setCount3((c) => { if (c <= 1) { clearInterval(id); startRecording(); return 0; } return c - 1; }), 1000);
+    const id = setInterval(() => setCount3((c) => {
+      if (c <= 1) {
+        clearInterval(id);
+        startRecording(micStream || undefined);
+        return 0;
+      }
+      return c - 1;
+    }), 1000);
     return () => clearInterval(id);
-  }, [phase]);
+  }, [phase, micStream]);
 
-  const startRecording = async () => {
+  const handlePlayPauseTts = () => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const synth = window.speechSynthesis;
+    if (synth.speaking) {
+      if (synth.paused) {
+        synth.resume();
+        setIsTtsPaused(false);
+      } else {
+        synth.pause();
+        setIsTtsPaused(true);
+      }
+    } else {
+      setIsTtsPaused(false);
+      const text = buildSpeakingPrompt(part, partNumber);
+      if (!text) return;
+      const total = Math.max(1, text.length);
+      synth.cancel();
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.lang = "en-US"; utt.rate = 0.95;
+      utt.onboundary = (e: SpeechSynthesisEvent) => setTtsProgress(Math.min(1, e.charIndex / total));
+      utt.onend = async () => { setTtsProgress(1); await playBeep(); };
+      utt.onerror = () => {};
+      synth.speak(utt);
+    }
+  };
+
+  const handleStartClick = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setMicStream(stream);
+      window.speechSynthesis?.cancel();
+      setPhase("countdown3");
+    } catch (err) {
+      console.error("[Speaking] Mic permission error:", err);
+      alert("Không thể truy cập microphone. Vui lòng cho phép quyền ghi âm.");
+      setPhase("intro");
+    }
+  };
+
+  const startRecording = async (existingStream?: MediaStream) => {
+    try {
+      const stream = existingStream || await navigator.mediaDevices.getUserMedia({ audio: true });
       setMicStream(stream); chunksRef.current = [];
       const mr = new MediaRecorder(stream);
       mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       mr.onstop = async () => {
-        // ✅ FIX: đọc chunksRef.current SAU khi onstop — lúc này dataavailable đã đầy đủ
         const chunks = chunksRef.current;
         if (chunks.length === 0) {
           console.warn('[Speaking] onstop fired but no audio chunks — recording may have been empty');
@@ -2715,8 +2794,8 @@ function SpeakingQuestionScreen({ part, partNumber, submissionId, onComplete, re
         setAudioUrl(localUrl);
         stream.getTracks().forEach((t) => t.stop());
         setMicStream(null); setPhase("done"); onComplete?.(partNumber);
-        // Upload recording to server — show error if fails
-        const sid = submissionId; // capture current value (không dùng closure cũ)
+        
+        const sid = submissionId;
         if (sid && blob.size > 0) {
           setUploading(true);
           setUploadError(null);
@@ -2731,33 +2810,19 @@ function SpeakingQuestionScreen({ part, partNumber, submissionId, onComplete, re
           console.warn('[Speaking] submissionId is null — audio not uploaded');
         }
       };
-      // ✅ FIX: dùng timeslice 250ms để MediaRecorder flush data liên tục
-      // → đảm bảo dataavailable có dữ liệu kể cả khi stop sớm
       mr.start(250); mediaRef.current = mr; setPhase("recording"); setRecLeft(times.recSec); clearTimer();
       timerRef.current = setInterval(() => setRecLeft((c) => { if (c <= 1) { clearTimer(); mr.stop(); return 0; } return c - 1; }), 1000);
     } catch {
       alert("Không thể truy cập microphone. Vui lòng cho phép quyền ghi âm.");
-      setPhase("done");
+      setPhase("intro");
     }
   };
 
   const stopRecording = () => { clearTimer(); mediaRef.current?.stop(); };
-  const skipIntro = () => { window.speechSynthesis?.cancel(); setPhase("countdown3"); };
   const reset = () => {
     clearTimer(); window.speechSynthesis?.cancel(); mediaRef.current?.stop();
     if (audioUrl) URL.revokeObjectURL(audioUrl);
-    setAudioUrl(null); setMicStream(null); setPhase("intro"); setTtsProgress(0);
-    setTimeout(() => {
-      const text = buildSpeakingPrompt(part, partNumber);
-      if (!text || !("speechSynthesis" in window)) { setPhase("countdown3"); return; }
-      const total = Math.max(1, text.length);
-      const utt = new SpeechSynthesisUtterance(text);
-      utt.lang = "en-US"; utt.rate = 0.95;
-      utt.onboundary = (e: SpeechSynthesisEvent) => setTtsProgress(Math.min(1, e.charIndex / total));
-      utt.onend = async () => { setTtsProgress(1); await playBeep(); setPhase("countdown3"); };
-      utt.onerror = () => setPhase("countdown3");
-      window.speechSynthesis.speak(utt);
-    }, 100);
+    setAudioUrl(null); setMicStream(null); setPhase("intro"); setTtsProgress(0); setIsTtsPaused(false);
   };
 
   useEffect(() => () => { clearTimer(); window.speechSynthesis?.cancel(); mediaRef.current?.stop(); }, []);
@@ -2775,9 +2840,14 @@ function SpeakingQuestionScreen({ part, partNumber, submissionId, onComplete, re
           {!reviewMode && (
             <>
               <div className="bg-slate-100 rounded-full px-4 py-2 flex items-center gap-3 mb-3 max-w-md select-none">
-                <div className="w-7 h-7 rounded-full bg-slate-300 flex items-center justify-center" aria-hidden>
-                  {phase === "intro" ? <Pause className="w-3.5 h-3.5 text-slate-700" /> : <Play className="w-3.5 h-3.5 text-slate-700" />}
-                </div>
+                <button
+                  type="button"
+                  onClick={handlePlayPauseTts}
+                  className="w-7 h-7 rounded-full bg-slate-300 hover:bg-slate-400 active:scale-90 flex items-center justify-center transition-all cursor-pointer"
+                  title={isTtsPaused ? "Phát tiếp hướng dẫn" : "Tạm dừng hướng dẫn"}
+                >
+                  {isTtsPaused ? <Play className="w-3.5 h-3.5 text-slate-700 fill-slate-700" /> : <Pause className="w-3.5 h-3.5 text-slate-700" />}
+                </button>
                 <div className="flex-1 h-1 bg-slate-300 rounded-full overflow-hidden">
                   <div className="h-full bg-slate-600 transition-[width] duration-200 ease-linear" style={{ width: `${phase === "intro" ? Math.round(ttsProgress * 100) : 100}%` }} />
                 </div>
@@ -2807,6 +2877,14 @@ function SpeakingQuestionScreen({ part, partNumber, submissionId, onComplete, re
           )}
           {!reviewMode && (
             <div className="mt-5 flex gap-2">
+              {phase === "intro" && (
+                <button
+                  onClick={handleStartClick}
+                  className="flex items-center gap-2 px-6 py-3 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-base font-bold active:scale-[0.97] transition-all shadow-md cursor-pointer animate-pulse"
+                >
+                  <Mic className="w-5 h-5 fill-white" /> Bắt đầu ghi âm bài nói
+                </button>
+              )}
               {phase === "recording" && (<button onClick={stopRecording} className="flex items-center gap-2 px-5 py-2.5 bg-slate-700 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 transition-colors"><Pause className="w-4 h-4" /> Dừng ghi âm</button>)}
               {(phase === "recording" || phase === "done") && (<button onClick={reset} className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"><RotateCcw className="w-4 h-4" /> Làm lại</button>)}
             </div>
