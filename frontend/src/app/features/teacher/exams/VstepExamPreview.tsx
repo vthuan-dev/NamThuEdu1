@@ -170,16 +170,13 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
     setCurrent({ skill, partNumber });
   };
 
-  // Reset & countdown per skill
+  // Reset the displayed time when switching skill.
+  // Preview mode does NOT count down — it just shows the allotted time per skill.
   useEffect(() => {
     setTimeLeft(SKILL_TIME[current.skill] * 60);
   }, [current.skill]);
 
-  useEffect(() => {
-    if (timeLeft <= 0) return;
-    const id = setInterval(() => setTimeLeft((t) => Math.max(0, t - 1)), 1000);
-    return () => clearInterval(id);
-  }, [timeLeft > 0, current.skill]);
+  // Countdown disabled in preview mode (giáo viên chỉ xem trước, không tính giờ).
 
   // Guard: đề kids bị route nhầm sang preview VSTEP → chuyển về đúng trang kids.
   useEffect(() => {
@@ -386,17 +383,13 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
             </div>
           </div>
 
-          {/* Timer — current skill only */}
-          <div className={`flex items-center gap-2 px-4 py-1.5 rounded-lg border ${
-            timeLeft < 120 ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-200"
-          }`}>
-            <Clock className={`w-4 h-4 ${timeLeft < 120 ? "text-red-500" : "text-blue-600"}`} />
-            <span className={`text-lg font-bold tabular-nums ${
-              timeLeft < 120 ? "text-red-600" : "text-blue-700"
-            }`}>{fmtTime(timeLeft)}</span>
-            <span className={`text-[11px] font-medium hidden sm:inline ${
-              timeLeft < 120 ? "text-red-400" : "text-blue-400"
-            }`}>{SKILL_META[current.skill].label}</span>
+          {/* Timer — preview mode: hiển thị thời lượng cho phép, KHÔNG đếm ngược */}
+          <div className="flex items-center gap-2 px-4 py-1.5 rounded-lg border bg-slate-50 border-slate-200">
+            <Clock className="w-4 h-4 text-slate-400" />
+            <span className="text-lg font-bold tabular-nums text-slate-500">{fmtTime(timeLeft)}</span>
+            <span className="text-[11px] font-medium hidden sm:inline text-slate-400">
+              {SKILL_META[current.skill].label} · Không tính giờ (xem trước)
+            </span>
           </div>
 
           <div className="flex items-center gap-3">
