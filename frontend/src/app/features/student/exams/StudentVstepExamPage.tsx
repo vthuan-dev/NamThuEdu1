@@ -2432,118 +2432,121 @@ function formatPartContent(part: SpeakingPart, partNumber: number): React.ReactN
       <>
         {Header}
         <div className="flex flex-col items-center gap-6 w-full max-w-3xl mx-auto my-6">
-          {/* Mindmap Container */}
-          <div className="relative w-full min-h-[360px] flex items-center justify-center bg-slate-50/50 rounded-2xl border border-slate-100 p-6 overflow-hidden">
-            {/* SVG Arrows Layer */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }}>
-              <defs>
-                <marker
-                  id="arrowhead-purple-student"
-                  markerWidth="8"
-                  markerHeight="8"
-                  refX="7"
-                  refY="3"
-                  orient="auto"
-                >
-                  <polygon points="0 0, 8 3, 0 6" fill="#8b5cf6" />
-                </marker>
-              </defs>
-              
-              {/* Top Arrow */}
+          {/* Mindmap Container Wrapper with Horizontal Scroll if screen is too narrow */}
+          <div className="w-full overflow-x-auto py-2 scrollbar-thin flex md:justify-center">
+            {/* Mindmap Container with Locked Dimensions to prevent overlapping */}
+            <div className="relative w-[600px] h-[340px] flex items-center justify-center flex-shrink-0 bg-slate-50/50 rounded-2xl border border-slate-100 p-6 overflow-hidden">
+              {/* SVG Arrows Layer */}
+              <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }}>
+                <defs>
+                  <marker
+                    id="arrowhead-purple-student"
+                    markerWidth="8"
+                    markerHeight="8"
+                    refX="7"
+                    refY="3"
+                    orient="auto"
+                  >
+                    <polygon points="0 0, 8 3, 0 6" fill="#8b5cf6" />
+                  </marker>
+                </defs>
+                
+                {/* Top Arrow */}
+                {ideas[0] && (
+                  <line
+                    x1="50%"
+                    y1="50%"
+                    x2="50%"
+                    y2="20%"
+                    stroke="#c084fc"
+                    strokeWidth="2"
+                    markerEnd="url(#arrowhead-purple-student)"
+                  />
+                )}
+                
+                {/* Right Arrow */}
+                {ideas[1] && (
+                  <line
+                    x1="50%"
+                    y1="50%"
+                    x2="69%"
+                    y2="50%"
+                    stroke="#c084fc"
+                    strokeWidth="2"
+                    markerEnd="url(#arrowhead-purple-student)"
+                  />
+                )}
+                
+                {/* Bottom Arrow */}
+                {ideas[2] && (
+                  <line
+                    x1="50%"
+                    y1="50%"
+                    x2="50%"
+                    y2="80%"
+                    stroke="#c084fc"
+                    strokeWidth="2"
+                    markerEnd="url(#arrowhead-purple-student)"
+                  />
+                )}
+                
+                {/* Left Arrow */}
+                {ideas[3] && (
+                  <line
+                    x1="50%"
+                    y1="50%"
+                    x2="31%"
+                    y2="50%"
+                    stroke="#c084fc"
+                    strokeWidth="2"
+                    markerEnd="url(#arrowhead-purple-student)"
+                  />
+                )}
+              </svg>
+
+              {/* Top Idea */}
               {ideas[0] && (
-                <line
-                  x1="50%"
-                  y1="50%"
-                  x2="50%"
-                  y2="18%"
-                  stroke="#c084fc"
-                  strokeWidth="2"
-                  markerEnd="url(#arrowhead-purple-student)"
-                />
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 w-40 text-center z-10">
+                  <div className="px-3 py-2 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
+                    {ideas[0]}
+                  </div>
+                </div>
               )}
-              
-              {/* Right Arrow */}
+
+              {/* Center - Main Topic */}
+              <div className="relative z-20 w-44 text-center">
+                <div className="px-4 py-3 text-sm sm:text-base font-extrabold text-white bg-purple-600 border-2 border-purple-500 rounded-2xl shadow-md uppercase tracking-wider">
+                  {mainTopic}
+                </div>
+              </div>
+
+              {/* Right Idea */}
               {ideas[1] && (
-                <line
-                  x1="50%"
-                  y1="50%"
-                  x2="82%"
-                  y2="50%"
-                  stroke="#c084fc"
-                  strokeWidth="2"
-                  markerEnd="url(#arrowhead-purple-student)"
-                />
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 w-40 text-center z-10">
+                  <div className="px-3 py-2 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
+                    {ideas[1]}
+                  </div>
+                </div>
               )}
-              
-              {/* Bottom Arrow */}
+
+              {/* Bottom Idea */}
               {ideas[2] && (
-                <line
-                  x1="50%"
-                  y1="50%"
-                  x2="50%"
-                  y2="82%"
-                  stroke="#c084fc"
-                  strokeWidth="2"
-                  markerEnd="url(#arrowhead-purple-student)"
-                />
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-40 text-center z-10">
+                  <div className="px-3 py-2 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
+                    {ideas[2]}
+                  </div>
+                </div>
               )}
-              
-              {/* Left Arrow */}
+
+              {/* Left Idea */}
               {ideas[3] && (
-                <line
-                  x1="50%"
-                  y1="50%"
-                  x2="18%"
-                  y2="50%"
-                  stroke="#c084fc"
-                  strokeWidth="2"
-                  markerEnd="url(#arrowhead-purple-student)"
-                />
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 w-40 text-center z-10">
+                  <div className="px-3 py-2 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
+                    {ideas[3]}
+                  </div>
+                </div>
               )}
-            </svg>
-
-            {/* Top Idea */}
-            {ideas[0] && (
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 w-36 sm:w-44 text-center z-10">
-                <div className="px-3 py-2.5 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
-                  {ideas[0]}
-                </div>
-              </div>
-            )}
-
-            {/* Center - Main Topic */}
-            <div className="relative z-20 w-44 sm:w-52 text-center">
-              <div className="px-4 py-3 text-sm sm:text-base font-extrabold text-white bg-purple-600 border-2 border-purple-500 rounded-2xl shadow-md uppercase tracking-wider">
-                {mainTopic}
-              </div>
             </div>
-
-            {/* Right Idea */}
-            {ideas[1] && (
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 w-36 sm:w-44 text-center z-10">
-                <div className="px-3 py-2.5 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
-                  {ideas[1]}
-                </div>
-              </div>
-            )}
-
-            {/* Bottom Idea */}
-            {ideas[2] && (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-36 sm:w-44 text-center z-10">
-                <div className="px-3 py-2.5 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
-                  {ideas[2]}
-                </div>
-              </div>
-            )}
-
-            {/* Left Idea */}
-            {ideas[3] && (
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 w-36 sm:w-44 text-center z-10">
-                <div className="px-3 py-2.5 text-xs sm:text-sm font-semibold text-purple-700 bg-purple-50 border-2 border-purple-200 rounded-xl shadow-sm">
-                  {ideas[3]}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Follow-up Questions */}
