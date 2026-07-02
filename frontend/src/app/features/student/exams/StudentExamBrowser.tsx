@@ -267,7 +267,7 @@ function PreExamModal({
 
           {/* Panel */}
           <motion.div
-            className="relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl overflow-hidden"
+            className="relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col my-auto max-h-[90vh] sm:max-h-none"
             initial={{ y: -60, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -40, opacity: 0 }}
@@ -275,7 +275,7 @@ function PreExamModal({
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100">
+            <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 flex-shrink-0">
               <h2 className="text-base font-bold text-slate-800 truncate pr-4">{exam.title}</h2>
               <button
                 onClick={onClose}
@@ -286,11 +286,13 @@ function PreExamModal({
               </button>
             </div>
 
-            <p className="text-center text-[13px] text-slate-500 py-2 bg-slate-50 border-b border-slate-100">
+            <p className="text-center text-[13px] text-slate-500 py-2 bg-slate-50 border-b border-slate-100 flex-shrink-0">
               Vui lòng cấp quyền sử dụng micro cho trình duyệt trước khi thi.
             </p>
 
-            {/* Top: Camera + student info */}
+            {/* Scrollable Body */}
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {/* Top: Camera + student info */}
             <div className="px-6 pt-5 pb-4 flex justify-center">
             <div className="grid grid-cols-1 sm:grid-cols-[200px_1fr] gap-6 items-start w-full max-w-lg">
               <div>
@@ -404,28 +406,38 @@ function PreExamModal({
                 </div>
               </div>
 
-              {/* 3 — Notes + CTA */}
+              {/* 3 — Notes */}
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <span className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-bold">3</span>
                   <h3 className="text-[13px] font-bold uppercase tracking-wider text-slate-700">Lưu ý</h3>
                 </div>
-                <ul className="space-y-1.5 text-[12px] text-slate-600 mb-4">
+                <ul className="space-y-1.5 text-[12px] text-slate-600">
                   <li>- Khi hết thời gian mỗi kỹ năng, hệ thống tự động chuyển tiếp.</li>
                   <li>- Bấm "TIẾP TỤC" để sang part hoặc kỹ năng kế tiếp.</li>
                   <li className="text-rose-500 font-semibold">- Bài thi sẽ là thật, không thể làm lại.</li>
                 </ul>
-                <button
-                  onClick={goExam}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-md bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] text-white text-sm font-bold uppercase tracking-wider transition-all shadow-md"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  Nhận đề
-                </button>
-                <p className="text-center text-[12px] text-slate-500 mt-3">
-                  hoặc <button onClick={onClose} className="text-sky-600 hover:underline">quay lại</button>
-                </p>
               </div>
+            </div>
+            </div>
+
+            {/* Sticky Footer */}
+            <div className="flex-shrink-0 bg-slate-50 px-6 py-4 flex items-center justify-between gap-4 border-t border-slate-100">
+              <button 
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold uppercase tracking-wider hover:bg-slate-100 transition-colors"
+              >
+                Quay lại
+              </button>
+              <button
+                type="button"
+                onClick={goExam}
+                className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] text-white text-xs font-bold uppercase tracking-wider transition-all shadow-md"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Nhận đề
+              </button>
             </div>
           </motion.div>
         </motion.div>
@@ -485,10 +497,6 @@ function ExamCard({
   const [mobileBlocked, setMobileBlocked] = useState(false);
 
   const handleStartExam = () => {
-    if (isMobileDevice()) {
-      setMobileBlocked(true);
-      return;
-    }
     // IELTS: skip pre-exam modal, navigate thẳng vào trang detail (Practice/Full test selector)
     if (isIelts) {
       navigate(examPath);

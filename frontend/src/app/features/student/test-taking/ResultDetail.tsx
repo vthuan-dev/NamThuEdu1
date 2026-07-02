@@ -285,7 +285,7 @@ export function ResultDetail({ modalSubmissionId }: { modalSubmissionId?: number
           </div>
 
           {/* Stats row */}
-          <div className="grid grid-cols-3 gap-2.5 my-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 my-4">
             {[
               { icon: CheckCircle, label: "Số câu đúng", value: `${answeredCorrect}/${totalQuestions}` },
               { icon: Clock, label: "Trạng thái", value: submission?.sStatus === "graded" ? "Đã chấm" : "Đã nộp" },

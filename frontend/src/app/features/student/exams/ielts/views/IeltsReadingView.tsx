@@ -6,7 +6,7 @@
  *  • Split view: passage on the left (scrollable), questions on the right
  *  • 60 minutes total, no automatic skill end (managed by parent timer)
  */
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { FileText } from "lucide-react";
 import { PassageSplitLayout } from "../../../components/PassageSplitLayout";
 import type { IeltsReadingPayload, AnswerMap } from "../types";
@@ -46,6 +46,12 @@ export function IeltsReadingView({
 }: IeltsReadingViewProps) {
   const passages = payload.passages ?? [];
   const [activeIdx, setActiveIdx] = useState(0);
+  const [mobileTab, setMobileTab] = useState<'question' | 'passage'>('question');
+
+  // Reset tab về 'question' khi chuyển Passage
+  useEffect(() => {
+    setMobileTab('question');
+  }, [activeIdx]);
 
   const currentPassage = passages[activeIdx];
 
@@ -140,6 +146,8 @@ export function IeltsReadingView({
       {/* 2-col split: passage | questions */}
       <div className="flex-1 px-4 py-4 max-w-7xl w-full mx-auto">
         <PassageSplitLayout
+          mobileActiveTab={mobileTab}
+          onMobileTabChange={setMobileTab}
           passageTitle={currentPassage.passageName}
           passageSubtitle={currentPassage.title ? <span className="italic">{currentPassage.title}</span> : undefined}
           passageContent={

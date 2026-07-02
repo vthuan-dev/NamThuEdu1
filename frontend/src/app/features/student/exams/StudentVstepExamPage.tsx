@@ -1253,6 +1253,30 @@ export function StudentVstepExamPage() {
         </div>
       </header>
 
+      {/* ─── MOBILE QUESTION NAVIGATOR ────────────────────────── */}
+      {(!teacherMode && (current.skill === "listening" || current.skill === "reading")) && (
+        <div className="lg:hidden flex-shrink-0 bg-white border-b border-slate-200">
+          <MobileQuestionNavigator
+            skill={current.skill}
+            currentPart={current.partNumber}
+            listeningParts={listeningParts}
+            readingParts={readingParts}
+            answers={answers}
+            flagged={flagged}
+            reviewMode={reviewMode}
+            correctAnswersMap={correctAnswersMap}
+            answeredCount={stats.answeredMCQ}
+            totalCount={stats.totalMCQ}
+            onJump={(pn, qId) => {
+              if (pn !== current.partNumber) navigate2(current.skill, pn);
+              setTimeout(() => {
+                document.getElementById(`q-${qId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }, 80);
+            }}
+          />
+        </div>
+      )}
+
       {/* ─── MAIN CONTENT + QUESTION NAVIGATOR ──────────────── */}
       <main className="flex-1 overflow-hidden min-h-0 relative">
         <div className="h-full overflow-hidden min-h-0">{renderContent()}</div>
@@ -1972,10 +1996,18 @@ function ReadingView({
   correctAnswersMap?: Record<number, string>;
   examId?: number;
 }) {
+  const [mobileTab, setMobileTab] = useState<'question' | 'passage'>('question');
+
+  useEffect(() => {
+    setMobileTab('question');
+  }, [partNumber]);
+
   if (!part || !part.questions?.length) return <EmptyState skill="reading" />;
 
   return (
     <PassageSplitLayout
+      mobileActiveTab={mobileTab}
+      onMobileTabChange={setMobileTab}
       className="h-full p-4 overflow-hidden"
       gridClassName="grid-cols-1 md:grid-cols-[45%_55%]"
       heightClassName="h-full"
@@ -2819,6 +2851,92 @@ function PartHeader({ icon: Icon, color, title, subtitle }: { icon: any; color: 
       <div className="flex-1">
         <h2 className="text-lg font-bold" style={{ color: p.titleColor, letterSpacing: "-0.01em" }}>{title}</h2>
         {subtitle && <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>}
+      </div>
+    </div>
+  );
+}
+
+function MobileQuestionNavigator({
+  skill, currentPart, listeningParts, readingParts, answers, flagged, onJump, reviewMode, correctAnswersMap,
+  answeredCount, totalCount,
+}: {
+  skill: "listening" | "reading";
+  currentPart: number;
+  listeningParts: ListeningPart[];
+  readingParts: ReadingPart[];
+  answers: Record<string, "A" | "B" | "C" | "D">;
+  flagged: Record<number, boolean>;
+  onJump: (partNumber: number, qId: number) => void;
+  reviewMode?: boolean;
+  correctAnswersMap?: Record<number, string>;
+  answeredCount?: number;
+  totalCount?: number;
+}) {
+  const partsData = skill === "listening"
+    ? listeningParts.map(p => ({
+        partNumber: p.partNumber,
+        questions: p.sections.flatMap(s => s.questions),
+      }))
+    : readingParts.map(p => ({
+        partNumber: p.partNumber,
+        questions: p.questions,
+      }));
+
+  if (partsData.length === 0) return null;
+
+  const answeredCls = skill === "listening" ? "bg-sky-500 text-white" : "bg-emerald-500 text-white";
+
+  return (
+    <div className="w-full flex flex-col bg-white">
+      {/* Summary Row */}
+      <div className="px-4 py-1.5 flex items-center justify-between border-b border-slate-100 bg-slate-50/50">
+        <span className="text-[10px] font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1">
+          <span className={`w-1.5 h-1.5 rounded-full ${skill === 'listening' ? 'bg-sky-500' : 'bg-emerald-500'} animate-pulse`} />
+          Câu hỏi ({skill === "listening" ? "Listening" : "Reading"})
+        </span>
+        <span className="text-[10px] text-slate-500 font-medium">
+          Đã làm: <span className="font-bold text-slate-800">{answeredCount ?? 0}/{totalCount ?? 0}</span>
+        </span>
+      </div>
+      {/* Horizontal Scroll Questions */}
+      <div className="p-2 overflow-x-auto flex items-center gap-3 scrollbar-none">
+        {partsData.map(p => (
+          <div key={p.partNumber} className="flex items-center gap-1.5 flex-shrink-0">
+            <span className={`text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded ${currentPart === p.partNumber ? 'bg-amber-100 text-amber-800 ring-1 ring-amber-300' : 'bg-slate-100 text-slate-600'}`}>
+              P{p.partNumber}
+            </span>
+            <div className="flex items-center gap-1">
+              {p.questions.map(q => {
+                const answered = !!answers[q.qId];
+                const isFlagged = !!flagged[q.qId];
+                const isCurrentPart = currentPart === p.partNumber;
+                const isCorrect = reviewMode && answered && answers[q.qId] === correctAnswersMap?.[q.qId];
+                const isWrong  = reviewMode && answered && answers[q.qId] !== correctAnswersMap?.[q.qId];
+                let btnCls: string;
+                if (reviewMode) {
+                  if (isCorrect)     btnCls = "bg-emerald-500 text-white";
+                  else if (isWrong)  btnCls = "bg-red-400 text-white";
+                  else               btnCls = "bg-slate-100 text-slate-400";
+                } else {
+                  btnCls = isFlagged
+                    ? "bg-orange-500 text-white"
+                    : answered ? answeredCls : "bg-slate-100 text-slate-600";
+                }
+                return (
+                  <button
+                    key={q.qId}
+                    onClick={() => onJump(p.partNumber, q.qId)}
+                    className={`w-7 h-7 flex-shrink-0 rounded text-[11px] font-bold flex items-center justify-center transition-all ${btnCls} ${isCurrentPart ? "ring-2 ring-amber-400" : ""}`}
+                  >
+                    {q.questionNumber}
+                  </button>
+                );
+              })}
+            </div>
+            {/* Divider between parts */}
+            <div className="h-4 w-[1.5px] bg-slate-200 mx-1 flex-shrink-0" />
+          </div>
+        ))}
       </div>
     </div>
   );

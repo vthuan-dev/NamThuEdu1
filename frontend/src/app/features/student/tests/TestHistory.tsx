@@ -292,11 +292,11 @@ export function TestHistory() {
       <div className="px-8 lg:px-16 py-8 space-y-5">
 
       {/* ── Stats strip ── */}
-      <div className="rounded-2xl bg-white flex divide-x divide-[#F0EEFF]"
-        style={{ border: "1.5px solid #F0F0F8", boxShadow: "0 2px 10px rgba(124,58,237,0.06)" }}>
+      <div className="rounded-2xl bg-white grid grid-cols-2 md:grid-cols-4 overflow-hidden border border-[#F0F0F8]"
+        style={{ boxShadow: "0 2px 10px rgba(124,58,237,0.06)" }}>
 
         {/* Total */}
-        <div className="flex-1 flex items-center gap-3 px-4 py-3.5">
+        <div className="flex items-center gap-3 px-4 py-3.5 border-r border-b md:border-b-0 border-[#F0EEFF]">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "#EDE9FE" }}>
             <BarChart2 className="w-3.5 h-3.5" style={{ color: PURPLE }} />
           </div>
@@ -308,7 +308,7 @@ export function TestHistory() {
         </div>
 
         {/* Assignment completion rate */}
-        <div className="flex-1 flex items-center gap-3 px-4 py-3.5">
+        <div className="flex items-center gap-3 px-4 py-3.5 border-b md:border-r md:border-b-0 border-[#F0EEFF]">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
             style={{ background: allAssigned.length > 0 ? "#DBEAFE" : "#F3F4F6" }}>
             <BookOpen className="w-3.5 h-3.5" style={{ color: allAssigned.length > 0 ? "#2563EB" : "#9CA3AF" }} />
@@ -334,7 +334,7 @@ export function TestHistory() {
         </div>
 
         {/* VSTEP Record — 0-10 scale */}
-        <div className="flex-1 flex items-center gap-3 px-4 py-3.5">
+        <div className="flex items-center gap-3 px-4 py-3.5 border-r border-b-0 border-[#F0EEFF]">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "#EDE9FE" }}>
             <Trophy className="w-3.5 h-3.5" style={{ color: PURPLE }} />
           </div>
@@ -363,7 +363,7 @@ export function TestHistory() {
         </div>
 
         {/* IELTS Record — band 0-9 scale */}
-        <div className="flex-1 flex items-center gap-3 px-4 py-3.5">
+        <div className="flex items-center gap-3 px-4 py-3.5">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "#D1FAE5" }}>
             <Trophy className="w-3.5 h-3.5" style={{ color: "#059669" }} />
           </div>

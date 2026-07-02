@@ -316,7 +316,7 @@ export function TestList() {
         style={{ background: "rgba(248,247,255,0.93)", backdropFilter: "blur(16px)", borderBottom: "1px solid #DDD6FE" }}>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           {/* Status tabs */}
-          <div className="flex items-center gap-1 p-1 rounded-xl flex-shrink-0"
+          <div className="flex items-center gap-1 p-1 rounded-xl flex-shrink-0 overflow-x-auto max-w-full scrollbar-none"
             style={{ background: "#fff", border: "1.5px solid #DDD6FE" }}>
             {tabs.map(tab => {
               const Icon = tab.icon;

@@ -602,7 +602,7 @@ export function VstepResultPage() {
                       )}
                     </span>
                   </div>
-                  <div className="grid grid-cols-10 gap-1">
+                  <div className="flex flex-wrap gap-1.5">
                     {displayRows.map((r, idx) => {
                       const num = r.question?.qNumber ?? idx + 1;
                       const text = r.saAnswer_text;
@@ -626,7 +626,7 @@ export function VstepResultPage() {
                               ? `Câu ${num}: chưa trả lời`
                               : `Câu ${num}: bạn ${correct ? "trả lời đúng" : "trả lời sai"} — "${text}"`
                           }
-                          className={`h-7 rounded text-[11px] font-semibold tabular-nums flex items-center justify-center cursor-default ${tone}`}
+                          className={`w-7 h-7 rounded text-[11px] font-semibold tabular-nums flex items-center justify-center cursor-default flex-shrink-0 ${tone}`}
                         >
                           {num}
                         </span>

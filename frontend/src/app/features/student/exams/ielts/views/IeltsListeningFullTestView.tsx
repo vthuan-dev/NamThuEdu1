@@ -22,7 +22,7 @@
  *   • Audio component, navigator, submit dialog (dùng cùng IeltsAudioOnce)
  */
 import { useMemo, useState, useCallback } from "react";
-import { ArrowRight, Headphones, Lightbulb } from "lucide-react";
+import { ArrowRight, Headphones, Lightbulb, ChevronDown, ChevronUp } from "lucide-react";
 import type {
   IeltsListeningPayload,
   IeltsListeningSection,
@@ -75,6 +75,7 @@ export function IeltsListeningFullTestView({
   const [sectionIdx, setSectionIdx] = useState(() => reviewMode ? Math.max(0, (payload.sections ?? []).length - 1) : 0);
   const [audioStartedAt, setAudioStartedAt] = useState<number | null>(null);
   const currentSection: IeltsListeningSection | undefined = sections[sectionIdx];
+  const [isTipExpanded, setIsTipExpanded] = useState(false);
 
   // Build flat list of all questions cho navigator (1–40)
   const allMeta: QuestionMeta[] = useMemo(() => {
@@ -203,22 +204,60 @@ export function IeltsListeningFullTestView({
       <div className="flex-1 max-w-[1100px] w-full mx-auto px-4 sm:px-6 py-6 pb-32">
         {/* Tip banner — Pro tips cho practice, tip ngắn cho full test (chỉ hiện ở đầu trang) */}
         {practiceMode ? (
-          <div className="mb-5 p-3 rounded-lg border border-emerald-200 bg-emerald-50/60">
-            <div className="flex items-start gap-2">
-              <Lightbulb className="w-4 h-4 mt-0.5 flex-shrink-0 text-emerald-600" />
-              <div className="text-[13px] leading-relaxed text-emerald-900">
-                <b>Pro tips luyện tập:</b> Bạn có thể tạm dừng, tua lại, hoặc nghe lại
-                audio thoải mái. Hãy gõ đáp án trực tiếp vào ô trống trong câu hỏi và
-                kiểm tra chính tả trước khi nộp bài.
+          <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50/60 transition-all duration-200 overflow-hidden">
+            {/* Header: Click to toggle on mobile, static on desktop */}
+            <button 
+              type="button"
+              onClick={() => setIsTipExpanded(!isTipExpanded)}
+              className="w-full flex items-center justify-between p-3 cursor-pointer sm:cursor-default select-none text-left bg-transparent border-none outline-none focus:outline-none"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <Lightbulb className="w-4 h-4 flex-shrink-0 text-emerald-600 animate-pulse" />
+                <span className="text-[13px] font-bold text-emerald-900 truncate">
+                  Pro tips luyện tập
+                </span>
               </div>
+              <span className="sm:hidden text-emerald-600">
+                {isTipExpanded ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </span>
+            </button>
+
+            {/* Content: always visible on desktop, toggleable on mobile */}
+            <div className={`px-3 pb-3 pt-0 text-[12px] leading-relaxed text-emerald-850 border-t border-emerald-100/50 sm:border-none sm:block sm:px-3 sm:pb-3 ${isTipExpanded ? 'block' : 'hidden'}`}>
+              Bạn có thể tạm dừng, tua lại, hoặc nghe lại audio thoải mái. Hãy gõ đáp án trực tiếp vào ô trống trong câu hỏi và kiểm tra chính tả trước khi nộp bài.
             </div>
           </div>
         ) : (
-          <div className="mb-5 flex items-start gap-2 text-xs text-gray-500">
-            <Lightbulb className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gray-400" />
-            <span>
+          <div className="mb-5 rounded-lg border border-slate-200 bg-slate-50 transition-all duration-200 overflow-hidden">
+            {/* Header: Click to toggle on mobile, static on desktop */}
+            <button 
+              type="button"
+              onClick={() => setIsTipExpanded(!isTipExpanded)}
+              className="w-full flex items-center justify-between p-3 cursor-pointer sm:cursor-default select-none text-left bg-transparent border-none outline-none focus:outline-none"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <Lightbulb className="w-4 h-4 flex-shrink-0 text-gray-500" />
+                <span className="text-[13px] font-bold text-gray-700 truncate">
+                  Hướng dẫn làm bài
+                </span>
+              </div>
+              <span className="sm:hidden text-gray-500">
+                {isTipExpanded ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+              </span>
+            </button>
+
+            {/* Content: always visible on desktop, toggleable on mobile */}
+            <div className={`px-3 pb-3 pt-0 text-[12px] leading-relaxed text-gray-600 border-t border-slate-100 sm:border-none sm:block sm:px-3 sm:pb-3 ${isTipExpanded ? 'block' : 'hidden'}`}>
               Bài nghe phát <b>1 lần duy nhất</b>. Các phần đã nghe xong vẫn có thể xem lại và sửa đáp án.
-            </span>
+            </div>
           </div>
         )}
 

@@ -258,6 +258,12 @@ export function TestTaking() {
 
   const [activeSkill, setActiveSkill] = useState<string>("listening");
   const [activePart, setActivePart] = useState<number>(1);
+  const [mobileTab, setMobileTab] = useState<'question' | 'passage'>('question');
+
+  useEffect(() => {
+    setMobileTab('question');
+  }, [activeSkill, activePart]);
+
   const [showSubmit, setShowSubmit] = useState(false);
   const [started, setStarted] = useState(false);
   const [showBottomNav, setShowBottomNav] = useState(true);
@@ -775,6 +781,8 @@ export function TestTaking() {
 
             {activeSkill === "reading" && (
               <PassageSplitLayout
+                mobileActiveTab={mobileTab}
+                onMobileTabChange={setMobileTab}
                 heightClassName="min-h-[62vh] xl:h-[62vh]"
                 gridClassName="grid-cols-1 xl:grid-cols-2"
                 tone="emerald"

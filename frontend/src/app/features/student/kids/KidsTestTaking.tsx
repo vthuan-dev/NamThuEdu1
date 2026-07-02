@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useLocation, useNavigate, useParams } from 'react-router';
-import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Volume2, AlertTriangle, PartyPopper } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Volume2, AlertTriangle, PartyPopper, X, ListChecks } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
 import { QuestionRenderer } from '../../../../components/exam/QuestionRenderer';
 import { useExamSession } from '../../../../hooks/exam/useExamSession';
@@ -140,6 +140,15 @@ export function KidsTestTaking() {
   const [startedAtServer, setStartedAtServer] = useState('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const startAttemptedRef = useRef(false);
+
+  // States responsive cho di động (Kids mobile flow)
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'question' | 'passage'>('question');
+
+  // Tự động đưa về tab Câu hỏi khi chuyển câu
+  useEffect(() => {
+    setMobileTab('question');
+  }, [current]);
 
   const session = useExamSession({
     submissionId,
@@ -360,90 +369,116 @@ export function KidsTestTaking() {
       </header>
 
       <main className={`${wrap} mx-auto px-4 sm:px-6 pt-3 pb-24`}>
+        {/* Tab Switcher cho Kids trên Mobile khi có bài đọc */}
+        {q?.qPassage && (
+          <div className="sm:hidden flex rounded-2xl bg-rose-50 p-1 mb-4 border border-rose-100/50">
+            <button 
+              onClick={() => setMobileTab('question')}
+              className={`flex-1 py-2 text-center text-sm font-extrabold rounded-xl transition-all ${mobileTab === 'question' ? 'bg-white text-rose-600 shadow-sm' : 'text-rose-450'}`}
+            >
+              ❓ Câu hỏi
+            </button>
+            <button 
+              onClick={() => setMobileTab('passage')}
+              className={`flex-1 py-2 text-center text-sm font-extrabold rounded-xl transition-all ${mobileTab === 'passage' ? 'bg-white text-rose-600 shadow-sm' : 'text-rose-450'}`}
+            >
+              📖 Bài đọc
+            </button>
+          </div>
+        )}
+
         <section className="rounded-3xl p-4 sm:p-5"
           style={{ background: 'rgba(255,255,255,0.9)', boxShadow: '0 8px 32px rgba(251,113,133,0.12)', border: '2px solid rgba(255,255,255,0.9)' }}>
 
-          {/* Audio (listening) */}
-          {q?.qMedia_url && (
-            <button onClick={playAudio}
-              className="mb-5 inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-white font-extrabold transition-transform hover:scale-[1.02] active:scale-95"
-              style={{ background: 'linear-gradient(135deg, #8B5CF6, #6366F1)', boxShadow: '0 8px 20px rgba(139,92,246,0.3)' }}>
-              <Volume2 className="w-5 h-5" /> Nghe lại
-            </button>
-          )}
-
-          {/* Optional image */}
-          {q?.qImage_url && (
-            <img src={q.qImage_url} alt="" className="w-full max-h-52 object-contain rounded-2xl mb-4 bg-slate-50" />
-          )}
-
           {/* Reading passage */}
           {q?.qPassage && (
-            <div className="mb-5 rounded-2xl p-4 text-[15px] leading-7 text-slate-700 bg-slate-50 border border-slate-100"
+            <div className={`mb-5 rounded-2xl p-4 text-[15px] leading-7 text-slate-700 bg-slate-50 border border-slate-100 ${mobileTab === 'passage' ? 'block' : 'hidden sm:block'}`}
               dangerouslySetInnerHTML={{ __html: q.qPassage }} />
           )}
 
-          {/* Question (đề thường — kids task để component tự render tiêu đề/hướng dẫn) */}
-          {!isKidsTask && (
-            <h1 className="text-lg sm:text-xl font-extrabold leading-snug" style={{ color: '#1A1040' }}
-              dangerouslySetInnerHTML={{ __html: q?.qContent ?? `Câu ${current + 1}` }} />
-          )}
+          {/* Câu hỏi & bài làm (ẩn khi xem bài đọc trên mobile) */}
+          <div className={q?.qPassage && mobileTab !== 'question' ? 'hidden sm:block' : 'block'}>
+            {/* Audio (listening) */}
+            {q?.qMedia_url && (
+              <button onClick={playAudio}
+                className="mb-5 inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-white font-extrabold transition-transform hover:scale-[1.02] active:scale-95"
+                style={{ background: 'linear-gradient(135deg, #8B5CF6, #6366F1)', boxShadow: '0 8px 20px rgba(139,92,246,0.3)' }}>
+                <Volume2 className="w-5 h-5" /> Nghe lại
+              </button>
+            )}
 
-          {/* Answers */}
-          {isKidsTask ? (
-            <div className="mt-1">
-              <QuestionRenderer
-                question={q}
-                mode="student"
-                answer={kidsAnswer}
-                onAnswer={handleKidsAnswer}
+            {/* Optional image */}
+            {q?.qImage_url && (
+              <img src={q.qImage_url} alt="" className="w-full max-h-52 object-contain rounded-2xl mb-4 bg-slate-50" />
+            )}
+
+            {/* Question (đề thường — kids task để component tự render tiêu đề/hướng dẫn) */}
+            {!isKidsTask && (
+              <h1 className="text-lg sm:text-xl font-extrabold leading-snug" style={{ color: '#1A1040' }}
+                dangerouslySetInnerHTML={{ __html: q?.qContent ?? `Câu ${current + 1}` }} />
+            )}
+
+            {/* Answers */}
+            {isKidsTask ? (
+              <div className="mt-1">
+                <QuestionRenderer
+                  question={q}
+                  mode="student"
+                  answer={kidsAnswer}
+                  onAnswer={handleKidsAnswer}
+                />
+              </div>
+            ) : isWriting ? (
+              <textarea
+                value={selected}
+                onChange={e => handleAnswer(e.target.value)}
+                placeholder="Em viết câu trả lời ở đây nhé…"
+                className="mt-5 w-full min-h-[140px] rounded-2xl border-2 border-rose-100 p-4 text-[15px] outline-none focus:border-rose-300 transition-colors"
               />
-            </div>
-          ) : isWriting ? (
-            <textarea
-              value={selected}
-              onChange={e => handleAnswer(e.target.value)}
-              placeholder="Em viết câu trả lời ở đây nhé…"
-              className="mt-5 w-full min-h-[140px] rounded-2xl border-2 border-rose-100 p-4 text-[15px] outline-none focus:border-rose-300 transition-colors"
-            />
-          ) : (
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {options.map((opt: any, i: number) => {
-                const tone = OPTION_TONES[i % OPTION_TONES.length];
-                const active = selected === opt.value;
-                return (
-                  <button key={opt.id} onClick={() => handleAnswer(opt.value)}
-                    className="group flex items-center gap-3 rounded-2xl p-4 text-left transition-all duration-150 hover:-translate-y-0.5 active:scale-[0.98]"
-                    style={{
-                      background: active ? tone.bg : '#fff',
-                      border: active ? `2.5px solid ${tone.c}` : '2px solid #F1F5F9',
-                      boxShadow: active ? `0 8px 20px ${tone.c}33` : '0 2px 8px rgba(0,0,0,0.04)',
-                    }}>
-                    <span className="w-9 h-9 rounded-xl flex items-center justify-center font-extrabold flex-shrink-0 text-white"
-                      style={{ background: tone.c }}>
-                      {opt.label}
-                    </span>
-                    <span className="flex-1 text-[15px] font-bold" style={{ color: active ? tone.c : '#334155' }}
-                      dangerouslySetInnerHTML={{ __html: opt.content }} />
-                    {active && <CheckCircle2 className="w-5 h-5 flex-shrink-0" style={{ color: tone.c }} />}
+            ) : (
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {options.map((opt: any, i: number) => {
+                  const tone = OPTION_TONES[i % OPTION_TONES.length];
+                  const active = selected === opt.value;
+                  return (
+                    <button key={opt.id} onClick={() => handleAnswer(opt.value)}
+                      className="group flex items-center gap-3 rounded-2xl p-4 text-left transition-all duration-150 hover:-translate-y-0.5 active:scale-[0.98]"
+                      style={{
+                        background: active ? tone.bg : '#fff',
+                        border: active ? `2.5px solid ${tone.c}` : '2px solid #F1F5F9',
+                        boxShadow: active ? `0 8px 20px ${tone.c}33` : '0 2px 8px rgba(0,0,0,0.04)',
+                      }}>
+                      <span className="w-9 h-9 rounded-xl flex items-center justify-center font-extrabold flex-shrink-0 text-white"
+                        style={{ background: tone.c }}>
+                        {opt.label}
+                      </span>
+                      <span className="flex-1 text-[15px] font-bold" style={{ color: active ? tone.c : '#334155' }}
+                        dangerouslySetInnerHTML={{ __html: opt.content }} />
+                      {active && <CheckCircle2 className="w-5 h-5 flex-shrink-0" style={{ color: tone.c }} />}
                   </button>
                 );
               })}
             </div>
           )}
+          </div>
         </section>
       </main>
 
       {/* Bottom nav */}
-      <div className="fixed bottom-0 left-0 right-0 z-30" style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(14px)', borderTop: '1.5px solid #FFE4E6' }}>
+      <div className="fixed bottom-0 left-0 right-0 z-30" style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(14px)', borderTop: '1.5px solid #FFE4E6', boxShadow: '0 -4px 16px rgba(251,113,133,0.06)' }}>
         <div className={`${wrap} mx-auto px-4 sm:px-6 py-3 flex items-center gap-3`}>
           <button onClick={() => setCurrent(c => Math.max(0, c - 1))} disabled={current === 0}
             className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors disabled:opacity-40">
             <ArrowLeft className="w-4 h-4" /> Trước
           </button>
-          <span className="flex-1 text-center text-xs font-bold text-slate-400">
-            Đã trả lời {answeredCount}/{total}
-          </span>
+          
+          <button 
+            onClick={() => setIsMobileNavOpen(true)}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-3 rounded-2xl text-xs font-extrabold text-rose-700 bg-rose-50 hover:bg-rose-100 transition-colors border border-rose-100"
+          >
+            <span>🎈 Câu {current + 1}/{total}</span>
+          </button>
+
           {isLast ? (
             <button onClick={() => setShowSubmit(true)}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-extrabold text-white transition-transform hover:scale-[1.02] active:scale-95"
@@ -459,6 +494,69 @@ export function KidsTestTaking() {
           )}
         </div>
       </div>
+
+      {/* Mobile Navigator Bottom Sheet cho Kids */}
+      {isMobileNavOpen && (
+        <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-end justify-center">
+          <div className="absolute inset-0" onClick={() => setIsMobileNavOpen(false)} />
+          <div className="relative w-full max-h-[80vh] bg-white rounded-t-[32px] p-6 shadow-2xl flex flex-col z-10"
+            style={{ animation: 'kidsSlideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards', borderTop: '3px solid #FFE4E6' }}>
+            <style>{`@keyframes kidsSlideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }`}</style>
+            
+            <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4" onClick={() => setIsMobileNavOpen(false)} />
+            
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🎈</span>
+                <h3 className="text-lg font-extrabold text-rose-700">Tất cả câu hỏi</h3>
+              </div>
+              <button 
+                onClick={() => setIsMobileNavOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto min-h-0 pr-1 py-1">
+              <div className="grid grid-cols-5 gap-3">
+                {questions.map((_, i) => {
+                  const hasAns = String(session.answers[getQuestionId(questions[i])] ?? '').trim() !== '' || 
+                                 typeof session.answers[getQuestionId(questions[i])] === 'object' && 
+                                 Object.keys(session.answers[getQuestionId(questions[i])] as object).length > 0;
+                  const isCur = i === current;
+                  
+                  const circleStyle = (): React.CSSProperties => {
+                    if (isCur) return { background: 'linear-gradient(135deg, #FB7185, #F97316)', color: '#fff', boxShadow: '0 4px 12px rgba(251,113,133,0.35)' };
+                    if (hasAns) return { background: '#DEF7EC', color: '#03543F', border: '2px solid #BCF0DA' };
+                    return { background: '#F8FAFC', color: '#64748B', border: '2px solid #E2E8F0' };
+                  };
+
+                  return (
+                    <button 
+                      key={i} 
+                      onClick={() => { setCurrent(i); setIsMobileNavOpen(false); }}
+                      className="aspect-square rounded-full text-base font-black transition-all flex items-center justify-center"
+                      style={circleStyle()}
+                    >
+                      {i + 1}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs font-bold text-slate-500">
+              <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full" style={{ background: '#DEF7EC', border: '1.5px solid #BCF0DA' }} /> Đã làm</div>
+              <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full" style={{ background: '#F8FAFC', border: '1.5px solid #E2E8F0' }} /> Chưa làm</div>
+            </div>
+            
+            <div className="mt-4 text-center text-sm font-extrabold text-slate-700">
+              Đã hoàn thành {answeredCount}/{total} câu 🎉
+            </div>
+          </div>
+        </div>
+      )}
 
       <KidsSubmitDialog
         open={showSubmit}

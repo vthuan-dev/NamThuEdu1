@@ -111,6 +111,13 @@ export function AnswerReview() {
     }
   };
 
+  useEffect(() => {
+    const activeBtn = document.getElementById(`mb-nav-item-${currentQuestion}`);
+    if (activeBtn) {
+      activeBtn.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    }
+  }, [currentQuestion]);
+
   if (isLoading || shouldRedirect) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3">
@@ -234,6 +241,40 @@ export function AnswerReview() {
             </p>
           </div>
         </div>
+
+        {/* Mobile Question Navigator */}
+        {filtered.length > 0 && (
+          <div className="lg:hidden flex overflow-x-auto gap-2 py-2 px-1 sticky top-[52px] bg-white/95 backdrop-blur z-15 border-b border-slate-100 shadow-sm mb-3 scrollbar-none">
+            {filtered.map((item: any, idx: number) => {
+              const studentAns = item.student_answer;
+              const isCorrect = studentAns?.saIs_correct === true;
+              const isWrong = studentAns && !isCorrect;
+              const isUnanswered = !studentAns;
+              const isCurrent = idx === currentQuestion;
+
+              const bgColor = isCorrect ? "#10B981" : isWrong ? "#EF4444" : isUnanswered ? "#F59E0B" : "#E5E7EB";
+              const textColor = isCorrect || isWrong || isUnanswered ? "#fff" : "#6B7280";
+
+              return (
+                <button
+                  key={idx}
+                  id={`mb-nav-item-${idx}`}
+                  onClick={() => scrollToQuestion(idx)}
+                  className={`w-8 h-8 rounded-lg flex-shrink-0 text-xs font-bold transition-all ${
+                    isCurrent ? "ring-2 ring-offset-1" : ""
+                  }`}
+                  style={{
+                    background: bgColor,
+                    color: textColor,
+                    ...(isCurrent ? { ringColor: PRIMARY } : {}),
+                  }}
+                >
+                  {idx + 1}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
       {/* Score summary bar */}
       <div className="rounded-2xl p-4 bg-white flex items-center gap-4 flex-wrap"

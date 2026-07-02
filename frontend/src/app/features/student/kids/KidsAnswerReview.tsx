@@ -117,7 +117,7 @@ export function KidsAnswerReview() {
 
               {/* Manual-graded (nói/viết) */}
               {isManualType || rows.length === 0 ? (
-                <div className="ml-10 space-y-2">
+                <div className="ml-6 sm:ml-10 space-y-2">
                   {studentAns?.saAnswer_text ? (
                     <div className="rounded-2xl bg-slate-50 p-3 text-[15px] text-slate-700">
                       {answerMap['0'] ?? studentAns.saAnswer_text}
@@ -134,7 +134,7 @@ export function KidsAnswerReview() {
                 </div>
               ) : (
                 /* Auto-graded: bảng từng ô con */
-                <div className="ml-10 space-y-2">
+                <div className="ml-6 sm:ml-10 space-y-2">
                   {rows.map((r, ri) => (
                     <div
                       key={ri}

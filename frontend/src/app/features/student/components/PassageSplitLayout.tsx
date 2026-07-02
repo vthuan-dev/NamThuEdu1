@@ -18,6 +18,8 @@ interface PassageSplitLayoutProps {
   passageBodyClassName?: string;
   questionsBodyClassName?: string;
   tone?: PassageSplitTone;
+  mobileActiveTab?: "passage" | "question";
+  onMobileTabChange?: (tab: "passage" | "question") => void;
 }
 
 const toneClasses: Record<PassageSplitTone, { icon: string; passageHeader: string; questionHeader: string }> = {
@@ -58,13 +60,45 @@ export function PassageSplitLayout({
   passageBodyClassName = "",
   questionsBodyClassName = "",
   tone = "blue",
+  mobileActiveTab,
+  onMobileTabChange,
 }: PassageSplitLayoutProps) {
   const toneClass = toneClasses[tone];
 
   return (
     <div className={`${className}`}>
+      {/* Mobile Tab Switcher */}
+      {mobileActiveTab && onMobileTabChange && (
+        <div className="lg:hidden flex rounded-lg bg-slate-100 p-1 mb-3 border border-slate-200/50">
+          <button
+            type="button"
+            onClick={() => onMobileTabChange("question")}
+            className={`flex-1 py-2 text-center text-xs font-bold rounded-md transition-all cursor-pointer ${
+              mobileActiveTab === "question"
+                ? "bg-white text-blue-600 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            ❓ Questions
+          </button>
+          <button
+            type="button"
+            onClick={() => onMobileTabChange("passage")}
+            className={`flex-1 py-2 text-center text-xs font-bold rounded-md transition-all cursor-pointer ${
+              mobileActiveTab === "passage"
+                ? "bg-white text-blue-600 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            📖 Passage
+          </button>
+        </div>
+      )}
+
       <div className={`grid ${gridClassName} gap-4 ${heightClassName}`}>
-        <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col min-h-0">
+        <section className={`bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col min-h-0 ${
+          mobileActiveTab ? (mobileActiveTab === "passage" ? "flex" : "hidden lg:flex") : "flex"
+        }`}>
           <div className={`px-5 py-3 border-b border-slate-100 bg-gradient-to-r ${toneClass.passageHeader}`}>
             <div className="flex items-center gap-2 mb-0.5">
               <BookOpen className={`w-4 h-4 ${toneClass.icon}`} />
@@ -82,7 +116,9 @@ export function PassageSplitLayout({
           )}
         </section>
 
-        <section className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col min-h-0">
+        <section className={`bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col min-h-0 ${
+          mobileActiveTab ? (mobileActiveTab === "question" ? "flex" : "hidden lg:flex") : "flex"
+        }`}>
           <div className={`px-5 py-3 border-b border-slate-100 bg-gradient-to-r ${toneClass.questionHeader} flex items-center justify-between gap-3`}>
             <div className="min-w-0">
               <h3 className="text-sm font-bold text-slate-900">{questionsTitle}</h3>

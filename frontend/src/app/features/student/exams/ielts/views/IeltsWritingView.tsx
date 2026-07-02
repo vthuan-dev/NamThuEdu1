@@ -7,7 +7,7 @@
  *  • Realtime word counter with min-words indicator (red until threshold met)
  *  • Spell-check disabled (matches real test)
  */
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { PenLine, Image as ImageIcon, FileText, CheckCircle2 } from "lucide-react";
 import type { IeltsWritingPayload, AnswerMap, IeltsWritingTask } from "../types";
 
@@ -33,6 +33,12 @@ export function IeltsWritingView({
 }: IeltsWritingViewProps) {
   const tasks = payload.tasks ?? [];
   const [activeIdx, setActiveIdx] = useState(0);
+  const [mobileTab, setMobileTab] = useState<'question' | 'passage'>('question');
+
+  useEffect(() => {
+    setMobileTab('question');
+  }, [activeIdx]);
+
   const currentTask: IeltsWritingTask | undefined = tasks[activeIdx];
 
   if (!currentTask) {
@@ -94,9 +100,37 @@ export function IeltsWritingView({
 
       {/* 2-col split */}
       <div className="flex-1 px-4 py-4 max-w-7xl w-full mx-auto">
+        {/* Mobile Tab Switcher */}
+        <div className="lg:hidden flex rounded-lg bg-slate-100 p-1 mb-3 border border-slate-200/50">
+          <button
+            type="button"
+            onClick={() => setMobileTab("question")}
+            className={`flex-1 py-2 text-center text-xs font-bold rounded-md transition-all cursor-pointer ${
+              mobileTab === "question"
+                ? "bg-white text-blue-600 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            ❓ Answer Editor
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab("passage")}
+            className={`flex-1 py-2 text-center text-xs font-bold rounded-md transition-all cursor-pointer ${
+              mobileTab === "passage"
+                ? "bg-white text-blue-600 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            📖 Task Prompt
+          </button>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-[440px_1fr] gap-4 h-[calc(100vh-12rem)]">
           {/* Prompt panel */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+          <div className={`bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col ${
+            mobileTab === "passage" ? "flex" : "hidden lg:flex"
+          }`}>
             <div className="px-5 py-3 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
               <div className="flex items-center gap-2 mb-0.5">
                 <FileText className="w-4 h-4 text-blue-600" />
@@ -154,7 +188,9 @@ export function IeltsWritingView({
           </div>
 
           {/* Editor panel */}
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+          <div className={`bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col ${
+            mobileTab === "question" ? "flex" : "hidden lg:flex"
+          }`}>
             <div className="px-5 py-3 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <PenLine className="w-4 h-4 text-emerald-600" />

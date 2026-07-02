@@ -227,9 +227,64 @@ export function KidsResult() {
               </section>
             )}
 
+            {/* ─── Danh sách câu hỏi di động (ngang) ──────────────── */}
+            {questionNavData.length > 0 && (
+              <div className="sm:hidden flex overflow-x-auto gap-2 py-2.5 px-3 sticky top-14 bg-white/95 backdrop-blur-md z-20 rounded-2xl border border-rose-100/60 shadow-md scrollbar-none">
+                {questionNavData.map(({ qId, idx, allCorrect, anyWrong, rowCount, correctCount, hasAnswer, isManual }) => {
+                  const isActive = activeQIdx === idx;
+                  const isSkipped = !hasAnswer;
+                  const isCorrectAll = allCorrect;
+                  const isPartial = rowCount > 0 && correctCount > 0 && correctCount < rowCount;
+                  const isWrongAll = rowCount > 0 && correctCount === 0 && hasAnswer;
+                  const isPending = isManual && hasAnswer;
+
+                  let themeColor = '#94A3B8';
+                  let themeBg = '#F8FAFC';
+                  let badgeBorder = '1.5px solid #CBD5E1';
+
+                  if (isCorrectAll) {
+                    themeColor = '#059669';
+                    themeBg = '#F0FDF4';
+                    badgeBorder = 'none';
+                  } else if (isPartial || isPending) {
+                    themeColor = '#D97706';
+                    themeBg = '#FFFBEB';
+                    badgeBorder = 'none';
+                  } else if (isWrongAll) {
+                    themeColor = '#E11D48';
+                    themeBg = '#FFF1F2';
+                    badgeBorder = 'none';
+                  } else {
+                    themeColor = '#94A3B8';
+                    themeBg = '#FFFFFF';
+                    badgeBorder = '1.5px solid #E2E8F0';
+                  }
+
+                  return (
+                    <button
+                      key={qId}
+                      onClick={() => {
+                        document.getElementById(`kq-${qId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        setActiveQIdx(idx);
+                      }}
+                      className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center font-extrabold text-[13px] transition-all"
+                      style={{
+                        background: isActive ? themeColor : (isSkipped ? '#F1F5F9' : themeBg),
+                        color: isActive ? '#FFFFFF' : (isSkipped ? '#64748B' : themeColor),
+                        border: isActive ? `2px solid ${themeColor}` : badgeBorder,
+                        boxShadow: isActive ? `0 4px 10px ${themeColor}40` : 'none',
+                      }}
+                    >
+                      {idx + 1}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             {/* ─── Danh sách câu hỏi (scroll spy nav) ──────────────── */}
             {questionNavData.length > 0 && (
-              <section className="rounded-2xl overflow-hidden"
+              <section className="hidden sm:block rounded-2xl overflow-hidden"
                 style={{ background: 'rgba(255,255,255,0.92)', border: '1.5px solid #F1F5F9', boxShadow: '0 4px 16px rgba(0,0,0,0.04)' }}>
                 {/* Header */}
                 <div className="flex items-center gap-2 px-3 py-2.5"

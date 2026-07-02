@@ -18,7 +18,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import {
   ArrowLeft, ArrowRight, CheckCircle2, Volume2, AlertTriangle,
-  Flag, Clock, ListChecks, Loader2, PenLine, Send, Mic, Square, BookOpen, GripVertical,
+  Flag, Clock, ListChecks, Loader2, PenLine, Send, Mic, Square, BookOpen, GripVertical, X,
 } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
 import { useExamSession } from '../../../../hooks/exam/useExamSession';
@@ -446,6 +446,16 @@ export function TeensTestTaking() {
   const cardRefs = useRef<Record<number, HTMLElement | null>>({});
   const startAttemptedRef = useRef(false);
 
+  // States responsive di động (Mobile responsive)
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [mobileActiveTab, setMobileActiveTab] = useState<'question' | 'passage'>('question');
+  const [isMobilePassageModalOpen, setIsMobilePassageModalOpen] = useState(false);
+
+  // Khi đổi câu hỏi hiện tại, tự động chuyển tab về hiển thị câu hỏi trên mobile
+  useEffect(() => {
+    setMobileActiveTab('question');
+  }, [current]);
+
   // ─── Navigator nổi kéo-thả được (giống VSTEP) ────────────────────────────────
   // null = vị trí mặc định (góc phải, sticky). Khi user kéo, lưu toạ độ tuyệt đối.
   const [navPos, setNavPos] = useState<{ x: number; y: number } | null>(null);
@@ -711,6 +721,24 @@ export function TeensTestTaking() {
         </div>
       </div>
 
+      {/* Tab Switcher cho Mobile (chỉ hiện khi có đoạn đọc hiểu) */}
+      {isReading && (
+        <div className="lg:hidden flex border-b border-slate-200 bg-white sticky top-[120px] z-20 -mx-4 px-4">
+          <button 
+            onClick={() => setMobileActiveTab('question')}
+            className={`flex-1 py-3 text-center text-sm font-bold border-b-2 transition-colors ${mobileActiveTab === 'question' ? 'border-teal-600 text-teal-600 font-extrabold' : 'border-transparent text-slate-500'}`}
+          >
+            ❓ Câu hỏi làm bài
+          </button>
+          <button 
+            onClick={() => setMobileActiveTab('passage')}
+            className={`flex-1 py-3 text-center text-sm font-bold border-b-2 transition-colors ${mobileActiveTab === 'passage' ? 'border-teal-600 text-teal-600 font-extrabold' : 'border-transparent text-slate-500'}`}
+          >
+            📖 Đoạn văn đọc hiểu
+          </button>
+        </div>
+      )}
+
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_240px]">
         {/* Cột đoạn đọc (luôn render để tránh hook order violation, chỉ hiển thị khi reading) */}
         <section className={`hidden lg:flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden h-[calc(100vh-12rem)] ${!isReading ? 'invisible' : ''}`}>
@@ -737,15 +765,15 @@ export function TeensTestTaking() {
         {/* Cột nội dung câu hỏi */}
         <main className="min-w-0">
           <div className="lg:h-[calc(100vh-12rem)] lg:overflow-y-auto lg:space-y-4 space-y-4">
-            {/* Đoạn đọc cho mobile/tablet — desktop dùng cột riêng bên trái */}
-            <section className={`lg:hidden bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden ${!isReading ? 'hidden' : ''}`}>
+            {/* Đoạn đọc cho mobile/tablet — hiển thị dựa trên mobileActiveTab */}
+            <section className={`lg:hidden bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden ${!isReading || mobileActiveTab !== 'passage' ? 'hidden' : 'block'}`}>
               <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-teal-50 to-white">
                 <div className="flex items-center gap-2">
                   <BookOpen className="w-4 h-4 text-teal-600" />
                   <h2 className="text-sm font-bold text-slate-900">Đọc hiểu</h2>
                 </div>
               </div>
-              <div className="max-h-[40vh] overflow-y-auto px-5 py-4">
+              <div className="overflow-y-auto px-5 py-4 min-h-[50vh]">
                 <HighlightablePassage
                   html={passage}
                   highlights={highlightHook.highlights}
@@ -760,7 +788,7 @@ export function TeensTestTaking() {
             </section>
 
             {/* Reading mode questions list */}
-            <div className={`${!isReading ? 'hidden' : ''}`}>
+            <div className={`${!isReading ? 'hidden' : ''} ${mobileActiveTab === 'question' ? 'block' : 'hidden lg:block'}`}>
               {groupIndices.map((idx) => {
                 const gq = questions[idx];
                 const gid = getQuestionId(gq);
@@ -772,7 +800,7 @@ export function TeensTestTaking() {
                     key={gid || idx}
                     ref={(el) => { cardRefs.current[idx] = el; }}
                     onMouseDown={() => setCurrent(idx)}
-                    className="rounded-2xl bg-white border p-5 sm:p-6 transition-shadow scroll-mt-36"
+                    className={`rounded-2xl bg-white border p-5 sm:p-6 transition-shadow scroll-mt-36 ${!isCur ? 'hidden lg:block' : 'block'}`}
                     style={{ borderColor: isCur ? TEAL : '#E2E8F0', boxShadow: isCur ? '0 0 0 3px #CCFBF1' : undefined }}
                   >
                     <div className="flex items-center justify-between mb-3">
@@ -975,28 +1003,145 @@ export function TeensTestTaking() {
       </div>
 
       {/* Bottom bar (mobile) */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
         <div className="px-4 py-3 flex items-center gap-3">
           <button onClick={() => setCurrent(c => Math.max(0, c - 1))} disabled={current === 0}
             className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-semibold text-slate-600 bg-slate-100 disabled:opacity-40">
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <span className="flex-1 text-center text-xs font-bold text-slate-400">{answeredCount}/{total} câu</span>
+          
+          <button 
+            onClick={() => setIsMobileNavOpen(true)}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+          >
+            <ListChecks className="w-4 h-4 text-teal-600" />
+            <span>Câu {current + 1}/{total} ({answeredCount} câu)</span>
+          </button>
+
           {isLast ? (
             <button onClick={() => setShowSubmit(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white transition-transform active:scale-95"
               style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
               <Send className="w-4 h-4" /> Nộp
             </button>
           ) : (
             <button onClick={() => setCurrent(c => Math.min(total - 1, c + 1))}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white transition-transform active:scale-95"
               style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
               Tiếp <ArrowRight className="w-4 h-4" />
             </button>
           )}
         </div>
       </div>
+
+      {/* Nút nổi xem bài đọc nhanh cho mobile */}
+      {isReading && mobileActiveTab === 'question' && (
+        <button
+          onClick={() => setIsMobilePassageModalOpen(true)}
+          className="lg:hidden fixed bottom-20 right-4 z-40 w-12 h-12 rounded-full bg-teal-600 hover:bg-teal-700 text-white shadow-lg flex items-center justify-center transition-transform active:scale-90"
+        >
+          <BookOpen className="w-5 h-5" />
+        </button>
+      )}
+
+      {/* Mobile Navigator Drawer (Bottom Sheet) */}
+      {isMobileNavOpen && (
+        <div className="lg:hidden fixed inset-0 z-[60] bg-slate-900/50 backdrop-blur-sm flex items-end justify-center">
+          <div className="absolute inset-0" onClick={() => setIsMobileNavOpen(false)} />
+          <div className="relative w-full max-h-[80vh] bg-white rounded-t-3xl p-5 shadow-2xl flex flex-col z-10"
+            style={{ animation: 'teensSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}>
+            <style>{`@keyframes teensSlideUp { from { transform: translateY(100%) } to { transform: translateY(0) } }`}</style>
+            
+            <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4" onClick={() => setIsMobileNavOpen(false)} />
+            
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <ListChecks className="w-5 h-5 text-teal-600" />
+                <h3 className="text-base font-bold text-slate-900">Danh sách câu hỏi</h3>
+              </div>
+              <button 
+                onClick={() => setIsMobileNavOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto min-h-0 pr-1 py-1">
+              <div className="grid grid-cols-5 gap-2.5">
+                {questions.map((_, i) => {
+                  const st = statusOf(i);
+                  const styleByStatus: Record<string, React.CSSProperties> = {
+                    current: { background: TEAL, color: '#fff', boxShadow: `0 0 0 3px #CCFBF1` },
+                    answered: { background: '#CCFBF1', color: TEAL },
+                    flagged: { background: '#FEF3C7', color: '#B45309' },
+                    empty: { background: '#F1F5F9', color: '#94A3B8' },
+                  };
+                  return (
+                    <button key={i} onClick={() => { setCurrent(i); setIsMobileNavOpen(false); }}
+                      className="aspect-square rounded-xl text-sm font-bold transition-all flex items-center justify-center"
+                      style={styleByStatus[st]}>
+                      {i + 1}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-3 gap-2 text-[10px] font-semibold text-slate-500">
+              <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded" style={{ background: '#CCFBF1' }} /> Đã làm</div>
+              <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded" style={{ background: '#FEF3C7' }} /> Đánh dấu</div>
+              <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded" style={{ background: '#F1F5F9' }} /> Chưa làm</div>
+            </div>
+            
+            <div className="mt-4 text-center text-sm font-bold text-slate-700">
+              Đã làm {answeredCount}/{total} câu
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Passage Modal (Xem bài đọc nhanh) */}
+      {isMobilePassageModalOpen && (
+        <div className="lg:hidden fixed inset-0 z-[60] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg h-[80vh] flex flex-col shadow-2xl overflow-hidden"
+            style={{ animation: 'teensPop 0.2s cubic-bezier(0.34, 1, 0.64, 1) forwards' }}>
+            <div className="px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-teal-50 to-white flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-teal-600" />
+                <h3 className="text-base font-bold text-slate-900">Đoạn văn đọc hiểu</h3>
+              </div>
+              <button 
+                onClick={() => setIsMobilePassageModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
+              <HighlightablePassage
+                html={passage}
+                highlights={highlightHook.highlights}
+                selectedColor={highlightHook.selectedColor}
+                onAddHighlight={highlightHook.addHighlight}
+                onRemoveHighlight={highlightHook.removeHighlight}
+                onSelectColor={highlightHook.setSelectedColor}
+                colors={highlightHook.colors}
+                enabled={isReading && !!submissionId}
+              />
+            </div>
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex-shrink-0">
+              <button 
+                onClick={() => setIsMobilePassageModalOpen(false)}
+                className="w-full py-2.5 rounded-xl font-bold text-white text-sm"
+                style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}
+              >
+                Quay lại câu hỏi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <SubmitDialog
         open={showSubmit}

@@ -617,71 +617,73 @@ function ListenAndDrawLinesTask({ taskData, answer, onChange, gradeOverrides }: 
 
       {/* Image with hotspot drop zones */}
       {imageUrl ? (
-        <div
-          className="relative select-none overflow-hidden rounded-2xl border-2 border-slate-200"
-          onDragLeave={() => setDragOverHotspot(null)}
-        >
-          <img
-            src={imageUrl}
-            alt="Scene"
-            className="block h-auto w-full pointer-events-none"
-            draggable={false}
-          />
-          {items.map((item, i) => {
-            if (!item.hotspot) return null;
-            const isExample = item.isExample || item.is_example;
-            const placedLabelIdx = isExample ? i : getPlacedLabelAt(i);
-            const placedName = placedLabelIdx !== null ? (items[placedLabelIdx]?.name ?? '') : null;
-            const isDragTarget = dragOverHotspot === i;
-            return (
-              <div
-                key={i}
-                className="absolute -translate-x-1/2"
-                style={{ left: `${item.hotspot.x}%`, top: `${item.hotspot.y}%` }}
-                onDragOver={!isExample ? (e) => handleDragOver(e, i) : undefined}
-                onDrop={!isExample ? (e) => handleDrop(e, i) : undefined}
-                onClick={() => handleHotspotClick(i)}
-              >
-                {placedName ? (
-                  (() => {
-                    // Trang chấm: tô màu theo giáo viên chỉnh (gradeOverrides theo chỉ số label).
-                    // Nhãn ở hotspot này thuộc label placedLabelIdx → tra trạng thái chấm của label đó.
-                    const graded =
-                      !isExample && gradeOverrides
-                        ? gradeOverrides[String(placedLabelIdx)]
-                        : undefined;
-                    const tone = isExample
-                      ? 'border-sky-600 bg-sky-500 text-white'
-                      : graded === false
-                      ? 'border-rose-600 bg-rose-500 text-white'
-                      : graded === true
-                      ? 'border-green-600 bg-green-500 text-white'
-                      : 'cursor-pointer border-green-600 bg-green-500 text-white hover:border-red-400 hover:bg-red-400';
-                    return (
-                      <div
-                        className={`whitespace-nowrap rounded-xl border-2 px-3 py-1 text-sm font-bold shadow-md transition-all ${tone}`}
-                        title={isExample ? '' : 'Nhấn để bỏ'}
-                      >
-                        {placedName}
-                      </div>
-                    );
-                  })()
-                ) : (
-                  <div
-                    className={`min-w-[52px] whitespace-nowrap rounded-xl border-2 border-dashed px-3 py-1 text-center text-sm font-bold shadow transition-all ${
-                      isDragTarget
-                        ? 'scale-110 border-rose-500 bg-rose-100 text-rose-500'
-                        : selected !== null
-                        ? 'border-indigo-400 bg-white/90 text-indigo-300'
-                        : 'border-slate-400 bg-white/70 text-slate-300'
-                    }`}
-                  >
-                    ?
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div
+            className="relative select-none overflow-hidden rounded-2xl border-2 border-slate-200 min-w-[500px] sm:min-w-0"
+            onDragLeave={() => setDragOverHotspot(null)}
+          >
+            <img
+              src={imageUrl}
+              alt="Scene"
+              className="block h-auto w-full pointer-events-none"
+              draggable={false}
+            />
+            {items.map((item, i) => {
+              if (!item.hotspot) return null;
+              const isExample = item.isExample || item.is_example;
+              const placedLabelIdx = isExample ? i : getPlacedLabelAt(i);
+              const placedName = placedLabelIdx !== null ? (items[placedLabelIdx]?.name ?? '') : null;
+              const isDragTarget = dragOverHotspot === i;
+              return (
+                <div
+                  key={i}
+                  className="absolute -translate-x-1/2"
+                  style={{ left: `${item.hotspot.x}%`, top: `${item.hotspot.y}%` }}
+                  onDragOver={!isExample ? (e) => handleDragOver(e, i) : undefined}
+                  onDrop={!isExample ? (e) => handleDrop(e, i) : undefined}
+                  onClick={() => handleHotspotClick(i)}
+                >
+                  {placedName ? (
+                    (() => {
+                      // Trang chấm: tô màu theo giáo viên chỉnh (gradeOverrides theo chỉ số label).
+                      // Nhãn ở hotspot này thuộc label placedLabelIdx → tra trạng thái chấm của label đó.
+                      const graded =
+                        !isExample && gradeOverrides
+                          ? gradeOverrides[String(placedLabelIdx)]
+                          : undefined;
+                      const tone = isExample
+                        ? 'border-sky-600 bg-sky-500 text-white'
+                        : graded === false
+                        ? 'border-rose-600 bg-rose-500 text-white'
+                        : graded === true
+                        ? 'border-green-600 bg-green-500 text-white'
+                        : 'cursor-pointer border-green-600 bg-green-500 text-white hover:border-red-400 hover:bg-red-400';
+                      return (
+                        <div
+                          className={`whitespace-nowrap rounded-xl border-2 px-3 py-1 text-sm font-bold shadow-md transition-all ${tone}`}
+                          title={isExample ? '' : 'Nhấn để bỏ'}
+                        >
+                          {placedName}
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <div
+                      className={`min-w-[52px] whitespace-nowrap rounded-xl border-2 border-dashed px-3 py-1 text-center text-sm font-bold shadow transition-all ${
+                        isDragTarget
+                          ? 'scale-110 border-rose-500 bg-rose-100 text-rose-500'
+                          : selected !== null
+                          ? 'border-indigo-400 bg-white/90 text-indigo-300'
+                          : 'border-slate-400 bg-white/70 text-slate-300'
+                      }`}
+                    >
+                      ?
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : (
         <p className="text-center text-sm italic text-slate-400">Chưa có hình ảnh cho câu này.</p>
