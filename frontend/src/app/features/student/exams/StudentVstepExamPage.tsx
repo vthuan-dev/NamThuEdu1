@@ -250,6 +250,7 @@ export function StudentVstepExamPage() {
   const [writingDrafts, setWritingDrafts] = useState<Record<number, string>>({});
   const [speakingDone, setSpeakingDone] = useState<Record<number, boolean>>({});
   const [flagged, setFlagged] = useState<Record<number, boolean>>({});
+  const [restored, setRestored] = useState(false);
 
   /* ── Timer handled by useExamSession (removed duplicate local state) ── */
   const submittedRef = useRef(false);
@@ -326,29 +327,38 @@ export function StudentVstepExamPage() {
       }
       const savedF = localStorage.getItem(`svstep_flags_sid_${submissionId}`);
       if (savedF) setFlagged(JSON.parse(savedF));
-    } catch {}
+    } catch {} finally {
+      setRestored(true);
+    }
   }, [submissionId]);
 
   /* ── Auto-save to localStorage (per submission) ─────────── */
   // ⚠️ Chỉ save khi data có nội dung — nếu vì lý do gì đó state bị reset về {},
   // KHÔNG được wipe localStorage (sẽ làm mất dữ liệu thực sự đã lưu).
+  // ✅ CHỈ hoạt động khi restored === true để tránh race-condition ghi đè data cũ.
   useEffect(() => {
-    if (!LS_ANSWERS) return;
+    if (!LS_ANSWERS || !restored) return;
     try {
       if (Object.keys(answers).length > 0) {
         localStorage.setItem(LS_ANSWERS, JSON.stringify(answers));
       }
     } catch {}
-  }, [answers, LS_ANSWERS]);
+  }, [answers, LS_ANSWERS, restored]);
   useEffect(() => {
-    if (!LS_WRITING) return;
+    if (!LS_WRITING || !restored) return;
     try {
       if (Object.keys(writingDrafts).length > 0) {
         localStorage.setItem(LS_WRITING, JSON.stringify(writingDrafts));
       }
     } catch {}
-  }, [writingDrafts, LS_WRITING]);
-  useEffect(() => { if (submissionId) try { localStorage.setItem(`svstep_flags_sid_${submissionId}`, JSON.stringify(flagged)); } catch {} }, [flagged, submissionId]);
+  }, [writingDrafts, LS_WRITING, restored]);
+  useEffect(() => {
+    if (submissionId && restored) {
+      try {
+        localStorage.setItem(`svstep_flags_sid_${submissionId}`, JSON.stringify(flagged));
+      } catch {}
+    }
+  }, [flagged, submissionId, restored]);
 
   /* ── Periodic bulk save to backend mỗi 30s (defense-in-depth) ─── */
   // Đảm bảo backend luôn có data mới nhất ngay cả khi saveAnswer fire-and-forget bị fail.
