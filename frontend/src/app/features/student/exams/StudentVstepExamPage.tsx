@@ -276,19 +276,36 @@ export function StudentVstepExamPage() {
   };
 
   /* ── Mark next mount as a "reload" if window unloads (F5) ── */
+  // Cũng flush toàn bộ answers lên backend bằng sendBeacon trước khi F5
   useEffect(() => {
     if (!examId) return;
     const RELOAD_FLAG = `svstep_reload_${examId}`;
-    const onUnload = () => sessionStorage.setItem(RELOAD_FLAG, "1");
+    const onUnload = () => {
+      sessionStorage.setItem(RELOAD_FLAG, "1");
+      // Flush all answers to backend before F5 (with auth token via keepalive fetch)
+      if (submissionId) {
+        try {
+          const local = localStorage.getItem(`svstep_answers_sid_${submissionId}`);
+          const localParsed = local ? JSON.parse(local) : {};
+          const draftAnswers = Object.entries(localParsed)
+            .filter(([, v]) => ["A","B","C","D"].includes(String(v)))
+            .map(([qId, letter]) => ({ question_id: Number(qId), saAnswer_text: String(letter) }));
+          if (draftAnswers.length > 0) {
+            // studentApi.saveDraftOnUnload handles auth token + keepalive fetch + sendBeacon fallback
+            studentApi.saveDraftOnUnload(submissionId, draftAnswers);
+          }
+        } catch { /* best effort */ }
+      }
+    };
     window.addEventListener("beforeunload", onUnload);
     return () => window.removeEventListener("beforeunload", onUnload);
-  }, [examId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [examId, submissionId]);
 
   /* ── Restore saved answers once submissionId is known ──── */
-  // ⚠️ MERGE thay vì REPLACE: nếu .then() từ start-direct đã setAnswers() từ
-  // backend (savedAnswers), useEffect này KHÔNG được phép overwrite về data
-  // localStorage cũ hơn. Ngược lại nếu backend chưa có data nhưng localStorage
-  // có, localStorage được giữ. Mục tiêu: KHÔNG để mất câu trả lời.
+  // ✅ localStorage THẮNG backend: localStorage là data mới nhất của user.
+  // Backend có thể có data cũ hơn nếu saveAnswer API bị throttle/fail.
+  // Merge order: { ...backend, ...localStorage } → localStorage key thắng.
   useEffect(() => {
     if (!submissionId) return;
     try {
@@ -296,14 +313,15 @@ export function StudentVstepExamPage() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) {
-          setAnswers((prev) => ({ ...parsed, ...prev })); // prev (backend) thắng nếu trùng key
+          // localStorage THẮNG prev (backend) — vì localStorage = state mới nhất
+          setAnswers((prev) => ({ ...prev, ...parsed }));
         }
       }
       const savedW = localStorage.getItem(`svstep_writing_sid_${submissionId}`);
       if (savedW) {
         const parsed = JSON.parse(savedW);
         if (parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) {
-          setWritingDrafts((prev) => ({ ...parsed, ...prev }));
+          setWritingDrafts((prev) => ({ ...prev, ...parsed }));
         }
       }
       const savedF = localStorage.getItem(`svstep_flags_sid_${submissionId}`);
@@ -331,6 +349,38 @@ export function StudentVstepExamPage() {
     } catch {}
   }, [writingDrafts, LS_WRITING]);
   useEffect(() => { if (submissionId) try { localStorage.setItem(`svstep_flags_sid_${submissionId}`, JSON.stringify(flagged)); } catch {} }, [flagged, submissionId]);
+
+  /* ── Periodic bulk save to backend mỗi 30s (defense-in-depth) ─── */
+  // Đảm bảo backend luôn có data mới nhất ngay cả khi saveAnswer fire-and-forget bị fail.
+  // Dùng ref để tránh stale closure.
+  const answersRef = useRef(answers);
+  useEffect(() => { answersRef.current = answers; }, [answers]);
+  const writingDraftsRef = useRef(writingDrafts);
+  useEffect(() => { writingDraftsRef.current = writingDrafts; }, [writingDrafts]);
+  useEffect(() => {
+    if (!submissionId || reviewMode) return;
+    const id = setInterval(async () => {
+      const snap = answersRef.current;
+      const wSnap = writingDraftsRef.current;
+      if (!submissionId) return;
+      try {
+        const bulkPayload: Array<{ question_id: number; saAnswer_text: string }> = [];
+        for (const [qIdStr, letter] of Object.entries(snap)) {
+          const qId = Number(qIdStr);
+          if (!qId || !["A","B","C","D"].includes(String(letter))) continue;
+          bulkPayload.push({ question_id: qId, saAnswer_text: String(letter) });
+        }
+        // Writing drafts require questionId — not available here, skip
+        void wSnap; // suppress unused warning
+        if (bulkPayload.length > 0) {
+          await studentApi.bulkSaveAnswers(submissionId, bulkPayload);
+        }
+      } catch {
+        /* best-effort periodic save, ignore errors */
+      }
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [submissionId, reviewMode]);
 
   /* ── Toggle flag on a question ─────────────────────── */
   const toggleFlag = useCallback((qId: number) => {
@@ -639,7 +689,8 @@ export function StudentVstepExamPage() {
             }
             
             if (Object.keys(mcqAnswers).length > 0) {
-              setAnswers((prev) => ({ ...mcqAnswers, ...prev })); // prev có thì giữ
+              // Backend chỉ điền câu CHƯA có — không overwrite localStorage (localStorage mới hơn)
+              setAnswers((prev) => ({ ...mcqAnswers, ...prev })); // prev (localStorage) thắng
             }
             if (Object.keys(writingMap).length > 0) {
               setWritingDrafts((prev) => ({ ...writingMap, ...prev }));
