@@ -842,18 +842,20 @@
 }
 
 /*
- * VSTEP reading passage: keep whole words intact.
+ * VSTEP reading passage: keep whole words intact, ragged right edge.
  * The passage HTML is imported (docx/PDF paste) and often carries inline
- * `word-break: break-all` on child elements plus invisible break characters.
- * A parent Tailwind class cannot beat inline styles on children, so we force
- * normal word-breaking on the container AND every descendant with !important.
- * A word that doesn't fit wraps whole to the next line; only truly long
- * tokens (e.g. URLs) may break, via overflow-wrap.
+ * `text-align: justify` plus `word-break: break-all` on child elements.
+ * Justify stretches each line flush to the right edge and, combined with
+ * overflow-wrap, causes mid-word breaks ("educatio | n"). We force LEFT
+ * alignment (ragged right, lines may be long or short) and disable word
+ * breaking so every word stays whole. `overflow-wrap: normal` means only
+ * spaces are break opportunities; words never split mid-character.
  */
 .vstep-passage,
 .vstep-passage * {
+  text-align: left !important;
   word-break: normal !important;
-  overflow-wrap: break-word !important;
+  overflow-wrap: normal !important;
   -webkit-hyphens: none !important;
   hyphens: none !important;
 }
