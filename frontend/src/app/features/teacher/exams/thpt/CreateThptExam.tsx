@@ -55,8 +55,8 @@ export function CreateThptExam() {
   const [hasUnsaved, setHasUnsaved] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
-  /** Owner = giáo viên tạo đề. Non-owner xem ở chế độ read-only. */
-  const [isOwner, setIsOwner] = useState(true);
+  /** Giáo viên có TOÀN QUYỀN với mọi đề (của mình và của giáo viên khác): xem + sửa. */
+  const isOwner = true;
   /** Trạng thái publish hiện tại: 'draft' | 'published' */
   const [examStatus, setExamStatus] = useState<'draft' | 'published'>('draft');
   /** Đề đã xuất bản nhưng đang có thay đổi chưa áp dụng cho học viên */
@@ -107,7 +107,7 @@ export function CreateThptExam() {
           if (data.age_group) setAgeGroup(data.age_group);
           const loadedCfg = data.thpt_config ? normalizeConfig(data.thpt_config) : blankConfig();
           if (data.thpt_config) setConfig(loadedCfg);
-          if (data._is_owner === false) setIsOwner(false);
+          // Giáo viên có TOÀN QUYỀN với mọi đề: luôn cho phép chỉnh sửa (không khoá non-owner).
           if (data.eStatus) setExamStatus(data.eStatus);
           setHasDraft(Boolean(data._has_draft));
           setHasUnsaved(false);

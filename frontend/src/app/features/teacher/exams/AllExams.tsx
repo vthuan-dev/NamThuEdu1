@@ -945,7 +945,9 @@ export function AllExams() {
               if (!exam || !exam.eId || !exam.eTitle) return null;
               const typeInfo = getExamTypeInfo(exam);
               const isSelected = selectedIds.has(exam.eId);
-              const isOwner = exam._is_owner !== false;
+              // Giáo viên có TOÀN QUYỀN với mọi đề (của mình và của giáo viên khác):
+              // xem, sửa, xoá. Vì vậy luôn coi như owner để hiện đầy đủ nút thao tác.
+              const isOwner = true;
               return (
                 <div
                   key={exam.eId}

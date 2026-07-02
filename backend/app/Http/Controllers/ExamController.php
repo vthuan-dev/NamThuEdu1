@@ -42,21 +42,9 @@ class ExamController extends Controller
             ], 401);
         }
 
-        // Hiển thị:
-        // 1) Đề của chính giáo viên này (mọi status, mọi visibility)
-        // 2) Đề của giáo viên khác nếu là public (eIs_private = false) VÀ đã published
-        $query = Exam::where(function($outer) use ($user) {
-                        $outer->where('eTeacher_id', $user->uId)
-                              ->orWhere(function($pub) use ($user) {
-                                  $pub->where('eTeacher_id', '!=', $user->uId)
-                                      ->where(function($p) {
-                                          $p->whereNull('eIs_private')
-                                            ->orWhere('eIs_private', false);
-                                      })
-                                      ->where('eStatus', 'published');
-                              });
-                    })
-                    ->where(function($q) {
+        // Giáo viên có TOÀN QUYỀN với mọi đề: hiển thị TẤT CẢ đề (của mình và của giáo viên khác),
+        // mọi trạng thái/visibility, trừ đề mục đích luyện tập (practice).
+        $query = Exam::where(function($q) {
                         $q->whereNull('ePurpose')
                           ->orWhere('ePurpose', '!=', 'practice');
                     })
@@ -393,7 +381,7 @@ class ExamController extends Controller
         }
 
         $exam = Exam::where('eId', $id)
-                   ->where('eTeacher_id', $user->uId)
+                   
                    ->first();
 
         if (!$exam) {
@@ -476,7 +464,7 @@ class ExamController extends Controller
         }
 
         $exam = Exam::where('eId', $id)
-                   ->where('eTeacher_id', $user->uId)
+                   
                    ->first();
 
         if (!$exam) {
@@ -542,7 +530,7 @@ class ExamController extends Controller
         }
 
         $exam = Exam::where('eId', $id)
-                   ->where('eTeacher_id', $user->uId)
+                   
                    ->first();
 
         if (!$exam) {
@@ -683,7 +671,7 @@ class ExamController extends Controller
         }
 
         $exam = Exam::where('eId', $examId)
-                   ->where('eTeacher_id', $user->uId)
+                   
                    ->first();
 
         if (!$exam) {
@@ -750,7 +738,7 @@ class ExamController extends Controller
         }
 
         $exam = Exam::where('eId', $examId)
-                   ->where('eTeacher_id', $user->uId)
+                   
                    ->first();
 
         if (!$exam) {
@@ -816,7 +804,7 @@ class ExamController extends Controller
         }
 
         $exam = Exam::where('eId', $id)
-                   ->where('eTeacher_id', $user->uId)
+                   
                    ->with(['questions.answers'])
                    ->first();
 
@@ -886,7 +874,7 @@ class ExamController extends Controller
         }
 
         $originalExam = Exam::where('eId', $id)
-                           ->where('eTeacher_id', $user->uId)
+                           
                            ->with(['questions.answers'])
                            ->first();
 
@@ -990,7 +978,7 @@ class ExamController extends Controller
         }
 
         $exam = Exam::where('eId', $id)
-                   ->where('eTeacher_id', $user->uId)
+                   
                    ->with(['questions.answers'])
                    ->first();
 
@@ -1073,7 +1061,7 @@ class ExamController extends Controller
         }
 
         $exam = Exam::where('eId', $id)
-                   ->where('eTeacher_id', $user->uId)
+                   
                    ->with('questions')
                    ->first();
 
@@ -1258,7 +1246,7 @@ class ExamController extends Controller
         try {
             // Find or create exam
             $exam = Exam::where('eId', $examId)
-                       ->where('eTeacher_id', $user->uId)
+                       
                        ->first();
 
             if (!$exam) {
@@ -1396,7 +1384,7 @@ class ExamController extends Controller
         try {
             // Find exam
             $exam = Exam::where('eId', $examId)
-                       ->where('eTeacher_id', $user->uId)
+                       
                        ->first();
 
             if (!$exam) {
@@ -1485,7 +1473,7 @@ class ExamController extends Controller
         $isAdmin = $user->uRole === 'admin';
 
         $exam = Exam::where('eId', $examId)
-                   ->when(!$isAdmin, fn($q) => $q->where('eTeacher_id', $user->uId))
+                   ->when(false, fn($q) => $q)
                    ->with([
                        'contentBlocks' => function($q) {
                            $q->orderBy('display_order');
@@ -2078,7 +2066,7 @@ class ExamController extends Controller
         }
 
         $exam = Exam::where('eId', $examId)
-                    ->where('eTeacher_id', $user->uId)
+                    
                     ->first();
 
         if (!$exam) {
@@ -2170,7 +2158,7 @@ class ExamController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
         }
 
-        $exam = Exam::where('eId', $examId)->where('eTeacher_id', $user->uId)->first();
+        $exam = Exam::where('eId', $examId)->first();
         if (!$exam) {
             return response()->json(['status' => 'error', 'message' => 'Không tìm thấy bài thi.'], 404);
         }
@@ -2230,7 +2218,7 @@ class ExamController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Dữ liệu không hợp lệ.', 'errors' => $validator->errors()], 400);
         }
 
-        $exam = Exam::where('eId', $examId)->where('eTeacher_id', $user->uId)->first();
+        $exam = Exam::where('eId', $examId)->first();
         if (!$exam) {
             return response()->json(['status' => 'error', 'message' => 'Không tìm thấy đề thi.'], 404);
         }
@@ -2326,7 +2314,7 @@ class ExamController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Dữ liệu không hợp lệ.', 'errors' => $validator->errors()], 400);
         }
 
-        $exam = Exam::where('eId', $examId)->where('eTeacher_id', $user->uId)->first();
+        $exam = Exam::where('eId', $examId)->first();
         if (!$exam) {
             return response()->json(['status' => 'error', 'message' => 'Không tìm thấy đề thi.'], 404);
         }
@@ -2480,7 +2468,7 @@ class ExamController extends Controller
         }
 
         $exam = Exam::where('eId', $examId)
-                   ->where('eTeacher_id', $user->uId)
+                   
                    ->first();
 
         if (!$exam) {
@@ -2598,7 +2586,7 @@ class ExamController extends Controller
         try {
             // Find or create exam
             $exam = Exam::where('eId', $examId)
-                       ->where('eTeacher_id', $user->uId)
+                       
                        ->first();
 
             if (!$exam) {
@@ -2718,7 +2706,7 @@ class ExamController extends Controller
         try {
             // Find exam
             $exam = Exam::where('eId', $examId)
-                       ->where('eTeacher_id', $user->uId)
+                       
                        ->first();
 
             if (!$exam) {
@@ -2807,7 +2795,7 @@ class ExamController extends Controller
         $isAdmin = $user->uRole === 'admin';
 
         $exam = Exam::where('eId', $examId)
-                   ->when(!$isAdmin, fn($q) => $q->where('eTeacher_id', $user->uId))
+                   ->when(false, fn($q) => $q)
                    ->with([
                        'contentBlocks' => function($q) {
                            $q->orderBy('display_order');
@@ -2968,7 +2956,7 @@ class ExamController extends Controller
         try {
             // Find or create exam
             $exam = Exam::where('eId', $examId)
-                       ->where('eTeacher_id', $user->uId)
+                       
                        ->first();
 
             if (!$exam) {
@@ -3091,7 +3079,7 @@ class ExamController extends Controller
         try {
             // Find exam
             $exam = Exam::where('eId', $examId)
-                       ->where('eTeacher_id', $user->uId)
+                       
                        ->first();
 
             if (!$exam) {
@@ -3179,7 +3167,7 @@ class ExamController extends Controller
         $isAdmin = $user->uRole === 'admin';
 
         $exam = Exam::where('eId', $examId)
-                   ->when(!$isAdmin, fn($q) => $q->where('eTeacher_id', $user->uId))
+                   ->when(false, fn($q) => $q)
                    ->with([
                        'contentBlocks' => function($q) {
                            $q->orderBy('display_order');
@@ -3281,7 +3269,7 @@ class ExamController extends Controller
             // Part/task save APIs must never create a new exam. The exam scope
             // is decided once at the parent exam level.
             $exam = Exam::where('eId', $examId)
-                       ->where('eTeacher_id', $user->uId)
+                       
                        ->first();
 
             if (!$exam) {
@@ -3486,7 +3474,7 @@ class ExamController extends Controller
         try {
             // Find exam
             $exam = Exam::where('eId', $examId)
-                       ->where('eTeacher_id', $user->uId)
+                       
                        ->first();
 
             if (!$exam) {
@@ -3575,7 +3563,7 @@ class ExamController extends Controller
         $isAdmin = $user->uRole === 'admin';
 
         $exam = Exam::where('eId', $examId)
-                   ->when(!$isAdmin, fn($q) => $q->where('eTeacher_id', $user->uId))
+                   ->when(false, fn($q) => $q)
                    ->with([
                        'contentBlocks' => function($q) {
                            $q->orderBy('display_order');
