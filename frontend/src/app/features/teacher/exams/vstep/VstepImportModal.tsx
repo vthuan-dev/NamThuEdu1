@@ -186,7 +186,7 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
     setError('Chỉ hỗ trợ file .pdf, .docx hoặc .json');
   };
 
-  /** Trích xuất text từ file Word (.docx) bằng mammoth → dùng cho AI text→JSON. */
+  /** Trích xuất text từ file Word (.docx) dưới dạng HTML bằng mammoth → dùng cho AI text→JSON. */
   const extractDocxText = async (f: File) => {
     setError('');
     setPayload(null);
@@ -195,16 +195,17 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
     pdfFileRef.current = null; // không có file PDF cho path vision
     try {
       setPdfStage('extract');
-      setPdfProgress({ label: 'Đang đọc file Word...', done: 0, total: 0 });
+      setPdfProgress({ label: 'Đang đọc và chuyển đổi cấu trúc file Word...', done: 0, total: 0 });
       const mammoth = await import('mammoth');
       const buf = await f.arrayBuffer();
-      const { value } = await mammoth.extractRawText({ arrayBuffer: buf });
-      const text = (value || '').trim();
-      if (text.length < 30) {
+      // convertToHtml thay vì extractRawText để giữ lại thẻ <p>, <table>, <ul> giúp AI phân tách chính xác đoạn văn và câu hỏi
+      const { value } = await mammoth.convertToHtml({ arrayBuffer: buf });
+      const htmlText = (value || '').trim();
+      if (htmlText.length < 30) {
         throw new Error('File Word không có nội dung văn bản để trích xuất.');
       }
-      setScannedText(text);
-      setIsScanned(false); // Word luôn là text thuần → dùng AI text→JSON
+      setScannedText(htmlText);
+      setIsScanned(false); // Word luôn là text cấu trúc → dùng AI text→JSON
       setPdfStage('scanned');
     } catch (e: any) {
       setError(e.message || 'Lỗi đọc file Word');

@@ -696,7 +696,7 @@ function ReadingView({
         </div>
         <div className="flex-1 overflow-y-auto px-6 py-5">
           <article
-            className="prose prose-sm max-w-none text-slate-800 leading-relaxed whitespace-pre-wrap"
+            className="prose prose-sm max-w-none text-slate-800 leading-relaxed break-words whitespace-pre-wrap [word-break:break-word] overflow-wrap-anywhere"
             dangerouslySetInnerHTML={{ __html: part.passage || "" }}
           />
         </div>
