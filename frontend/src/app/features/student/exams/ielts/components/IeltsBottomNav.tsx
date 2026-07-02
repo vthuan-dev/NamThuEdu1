@@ -79,20 +79,9 @@ export function IeltsBottomNav({
 
   return (
     <footer className="sticky bottom-0 z-40 bg-white border-t border-[#e0e0e0] shadow-[0_-2px_12px_rgba(0,0,0,0.06)]">
-      <div className="max-w-[1170px] mx-auto px-3 sm:px-4 py-2.5 flex items-center gap-3">
-        {/* Prev */}
-        <button
-          type="button"
-          onClick={onPrev}
-          disabled={!canPrev}
-          className="flex-shrink-0 inline-flex items-center gap-1 px-3 py-2 rounded-md text-sm font-semibold text-[#677788] bg-[#f8f9fa] hover:bg-[#efefef] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          <span className="hidden sm:inline">Trước</span>
-        </button>
-
+      <div className="max-w-[1170px] mx-auto px-3 sm:px-4 py-2.5 flex flex-col md:flex-row items-center gap-3">
         {/* Question grid — grouped by section (style giống VSTEP) */}
-        <div className="flex items-stretch gap-2 flex-1 overflow-x-auto py-1 px-0.5">
+        <div className="flex items-stretch gap-2 w-full md:flex-1 overflow-x-auto py-1 px-0.5 scrollbar-none">
           {groups.map((group) => {
             const groupAnswered = group.items.filter((q) => {
               const v = answers[q.qId];
@@ -159,42 +148,60 @@ export function IeltsBottomNav({
           })}
         </div>
 
-        {/* Answered counter */}
-        <div className="hidden md:flex flex-shrink-0 items-center text-xs text-[#677788] font-medium tabular-nums">
-          {answeredCount}/{questions.length} câu
+        {/* Action Controls */}
+        <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto flex-shrink-0 border-t md:border-t-0 pt-2 md:pt-0 border-slate-100">
+          <div className="flex items-center gap-2">
+            {/* Prev */}
+            <button
+              type="button"
+              onClick={onPrev}
+              disabled={!canPrev}
+              className="flex-shrink-0 inline-flex items-center gap-1 px-3 py-2 rounded-md text-sm font-semibold text-[#677788] bg-[#f8f9fa] hover:bg-[#efefef] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Trước</span>
+            </button>
+
+            {/* Next */}
+            <button
+              type="button"
+              onClick={onNext}
+              disabled={!canNext}
+              className="flex-shrink-0 inline-flex items-center gap-1 px-3 py-2 rounded-md text-sm font-semibold text-[#677788] bg-[#f8f9fa] hover:bg-[#efefef] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            >
+              <span>Tiếp</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            {/* Answered counter */}
+            <div className="flex-shrink-0 flex items-center text-xs text-[#677788] font-medium tabular-nums">
+              {answeredCount}/{questions.length} câu
+            </div>
+
+            {/* Submit */}
+            {!hideSubmit && (
+              <button
+                type="button"
+                onClick={onSubmit}
+                disabled={!canSubmit}
+                title={submitTooltip ?? (canSubmit ? "Nộp bài" : "Cần khoanh hết câu hỏi mới được nộp")}
+                className={`flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-bold transition-all shadow-sm ${
+                  canSubmit
+                    ? "text-white cursor-pointer hover:shadow-md"
+                    : "text-slate-400 bg-slate-100 cursor-not-allowed"
+                }`}
+                style={canSubmit ? {
+                  background: `linear-gradient(135deg, ${BRAND_PRIMARY}, ${BRAND_SECONDARY})`,
+                } : undefined}
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>{submitLabel ?? "Nộp bài"}</span>
+              </button>
+            )}
+          </div>
         </div>
-
-        {/* Next */}
-        <button
-          type="button"
-          onClick={onNext}
-          disabled={!canNext}
-          className="flex-shrink-0 inline-flex items-center gap-1 px-3 py-2 rounded-md text-sm font-semibold text-[#677788] bg-[#f8f9fa] hover:bg-[#efefef] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-        >
-          <span className="hidden sm:inline">Tiếp</span>
-          <ChevronRight className="w-4 h-4" />
-        </button>
-
-        {/* Submit */}
-        {!hideSubmit && (
-          <button
-            type="button"
-            onClick={onSubmit}
-            disabled={!canSubmit}
-            title={submitTooltip ?? (canSubmit ? "Nộp bài" : "Cần khoanh hết câu hỏi mới được nộp")}
-            className={`flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-bold transition-all shadow-sm ${
-              canSubmit
-                ? "text-white cursor-pointer hover:shadow-md"
-                : "text-slate-400 bg-slate-100 cursor-not-allowed"
-            }`}
-            style={canSubmit ? {
-              background: `linear-gradient(135deg, ${BRAND_PRIMARY}, ${BRAND_SECONDARY})`,
-            } : undefined}
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>{submitLabel ?? "Nộp bài"}</span>
-          </button>
-        )}
       </div>
     </footer>
   );

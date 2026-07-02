@@ -16,6 +16,8 @@ import {
   Search,
   ChevronRight,
   FileEdit,
+  Menu,
+  X,
 } from "lucide-react";
 import { logout } from "../../services/authApi";
 import { adminApi } from "../../services/adminApi";
@@ -69,6 +71,7 @@ export function AdminLayout() {
   const navigate = useNavigate();
   const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
   const [avatarGradient, setAvatarGradient] = useState(getAvatarGradient);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // ── Real data state ──
   const authUser = getAuthUser();
@@ -132,6 +135,7 @@ export function AdminLayout() {
   }, []);
 
   useEffect(() => {
+    setIsMobileSidebarOpen(false);
     for (const item of adminNav) {
       if (item.submenu?.some((s) => location.pathname.startsWith(s.href))) {
         setExpandedMenu(item.label);
@@ -170,9 +174,19 @@ export function AdminLayout() {
 
   return (
     <div className="flex h-screen" style={{ background: ADMIN_BG }}>
+      {/* Sidebar backdrop for mobile */}
+      {isMobileSidebarOpen && (
+        <div 
+          className="fixed inset-0 z-[49] bg-slate-900/60 backdrop-blur-sm lg:hidden transition-opacity duration-300"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside
-        className="w-64 h-screen flex flex-col flex-shrink-0 relative overflow-hidden"
+        className={`fixed inset-y-0 left-0 z-50 lg:static w-64 h-screen flex flex-col flex-shrink-0 relative overflow-hidden transition-transform duration-300 ease-in-out ${
+          isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        }`}
         style={{ background: "linear-gradient(180deg, #0F172A 0%, #1E293B 100%)" }}
       >
         {/* Subtle background texture */}
@@ -193,8 +207,17 @@ export function AdminLayout() {
             <p className="leading-none font-bold text-white" style={{ fontSize: 15, letterSpacing: "-0.01em" }}>NamThu Edu</p>
             <p className="leading-none mt-0.5 font-semibold" style={{ fontSize: 10, color: "#F59E0B" }}>Admin Console</p>
           </div>
+          {/* Close button for Mobile */}
+          <button
+            type="button"
+            onClick={() => setIsMobileSidebarOpen(false)}
+            className="lg:hidden ml-auto p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            title="Đóng sidebar"
+          >
+            <X className="w-4.5 h-4.5" />
+          </button>
           {/* live dot */}
-          <div className="ml-auto flex items-center gap-1">
+          <div className="hidden lg:flex ml-auto items-center gap-1">
             <div className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
           </div>
         </div>
@@ -350,11 +373,21 @@ export function AdminLayout() {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar — Data-Dense theme (slate / amber / blue focus) */}
-        <header className="flex-shrink-0 flex items-center gap-4 px-6 bg-white relative"
+        <header className="flex-shrink-0 flex items-center gap-4 px-4 sm:px-6 bg-white relative"
           style={{ height: 60, borderBottom: "1px solid #E2E8F0", boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
           {/* amber top hairline accent */}
           <div className="absolute top-0 left-0 right-0 h-[2px]"
             style={{ background: "linear-gradient(90deg, #F59E0B, transparent 45%)" }} />
+
+          {/* Hamburger Menu Toggle for Mobile */}
+          <button
+            type="button"
+            onClick={() => setIsMobileSidebarOpen(true)}
+            className="lg:hidden p-2 -ml-2 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-950 active:scale-95 transition-all cursor-pointer flex-shrink-0"
+            aria-label="Open sidebar"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
 
           {/* Left: breadcrumb */}
           <div className="flex items-center gap-2 min-w-0">
