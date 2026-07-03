@@ -1143,19 +1143,26 @@ function formatPartContent(part: SpeakingPart, partNumber: number): React.ReactN
     );
   }
   if (partNumber === 2 && part.part2Data) {
+    const hasSolutions = part.part2Data.solutions && part.part2Data.solutions.some(s => s && s.trim().length > 0);
     return (
       <>
         {Header}
         <div className="text-[14px] text-slate-700 leading-[1.9] space-y-2">
-          <p className="italic text-slate-500">Here is the situation:</p>
-          <p>{part.part2Data.situation}</p>
-          <p className="italic text-slate-500 mt-2">You have three options:</p>
-          <div>
-            {part.part2Data.solutions.map((s, i) => (
-              <p key={i}>- {String.fromCharCode(65 + i)}. {s}</p>
-            ))}
-          </div>
-          <p className="font-semibold pt-1">{part.part2Data.question}</p>
+          {!hasSolutions ? (
+            <p className="whitespace-pre-wrap">{part.part2Data.situation}</p>
+          ) : (
+            <>
+              <p className="italic text-slate-500">Here is the situation:</p>
+              <p>{part.part2Data.situation}</p>
+              <p className="italic text-slate-500 mt-2">You have three options:</p>
+              <div>
+                {part.part2Data.solutions.map((s, i) => (
+                  <p key={i}>- {String.fromCharCode(65 + i)}. {s}</p>
+                ))}
+              </div>
+              {part.part2Data.question && <p className="font-semibold pt-1">{part.part2Data.question}</p>}
+            </>
+          )}
         </div>
       </>
     );

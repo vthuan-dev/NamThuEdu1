@@ -912,76 +912,38 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
           </div>
         </div>
 
-        <div className="border border-gray-200 rounded-xl p-7 bg-white space-y-7">
-          {/* Situation */}
+        <div className="border border-gray-200 rounded-xl p-7 bg-white">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
               <span className="inline-flex items-center gap-2">
-                <span className="w-7 h-7 bg-gray-100 text-gray-600 rounded-lg flex items-center justify-center text-sm font-medium">
-                  1
+                <span className="w-7 h-7 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center text-sm font-medium">
+                  💡
                 </span>
-                Situation
+                Đề bài Part 2 (Situation, Solutions & Question)
               </span>
             </label>
             <textarea
               value={data.situation}
-              onChange={(e) => updatePart2Field("situation", e.target.value)}
-              rows={4}
-              placeholder="Describe the situation or problem. Example: You want to improve your English speaking skills but you have a limited budget..."
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 text-gray-900 placeholder:text-gray-400 transition-all"
-            />
-          </div>
-
-          {/* Solutions */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-4">
-              <span className="inline-flex items-center gap-2">
-                <span className="w-7 h-7 bg-gray-100 text-gray-600 rounded-lg flex items-center justify-center text-sm font-medium">
-                  2
-                </span>
-                Suggested Solutions
-              </span>
-            </label>
-            <div className="space-y-3">
-              {data.solutions.map((solution, index) => (
-                <div key={index} className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-7 h-7 bg-gray-50 text-gray-500 rounded-lg flex items-center justify-center font-medium text-sm">
-                    {index + 1}
-                  </span>
-                  <input
-                    type="text"
-                    value={solution}
-                    onChange={(e) => updatePart2Solution(index, e.target.value)}
-                    placeholder={`Solution ${index + 1}: e.g., ${
-                      index === 0
-                        ? "Join an online speaking course ($50/month)"
-                        : index === 1
-                        ? "Take a speaking course at a language center ($200/month)"
-                        : "Find a native English speaker for language exchange (free)"
-                    }`}
-                    className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 text-gray-900 placeholder:text-gray-400 transition-all"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Question */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              <span className="inline-flex items-center gap-2">
-                <span className="w-7 h-7 bg-gray-100 text-gray-600 rounded-lg flex items-center justify-center text-sm font-medium">
-                  3
-                </span>
-                Main Question
-              </span>
-            </label>
-            <input
-              type="text"
-              value={data.question}
-              onChange={(e) => updatePart2Field("question", e.target.value)}
-              placeholder="Which solution do you think is the best? Why?"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 text-gray-900 placeholder:text-gray-400 transition-all"
+              onChange={(e) => {
+                const val = e.target.value;
+                setParts((prev) =>
+                  prev.map((p) =>
+                    p.partNumber === 2
+                      ? {
+                          ...p,
+                          part2Data: {
+                            situation: val,
+                            solutions: ["", "", ""], // Size 3 to pass backend validation
+                            question: "", // String to pass backend validation
+                          },
+                        }
+                      : p
+                  )
+                );
+              }}
+              rows={6}
+              placeholder="Describe the situation, proposed solutions, and discussion question..."
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 text-gray-900 placeholder:text-gray-400 transition-all font-sans"
             />
           </div>
         </div>
