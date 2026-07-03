@@ -14,7 +14,7 @@ import {
   nextQuestionNumber,
   sectionMeta,
 } from '../sections';
-import { SectionHeader, QuestionBadge, DeleteBtn, AddButton, OptionRow } from './shared';
+import { SectionHeader, QuestionBadge, DeleteBtn, AddButton, OptionRow, FormattedTextarea } from './shared';
 import { THPT_THEME, LETTERS } from '../sections';
 import { splitPhoneticWord } from '../../../../../../utils/examUtils';
 
@@ -504,16 +504,16 @@ function McQuestionsEditor({ section, all, onChange }: { section: Extract<ThptSe
 
       {section.items.map((item, idx) => (
         <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
-          <textarea
+          <FormattedTextarea
             value={item.prompt}
-            onChange={(e) => {
+            onChange={(v) => {
               const items = [...section.items];
-              items[idx] = { ...item, prompt: e.target.value };
+              items[idx] = { ...item, prompt: v };
               update(items);
             }}
             rows={2}
             placeholder="Nội dung câu hỏi (dùng ____ cho chỗ trống nếu cần)"
-            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            className="mb-3"
           />
           <div className="space-y-2">
             {item.options.map((opt, oi) => (
@@ -606,16 +606,16 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
 
       {section.items.map((item, idx) => (
         <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
-          <textarea
+          <FormattedTextarea
             value={item.prompt}
-            onChange={(e) => {
+            onChange={(v) => {
               const items = [...section.items];
-              items[idx] = { ...item, prompt: e.target.value };
+              items[idx] = { ...item, prompt: v };
               update(items);
             }}
             rows={2}
             placeholder="Nội dung câu hỏi nghe"
-            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            className="mb-3"
           />
           <div className="space-y-2">
             {item.options.map((opt, oi) => (
@@ -657,16 +657,16 @@ function SpeakingEditor({ section, all, onChange }: { section: Extract<ThptSecti
       </div>
       {section.items.map((item, idx) => (
         <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
-          <textarea
+          <FormattedTextarea
             value={item.prompt}
-            onChange={(e) => {
+            onChange={(v) => {
               const items = [...section.items];
-              items[idx] = { ...item, prompt: e.target.value };
+              items[idx] = { ...item, prompt: v };
               update(items);
             }}
             rows={3}
             placeholder="Đề nói (VD: Describe your favourite hobby. You should say what it is, when you do it, and why you enjoy it.)"
-            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            className="mb-3"
           />
           <div className="grid grid-cols-2 gap-3">
             <label className="text-xs font-semibold text-slate-500">
@@ -1009,11 +1009,11 @@ function PassageEditor({
           </button>
         )}
       </div>
-      <textarea
+      <FormattedTextarea
         value={passage}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
         rows={8}
-        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200 font-mono leading-relaxed"
+        className="font-mono"
       />
       <p className="mt-1.5 text-[11px] text-slate-500">💡 {hint}</p>
     </div>
@@ -1030,16 +1030,16 @@ function TfGroupEditor({ section, all, onChange }: { section: Extract<ThptSectio
       {section.items.map((item, idx) => (
         <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <textarea
+            <FormattedTextarea
               value={item.context}
-              onChange={(e) => {
+              onChange={(v) => {
                 const items = [...section.items];
-                items[idx] = { ...item, context: e.target.value };
+                items[idx] = { ...item, context: v };
                 update(items);
               }}
               rows={6}
               placeholder="Context (notice / ad / email...)"
-              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200 font-mono"
+              className="font-mono"
             />
             <div className="space-y-2">
               {item.statements.map((s, si) => (
@@ -1126,11 +1126,11 @@ function ReadingMixedEditor({ section, all, onChange }: { section: Extract<ThptS
     <div className="space-y-4">
       <div className="rounded-2xl bg-white border border-slate-200 p-5">
         <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 block">Đoạn văn</label>
-        <textarea
+        <FormattedTextarea
           value={section.passage}
-          onChange={(e) => onChange({ ...section, passage: e.target.value })}
+          onChange={(v) => onChange({ ...section, passage: v })}
           rows={10}
-          className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200 font-mono leading-relaxed"
+          className="font-mono"
         />
         <p className="mt-1.5 text-[11px] text-slate-500">💡 Đặt markers [A][B][C][D] cho dạng Sentence Insertion.</p>
       </div>
@@ -1192,16 +1192,15 @@ function ReadingMixedEditor({ section, all, onChange }: { section: Extract<ThptS
 
           {item.kind === 'mc' && (
             <div className="space-y-2">
-              <textarea
+              <FormattedTextarea
                 value={item.prompt}
-                onChange={(e) => {
+                onChange={(v) => {
                   const items = [...section.items];
-                  items[idx] = { ...item, prompt: e.target.value };
+                  items[idx] = { ...item, prompt: v };
                   update(items);
                 }}
                 rows={2}
                 placeholder="Câu hỏi"
-                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
               />
               {item.options.map((opt, oi) => (
                 <OptionRow
@@ -1228,16 +1227,16 @@ function ReadingMixedEditor({ section, all, onChange }: { section: Extract<ThptS
 
           {item.kind === 'sentence_insertion' && (
             <div className="space-y-2">
-              <textarea
+              <FormattedTextarea
                 value={item.sentence_to_insert}
-                onChange={(e) => {
+                onChange={(v) => {
                   const items = [...section.items];
-                  items[idx] = { ...item, sentence_to_insert: e.target.value };
+                  items[idx] = { ...item, sentence_to_insert: v };
                   update(items);
                 }}
                 rows={2}
                 placeholder="Câu cần chèn"
-                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200 italic"
+                className="italic"
               />
               <div className="flex items-center gap-2">
                 {MARKERS.map((m) => (

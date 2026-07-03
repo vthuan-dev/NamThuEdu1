@@ -1,6 +1,4 @@
-/**
- * Shared sub-components dùng chung cho các section editor.
- */
+import { useRef } from 'react';
 import { Trash2 } from 'lucide-react';
 import { THPT_THEME } from '../sections';
 
@@ -73,12 +71,12 @@ export function SectionHeader({
         placeholder="Tiêu đề phần"
       />
       {hint && <p className="text-sm text-slate-500 mt-0.5">{hint}</p>}
-      <textarea
+      <FormattedTextarea
         value={instructions}
-        onChange={(e) => onInstructionsChange(e.target.value)}
+        onChange={onInstructionsChange}
         placeholder="Hướng dẫn cho học viên..."
         rows={2}
-        className="mt-3 w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
+        className="mt-3"
       />
     </div>
   );
@@ -123,6 +121,81 @@ export function OptionRow({
         onChange={(e) => onTextChange(e.target.value)}
         placeholder={placeholder ?? `Phương án ${letter}`}
         className="flex-1 min-w-0 text-sm bg-transparent border-0 focus:outline-none focus:ring-2 focus:ring-blue-200 rounded-md px-2 py-1"
+      />
+    </div>
+  );
+}
+
+interface FormattedTextareaProps {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  rows?: number;
+  className?: string;
+}
+
+export function FormattedTextarea({ value, onChange, placeholder, rows = 2, className = '' }: FormattedTextareaProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const applyFormat = (tag: string) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+
+    const selectedText = text.substring(start, end);
+    const replacement = `<${tag}>${selectedText}</${tag}>`;
+    const newValue = text.substring(0, start) + replacement + text.substring(end);
+
+    onChange(newValue);
+
+    // Reposition cursor and refocus after DOM update
+    setTimeout(() => {
+      if (textarea) {
+        textarea.focus();
+        textarea.setSelectionRange(start + tag.length + 2, start + tag.length + 2 + selectedText.length);
+      }
+    }, 0);
+  };
+
+  return (
+    <div className="relative group">
+      {/* Format buttons bar in absolute top right */}
+      <div className="absolute right-2 top-2 z-10 flex items-center gap-1 rounded bg-slate-100/90 border border-slate-200/50 p-0.5 shadow-sm opacity-60 group-hover:opacity-100 hover:opacity-100 transition-opacity">
+        <button
+          type="button"
+          onClick={() => applyFormat('b')}
+          className="w-5 h-5 flex items-center justify-center text-xs font-bold text-slate-700 hover:bg-slate-200 hover:text-slate-900 rounded cursor-pointer transition-colors"
+          title="In đậm (Bold)"
+        >
+          B
+        </button>
+        <button
+          type="button"
+          onClick={() => applyFormat('i')}
+          className="w-5 h-5 flex items-center justify-center text-xs font-semibold italic text-slate-700 hover:bg-slate-200 hover:text-slate-900 rounded cursor-pointer transition-colors"
+          title="In nghiêng (Italic)"
+        >
+          I
+        </button>
+        <button
+          type="button"
+          onClick={() => applyFormat('u')}
+          className="w-5 h-5 flex items-center justify-center text-xs font-semibold underline text-slate-700 hover:bg-slate-200 hover:text-slate-900 rounded cursor-pointer transition-colors"
+          title="Gạch chân (Underline)"
+        >
+          U
+        </button>
+      </div>
+      <textarea
+        ref={textareaRef}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={rows}
+        placeholder={placeholder}
+        className={`w-full text-sm border border-slate-200 rounded-lg pl-3 pr-20 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200 font-sans leading-relaxed ${className}`}
       />
     </div>
   );
