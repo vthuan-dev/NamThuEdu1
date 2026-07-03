@@ -129,21 +129,39 @@ export const detectPhoneticEnding = (word: string): string => {
  * (phần phát âm khác biệt) với gạch chân + in nghiêng.
  *
  * - Nếu giáo viên đã nhập `underline` → dùng đúng phần đó (khớp cuối từ trước).
- * - Nếu chưa nhập → tự động phát hiện đuôi ed/s/es.
+ * - Nếu chưa nhập và `autoDetectEnding` = true → tự động phát hiện đuôi ed/s/es.
+ *   (Chỉ dùng cho dạng "Phát âm". Dạng "Trọng âm" phải để giáo viên tự đánh dấu
+ *    âm tiết nhấn, KHÔNG tự dò đuôi để tránh in nghiêng nhầm.)
  *
  * @param text - Từ đầy đủ
- * @param underline - Phần gạch chân do giáo viên chỉ định (tùy chọn)
+ * @param underline - Phần cần đánh dấu do giáo viên chỉ định (tùy chọn)
+ * @param autoDetectEnding - Tự dò đuôi ed/s/es khi giáo viên chưa nhập (mặc định true)
+ * @param startAt - Vị trí bắt đầu của phần đánh dấu trong `text` (tùy chọn). Dùng để
+ *   định vị chính xác khi cùng 1 chuỗi con xuất hiện nhiều lần (vd "in" trong "interesting").
  */
 export const splitPhoneticWord = (
   text: string,
   underline?: string,
+  autoDetectEnding = true,
+  startAt?: number,
 ): { before: string; mark: string; after: string } => {
   const word = text ?? "";
   let target = (underline ?? "").trim();
-  if (!target) target = detectPhoneticEnding(word);
+  if (!target && autoDetectEnding) target = detectPhoneticEnding(word);
   if (!target) return { before: word, mark: "", after: "" };
 
-  const idx = word.toLowerCase().lastIndexOf(target.toLowerCase());
+  // Nếu có vị trí bắt đầu hợp lệ và khớp đúng phần văn bản tại đó → dùng luôn.
+  let idx: number;
+  if (
+    startAt != null &&
+    startAt >= 0 &&
+    startAt + target.length <= word.length &&
+    word.slice(startAt, startAt + target.length).toLowerCase() === target.toLowerCase()
+  ) {
+    idx = startAt;
+  } else {
+    idx = word.toLowerCase().lastIndexOf(target.toLowerCase());
+  }
   if (idx === -1) return { before: word, mark: "", after: "" };
 
   return {
@@ -152,3 +170,61 @@ export const splitPhoneticWord = (
     after: word.slice(idx + target.length),
   };
 };
+
+/**
+ * Tự động định dạng câu tìm lỗi sai (error_identification):
+ * Gạch chân và in đậm các phần phương án nhiễu (A, B, C, D) trực tiếp trong câu.
+ *
+ * @param sentence - Câu đầy đủ chưa định dạng (vd: "She have been to Paris.")
+ * @param segments - Danh sách các phần gạch chân (vd: [{id: 'A', text: 'have'}, {id: 'B', text: 'been'}])
+ * @returns Chuỗi HTML chứa các thẻ định dạng <u> và <b>(A)</b>
+ */
+export const formatErrorSentence = (
+  sentence: string,
+  segments: { id: string; text: string }[],
+): string => {
+  if (!sentence) return "";
+
+  // Nếu câu đã chứa sẵn các thẻ định dạng html (như <u>, <span>), coi như đã tự format
+  if (/<[a-z][\s\S]*>/i.test(sentence)) {
+    return sentence;
+  }
+
+  // Lọc và sắp xếp các phần khớp có vị trí xuất hiện tăng dần trong câu
+  const matches = segments
+    .map((seg) => {
+      const text = (seg.text ?? "").trim();
+      if (!text) return null;
+      // Tìm vị trí xuất hiện của phần text trong câu (không phân biệt hoa thường)
+      const index = sentence.toLowerCase().indexOf(text.toLowerCase());
+      return { id: seg.id, text, index };
+    })
+    .filter(
+      (m): m is { id: string; text: string; index: number } =>
+        m !== null && m.index !== -1,
+    )
+    .sort((a, b) => a.index - b.index);
+
+  let result = "";
+  let lastIndex = 0;
+
+  for (const m of matches) {
+    // Để tránh trùng lặp hoặc nhảy lùi lại phía trước
+    const idx = sentence.toLowerCase().indexOf(m.text.toLowerCase(), lastIndex);
+    if (idx === -1) continue;
+
+    // Ghép đoạn text trước match
+    result += sentence.slice(lastIndex, idx);
+
+    // Ghép phần được định dạng gạch chân + mã chữ cái (A/B/C/D)
+    const matchedText = sentence.slice(idx, idx + m.text.length);
+    result += `<span class="underline underline-offset-4 decoration-2 font-semibold text-slate-800">${matchedText}</span> <strong class="text-xs text-teal-600 font-bold">(${m.id})</strong>`;
+
+    lastIndex = idx + m.text.length;
+  }
+
+  // Ghép phần còn lại
+  result += sentence.slice(lastIndex);
+  return result;
+};
+

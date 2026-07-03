@@ -1347,8 +1347,10 @@ function McqReview({
               </span>
               <span className="flex-1 min-w-0 text-sm text-slate-800">
                 {opt.text ? (() => {
-                  // Render phần gạch chân của từ ngữ âm với italic+teal (nhất quán với student view)
-                  const parts = splitPhoneticWord(opt.text, opt.underline);
+                  // Render phần gạch chân của từ ngữ âm với italic+teal (nhất quán với student view).
+                  // Trọng âm: KHÔNG tự dò đuôi ed/s/es — chỉ nhấn khi giáo viên đã đánh dấu.
+                  const isStress = q.variant === 'stress';
+                  const parts = splitPhoneticWord(opt.text, opt.underline, !isStress, opt.underlineStart);
                   if (!parts.mark) return <>{opt.text}</>;
                   return (
                     <>

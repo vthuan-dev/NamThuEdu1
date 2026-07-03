@@ -405,6 +405,7 @@ class ThptGradingController extends Controller
                 if (is_array($o)) {
                     $entry = ['id' => $o['id'] ?? null, 'text' => $o['text'] ?? ''];
                     if (isset($o['underline'])) $entry['underline'] = $o['underline'];
+                    if (isset($o['underlineStart'])) $entry['underlineStart'] = $o['underlineStart'];
                     $out[] = $entry;
                 }
             }
@@ -515,8 +516,13 @@ class ThptGradingController extends Controller
             $questions = [];
             switch ($type) {
                 case 'phonetics':
+                    // variant (pronunciation/stress) để UI review biết có tự dò đuôi ed/s/es không.
+                    $phoneticsVariant = $s['variant'] ?? 'pronunciation';
+                    $base['variant'] = $phoneticsVariant;
                     foreach (($s['items'] ?? []) as $it) {
-                        $questions[] = $mcq($it['question_number'] ?? '?', $it['prompt'] ?? null, $it['words'] ?? [], $it['correct_id'] ?? null);
+                        $q = $mcq($it['question_number'] ?? '?', $it['prompt'] ?? null, $it['words'] ?? [], $it['correct_id'] ?? null);
+                        $q['variant'] = $phoneticsVariant;
+                        $questions[] = $q;
                     }
                     break;
 

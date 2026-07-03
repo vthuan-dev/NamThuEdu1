@@ -50,6 +50,8 @@ export interface McqOption {
   id: string;
   text: string;
   underline?: string;
+  /** Vị trí bắt đầu phần đánh dấu trong `text` (để định vị chính xác khi lặp chuỗi con). */
+  underlineStart?: number;
 }
 
 export interface McqQuestion {
@@ -61,6 +63,8 @@ export interface McqQuestion {
   student_answer: string | null;
   correct_answer: string | null;
   is_correct: boolean;
+  /** Chỉ có với câu ngữ âm: 'pronunciation' | 'stress'. Dùng để quyết định tự dò đuôi. */
+  variant?: string;
 }
 
 export interface TextQuestion {

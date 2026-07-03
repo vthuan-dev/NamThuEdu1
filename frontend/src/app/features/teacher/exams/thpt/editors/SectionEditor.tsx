@@ -16,7 +16,7 @@ import {
 } from '../sections';
 import { SectionHeader, QuestionBadge, DeleteBtn, AddButton, OptionRow, FormattedTextarea } from './shared';
 import { THPT_THEME, LETTERS } from '../sections';
-import { splitPhoneticWord } from '../../../../../../utils/examUtils';
+import { splitPhoneticWord, formatErrorSentence } from '../../../../../../utils/examUtils';
 
 interface Props {
   section: ThptSection;
@@ -45,11 +45,12 @@ const SECTION_GUIDE: Record<string, GuideContent> = {
     steps: [
       'Chọn dạng: "Phát âm" hoặc "Trọng âm".',
       'Nhập 4 từ vào ô A, B, C, D.',
-      'Với "Phát âm": điền thêm phần gạch chân của mỗi từ (vd: ea).',
-      'Bấm nút chữ cái ở từ KHÁC BIỆT để đánh dấu đáp án đúng.',
+      'Đánh dấu âm tiết: KÉO CHUỘT (hoặc bấm) trực tiếp lên các chữ cái ngay dưới ô từ để bôi phần cần nhấn — phần đó sẽ tự in nghiêng + gạch chân.',
+      'Muốn bỏ đánh dấu: bấm "Xóa" bên dưới từ.',
+      'Bấm nút chữ cái (A/B/C/D) ở từ KHÁC BIỆT để đánh dấu đáp án đúng.',
     ],
     example:
-      'A. h(ea)d   B. br(ea)d   C. t(ea)   D. h(ea)vy\n→ Đáp án đúng: C (đọc /iː/, khác /e/)',
+      'Phát âm: h(ea)d, br(ea)d, t(ea), h(ea)vy → đáp án C (đọc /iː/).\nTrọng âm: com·fort·a·ble, in·ter·est·ing, im·POR·tant, dif·fi·cult → bôi âm tiết nhấn.',
   },
   mc_questions: {
     short: 'Câu hỏi 4 phương án A–D, chọn 1 đáp án đúng.',
@@ -274,6 +275,25 @@ function SectionGuide({ type, label }: { type: string; label: string }) {
   );
 }
 
+function InlineGuide({ type }: { type: string }) {
+  const g = SECTION_GUIDE[type];
+  if (!g) return null;
+  return (
+    <div className="rounded-xl border border-teal-200 bg-teal-50/60 px-3.5 py-2.5 flex items-start gap-2.5">
+      <span className="text-base leading-none mt-0.5">💡</span>
+      <div className="text-[12px] leading-relaxed text-slate-600">
+        <b className="text-teal-800">Hướng dẫn nhanh:</b>{' '}
+        <span>{g.short}</span>
+        <ul className="list-disc pl-4 mt-1 space-y-0.5 text-slate-500">
+          {g.steps.map((s, idx) => (
+            <li key={idx}>{s}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Dispatcher: render đúng editor theo section.type.
  */
@@ -363,6 +383,105 @@ function AcceptedAnswersInput({
 // ════════════════════════════════════════════════════════════════════════════
 // 1. PHONETICS
 // ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Bộ chọn âm tiết: giáo viên kéo (hoặc bấm chữ đầu rồi chữ cuối) để tô vùng
+ * cần đánh dấu (nghiêng + gạch chân). Lưu cả `underline` (chuỗi) lẫn
+ * `underlineStart` (vị trí) để định vị chính xác khi chuỗi con lặp lại.
+ */
+function SyllableMarker({
+  text,
+  start,
+  length,
+  onChange,
+}: {
+  text: string;
+  /** vị trí bắt đầu vùng đánh dấu; null nếu chưa đánh dấu */
+  start: number | null;
+  /** độ dài vùng đánh dấu */
+  length: number;
+  onChange: (next: { underline: string; underlineStart: number } | null) => void;
+}) {
+  const [dragAnchor, setDragAnchor] = useState<number | null>(null);
+  const [dragEnd, setDragEnd] = useState<number | null>(null);
+
+  const chars = Array.from(text);
+  // Vùng đang kéo (ưu tiên hiển thị) hoặc vùng đã lưu.
+  const active =
+    dragAnchor != null && dragEnd != null
+      ? { s: Math.min(dragAnchor, dragEnd), e: Math.max(dragAnchor, dragEnd) }
+      : start != null && length > 0
+        ? { s: start, e: start + length - 1 }
+        : null;
+
+  const commit = (a: number, b: number) => {
+    const s = Math.min(a, b);
+    const e = Math.max(a, b);
+    onChange({ underline: text.slice(s, e + 1), underlineStart: s });
+  };
+
+  if (!text.trim()) {
+    return <div className="mt-1 text-[11px] text-slate-300 text-center italic">nhập từ để đánh dấu</div>;
+  }
+
+  return (
+    <div className="mt-1.5">
+      <div
+        className="flex flex-wrap justify-center gap-px select-none"
+        onMouseLeave={() => {
+          if (dragAnchor != null && dragEnd != null) commit(dragAnchor, dragEnd);
+          setDragAnchor(null);
+          setDragEnd(null);
+        }}
+        onMouseUp={() => {
+          if (dragAnchor != null && dragEnd != null) commit(dragAnchor, dragEnd);
+          setDragAnchor(null);
+          setDragEnd(null);
+        }}
+      >
+        {chars.map((ch, i) => {
+          const marked = active != null && i >= active.s && i <= active.e;
+          return (
+            <button
+              key={i}
+              type="button"
+              onMouseDown={() => {
+                setDragAnchor(i);
+                setDragEnd(i);
+              }}
+              onMouseEnter={() => {
+                if (dragAnchor != null) setDragEnd(i);
+              }}
+              className={`px-0.5 py-0.5 text-sm leading-none rounded transition-colors cursor-pointer ${
+                marked
+                  ? 'italic underline underline-offset-2 decoration-2 font-semibold text-teal-700 bg-teal-50'
+                  : 'text-slate-700 hover:bg-slate-100'
+              }`}
+              title="Kéo để chọn âm tiết"
+            >
+              {ch === ' ' ? '\u00A0' : ch}
+            </button>
+          );
+        })}
+      </div>
+      {active && (
+        <div className="mt-1 flex items-center justify-center gap-2">
+          <span className="text-[10px] text-slate-400">
+            Đã chọn: <b className="text-teal-600">{text.slice(active.s, active.e + 1)}</b>
+          </span>
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="text-[10px] font-semibold text-slate-400 hover:text-red-500 cursor-pointer"
+          >
+            Xóa
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PhoneticsEditor({ section, all, onChange }: { section: Extract<ThptSection, { type: 'phonetics' }>; all: ThptSection[]; onChange: (s: ThptSection) => void }) {
   const update = (items: typeof section.items) => onChange({ ...section, items });
   return (
@@ -382,6 +501,28 @@ function PhoneticsEditor({ section, all, onChange }: { section: Extract<ThptSect
               {v === 'pronunciation' ? 'Phát âm' : 'Trọng âm'}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Note hướng dẫn cách đánh dấu — đổi nội dung theo dạng đang chọn. */}
+      <div className="rounded-xl border border-teal-200 bg-teal-50/60 px-3.5 py-2.5 flex items-start gap-2.5">
+        <span className="text-base leading-none mt-0.5">💡</span>
+        <div className="text-[12px] leading-relaxed text-slate-600">
+          <b className="text-teal-800">Cách đánh dấu {section.variant === 'stress' ? 'âm tiết nhấn' : 'phần phát âm'}:</b>{' '}
+          Sau khi nhập từ, hãy <b>kéo chuột</b> (hoặc bấm chữ đầu rồi chữ cuối) <b>trực tiếp trên các chữ cái</b> ngay dưới ô từ để bôi{' '}
+          {section.variant === 'stress' ? 'âm tiết được nhấn trọng âm' : 'phần đọc khác biệt'}. Phần được chọn sẽ{' '}
+          <span className="italic underline underline-offset-2 decoration-2 font-semibold text-teal-700">tự in nghiêng &amp; gạch chân</span>{' '}
+          giống hệt màn hình học viên khi thi. Bấm <b>Xóa</b> để bỏ đánh dấu.
+          {section.variant === 'stress' && (
+            <span className="block mt-1 text-slate-500">
+              Ví dụ: từ <b>important</b> → kéo chọn <span className="italic underline underline-offset-2 decoration-2 font-semibold text-teal-700">por</span> (âm tiết nhấn).
+            </span>
+          )}
+          {section.variant === 'pronunciation' && (
+            <span className="block mt-1 text-slate-500">
+              Ví dụ: từ <b>head</b> → kéo chọn <span className="italic underline underline-offset-2 decoration-2 font-semibold text-teal-700">ea</span> (phần nguyên âm cần so sánh).
+            </span>
+          )}
         </div>
       </div>
 
@@ -425,37 +566,40 @@ function PhoneticsEditor({ section, all, onChange }: { section: Extract<ThptSect
                     placeholder="từ"
                     className="w-full text-sm border border-slate-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-200"
                   />
-                  {section.variant === 'pronunciation' && (() => {
-                    const { before, mark, after } = splitPhoneticWord(w.text, w.underline);
+                  {(() => {
+                    // Vị trí bắt đầu đã lưu; nếu chưa có thì dò theo chuỗi underline.
+                    const ul = (w.underline ?? '').trim();
+                    let start: number | null = null;
+                    if (ul) {
+                      if (
+                        w.underlineStart != null &&
+                        w.underlineStart >= 0 &&
+                        w.text.slice(w.underlineStart, w.underlineStart + ul.length).toLowerCase() === ul.toLowerCase()
+                      ) {
+                        start = w.underlineStart;
+                      } else {
+                        const found = w.text.toLowerCase().indexOf(ul.toLowerCase());
+                        start = found === -1 ? null : found;
+                      }
+                    }
                     return (
-                      <>
-                        {w.text.trim() && (
-                          <div className="mt-1 text-sm text-slate-700 text-center">
-                            {mark ? (
-                              <span>
-                                {before}
-                                <span className="italic underline underline-offset-2 decoration-2 font-semibold text-teal-700">{mark}</span>
-                                {after}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400">{w.text}</span>
-                            )}
-                          </div>
-                        )}
-                        <input
-                          type="text"
-                          value={w.underline ?? ''}
-                          onChange={(e) => {
-                            const items = [...section.items];
-                            const words = [...item.words];
-                            words[wi] = { ...w, underline: e.target.value };
-                            items[idx] = { ...item, words };
-                            update(items);
-                          }}
-                          placeholder="phần gạch chân (tự động)"
-                          className="w-full text-[11px] mt-1 border border-slate-200 rounded-md px-2 py-1 text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                        />
-                      </>
+                      <SyllableMarker
+                        text={w.text}
+                        start={start}
+                        length={ul.length}
+                        onChange={(next) => {
+                          const items = [...section.items];
+                          const words = [...item.words];
+                          if (next) {
+                            words[wi] = { ...w, underline: next.underline, underlineStart: next.underlineStart };
+                          } else {
+                            const { underline: _u, underlineStart: _s, ...rest } = w;
+                            words[wi] = rest;
+                          }
+                          items[idx] = { ...item, words };
+                          update(items);
+                        }}
+                      />
                     );
                   })()}
                 </div>
@@ -485,6 +629,7 @@ function McQuestionsEditor({ section, all, onChange }: { section: Extract<ThptSe
 
   return (
     <div className="space-y-4">
+      <InlineGuide type="mc_questions" />
       <div className="rounded-xl bg-white border border-slate-200 p-3 flex flex-wrap items-center gap-2">
         <span className="text-xs font-bold text-slate-500">Dạng:</span>
         {VARIANTS.map(({ v, l }) => (
@@ -575,6 +720,7 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
 
   return (
     <div className="space-y-4">
+      <InlineGuide type="listening" />
       {/* Audio uploader */}
       <div className="rounded-xl bg-white border border-slate-200 p-4">
         <p className="text-xs font-bold text-slate-500 mb-2">Audio cho phần Nghe</p>
@@ -652,9 +798,7 @@ function SpeakingEditor({ section, all, onChange }: { section: Extract<ThptSecti
   const update = (items: typeof section.items) => onChange({ ...section, items });
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
-        <span>🎙️ Học viên sẽ ghi âm trả lời. Phần Nói được <b>AI chấm tự động</b> (phát âm + nội dung) sau khi nộp; giáo viên có thể xem lại và điều chỉnh.</span>
-      </div>
+      <InlineGuide type="speaking" />
       {section.items.map((item, idx) => (
         <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
           <FormattedTextarea
@@ -707,6 +851,7 @@ function WordFormEditor({ section, all, onChange }: { section: Extract<ThptSecti
   const update = (items: typeof section.items) => onChange({ ...section, items });
   return (
     <div className="space-y-4">
+      <InlineGuide type="word_form" />
       {section.items.map((item, idx) => (
         <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
           <div className="space-y-2">
@@ -758,6 +903,7 @@ function ErrorIdEditor({ section, all, onChange }: { section: Extract<ThptSectio
   const update = (items: typeof section.items) => onChange({ ...section, items });
   return (
     <div className="space-y-4">
+      <InlineGuide type="error_identification" />
       {section.items.map((item, idx) => (
         <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
           <input
@@ -771,6 +917,12 @@ function ErrorIdEditor({ section, all, onChange }: { section: Extract<ThptSectio
             placeholder="Câu đầy đủ (optional, để hiển thị)"
             className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-200"
           />
+          {item.sentence && (
+            <div className="mb-3 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700">
+              <span className="text-[10px] font-bold text-slate-400 block mb-1.5 uppercase tracking-wider">Xem trước hiển thị:</span>
+              <p className="italic leading-relaxed" dangerouslySetInnerHTML={{ __html: formatErrorSentence(item.sentence, item.segments) }} />
+            </div>
+          )}
           <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
             4 phần gạch chân (chọn phần SAI)
           </p>
@@ -828,6 +980,7 @@ function McClozeEditor({ section, onChange }: { section: Extract<ThptSection, { 
   };
   return (
     <div className="space-y-4">
+      <InlineGuide type="mc_cloze" />
       <PassageEditor
         passage={section.passage}
         onChange={(v) => onChange({ ...section, passage: v })}
@@ -890,6 +1043,7 @@ function WordBankClozeEditor({ section, onChange }: { section: Extract<ThptSecti
   };
   return (
     <div className="space-y-4">
+      <InlineGuide type="word_bank_cloze" />
       <div className="rounded-2xl bg-white border border-slate-200 p-5">
         <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1 block">
           Ngân hàng từ (cách bằng dấu phẩy)
@@ -950,6 +1104,7 @@ function OpenClozeEditor({ section, onChange }: { section: Extract<ThptSection, 
   };
   return (
     <div className="space-y-4">
+      <InlineGuide type="open_cloze" />
       <PassageEditor
         passage={section.passage}
         onChange={(v) => onChange({ ...section, passage: v })}
@@ -1027,6 +1182,7 @@ function TfGroupEditor({ section, all, onChange }: { section: Extract<ThptSectio
   const update = (items: typeof section.items) => onChange({ ...section, items });
   return (
     <div className="space-y-4">
+      <InlineGuide type="tf_group" />
       {section.items.map((item, idx) => (
         <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1124,6 +1280,7 @@ function ReadingMixedEditor({ section, all, onChange }: { section: Extract<ThptS
 
   return (
     <div className="space-y-4">
+      <InlineGuide type="reading_mixed" />
       <div className="rounded-2xl bg-white border border-slate-200 p-5">
         <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 block">Đoạn văn</label>
         <FormattedTextarea
@@ -1278,6 +1435,7 @@ function MatchingEditor({ section, all, onChange }: { section: Extract<ThptSecti
   const update = (items: typeof section.items) => onChange({ ...section, items });
   return (
     <div className="space-y-4">
+      <InlineGuide type="matching" />
       {section.items.map((item, idx) => (
         <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1351,6 +1509,7 @@ function TransformationEditor({ section, all, onChange }: { section: Extract<Thp
   const update = (items: typeof section.items) => onChange({ ...section, items });
   return (
     <div className="space-y-4">
+      <InlineGuide type="sentence_transformation" />
       {section.items.map((item, idx) => (
         <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
           <div className="space-y-2">

@@ -59,8 +59,12 @@ interface BaseSection {
 // ── 1. Phonetics (pronunciation / stress) ────────────────────────────────
 export interface PhoneticsItem {
   question_number: number;
-  /** mỗi từ là 1 lựa chọn; với phát âm có thể đánh dấu phần gạch chân */
-  words: Array<{ id: string; text: string; underline?: string }>;
+  /**
+   * mỗi từ là 1 lựa chọn; `underline` là phần được đánh dấu (nghiêng + gạch chân).
+   * `underlineStart` là vị trí bắt đầu của phần đó trong `text` (để định vị chính xác
+   * khi cùng 1 chuỗi con xuất hiện nhiều lần, vd "in" trong "interesting").
+   */
+  words: Array<{ id: string; text: string; underline?: string; underlineStart?: number }>;
   correct_id: string; // từ "khác biệt"
   explanation?: string;
 }

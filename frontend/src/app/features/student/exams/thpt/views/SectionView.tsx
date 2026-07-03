@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { CheckCircle2, XCircle, Headphones, Mic, Sparkles, Loader2 } from 'lucide-react';
 import type { ThptAnswers, ThptSection, ViewMode } from '../types';
 import { ThptSpeakingRecorder } from '../components/ThptSpeakingRecorder';
-import { splitPhoneticWord } from '../../../../../../utils/examUtils';
+import { splitPhoneticWord, formatErrorSentence } from '../../../../../../utils/examUtils';
 
 const THEME = {
   primary: '#0D9488',
@@ -109,7 +109,9 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
               <QCard key={key} n={item.question_number}>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {item.words.map((w) => {
-                    const { before, mark, after } = splitPhoneticWord(w.text, w.underline);
+                    // Phát âm: tự dò đuôi ed/s/es. Trọng âm: chỉ nhấn khi giáo viên đã đánh dấu.
+                    const isStress = section.variant === 'stress';
+                    const { before, mark, after } = splitPhoneticWord(w.text, w.underline, !isStress, w.underlineStart);
                     const wordLabel = mark ? (
                       <span>
                         {before}
@@ -159,7 +161,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                   </div>
                 )}
                 {isError && item.sentence && (
-                  <p className="text-sm text-slate-700 italic mb-3" dangerouslySetInnerHTML={{ __html: item.sentence }} />
+                  <p className="text-sm text-slate-700 italic mb-3" dangerouslySetInnerHTML={{ __html: formatErrorSentence(item.sentence, item.segments) }} />
                 )}
                 <div className={isError ? 'grid grid-cols-2 sm:grid-cols-4 gap-2' : 'space-y-2'}>
                   {options.map((opt: any) => (
