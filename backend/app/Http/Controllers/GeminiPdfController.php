@@ -315,6 +315,17 @@ class GeminiPdfController extends Controller
         $text = preg_replace('/^```json\s*/i', '', trim($text));
         $text = preg_replace('/\s*```$/i', '', $text);
 
+        // Remove UTF-8 BOM if present
+        if (0 === strpos($text, "\xEF\xBB\xBF")) {
+            $text = substr($text, 3);
+        }
+
+        // Clean UTF-8 encoding
+        $text = mb_convert_encoding($text, 'UTF-8', 'UTF-8');
+
+        // Remove unescaped control characters (ASCII 0 to 31 and 127) that violate JSON specification
+        $text = preg_replace('/[\x00-\x1F\x7F]/', '', $text);
+
         $parsed = json_decode($text, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
             throw new \Exception('Gemini trả về JSON không hợp lệ: ' . json_last_error_msg());
