@@ -16,6 +16,7 @@ import {
   Clock, ListChecks, Search, Play, RotateCcw,
   Sparkles, Gift, ClipboardList, BookOpen, AlertTriangle,
   Headphones, Mic, PenLine, FileText, ArrowRight, CheckCircle,
+  CalendarDays,
 } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
 import { usePageTitle, PAGE_TITLES } from '../../../../hooks/usePageTitle';
@@ -34,6 +35,14 @@ const SKILL_LABELS: Record<string, string> = {
 function skillLabel(s?: string) {
   const k = String(s ?? '').toLowerCase();
   return SKILL_LABELS[k] ?? (s ? s[0].toUpperCase() + s.slice(1) : '');
+}
+
+// Định dạng ngày xuất bản đề: dd/MM/yyyy (giờ VN)
+function formatPublishDate(raw?: string | null): string {
+  if (!raw) return '';
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 // Icon theo kỹ năng — dùng cho ô icon nhã nhặn trên thẻ.
@@ -62,6 +71,7 @@ interface TeensExamItem {
   assignmentId: number | null;
   isAssigned: boolean;
   deadline?: string | null;
+  createdAt?: string | null;
 }
 
 // ─── Card ──────────────────────────────────────────────────────────────────────
@@ -78,7 +88,7 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
   // Khi hết hạn, ép trạng thái card về "pending" để chỉ hiện nút "Làm bài"
   // (ẩn Kết quả + Làm lại); xem kết quả cũ chuyển sang tab Lịch sử.
   const isCompleted = !isExpired && item.status === 'completed';
-  const inProgress = !isExpired && item.status === 'in_progress';
+  const inProgress = item.status === 'in_progress';
 
   const dot = isCompleted ? '#10B981' : inProgress ? '#F59E0B' : '#94A3B8';
   const statusText = isCompleted ? 'Hoàn thành' : inProgress ? 'Đang làm' : 'Chưa làm';
@@ -101,76 +111,100 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
     : `${BASE}/lam-bai/${item.examId}?autostart=1&direct=1`;
 
   return (
-    <div className="group flex flex-col bg-white rounded-2xl border border-slate-200 p-5 transition-all duration-200 hover:border-teal-300 hover:shadow-[0_6px_20px_-8px_rgba(13,148,136,0.25)]">
-      {/* Icon kỹ năng + trạng thái */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-teal-50 text-teal-700 ring-1 ring-teal-100">
-          <SkillIcon className="w-5 h-5" />
-        </div>
-        <div className="flex items-center gap-2.5">
-          {showAssignedBadge && effectiveAssigned && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-700">
-              <Gift className="w-3.5 h-3.5" /> GV giao
+    <div className="group relative flex flex-col overflow-hidden rounded-xl bg-white ring-1 ring-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all duration-300 hover:-translate-y-0.5 hover:ring-teal-300/70 hover:shadow-[0_12px_26px_-14px_rgba(13,148,136,0.3)]">
+      {/* Orb trang trí — hình tròn mờ tông teal/cyan, đậm hơn khi hover (đồng bộ thẻ adults) */}
+      <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full opacity-40 group-hover:opacity-70 transition-opacity duration-300 pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgba(45,212,191,0.35), transparent 70%)' }} />
+      <div className="absolute -bottom-10 -left-6 w-24 h-24 rounded-full opacity-25 group-hover:opacity-45 transition-opacity duration-300 pointer-events-none"
+        style={{ background: 'radial-gradient(circle, rgba(20,184,166,0.28), transparent 70%)' }} />
+
+      {/* Dải nhấn teal mảnh phía trên, hiện rõ hơn khi hover */}
+      <span className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-teal-500/60 via-teal-400 to-cyan-400/60 opacity-0 group-hover:opacity-100 transition-opacity" />
+
+      <div className="relative flex flex-col flex-1 p-3.5">
+        {/* Hàng đầu: icon + trạng thái */}
+        <div className="flex items-center justify-between">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-teal-50 text-teal-700 ring-1 ring-teal-100 flex-shrink-0">
+            <SkillIcon className="w-4 h-4" />
+          </div>
+          {inProgress ? (
+            <span className="inline-flex items-center gap-1 text-[10.5px] font-bold flex-shrink-0 rounded-full px-2 py-0.5 text-rose-600 bg-rose-50 ring-1 ring-rose-200 animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+              Làm dở
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[10.5px] font-medium text-slate-500 flex-shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: dot }} />
+              {statusText}
             </span>
           )}
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-cyan-700 bg-cyan-50 border border-cyan-100 rounded-full px-2 py-0.5">
+        </div>
+
+        {/* Title — chiếm trọn chiều ngang */}
+        <h3 className="text-[13px] font-bold text-slate-900 leading-snug line-clamp-2 min-h-[34px] tracking-[-0.01em] mt-2.5">
+          {item.title}
+        </h3>
+
+        {/* Nhãn phạm vi + GV giao + kỹ năng */}
+        <div className="flex items-center flex-wrap gap-1 mt-2">
+          <span className="inline-flex items-center text-[10px] font-semibold text-teal-700 bg-teal-50 rounded px-1.5 py-0.5">
             {scopeLabel}
           </span>
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: dot }} />
-            {statusText}
-          </span>
+          {item.skill && (
+            <span className="inline-flex items-center text-[10px] font-semibold text-slate-500 bg-slate-100 rounded px-1.5 py-0.5">
+              {skillLabel(item.skill)}
+            </span>
+          )}
+          {showAssignedBadge && effectiveAssigned && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 rounded px-1.5 py-0.5">
+              <Gift className="w-2.5 h-2.5" /> GV giao
+            </span>
+          )}
         </div>
-      </div>
 
-      {/* Title */}
-      <h3 className="text-[15px] font-bold text-slate-900 leading-snug line-clamp-2 min-h-[42px]">
-        {item.title}
-      </h3>
+        {/* Meta: thời lượng · số câu · ngày xuất bản — gộp một hàng */}
+        <div className="flex items-center flex-wrap gap-x-2 gap-y-1 text-[11px] text-slate-400 mt-2">
+          {!!item.duration && item.duration > 0 && (
+            <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3" /> <span className="tabular-nums">{item.duration}</span>p</span>
+          )}
+          {!!item.questions && item.questions > 0 && (
+            <span className="inline-flex items-center gap-1"><ListChecks className="w-3 h-3" /> <span className="tabular-nums">{item.questions}</span> câu</span>
+          )}
+          {formatPublishDate(item.createdAt) && (
+            <span className="inline-flex items-center gap-1" title="Ngày giáo viên xuất bản đề">
+              <CalendarDays className="w-3 h-3" /> <span className="tabular-nums">{formatPublishDate(item.createdAt)}</span>
+            </span>
+          )}
+        </div>
 
-      {/* Meta */}
-      <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-[13px] text-slate-400 mt-2 mb-4">
-        {!!item.duration && item.duration > 0 && (
-          <span className="inline-flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {item.duration} phút</span>
-        )}
-        {!!item.questions && item.questions > 0 && (
-          <span className="inline-flex items-center gap-1.5"><ListChecks className="w-3.5 h-3.5" /> {item.questions} câu</span>
-        )}
-        {item.skill && (
-          <span className="font-medium text-slate-500">{skillLabel(item.skill)}</span>
-        )}
-      </div>
-
-      {/* Action */}
-      <div className="mt-auto">
-        {isCompleted && item.submissionId ? (
-          <div className="flex items-center gap-2">
-            <Link to={redoTo}
-              className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
+        {/* Action */}
+        <div className="mt-3">
+          {isCompleted && item.submissionId ? (
+            <div className="flex items-center gap-2">
+              <Link to={redoTo}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-semibold text-slate-700 bg-white ring-1 ring-slate-200 transition-all hover:ring-teal-300 hover:text-teal-700 active:scale-[0.98]">
+                <RotateCcw className="w-3.5 h-3.5" /> Làm lại
+              </Link>
+              <Link to={`${BASE}/ket-qua/${item.submissionId}`}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-semibold text-white transition-all active:scale-[0.98]"
+                style={{ background: TEAL }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#0B7E74')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = TEAL)}>
+                <CheckCircle className="w-3.5 h-3.5" /> Kết quả
+              </Link>
+            </div>
+          ) : (
+            <Link to={startTo}
+              className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-semibold text-white transition-all active:scale-[0.98] shadow-[0_5px_14px_-8px_rgba(13,148,136,0.6)]"
               style={{ background: TEAL }}
               onMouseEnter={(e) => (e.currentTarget.style.background = '#0B7E74')}
               onMouseLeave={(e) => (e.currentTarget.style.background = TEAL)}>
-              <RotateCcw className="w-4 h-4" /> Làm lại
+              {inProgress ? <RotateCcw className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-white" />}
+              {inProgress ? 'Làm tiếp' : 'Bắt đầu'}
+              <ArrowRight className="w-3.5 h-3.5 opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
             </Link>
-            <Link to={`${BASE}/ket-qua/${item.submissionId}`}
-              className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
-              style={{ background: '#10B981' }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#059669')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = '#10B981')}>
-              <CheckCircle className="w-4 h-4" /> Xem kết quả
-            </Link>
-          </div>
-        ) : (
-          <Link to={startTo}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
-            style={{ background: TEAL }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = '#0B7E74')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = TEAL)}>
-            {inProgress ? <RotateCcw className="w-4 h-4" /> : <Play className="w-4 h-4 fill-white" />}
-            {inProgress ? 'Làm tiếp' : 'Bắt đầu'}
-            <ArrowRight className="w-4 h-4 opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
-          </Link>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
@@ -180,6 +214,8 @@ export function TeensTests() {
   usePageTitle(PAGE_TITLES.STUDENT_TESTS);
   const [tab, setTab] = useState<Tab>('all');
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
+  const [sortBy, setSortBy] = useState<'newest' | 'duration' | 'questions'>('newest');
 
   // Tab "Tất cả" — luôn lấy hết đề teens đã publish
   const { data: browseData, isLoading: browseLoading } = useQuery({
@@ -191,7 +227,6 @@ export function TeensTests() {
   const { data: assignedData, isLoading: assignedLoading } = useQuery({
     queryKey: ['student', 'tests', 'teens-assigned'],
     queryFn: () => studentApi.getTests({}),
-    enabled: tab === 'assigned',
   });
 
   const allExams: TeensExamItem[] = useMemo(() => {
@@ -211,6 +246,7 @@ export function TeensTests() {
       assignmentId: e.assignment_id ?? null,
       isAssigned: !!e.is_assigned,
       deadline: e.deadline ?? null,
+      createdAt: e.created_at ?? null,
     }));
   }, [browseData]);
 
@@ -232,6 +268,7 @@ export function TeensTests() {
       assignmentId: t.assignment_id ?? null,
       isAssigned: true,
       deadline: t.deadline ?? null,
+      createdAt: t.created_at ?? t.exam_created_at ?? null,
     }));
     const isPastDeadline = (d?: string | null) => !!d && new Date(d).getTime() < Date.now();
     return [
@@ -245,15 +282,36 @@ export function TeensTests() {
   const isLoading = tab === 'all' ? browseLoading : assignedLoading;
 
   const visible = useMemo(() => {
-    if (!search.trim()) return source;
-    const q = search.toLowerCase();
-    return source.filter((t) => String(t.title ?? '').toLowerCase().includes(q));
-  }, [source, search]);
+    let result = source;
+
+    // Filter by status
+    if (statusFilter !== 'all') {
+      result = result.filter((t) => t.status === statusFilter);
+    }
+
+    // Filter by search
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter((t) => String(t.title ?? '').toLowerCase().includes(q));
+    }
+
+    // Sort items
+    const sorted = [...result];
+    if (sortBy === 'newest') {
+      sorted.sort((a, b) => b.examId - a.examId);
+    } else if (sortBy === 'duration') {
+      sorted.sort((a, b) => (b.duration ?? 0) - (a.duration ?? 0));
+    } else if (sortBy === 'questions') {
+      sorted.sort((a, b) => (b.questions ?? 0) - (a.questions ?? 0));
+    }
+
+    return sorted;
+  }, [source, search, statusFilter, sortBy]);
 
   // ─── Phân trang: 12 bài / trang ───────────────────────────────────────────
   const PAGE_SIZE = 12;
   const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [tab, search]);
+  useEffect(() => { setPage(1); }, [tab, search, statusFilter, sortBy]);
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
   const paged = useMemo(
@@ -261,7 +319,9 @@ export function TeensTests() {
     [visible, pageSafe]
   );
 
-  const assignedCount = allExams.filter((e) => e.isAssigned).length;
+  // Badge phải khớp CHÍNH XÁC với danh sách hiển thị trong tab "Giáo viên giao"
+  // (assignedExams đã loại các bài quá hạn deadline). Nếu đếm từ allExams sẽ lệch.
+  const assignedCount = assignedExams.length;
   const stats = {
     total: allExams.length,
     pending: allExams.filter((e) => e.status === 'pending').length,
@@ -340,6 +400,37 @@ export function TeensTests() {
             </button>
           </div>
 
+          {/* Bộ lọc trạng thái */}
+          <div className="relative flex-shrink-0">
+            <select
+              value={statusFilter}
+              onChange={(e: any) => setStatusFilter(e.target.value)}
+              className="pl-3 pr-8 py-2.5 rounded-xl text-sm font-bold border border-slate-200 bg-white text-slate-600 outline-none cursor-pointer focus:border-teal-300 transition-colors appearance-none"
+              style={{ minWidth: '150px' }}
+            >
+              <option value="all">⏳ Trạng thái: Tất cả</option>
+              <option value="pending">📖 Chưa làm</option>
+              <option value="in_progress">⏱️ Đang làm dở</option>
+              <option value="completed">✅ Hoàn thành</option>
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</div>
+          </div>
+
+          {/* Sắp xếp */}
+          <div className="relative flex-shrink-0">
+            <select
+              value={sortBy}
+              onChange={(e: any) => setSortBy(e.target.value)}
+              className="pl-3 pr-8 py-2.5 rounded-xl text-sm font-bold border border-slate-200 bg-white text-slate-600 outline-none cursor-pointer focus:border-teal-300 transition-colors appearance-none"
+              style={{ minWidth: '160px' }}
+            >
+              <option value="newest">📅 Mới nhất</option>
+              <option value="duration">⏱️ Thời gian (nhiều trước)</option>
+              <option value="questions">📝 Số câu hỏi (nhiều trước)</option>
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</div>
+          </div>
+
           {/* Search */}
           <div className="relative flex-1 sm:max-w-xs sm:ml-auto">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -352,9 +443,9 @@ export function TeensTests() {
 
         {/* ══ List ════════════════════════════════════════════════════════════ */}
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="h-52 rounded-2xl animate-pulse bg-white border border-slate-200" />
+              <div key={i} className="h-44 rounded-xl animate-pulse bg-white border border-slate-200" />
             ))}
           </div>
         ) : visible.length === 0 ? (
@@ -375,7 +466,7 @@ export function TeensTests() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {paged.map((t) => (
               <ExamCard key={t.key} item={t} showAssignedBadge={tab === 'all'} />
             ))}

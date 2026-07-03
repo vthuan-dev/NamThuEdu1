@@ -150,7 +150,7 @@ function ExamCard({
   // - Chưa quá 24h đối với đề tự luyện tự do
   // - Chưa hết hạn nộp đối với đề giáo viên giao
   const isCompleted = status === 'completed' && !isFreePracticeAndOld && !isExpired;
-  const inProgress = status === 'in_progress' && !isExpired;
+  const inProgress = status === 'in_progress';
 
   // Số lần làm của bài giáo viên giao. allowed <= 0 (hoặc null) = không giới hạn.
   const used = attemptsUsed ?? 0;
@@ -180,6 +180,11 @@ function ExamCard({
           {isCompleted ? <CheckCircle2 className="w-3.5 h-3.5" /> : inProgress ? <RotateCcw className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
           {meta.label}
         </span>
+        {inProgress && (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black bg-rose-100 text-rose-700 border border-rose-200 animate-pulse">
+            Đang làm dở
+          </span>
+        )}
         {showAssignedBadge && effectiveAssigned && (
           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-extrabold"
             style={{ background: '#EDE9FE', color: '#7C3AED' }}>

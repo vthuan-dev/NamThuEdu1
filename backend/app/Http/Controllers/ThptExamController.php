@@ -455,6 +455,12 @@ class ThptExamController extends Controller
             ->where('sStatus', 'in_progress')
             ->first();
 
+        if ($existing && $request->input('restart')) {
+            $existing->answers()->delete();
+            $existing->delete();
+            $existing = null;
+        }
+
         if ($existing) {
             // Check if expired
             $durationMin = (int) ($existing->submission_payload['exam_snapshot']['eDuration_minutes']

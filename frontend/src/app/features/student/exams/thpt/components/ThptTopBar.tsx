@@ -7,6 +7,7 @@ interface Props {
   totalDurationSec: number;   // total
   onBack?: () => void;
   hideTimer?: boolean;
+  onRestart?: () => void;
 }
 
 function formatTime(s: number) {
@@ -15,7 +16,7 @@ function formatTime(s: number) {
   return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
 }
 
-export function ThptTopBar({ examTitle, totalSeconds, totalDurationSec, onBack, hideTimer }: Props) {
+export function ThptTopBar({ examTitle, totalSeconds, totalDurationSec, onBack, hideTimer, onRestart }: Props) {
   const navigate = useNavigate();
   const pct = totalDurationSec > 0 ? (totalSeconds / totalDurationSec) * 100 : 0;
   const danger = totalSeconds > 0 && totalSeconds < 5 * 60; // <5 phút
@@ -39,6 +40,17 @@ export function ThptTopBar({ examTitle, totalSeconds, totalDurationSec, onBack, 
             <p className="text-[11px] text-slate-500">Đề Tiếng Anh · Thi trên máy tính</p>
           </div>
         </div>
+
+        {onRestart && (
+          <button
+            type="button"
+            onClick={onRestart}
+            className="text-xs font-bold text-red-600 hover:text-red-700 px-3 py-2 rounded-xl border border-red-200 hover:bg-red-50 cursor-pointer flex-shrink-0 transition-colors"
+            title="Hủy phiên hiện tại và làm lại từ đầu"
+          >
+            Làm lại từ đầu
+          </button>
+        )}
 
         {!hideTimer && (
           <div

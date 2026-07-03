@@ -35,6 +35,8 @@ export interface InProgressTest {
   time_remaining: number;
   total_duration: number;
   started_at: string;
+  answered_questions?: number;
+  total_questions?: number;
 }
 
 export interface TeacherReminder {

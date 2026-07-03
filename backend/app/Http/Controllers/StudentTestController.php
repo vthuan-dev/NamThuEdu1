@@ -1936,16 +1936,26 @@ class StudentTestController extends Controller
             $timeElapsed = \Carbon\Carbon::parse($submission->sStart_time)->diffInMinutes(now(), true);
             $timeRemaining = max(0, $duration - $timeElapsed);
 
+            // Tiến độ làm bài: số câu đã trả lời (đáp án khác rỗng) trên tổng số câu của đề.
+            // getQuestionsCount() xử lý đúng cả THPT (đếm theo thpt_config) lẫn đề thường.
+            $answeredQuestions = SubmissionAnswer::where('submission_id', $submission->sId)
+                ->whereNotNull('saAnswer_text')
+                ->where('saAnswer_text', '!=', '')
+                ->count();
+            $totalQuestions = $exam->getQuestionsCount();
+
             return [
-                'id'             => $exam->eId,
-                'submission_id'  => $submission->sId,
-                'assignment_id'  => $submission->assignment_id,
-                'title'          => $exam->eTitle,
-                'type'           => $exam->eType,
-                'skill'          => $exam->eSkill,
-                'time_remaining' => $timeRemaining,
-                'total_duration' => $duration,
-                'started_at'     => $submission->sStart_time,
+                'id'                 => $exam->eId,
+                'submission_id'      => $submission->sId,
+                'assignment_id'      => $submission->assignment_id,
+                'title'              => $exam->eTitle,
+                'type'               => $exam->eType,
+                'skill'              => $exam->eSkill,
+                'time_remaining'     => $timeRemaining,
+                'total_duration'     => $duration,
+                'started_at'         => $submission->sStart_time,
+                'answered_questions' => $answeredQuestions,
+                'total_questions'    => $totalQuestions,
             ];
         });
 
@@ -2256,6 +2266,10 @@ class StudentTestController extends Controller
                 });
             })
             ->where('taCreated_at', '>=', now()->subDays(7))
+            // Không thông báo bài đã quá hạn (khớp với tab đề luyện: đề hết hạn bị ẩn)
+            ->where(function ($q) {
+                $q->whereNull('taDeadline')->orWhere('taDeadline', '>=', now());
+            })
             ->with(['exam'])
             ->latest('taCreated_at')
             ->take(5)
@@ -4409,7 +4423,6 @@ class StudentTestController extends Controller
 
         $duration = $exam->eDuration_minutes ?? 30;
 
-        // Resume nếu có bài đang làm dở (direct → assignment_id null)
         $existing = Submission::with('answers')
             ->where('user_id', $user->uId)
             ->where('exam_id', $examId)
@@ -4417,6 +4430,12 @@ class StudentTestController extends Controller
             ->where('sStatus', 'in_progress')
             ->orderByDesc('sId')
             ->first();
+
+        if ($existing && $request->input('restart')) {
+            $existing->answers()->delete();
+            $existing->delete();
+            $existing = null;
+        }
 
         if ($existing) {
             $timeElapsed   = now()->diffInMinutes($existing->sStart_time);
@@ -4457,6 +4476,7 @@ class StudentTestController extends Controller
                 'timeRemaining' => $timeRemaining,
                 'exam'          => $this->buildExamData($exam),
                 'savedAnswers'  => $savedAnswers,
+                'resumed'       => !empty($existing),
             ],
         ]);
     }
@@ -4577,7 +4597,6 @@ class StudentTestController extends Controller
 
         $duration = $exam->eDuration_minutes ?? 30;
 
-        // Resume nếu có bài đang làm dở (direct → assignment_id null)
         $existing = Submission::with('answers')
             ->where('user_id', $user->uId)
             ->where('exam_id', $examId)
@@ -4585,6 +4604,12 @@ class StudentTestController extends Controller
             ->where('sStatus', 'in_progress')
             ->orderByDesc('sId')
             ->first();
+
+        if ($existing && $request->input('restart')) {
+            $existing->answers()->delete();
+            $existing->delete();
+            $existing = null;
+        }
 
         if ($existing) {
             $timeElapsed   = now()->diffInMinutes($existing->sStart_time);
@@ -4625,6 +4650,7 @@ class StudentTestController extends Controller
                 'timeRemaining' => $timeRemaining,
                 'exam'          => $this->buildExamData($exam),
                 'savedAnswers'  => $savedAnswers,
+                'resumed'       => !empty($existing),
             ],
         ]);
     }

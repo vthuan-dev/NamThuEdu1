@@ -28,6 +28,7 @@ const PURPLE_LIGHT = '#EDE9FE';
 type NextAction =
   | {
       kind: 'resume';
+      id: number;
       submissionId: number;
       examType: string;
       title: string;
@@ -60,6 +61,7 @@ function computeNextAction(
     const isVstep = String(t.type || '').toUpperCase() === 'VSTEP';
     return {
       kind: 'resume',
+      id: t.id,
       submissionId: t.submission_id,
       examType: t.type || '',
       title: t.title || 'Bài thi',
@@ -232,6 +234,7 @@ export function AdultsDashboard() {
   const [dismissingId, setDismissingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -530,6 +533,32 @@ export function AdultsDashboard() {
       // silent fail — user can retry
     } finally {
       setDismissingId(null);
+    }
+  };
+
+  const handleResetSession = async (examId: number, type: string, submissionId: number) => {
+    if (!window.confirm('Bạn có chắc chắn muốn hủy phiên làm bài hiện tại và làm lại từ đầu? Mọi câu trả lời chưa nộp sẽ bị xóa.')) return;
+    setIsResetting(true);
+    try {
+      const typeUpper = String(type || '').toUpperCase();
+      if (typeUpper === 'THPT') {
+        await api.post(`/student/thpt-exams/${examId}/start`, { restart: true });
+        localStorage.removeItem(`thpt_deadline_${submissionId}`);
+      } else if (typeUpper === 'VSTEP' || typeUpper === 'IELTS') {
+        await api.post(`/student/exams/${examId}/discard-active-session`);
+        localStorage.removeItem(`ielts_deadline_${submissionId}`);
+      } else if (typeUpper === 'KIDS') {
+        await api.post(`/student/exams/${examId}/start-kids`, { restart: true });
+        localStorage.removeItem(`kids_deadline_${submissionId}`);
+      } else if (typeUpper === 'TEENS') {
+        await api.post(`/student/exams/${examId}/start-teens`, { restart: true });
+        localStorage.removeItem(`teens_deadline_${submissionId}`);
+      }
+      window.location.reload();
+    } catch (err: any) {
+      alert(err?.response?.data?.message || 'Không thể hủy phiên làm bài. Vui lòng thử lại.');
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -1055,22 +1084,34 @@ export function AdultsDashboard() {
                       </span>
                     )}
                   </div>
-                  <Link
-                    to={nextAction.routeUrl}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-bold text-white flex-shrink-0 transition-all duration-200 hover:gap-3 active:scale-[0.97]"
-                    style={{
-                      background: nextAction.kind === 'resume'
-                        ? 'linear-gradient(135deg, #EF4444, #F97316)'
-                        : `linear-gradient(135deg, ${PURPLE} 0%, ${PURPLE_MID} 100%)`,
-                      boxShadow: nextAction.kind === 'resume'
-                        ? '0 4px 14px rgba(239,68,68,0.4)'
-                        : `0 4px 14px ${PURPLE}45`,
-                    }}
-                  >
-                    <Play className="w-3.5 h-3.5 fill-white" />
-                    {ctaLabel}
-                    <ChevronRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    {nextAction.kind === 'resume' && (
+                      <button
+                        type="button"
+                        onClick={() => handleResetSession(nextAction.id, nextAction.examType, nextAction.submissionId)}
+                        disabled={isResetting}
+                        className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-sm font-bold border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+                      >
+                        Làm lại từ đầu
+                      </button>
+                    )}
+                    <Link
+                      to={nextAction.routeUrl}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-bold text-white flex-shrink-0 transition-all duration-200 hover:gap-3 active:scale-[0.97]"
+                      style={{
+                        background: nextAction.kind === 'resume'
+                          ? 'linear-gradient(135deg, #EF4444, #F97316)'
+                          : `linear-gradient(135deg, ${PURPLE} 0%, ${PURPLE_MID} 100%)`,
+                        boxShadow: nextAction.kind === 'resume'
+                          ? '0 4px 14px rgba(239,68,68,0.4)'
+                          : `0 4px 14px ${PURPLE}45`,
+                      }}
+                    >
+                      <Play className="w-3.5 h-3.5 fill-white" />
+                      {ctaLabel}
+                      <ChevronRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                    </Link>
+                  </div>
                 </div>
               </section>
             ) : (

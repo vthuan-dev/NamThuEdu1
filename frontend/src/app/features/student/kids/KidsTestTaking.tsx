@@ -138,6 +138,8 @@ export function KidsTestTaking() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [resumeDraft, setResumeDraft] = useState<any>(null);
   const [startedAtServer, setStartedAtServer] = useState('');
+  const [showActiveSessionModal, setShowActiveSessionModal] = useState(false);
+  const [isRestarting, setIsRestarting] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const startAttemptedRef = useRef(false);
 
@@ -228,6 +230,9 @@ export function KidsTestTaking() {
         if (draft && Object.keys(draft.answers).length > 0) {
           setResumeDraft(draft);
         }
+      }
+      if (data?.resumed) {
+        setShowActiveSessionModal(true);
       }
       setStarted(true);
     },
@@ -582,6 +587,123 @@ export function KidsTestTaking() {
         variant="kids"
       />
       <MultiTabWarning hasOtherTab={session.hasOtherTab} variant="kids" position="floating" />
+      <ActiveSessionChoiceModal
+        open={showActiveSessionModal}
+        onContinue={() => setShowActiveSessionModal(false)}
+        onRestart={async () => {
+          if (!window.confirm("Con có chắc chắn muốn hủy phiên làm bài hiện tại và làm lại từ đầu? Tất cả câu trả lời của phiên này sẽ bị xóa.")) return;
+          setIsRestarting(true);
+          try {
+            const examKey = exam?.id ?? exam?.eId ?? assignmentId;
+            if (direct) {
+              await api.post(`/student/exams/${examKey}/start-kids`, { restart: true });
+            } else {
+              await api.post(`/student/tests/${assignmentId}/start`, { restart: true });
+            }
+            if (submissionId) {
+              examDraftStorage.clear(submissionId);
+              localStorage.removeItem(`kids_deadline_${submissionId}`);
+            }
+            window.location.reload();
+          } catch (err: any) {
+            toast.error(err?.response?.data?.message || "Không thể hủy và khởi động lại bài thi.");
+          } finally {
+            setIsRestarting(false);
+          }
+        }}
+        isRestarting={isRestarting}
+        variant="kids"
+      />
+    </div>
+  );
+}
+
+interface ActiveSessionChoiceModalProps {
+  open: boolean;
+  onContinue: () => void;
+  onRestart: () => void;
+  isRestarting: boolean;
+  variant?: 'kids' | 'default';
+}
+
+function ActiveSessionChoiceModal({ open, onContinue, onRestart, isRestarting, variant = 'default' }: ActiveSessionChoiceModalProps) {
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  if (!open) return null;
+
+  const isKids = variant === 'kids';
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-[100] flex items-center justify-center px-4"
+      style={{ background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(6px)' }}
+    >
+      <div
+        className={[
+          "w-full max-w-md rounded-3xl bg-white p-6 sm:p-7 shadow-2xl",
+          isKids ? "border-4 border-rose-100" : "border border-slate-200"
+        ].join(' ')}
+        style={{
+          animation: 'modalIn 250ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+        }}
+      >
+        <h3 className={[
+          "text-lg font-extrabold mb-2",
+          isKids ? "text-rose-600 text-center" : "text-slate-900"
+        ].join(' ')}>
+          {isKids ? '🎉 Em có một bài làm chưa nộp!' : 'Bạn đang có một phiên làm bài chưa nộp'}
+        </h3>
+        <p className={[
+          "text-sm mb-6 leading-relaxed",
+          isKids ? "text-slate-600 text-center" : "text-slate-600"
+        ].join(' ')}>
+          {isKids
+            ? 'Em có muốn tiếp tục làm bài thi với các câu trả lời cũ hay muốn xóa phiên này để làm lại từ đầu (bài làm mới)?'
+            : 'Bạn có muốn tiếp tục làm bài thi với các câu trả lời trước đó hay muốn xóa hoàn toàn phiên này để làm lại từ đầu (phiên mới)?'}
+        </p>
+        <div className="flex flex-col gap-2.5">
+          <button
+            type="button"
+            onClick={onContinue}
+            className={[
+              "w-full py-3 px-4 rounded-xl text-sm font-bold text-white transition-colors shadow-md cursor-pointer",
+              isKids ? "bg-rose-500 hover:bg-rose-600" : "bg-teal-600 hover:bg-teal-700"
+            ].join(' ')}
+          >
+            {isKids ? 'Tiếp tục làm bài thôi!' : 'Tiếp tục làm bài'}
+          </button>
+          <button
+            type="button"
+            onClick={onRestart}
+            disabled={isRestarting}
+            className={[
+              "w-full py-3 px-4 rounded-xl text-sm font-bold transition-colors cursor-pointer",
+              isKids
+                ? "text-rose-600 bg-rose-50 hover:bg-rose-100 disabled:opacity-50"
+                : "text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            ].join(' ')}
+          >
+            {isRestarting
+              ? (isKids ? 'Đang chuẩn bị bài mới...' : 'Đang khởi động lại...')
+              : (isKids ? 'Hủy bài và Làm lại từ đầu' : 'Hủy phiên & Làm lại từ đầu')}
+          </button>
+        </div>
+      </div>
+      <style>{`
+        @keyframes modalIn {
+          0% { transform: scale(0.95); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }

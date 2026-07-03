@@ -66,7 +66,7 @@ function buildExamRouteUrl(opts: { examType?: string; assignmentId?: number; exa
 
 // ─── Next-action model ────────────────────────────────────────────────────────
 type NextAction =
-  | { kind: 'resume'; submissionId: number; examType: string; title: string; skill: string; minutesLeft: number; totalDuration: number; routeUrl: string; }
+  | { kind: 'resume'; id: number; submissionId: number; examType: string; title: string; skill: string; minutesLeft: number; totalDuration: number; answeredQuestions: number; totalQuestions: number; routeUrl: string; }
   | { kind: 'start'; assignmentId: number; examType: string; title: string; skill: string; durationMin: number; isUrgent: boolean; daysUntil: number; routeUrl: string; }
   | null;
 
@@ -76,10 +76,12 @@ function computeNextAction(inProgress: InProgressTest[], upcoming: UpcomingTest[
     const t = valid[0];
     const isThpt = (t.type || '').toUpperCase() === 'THPT';
     return {
-      kind: 'resume', submissionId: t.submission_id, examType: t.type || '',
+      kind: 'resume', id: t.id, submissionId: t.submission_id, examType: t.type || '',
       title: t.title || 'Bài thi', skill: t.skill || '',
       minutesLeft: Math.max(0, Math.round(Number(t.time_remaining) || 0)),
       totalDuration: Number(t.total_duration) || 0,
+      answeredQuestions: Math.max(0, Number(t.answered_questions) || 0),
+      totalQuestions: Math.max(0, Number(t.total_questions) || 0),
       routeUrl: isThpt
         ? `/hoc-vien/lam-bai-thpt/${(t as any).exam_id ?? t.id}`
         : `/hoc-vien/lam-bai/${t.assignment_id ?? t.id}?autostart=1&submissionId=${t.submission_id}`,
@@ -162,6 +164,7 @@ export function TeensDashboard() {
   const [dismissingId, setDismissingId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -275,6 +278,32 @@ export function TeensDashboard() {
       await studentApi.dismissReminder(item.reminderId);
       setReminders(prev => prev.filter(r => r.id !== item.reminderId));
     } catch { /* silent */ } finally { setDismissingId(null); }
+  };
+
+  const handleResetSession = async (examId: number, type: string, submissionId: number) => {
+    if (!window.confirm('Bạn có chắc chắn muốn hủy phiên làm bài hiện tại và làm lại từ đầu? Mọi câu trả lời chưa nộp sẽ bị xóa.')) return;
+    setIsResetting(true);
+    try {
+      const typeUpper = String(type || '').toUpperCase();
+      if (typeUpper === 'THPT') {
+        await api.post(`/student/thpt-exams/${examId}/start`, { restart: true });
+        localStorage.removeItem(`thpt_deadline_${submissionId}`);
+      } else if (typeUpper === 'VSTEP' || typeUpper === 'IELTS') {
+        await api.post(`/student/exams/${examId}/discard-active-session`);
+        localStorage.removeItem(`ielts_deadline_${submissionId}`);
+      } else if (typeUpper === 'KIDS') {
+        await api.post(`/student/exams/${examId}/start-kids`, { restart: true });
+        localStorage.removeItem(`kids_deadline_${submissionId}`);
+      } else if (typeUpper === 'TEENS') {
+        await api.post(`/student/exams/${examId}/start-teens`, { restart: true });
+        localStorage.removeItem(`teens_deadline_${submissionId}`);
+      }
+      window.location.reload();
+    } catch (err: any) {
+      alert(err?.response?.data?.message || 'Không thể hủy phiên làm bài. Vui lòng thử lại.');
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   const SKILL_MAP: Record<string, { label: string; color: string; bg: string; icon: any }> = {
@@ -485,16 +514,34 @@ export function TeensDashboard() {
                       </span>
                     )}
                     {nextAction.skill && nextAction.skill !== 'mixed' && <span className="text-slate-500 capitalize">{nextAction.skill}</span>}
+                    {nextAction.kind === 'resume' && nextAction.totalQuestions > 0 && (
+                      <span className="inline-flex items-center gap-1.5 font-semibold text-[11px] px-2.5 py-1 rounded-full bg-rose-50 text-rose-600 ring-1 ring-rose-200">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Đã làm {nextAction.answeredQuestions}/{nextAction.totalQuestions} câu
+                      </span>
+                    )}
                     {nextAction.kind === 'start' && nextAction.durationMin > 0 && <span className="text-slate-500">{nextAction.durationMin} phút</span>}
                     {nextAction.kind === 'start' && nextAction.daysUntil > 0 && (
                       <span className="font-semibold" style={{ color: nextAction.daysUntil <= 2 ? '#EF4444' : '#94A3B8' }}>Hạn còn {nextAction.daysUntil} ngày</span>
                     )}
                   </div>
-                  <Link to={nextAction.routeUrl}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-bold text-white flex-shrink-0 transition-all hover:gap-3 active:scale-[0.97]"
-                    style={{ background: nextAction.kind === 'resume' ? 'linear-gradient(135deg, #EF4444, #F97316)' : `linear-gradient(135deg, ${INDIGO}, ${INDIGO_MID})`, boxShadow: nextAction.kind === 'resume' ? '0 4px 14px rgba(239,68,68,0.4)' : `0 4px 14px ${INDIGO}45` }}>
-                    <Play className="w-3.5 h-3.5 fill-white" />{ctaLabel}<ChevronRight className="w-4 h-4" />
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    {nextAction.kind === 'resume' && (
+                      <button
+                        type="button"
+                        onClick={() => handleResetSession(nextAction.id, nextAction.examType, nextAction.submissionId)}
+                        disabled={isResetting}
+                        className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-sm font-bold border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+                      >
+                        Làm lại từ đầu
+                      </button>
+                    )}
+                    <Link to={nextAction.routeUrl}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-bold text-white flex-shrink-0 transition-all hover:gap-3 active:scale-[0.97]"
+                      style={{ background: nextAction.kind === 'resume' ? 'linear-gradient(135deg, #EF4444, #F97316)' : `linear-gradient(135deg, ${INDIGO}, ${INDIGO_MID})`, boxShadow: nextAction.kind === 'resume' ? '0 4px 14px rgba(239,68,68,0.4)' : `0 4px 14px ${INDIGO}45` }}>
+                      <Play className="w-3.5 h-3.5 fill-white" />{ctaLabel}<ChevronRight className="w-4 h-4" />
+                    </Link>
+                  </div>
                 </div>
               </section>
             ) : (

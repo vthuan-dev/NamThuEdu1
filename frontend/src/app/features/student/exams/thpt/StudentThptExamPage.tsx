@@ -51,6 +51,8 @@ export function StudentThptExamPage() {
   const [startedAtServer, setStartedAtServer] = useState('');
   const [totalDurationSec, setTotalDurationSec] = useState(0);
   const [remainingSec, setRemainingSec] = useState(0);
+  const [showActiveSessionModal, setShowActiveSessionModal] = useState(false);
+  const [isRestarting, setIsRestarting] = useState(false);
 
   // useExamSession: localStorage layer (layer 2) + online/hasOtherTab UI only.
   // Server save (layer 3) uses the manual saveDraft interval below because
@@ -102,6 +104,9 @@ export function StudentThptExamPage() {
           const draft = examDraftStorage.load(sid);
           if (draft && Object.keys(draft.answers).length > 0) setResumeDraft(draft);
         }
+        if (startData.resumed) {
+          setShowActiveSessionModal(true);
+        }
         setLoading(false);
       } catch (err: any) {
         setError(err?.response?.data?.message || 'Không tải được bài thi.');
@@ -112,6 +117,22 @@ export function StudentThptExamPage() {
       mounted = false;
     };
   }, [examId, assignmentId]);
+
+  const handleRestart = async () => {
+    if (!window.confirm("Bạn có chắc chắn muốn hủy phiên làm bài hiện tại và làm lại từ đầu? Tất cả câu trả lời của phiên này sẽ bị xóa.")) return;
+    try {
+      setLoading(true);
+      await api.post(`/student/thpt-exams/${examId}/start`, { restart: true });
+      if (submissionId) {
+        examDraftStorage.clear(submissionId);
+        localStorage.removeItem(thptDeadlineKey(examId, submissionId));
+      }
+      window.location.reload();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Không thể hủy và khởi động lại bài thi.");
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = useCallback(async (auto = false) => {
     if (!submissionId || !examId || isSubmitting) return;
@@ -258,7 +279,7 @@ export function StudentThptExamPage() {
         onDismiss={session.dismissWarning}
         timeRemaining={session.timeRemaining}
       />
-      <ThptTopBar examTitle={examTitle} totalSeconds={remainingSec} totalDurationSec={totalDurationSec} />
+      <ThptTopBar examTitle={examTitle} totalSeconds={remainingSec} totalDurationSec={totalDurationSec} onRestart={handleRestart} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
         <div className="min-w-0">
@@ -299,6 +320,85 @@ export function StudentThptExamPage() {
         onDiscard={() => { if (submissionId) examDraftStorage.clear(submissionId); setResumeDraft(null); }}
       />
       <MultiTabWarning hasOtherTab={session.hasOtherTab} position="floating" />
+      <ActiveSessionChoiceModal
+        open={showActiveSessionModal}
+        onContinue={() => setShowActiveSessionModal(false)}
+        onRestart={async () => {
+          setIsRestarting(true);
+          try {
+            await handleRestart();
+          } finally {
+            setIsRestarting(false);
+          }
+        }}
+        isRestarting={isRestarting}
+      />
+    </div>
+  );
+}
+
+interface ActiveSessionChoiceModalProps {
+  open: boolean;
+  onContinue: () => void;
+  onRestart: () => void;
+  isRestarting: boolean;
+}
+
+export function ActiveSessionChoiceModal({ open, onContinue, onRestart, isRestarting }: ActiveSessionChoiceModalProps) {
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-[100] flex items-center justify-center px-4"
+      style={{ background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(6px)' }}
+    >
+      <div
+        className="w-full max-w-md rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-slate-200"
+        style={{
+          animation: 'modalIn 250ms cubic-bezier(0.34, 1.56, 0.64, 1)',
+        }}
+      >
+        <h3 className="text-lg font-extrabold text-slate-900 mb-2">
+          Bạn đang có một phiên làm bài chưa nộp
+        </h3>
+        <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+          Bạn có muốn tiếp tục làm bài thi với các câu trả lời trước đó hay muốn xóa hoàn toàn phiên này để làm lại từ đầu (phiên mới)?
+        </p>
+        <div className="flex flex-col gap-2.5">
+          <button
+            type="button"
+            onClick={onContinue}
+            className="w-full py-3 px-4 rounded-xl text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 transition-colors shadow-md cursor-pointer"
+          >
+            Tiếp tục làm bài
+          </button>
+          <button
+            type="button"
+            onClick={onRestart}
+            disabled={isRestarting}
+            className="w-full py-3 px-4 rounded-xl text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          >
+            {isRestarting ? 'Đang khởi động lại...' : 'Hủy phiên & Làm lại từ đầu'}
+          </button>
+        </div>
+      </div>
+      <style>{`
+        @keyframes modalIn {
+          0% { transform: scale(0.95); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }
