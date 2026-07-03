@@ -154,12 +154,12 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                 {!isError && item.prompt && (
                   <div className="text-sm text-slate-800 leading-relaxed font-medium mb-3 space-y-1">
                     {item.prompt.split(/\s+(?=[a-e]\.\s)/i).map((part: string, i: number) => (
-                      <p key={i} className="leading-relaxed">{part.trim()}</p>
+                      <p key={i} className="leading-relaxed" dangerouslySetInnerHTML={{ __html: part.trim() }} />
                     ))}
                   </div>
                 )}
                 {isError && item.sentence && (
-                  <p className="text-sm text-slate-700 italic mb-3">{item.sentence}</p>
+                  <p className="text-sm text-slate-700 italic mb-3" dangerouslySetInnerHTML={{ __html: item.sentence }} />
                 )}
                 <div className={isError ? 'grid grid-cols-2 sm:grid-cols-4 gap-2' : 'space-y-2'}>
                   {options.map((opt: any) => (
@@ -191,7 +191,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             return (
               <QCard key={key} n={item.question_number}>
                 <p className="text-sm text-slate-800 mb-2">
-                  {item.sentence}{' '}
+                  <span dangerouslySetInnerHTML={{ __html: item.sentence }} />{' '}
                   {item.root_word && (
                     <span className="font-bold text-teal-700">({item.root_word})</span>
                   )}
@@ -235,7 +235,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                 {item.prompt && (
                   <div className="text-sm text-slate-800 leading-relaxed font-medium mb-3 space-y-1">
                     {item.prompt.split(/\s+(?=[a-e]\.\s)/i).map((part: string, i: number) => (
-                      <p key={i} className="leading-relaxed">{part.trim()}</p>
+                      <p key={i} className="leading-relaxed" dangerouslySetInnerHTML={{ __html: part.trim() }} />
                     ))}
                   </div>
                 )}
@@ -307,7 +307,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             const key = `q${item.question_number}`;
             return (
               <QCard key={key} n={item.question_number}>
-                <p className="text-sm text-slate-800 mb-2">{item.original}</p>
+                <p className="text-sm text-slate-800 mb-2" dangerouslySetInnerHTML={{ __html: item.original }} />
                 {(item.lead_in || item.prompt_word) && (
                   <p className="text-xs text-slate-500 mb-2">
                     {item.lead_in && <>➜ <span className="font-semibold">{item.lead_in}</span> </>}
@@ -511,7 +511,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                 <div className="space-y-2">
                   <div className="text-sm text-slate-800 font-medium mb-1 space-y-1">
                     {item.prompt.split(/\s+(?=[a-e]\.\s)/i).map((part: string, i: number) => (
-                      <p key={i} className="leading-relaxed">{part.trim()}</p>
+                      <p key={i} className="leading-relaxed" dangerouslySetInnerHTML={{ __html: part.trim() }} />
                     ))}
                   </div>
                   {item.options.map((opt: any) => {
@@ -849,14 +849,14 @@ function PassageBox({ text, markers }: { text: string; markers?: boolean }) {
             {markers
               ? renderParagraph(para).map((s, j) =>
                   s.kind === 'text' ? (
-                    <span key={j}>{s.value}</span>
+                    <span key={j} dangerouslySetInnerHTML={{ __html: s.value }} />
                   ) : (
                     <span key={j} className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-teal-100 text-teal-700 text-xs font-bold mx-0.5 align-middle">
                       [{s.value}]
                     </span>
                   )
                 )
-              : para}
+              : <span dangerouslySetInnerHTML={{ __html: para }} />}
           </p>
         ))}
       </div>
@@ -903,7 +903,7 @@ function ClozePassage({
           return (
             <p key={pi} className="whitespace-pre-wrap">
               {tokens.map((tok, i) => {
-                if (tok.type === 'text') return <span key={i}>{tok.text}</span>;
+                if (tok.type === 'text') return <span key={i} dangerouslySetInnerHTML={{ __html: tok.text ?? '' }} />;
                 const key = `q${tok.qn}`;
                 const userVal = String(answers[key] ?? '');
                 const correctVal = String(correctAnswers?.[key] ?? '');
