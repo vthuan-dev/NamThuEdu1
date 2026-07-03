@@ -456,6 +456,51 @@ class ThptExamController extends Controller
             ->first();
 
         if ($existing) {
+            // Check if expired
+            $durationMin = (int) ($existing->submission_payload['exam_snapshot']['eDuration_minutes']
+                ?? $exam->eDuration_minutes
+                ?? 60);
+
+            $startedAt = $existing->sStart_time;
+            $timeElapsed = now()->diffInMinutes($startedAt);
+            $timeRemaining = $durationMin - $timeElapsed;
+
+            if ($timeRemaining <= 0) {
+                // Tự động nộp bài khi hết giờ
+                $answers = $existing->submission_payload['answers'] ?? [];
+                $payload = $existing->submission_payload ?? [];
+
+                $configForGrading = $payload['exam_snapshot']['config']
+                    ?? $exam->thpt_config
+                    ?? $this->blankConfig();
+
+                $result = $this->gradeSubmission($configForGrading, $answers);
+                $existing->sScore = $result['scaled_score'];
+                $existing->sStatus = 'graded';
+                $existing->sSubmit_time = now();
+                $existing->sGraded_time = now();
+                $existing->sTime_taken = $existing->sStart_time
+                    ? now()->diffInSeconds($existing->sStart_time)
+                    : null;
+                $existing->auto_submit_reason = 'timeout';
+
+                $payload['result'] = $result;
+                $existing->submission_payload = $payload;
+
+                // Speaking check
+                $hasSpeakingSection = collect($configForGrading['sections'] ?? [])
+                    ->contains(fn($s) => ($s['type'] ?? '') === 'speaking');
+                $rawFeedback = json_decode($existing->sGemini_feedback ?? '{}', true) ?: [];
+                $hasSpeakingAudio = !empty($rawFeedback['speaking_audio'] ?? []);
+                if ($hasSpeakingSection && $hasSpeakingAudio) {
+                    \App\Jobs\GradeThptSpeakingJob::dispatch((int) $existing->sId);
+                }
+
+                $existing->save();
+
+                return $this->error('Bài thi đã hết thời gian làm bài và đã được tự động nộp.', 403);
+            }
+
             $existingPayload = $existing->submission_payload ?? [];
             return response()->json([
                 'status' => 'success',
@@ -643,6 +688,18 @@ class ThptExamController extends Controller
         $snapshotVersion = $payload['exam_snapshot']['version'] ?? null;
 
         $result = $payload['result'] ?? null;
+
+        // Nếu bài đang làm và chưa hết hạn → không cho phép lấy kết quả (chặn cheat)
+        if ($submission->sStatus === 'in_progress') {
+            $durationMin = (int) ($payload['exam_snapshot']['eDuration_minutes']
+                ?? $exam->eDuration_minutes
+                ?? 60);
+            $startedAt = $submission->sStart_time;
+            $timeElapsed = now()->diffInMinutes($startedAt);
+            if ($timeElapsed < $durationMin) {
+                return $this->error('Bài thi đang trong quá trình làm, chưa thể xem kết quả.', 400);
+            }
+        }
 
         // ── SELF-HEAL ────────────────────────────────────────────────────────
         // Nếu bài chưa ở trạng thái 'graded' (vd: final submit bị gián đoạn, mất
