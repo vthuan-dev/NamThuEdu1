@@ -4420,7 +4420,14 @@ class StudentTestController extends Controller
 
         if ($existing) {
             $timeElapsed   = now()->diffInMinutes($existing->sStart_time);
-            $timeRemaining = max(0, $duration - $timeElapsed);
+            $timeRemaining = $duration - $timeElapsed;
+            if ($timeRemaining <= 0) {
+                $this->autoSubmit($existing);
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Bài thi đã hết thời gian làm bài và đã được tự động nộp.'
+                ], 403);
+            }
             $submission    = $existing;
             $savedAnswers  = $existing->answers;
         } else {
@@ -4581,7 +4588,14 @@ class StudentTestController extends Controller
 
         if ($existing) {
             $timeElapsed   = now()->diffInMinutes($existing->sStart_time);
-            $timeRemaining = max(0, $duration - $timeElapsed);
+            $timeRemaining = $duration - $timeElapsed;
+            if ($timeRemaining <= 0) {
+                $this->autoSubmit($existing);
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Bài thi đã hết thời gian làm bài và đã được tự động nộp.'
+                ], 403);
+            }
             $submission    = $existing;
             $savedAnswers  = $existing->answers;
         } else {

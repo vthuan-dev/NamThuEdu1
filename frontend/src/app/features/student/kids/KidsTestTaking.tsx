@@ -235,6 +235,8 @@ export function KidsTestTaking() {
       const msg: string = err?.response?.data?.message ?? '';
       if (msg.includes('hết số lần')) {
         setLoadError('Bạn đã hết số lần làm bài cho bài thi này.');
+      } else if (msg) {
+        setLoadError(msg);
       } else {
         setLoadError('Không kết nối được. Em tải lại trang nhé!');
       }
