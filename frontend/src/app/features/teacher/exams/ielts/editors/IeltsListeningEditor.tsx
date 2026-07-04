@@ -63,6 +63,101 @@ const WORD_LIMIT_OPTS = [
   "NO MORE THAN THREE WORDS",
 ];
 
+const QUESTION_TYPE_GUIDES: Record<string, { title: string; steps: string[]; note?: string }> = {
+  "multiple-choice": {
+    title: "Hướng dẫn soạn câu Trắc nghiệm (MCQ chọn 1 đáp án):",
+    steps: [
+      "Bước 1: Nhập nội dung câu hỏi riêng của từng câu.",
+      "Bước 2: Sử dụng nút '+ Thêm đáp án' để tạo các lựa chọn từ A đến D/H.",
+      "Bước 3: Click chọn nút Radio tròn tương ứng để đặt chữ cái đó làm đáp án đúng duy nhất.",
+    ],
+    note: "* Học viên sẽ thấy câu hỏi kèm danh sách đáp án, và chọn câu trả lời tại menu điền đáp án bên phải.",
+  },
+  "multiple-choice-group": {
+    title: "Hướng dẫn soạn câu MCQ chọn 2/3 đáp án (Choose TWO/THREE):",
+    steps: [
+      "Bước 1: Chọn loại <em>Multiple choice (Choose TWO/THREE)</em> cho các câu thuộc nhóm câu hỏi này (ví dụ: câu 1 và câu 2).",
+      "Bước 2 (Tại câu đầu nhóm): Nhập đề bài chung, bấm <strong>+ Thêm đáp án</strong> để nhập đầy đủ các lựa chọn (A-E/H), và tích chọn đáp án đúng thứ nhất.",
+      "Bước 3 (Tại các câu tiếp theo): Hệ thống tự ẩn bộ đáp án để giao diện gọn gàng, bạn chỉ cần click chọn đáp án đúng tiếp theo tại hàng nút chữ cái (A, B, C, D...).",
+    ],
+    note: "* Học viên sẽ nhìn thấy 1 bảng câu hỏi gộp duy nhất bên trái (Câu 1–2) và điền đáp án vào các ô tương ứng bên phải.",
+  },
+  "form-completion": {
+    title: "Hướng dẫn soạn Form completion (Điền biểu mẫu):",
+    steps: [
+      "Bước 1: Soạn toàn bộ biểu mẫu trong khung nhập liệu lớn 'Nội dung form'.",
+      "Bước 2: Mỗi ô điền đáp án, hãy gõ ít nhất 3 dấu gạch dưới liên tiếp '___'. Hệ thống tự động đếm số '___' để sinh ra các câu tương ứng.",
+      "Bước 3: Với mỗi câu sinh ra bên dưới, hãy điền đáp án đúng vào ô 'Đáp án đúng'.",
+      "Bước 4: Có thể đặt giới hạn từ (VD: ONE WORD ONLY) và bật checkbox 'Dùng word bank' nếu muốn học viên chọn từ danh sách từ cho sẵn.",
+    ],
+  },
+  "note-completion": {
+    title: "Hướng dẫn soạn Note completion (Hoàn thành ghi chú):",
+    steps: [
+      "Bước 1: Soạn nội dung từng câu ghi chú riêng biệt.",
+      "Bước 2: Điền đáp án đúng cho từng câu tương ứng.",
+      "Bước 3: Có thể cấu hình giới hạn số lượng từ cho phép nhập ở phần cài đặt.",
+    ],
+  },
+  "table-completion": {
+    title: "Hướng dẫn soạn Table completion (Hoàn thành bảng):",
+    steps: [
+      "Bước 1: Soạn nội dung dòng/cột tương ứng của bảng.",
+      "Bước 2: Nhập đáp án đúng tương ứng cho từng câu.",
+    ],
+  },
+  "flow-chart-completion": {
+    title: "Hướng dẫn soạn Flow-chart completion (Hoàn thành sơ đồ tiến trình):",
+    steps: [
+      "Bước 1: Soạn nội dung các bước của tiến trình.",
+      "Bước 2: Nhập đáp án đúng cho từng bước tương ứng.",
+    ],
+  },
+  "summary-completion": {
+    title: "Hướng dẫn soạn Summary completion (Hoàn thành bản tóm tắt):",
+    steps: [
+      "Bước 1: Soạn nội dung câu tóm tắt.",
+      "Bước 2: Nhập đáp án đúng tương ứng.",
+    ],
+  },
+  "sentence-completion": {
+    title: "Hướng dẫn soạn Sentence completion (Hoàn thành câu):",
+    steps: [
+      "Bước 1: Soạn nội dung câu chưa hoàn chỉnh.",
+      "Bước 2: Nhập từ/cụm từ chính xác cần điền vào ô đáp án đúng.",
+    ],
+  },
+  "short-answer": {
+    title: "Hướng dẫn soạn Short-answer (Trả lời ngắn):",
+    steps: [
+      "Bước 1: Nhập câu hỏi ngắn cần trả lời.",
+      "Bước 2: Nhập các đáp án đúng được chấp nhận.",
+    ],
+  },
+  "matching": {
+    title: "Hướng dẫn soạn câu Matching (Nối chéo / Ghép cặp):",
+    steps: [
+      "Bước 1 (Tại câu đầu nhóm): Nhập danh sách các lựa chọn để ghép (ví dụ A: ..., B: ...) tại khung 'Bảng lựa chọn'.",
+      "Bước 2 (Tại từng câu hỏi): Nhập tên mục cần ghép (ví dụ: tên một người, địa điểm...).",
+      "Bước 3: Tại mỗi mục câu hỏi, chọn chữ cái tương ứng đúng từ dropdown đáp án.",
+    ],
+  },
+  "plan-map-diagram": {
+    title: "Hướng dẫn soạn Plan / Map / Diagram labelling (Nhãn sơ đồ/bản đồ):",
+    steps: [
+      "Bước 1: Nhập câu hỏi hoặc mô tả nhãn cần điền.",
+      "Bước 2: Nhập đáp án đúng cho từng nhãn.",
+    ],
+  },
+  "image-completion": {
+    title: "Hướng dẫn soạn câu hỏi kèm hình ảnh (Image / Table):",
+    steps: [
+      "Bước 1: Tải lên hình ảnh đề bài chứa bản đồ/bảng biểu (áp dụng chung cho cả nhóm câu hỏi).",
+      "Bước 2: Tại từng câu hỏi được sinh ra, nhập đáp án đúng tương ứng với nhãn/chỗ trống trên ảnh.",
+    ],
+  },
+};
+
 type ParsedInlineForm = {
   questions: Array<{
     questionNumber: number;
@@ -1246,7 +1341,7 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
                 Dùng cài đặt chung ở câu {groupStartNumber}
               </span>
             )}
-            {question.questionType === "multiple-choice-group" && (
+            {QUESTION_TYPE_GUIDES[question.questionType] && (
               <button
                 type="button"
                 onClick={() => setShowGuide(prev => !prev)}
@@ -1257,29 +1352,36 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
             )}
           </div>
 
-          {question.questionType === "multiple-choice-group" && showGuide && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3 text-xs text-blue-900 space-y-1.5 animate-fadeIn">
-              <p className="font-bold text-blue-800 flex items-center gap-1">
-                Hướng dẫn soạn câu MCQ chọn 2/3 đáp án (Choose TWO/THREE):
-              </p>
-              <ul className="list-disc pl-4 space-y-1 text-gray-700">
-                <li><strong>Bước 1:</strong> Chọn loại <em>Multiple choice (Choose TWO/THREE)</em> cho các câu thuộc nhóm câu hỏi này (ví dụ: câu 1 và câu 2).</li>
-                <li><strong>Bước 2 (Tại câu đầu nhóm):</strong> Nhập đề bài chung, bấm <strong>+ Thêm đáp án</strong> để nhập đầy đủ các lựa chọn (A-E/H), và tích chọn đáp án đúng thứ nhất.</li>
-                <li><strong>Bước 3 (Tại các câu tiếp theo):</strong> Hệ thống tự ẩn bộ đáp án để giao diện gọn gàng, bạn chỉ cần click chọn đáp án đúng tiếp theo tại hàng nút chữ cái (A, B, C, D...).</li>
-              </ul>
-              <div className="mt-2 pt-2 border-t border-blue-100/50">
-                <p className="font-semibold text-blue-800 mb-1">Giao diện học viên khi làm bài sẽ trông như thế này:</p>
-                <img
-                  src="/images/ielts_student_grouped_mcq_ui.png"
-                  alt="Student MCQ Group UI Preview"
-                  className="rounded border border-blue-200 shadow-sm max-w-[280px] sm:max-w-[400px] h-auto"
-                />
+          {showGuide && QUESTION_TYPE_GUIDES[question.questionType] && (() => {
+            const guide = QUESTION_TYPE_GUIDES[question.questionType];
+            return (
+              <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3 text-xs text-blue-900 space-y-1.5 animate-fadeIn">
+                <p className="font-bold text-blue-800 flex items-center gap-1">
+                  {guide.title}
+                </p>
+                <ul className="list-disc pl-4 space-y-1 text-gray-700">
+                  {guide.steps.map((step, idx) => (
+                    <li key={idx} dangerouslySetInnerHTML={{ __html: step }} />
+                  ))}
+                </ul>
+                {question.questionType === "multiple-choice-group" && (
+                  <div className="mt-2 pt-2 border-t border-blue-100/50">
+                    <p className="font-semibold text-blue-800 mb-1">Giao diện học viên khi làm bài sẽ trông như thế này:</p>
+                    <img
+                      src="/images/ielts_student_grouped_mcq_ui.png"
+                      alt="Student MCQ Group UI Preview"
+                      className="rounded border border-blue-200 shadow-sm max-w-[280px] sm:max-w-[400px] h-auto"
+                    />
+                  </div>
+                )}
+                {guide.note && (
+                  <p className="text-[10px] text-gray-500 italic mt-1 border-t border-blue-100/50 pt-1">
+                    {guide.note}
+                  </p>
+                )}
               </div>
-              <p className="text-[10px] text-gray-500 italic mt-1 border-t border-blue-100/50 pt-1">
-                * Lưu ý: Học viên sẽ nhìn thấy 1 bảng câu hỏi gộp duy nhất bên trái (Câu 1–2) và điền đáp án vào các ô tương ứng bên phải.
-              </p>
-            </div>
-          )}
+            );
+          })()}
 
           {!isImgCompletion && (
             !isInlineForm && (
