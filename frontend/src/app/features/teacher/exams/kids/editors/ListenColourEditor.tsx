@@ -37,6 +37,7 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
   const [uploadingAudio, setUploadingAudio] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedInstForHotspot, setSelectedInstForHotspot] = useState<number | null>(null);
+  const [imageRotation, setImageRotation] = useState<number>(0);
 
   // Load initial data
   useEffect(() => {
@@ -44,6 +45,7 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
       setTitle(initialData.title || '');
       setMainAudioUrl(initialData.config?.mainAudioUrl || '');
       setMainImageUrl(initialData.config?.mainImageUrl || '');
+      setImageRotation(initialData.config?.imageRotation || 0);
       
       // Map instructions with writeText support
       const mappedInstructions = (initialData.config?.instructions || []).map((inst: any) => ({
@@ -172,14 +174,30 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
     const img = e.currentTarget;
     const rect = img.getBoundingClientRect();
     
-    // Calculate position as percentage
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const clickX = (e.clientX - rect.left) / rect.width;
+    const clickY = (e.clientY - rect.top) / rect.height;
+    
+    let x = clickX;
+    let y = clickY;
+    
+    if (imageRotation === 90) {
+      x = clickY;
+      y = 1 - clickX;
+    } else if (imageRotation === 180) {
+      x = 1 - clickX;
+      y = 1 - clickY;
+    } else if (imageRotation === 270) {
+      x = 1 - clickY;
+      y = clickX;
+    }
+    
+    const pctX = x * 100;
+    const pctY = y * 100;
     
     // Update instruction at selected index with hotspot
     setInstructions(instructions.map((inst, index) => 
       index === selectedInstForHotspot 
-        ? { ...inst, hotspot: { x, y } }
+        ? { ...inst, hotspot: { x: pctX, y: pctY } }
         : inst
     ));
     
@@ -200,6 +218,7 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
       config: {
         mainAudioUrl,
         mainImageUrl,
+        imageRotation,
         instructions: instructions.map(inst => ({
           id: inst.id,
           objectName: inst.objectName,
@@ -326,7 +345,14 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
         ) : (
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-start gap-4">
-              <div className="relative border border-slate-300 rounded-lg overflow-hidden bg-white shadow-sm inline-block">
+              <div 
+                className="relative border border-slate-300 rounded-lg overflow-hidden bg-white shadow-sm inline-block"
+                style={{ 
+                  transform: `rotate(${imageRotation}deg)`, 
+                  transformOrigin: 'center',
+                  transition: 'transform 0.3s ease-in-out'
+                }}
+              >
                 <img
                   src={getFullMediaUrl(mainImageUrl)}
                   alt="Main"
@@ -367,6 +393,20 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
                   title="Xóa ảnh"
                 >
                   <Trash2 className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImageRotation((prev) => (prev + 90) % 360)}
+                  disabled={instructions.some(inst => inst.hotspot)}
+                  className={`rounded-lg p-2 transition-colors border flex items-center gap-1.5 text-xs font-bold self-start ${
+                    instructions.some(inst => inst.hotspot)
+                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'bg-white border-orange-200 text-orange-700 hover:bg-orange-50 cursor-pointer'
+                  }`}
+                  title={instructions.some(inst => inst.hotspot) ? 'Không thể xoay khi đã gán vị trí vật thể' : 'Xoay hình 90°'}
+                >
+                  <span>🔄</span>
+                  <span>Xoay hình 90°</span>
                 </button>
                 {selectedInstForHotspot !== null && (
                   <div className="max-w-[200px] text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded p-2 animate-bounce">

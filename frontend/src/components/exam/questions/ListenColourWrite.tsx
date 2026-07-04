@@ -25,6 +25,7 @@ export function ListenColourWrite({
   const instructionsText = question?.title || realTaskData?.title || config?.instructionsText || 'Listen, colour and write. There is one example.';
   const audioUrl = realTaskData?.audioUrl || config?.audioUrl || realTaskData?.audio_url || config?.audio_url;
   const imageUrl = realTaskData?.imageUrl || config?.imageUrl || realTaskData?.image_url || config?.image_url;
+  const imageRotation = config?.imageRotation || realTaskData?.imageRotation || 0;
   
   // State lưu nhãn màu/từ đang được chọn (dành cho click-to-color trên mobile/tablet)
   const [selectedBadge, setSelectedBadge] = useState<any>(null);
@@ -136,7 +137,14 @@ export function ListenColourWrite({
       {/* Khu vực Bức tranh tương tác */}
       {imageUrl && (
         <div className="flex flex-col items-center justify-center p-4 border border-slate-200 bg-slate-50 rounded-2xl shadow-inner">
-          <div className="relative border border-slate-300 rounded-xl overflow-hidden bg-white shadow-md inline-block max-w-full">
+          <div 
+            className="relative border border-slate-300 rounded-xl overflow-hidden bg-white shadow-md inline-block max-w-full"
+            style={{ 
+              transform: `rotate(${imageRotation}deg)`,
+              transformOrigin: 'center',
+              transition: 'transform 0.3s ease-in-out'
+            }}
+          >
             <img 
               src={getFullMediaUrl(imageUrl)} 
               alt="Listen and Colour" 
