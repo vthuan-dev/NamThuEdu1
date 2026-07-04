@@ -65,6 +65,220 @@ const EDITOR_MAP: Record<string, React.ComponentType<any>> = {
   listening_letter_match: ListeningLetterMatchEditor,
 };
 
+const KIDS_TASK_GUIDES: Record<string, { rules: string[]; steps: string[]; note?: string }> = {
+  listen_and_draw_lines: {
+    rules: [
+      "Tổng số tên nhân vật: Cần thêm đầy đủ các tên nhân vật (thường là 6-7 tên).",
+      "Ví dụ mẫu (Example): Tích chọn 'Ví dụ mẫu' cho đúng 1 nhân vật đầu tiên.",
+      "Vị trí Hotspot: Vẽ khoanh vùng tọa độ của từng nhân vật trên ảnh nền đề thi.",
+    ],
+    steps: [
+      "Tải lên file audio bài nghe và hình ảnh đề bài chính.",
+      "Thêm các tên nhân vật cần nối ở danh sách bên dưới.",
+      "Sử dụng công cụ khoanh vùng (hotspot) trên ảnh đề để đánh dấu vị trí của từng nhân vật tương ứng.",
+    ],
+    note: "* Học viên sẽ kéo nối đường thẳng từ tên nhân vật vào đúng vị trí trên bức tranh khi làm bài.",
+  },
+  listen_and_write: {
+    rules: [
+      "Tổng số câu hỏi: Thường gồm 1 câu ví dụ (Example) và 5 câu hỏi chính.",
+      "Ví dụ mẫu: Điền từ mẫu và tích chọn checkbox 'Ví dụ mẫu'.",
+    ],
+    steps: [
+      "Tải lên file audio bài nghe và hình ảnh đề bài (nếu có).",
+      "Thêm các câu hỏi và điền từ đáp án chính xác cần viết vào ô 'Đáp án đúng'.",
+    ],
+    note: "* Học viên sẽ nghe và tự nhập từ/số vào ô trống tương ứng.",
+  },
+  listen_and_tick: {
+    rules: [
+      "Số bức tranh mỗi câu: Mỗi câu hỏi trắc nghiệm gồm 3 bức tranh lựa chọn (A, B, C).",
+      "Ví dụ mẫu: Tích chọn 'Ví dụ mẫu' ở câu hỏi số 0.",
+    ],
+    steps: [
+      "Tải lên file audio nghe và tải lên 3 hình ảnh tương ứng với các đáp án A, B, C cho từng câu.",
+      "Tích chọn đáp án đúng (A, B hoặc C) tương ứng với nội dung bài nghe.",
+    ],
+    note: "* Học viên sẽ nghe và tích chọn trực tiếp vào bức tranh đúng nhất.",
+  },
+  listen_colour: {
+    rules: [
+      "Tô màu và viết chữ: Thường có 5 câu tô màu và 1 câu viết chữ.",
+      "Vị trí Hotspot: Đánh dấu các vật thể cần tô màu trên bức tranh.",
+    ],
+    steps: [
+      "Tải lên hình ảnh đen trắng của đề bài và file audio.",
+      "Thêm các hướng dẫn tô màu: chọn vật thể cần tô, chỉ định màu sắc đúng hoặc từ cần viết.",
+    ],
+    note: "* Học viên sẽ sử dụng bảng màu vẽ trực tiếp lên các vật thể của bức tranh.",
+  },
+  listen_colour_write: {
+    rules: [
+      "Tô màu và viết chữ: Thường có 5 câu tô màu và 1 câu viết chữ.",
+      "Vị trí Hotspot: Đánh dấu các vật thể cần tô màu trên bức tranh.",
+    ],
+    steps: [
+      "Tải lên hình ảnh đen trắng của đề bài và file audio.",
+      "Thêm các hướng dẫn tô màu: chọn vật thể cần tô, chỉ định màu sắc đúng hoặc từ cần viết.",
+    ],
+    note: "* Học viên sẽ sử dụng bảng màu vẽ trực tiếp lên các vật thể của bức tranh.",
+  },
+  listening_letter_match: {
+    rules: [
+      "Tổng số chủ thể: Cần tạo đủ <strong>6 chủ thể</strong> (ví dụ: các nhân vật như <em>her son</em>, <em>her uncle</em>, <em>Jane</em>...).",
+      "Ví dụ mẫu (Example): Tích chọn <strong>'Ví dụ mẫu'</strong> cho đúng 1 chủ thể đầu tiên. Chỗ này sẽ tự điền sẵn đáp án khi học sinh làm bài thi thử.",
+      "Tổng số hình ảnh (Options A-H): Phải điền đầy đủ mô tả và tải lên đúng <strong>8 hình ảnh</strong> tương ứng từ A đến H. Sẽ có 2 đáp án nhiễu (distractors) không được ghép với chủ thể nào.",
+    ],
+    steps: [
+      "Tải lên file audio nghe tại mục <strong>🎵 File Audio</strong>.",
+      "Soạn 8 hình ảnh tại phần <strong>🖼️ Options</strong> bằng cách gõ mô tả ngắn (VD: <em>swimming</em>) và dán hình ảnh (Ctrl+V hoặc tải từ máy).",
+      "Tại phần <strong>🔤 Chủ thể</strong>, thêm đủ 6 chủ thể. Với từng chủ thể, chọn Chữ cái đáp án đúng tương ứng (A-H) từ menu thả xuống.",
+    ],
+    note: "* Học viên sẽ kéo thả các chữ cái (A-H) tương ứng với các tranh vào ô trống bên cạnh mỗi chủ thể khi làm bài.",
+  },
+  look_and_read: {
+    rules: [
+      "Đúng/Sai (yes/no): Đề bài gồm các khẳng định kèm theo tranh mô tả.",
+    ],
+    steps: [
+      "Tải lên bức tranh đề bài chính.",
+      "Nhập các câu khẳng định tương ứng với tranh.",
+      "Chọn đáp án đúng là Đúng (yes) hoặc Sai (no) cho mỗi câu.",
+    ],
+  },
+  look_read_write: {
+    rules: [
+      "Đọc truyện tranh và trả lời: Trả lời ngắn từ 1 đến 5 từ.",
+    ],
+    steps: [
+      "Tải lên các bức tranh diễn biến câu chuyện.",
+      "Nhập các câu hỏi đọc hiểu hoặc câu tóm tắt chứa ô trống '___'.",
+      "Điền các đáp án đúng được chấp nhận cho mỗi câu.",
+    ],
+  },
+  unscramble_words: {
+    rules: [
+      "Sắp xếp chữ cái: Cho sẵn các chữ cái đảo lộn và hình ảnh gợi ý.",
+    ],
+    steps: [
+      "Tải lên hình ảnh gợi ý cho từ cần viết.",
+      "Nhập từ đáp án chính xác. Hệ thống sẽ tự động đảo lộn các chữ cái để hiển thị cho học sinh.",
+    ],
+  },
+  word_bank_fill: {
+    rules: [
+      "Điền từ từ ngân hàng: Có một đoạn văn ngắn và danh sách từ cho sẵn kèm ảnh gợi ý.",
+    ],
+    steps: [
+      "Soạn đoạn văn và đặt các dấu '___' tại chỗ trống cần điền.",
+      "Thêm danh sách các từ trong ngân hàng từ (kèm ảnh minh họa).",
+      "Ghép nối từ đúng với từng ô trống tương ứng trong đoạn văn.",
+    ],
+  },
+  word_definition_matching: {
+    rules: [
+      "Ghép từ với định nghĩa: Cho sẵn danh sách từ vựng kèm hình ảnh và các câu định nghĩa.",
+    ],
+    steps: [
+      "Thêm danh sách từ vựng ở ô bên trái (thường là 8-10 từ kèm ảnh).",
+      "Thêm các câu định nghĩa/mô tả ở ô bên phải.",
+      "Chọn từ đúng tương ứng cho từng định nghĩa.",
+    ],
+  },
+  dialogue_matching: {
+    rules: [
+      "Hoàn thành hội thoại: Nối câu trả lời của nhân vật B khớp với câu nói của nhân vật A.",
+    ],
+    steps: [
+      "Nhập các câu nói dẫn dắt của nhân vật A.",
+      "Nhập danh sách lựa chọn câu trả lời của nhân vật B.",
+      "Tích chọn câu trả lời chính xác nhất cho từng đoạn hội thoại.",
+    ],
+  },
+  story_completion: {
+    rules: [
+      "Điền chỗ trống trong truyện: Điền từ vào đoạn văn và chọn tiêu đề truyện phù hợp.",
+    ],
+    steps: [
+      "Nhập nội dung đoạn văn có chứa các chỗ trống '___'.",
+      "Nhập danh sách các từ lựa chọn cho sẵn.",
+      "Thêm câu hỏi trắc nghiệm chọn tiêu đề đúng cho truyện.",
+    ],
+  },
+  open_cloze: {
+    rules: [
+      "Tự điền từ (không cho sẵn từ): Học sinh tự nghĩ từ phù hợp để điền vào chỗ trống.",
+    ],
+    steps: [
+      "Nhập đoạn văn chứa các chỗ trống cần điền.",
+      "Nhập danh sách đáp án đúng được chấp nhận cho mỗi câu.",
+    ],
+  },
+  picture_story_writing: {
+    rules: [
+      "Viết truyện theo tranh: Học sinh viết đoạn văn mô tả câu chuyện dựa trên 3 bức tranh.",
+    ],
+    steps: [
+      "Tải lên 3 bức tranh diễn biến câu chuyện theo đúng thứ tự.",
+      "Nhập gợi ý hoặc từ khóa bổ trợ (nếu có).",
+    ],
+  },
+  find_differences: {
+    rules: [
+      "Tìm điểm khác biệt: Nói/Mô tả các điểm khác biệt giữa 2 bức tranh.",
+    ],
+    steps: [
+      "Tải lên bức tranh A và bức tranh B.",
+      "Nhập danh sách các điểm khác biệt làm đáp án gợi ý cho giáo viên chấm điểm.",
+    ],
+  },
+  picture_story_narration: {
+    rules: [
+      "Kể chuyện theo tranh: Giáo viên hiển thị bộ tranh và học sinh ghi âm kể lại câu chuyện.",
+    ],
+    steps: [
+      "Tải lên chuỗi hình ảnh câu chuyện (thường là 4 tranh).",
+      "Ghi hướng dẫn kể chuyện hoặc câu mở đầu gợi ý.",
+    ],
+  },
+  information_exchange: {
+    rules: [
+      "Trao đổi thông tin: Dạng bài nói ghép cặp đổi thông tin giữa học viên và giám khảo.",
+    ],
+    steps: [
+      "Tải lên phiếu thông tin của Học sinh (Student card) và phiếu thông tin của Giám khảo (Examiner card).",
+      "Nhập bộ câu hỏi gợi ý.",
+    ],
+  },
+  picture_questions: {
+    rules: [
+      "Trả lời câu hỏi về tranh: Trả lời các câu hỏi mô tả chi tiết của bức tranh lớn.",
+    ],
+    steps: [
+      "Tải lên bức tranh toàn cảnh.",
+      "Soạn bộ câu hỏi nói (Speaking) tương ứng để giáo viên đặt câu hỏi khi thi.",
+    ],
+  },
+  picture_card_questions: {
+    rules: [
+      "Hỏi-đáp về thẻ hình: Hiển thị 4 thẻ hình nhỏ để hỏi học viên.",
+    ],
+    steps: [
+      "Tải lên hình ảnh của 4 thẻ hình.",
+      "Nhập câu hỏi gợi ý cho từng thẻ hình.",
+    ],
+  },
+  object_placement: {
+    rules: [
+      "Đặt thẻ vào tranh: Học sinh nghe lệnh nói và kéo các thẻ vật thể nhỏ đặt vào đúng vị trí của bức tranh lớn.",
+    ],
+    steps: [
+      "Tải lên bức tranh nền lớn và danh sách các ảnh vật thể nhỏ.",
+      "Nhập câu lệnh hướng dẫn vị trí đặt tương ứng.",
+    ],
+  },
+};
+
 // Nhãn ngắn cho từng phần (breadcrumb + badge)
 const PART_LABELS: Record<number, { icon: string; label: string }> = {
   1: { icon: '🎧', label: 'Nghe' },
@@ -82,6 +296,7 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
   const [selectedTaskType, setSelectedTaskType] = useState<string | null>(null);
   const [showEditor, setShowEditor] = useState(false);
   const [showTaskTypeSelector, setShowTaskTypeSelector] = useState(false);
+  const [showGuide, setShowGuide] = useState(true);
   const [selectedPart, setSelectedPart] = useState<number | null>(null);
   const [selectedSubPart, setSelectedSubPart] = useState<number | null>(null);
   const [expandedParts, setExpandedParts] = useState<number[]>([]);
@@ -483,7 +698,7 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
         <div className="flex-1 space-y-4 overflow-y-auto p-6">
           {/* Breadcrumb ngữ cảnh (chỉ hiện khi đang soạn) */}
           {showEditor && selectedPart && (
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
                 <span className="font-semibold text-slate-700">
                   {PART_LABELS[selectedPart]?.icon} {PART_LABELS[selectedPart]?.label}
@@ -495,13 +710,57 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
                   </>
                 )}
               </div>
-              {showSubParts && selectedSubPart && (
-                <button
-                  onClick={() => setShowTaskTypeSelector(true)}
-                  className="text-xs font-semibold text-orange-600 transition-colors hover:text-orange-700"
-                >
-                  Đổi dạng bài
-                </button>
+              <div className="flex items-center gap-3">
+                {selectedTaskType && KIDS_TASK_GUIDES[selectedTaskType] && (
+                  <button
+                    onClick={() => setShowGuide(prev => !prev)}
+                    type="button"
+                    className="flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700 hover:bg-orange-100 transition-colors cursor-pointer"
+                  >
+                    <span>ℹ️</span>
+                    <span>{showGuide ? 'Ẩn hướng dẫn soạn bài' : 'Hiện hướng dẫn soạn bài'}</span>
+                  </button>
+                )}
+                {showSubParts && selectedSubPart && (
+                  <button
+                    onClick={() => setShowTaskTypeSelector(true)}
+                    className="text-xs font-semibold text-orange-600 transition-colors hover:text-orange-700"
+                  >
+                    Đổi dạng bài
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Hướng dẫn chi tiết soạn đề */}
+          {showEditor && selectedTaskType && showGuide && KIDS_TASK_GUIDES[selectedTaskType] && (
+            <div className="rounded-xl border border-orange-200 bg-orange-50/50 p-5 space-y-3 text-sm text-slate-700 animate-fadeIn shadow-sm">
+              <h4 className="flex items-center gap-2 font-bold text-orange-800 text-base">
+                ℹ️ Hướng dẫn chi tiết soạn đề: {getTaskTypeLabel(selectedTaskType)}
+              </h4>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <p className="font-semibold text-slate-800">📌 Quy chuẩn cấu trúc đề:</p>
+                  <ul className="list-disc pl-4 space-y-1.5 text-slate-600">
+                    {KIDS_TASK_GUIDES[selectedTaskType].rules.map((rule, idx) => (
+                      <li key={idx} dangerouslySetInnerHTML={{ __html: rule }} />
+                    ))}
+                  </ul>
+                </div>
+                <div className="space-y-2">
+                  <p className="font-semibold text-slate-800">🚀 Các bước thực hiện nhanh:</p>
+                  <ol className="list-decimal pl-4 space-y-1.5 text-slate-600">
+                    {KIDS_TASK_GUIDES[selectedTaskType].steps.map((step, idx) => (
+                      <li key={idx} dangerouslySetInnerHTML={{ __html: step }} />
+                    ))}
+                  </ol>
+                </div>
+              </div>
+              {KIDS_TASK_GUIDES[selectedTaskType].note && (
+                <p className="text-xs text-slate-500 italic border-t border-orange-100/50 pt-2 mt-1">
+                  {KIDS_TASK_GUIDES[selectedTaskType].note}
+                </p>
               )}
             </div>
           )}
