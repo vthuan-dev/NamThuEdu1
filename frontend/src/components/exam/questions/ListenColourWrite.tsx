@@ -17,15 +17,12 @@ export function ListenColourWrite({
   userAnswer,
   onAnswerChange
 }: ListenColourWriteProps) {
-  const realTaskData = taskData.task_data || taskData;
-  const config = taskData.config || realTaskData.config || {};
-  
-  // Hỗ trợ cả config.instructions và config.items làm danh sách câu hỏi
-  const items = config?.instructions || config?.items || realTaskData?.items || [];
-  const instructionsText = question?.title || realTaskData?.title || config?.instructionsText || 'Listen, colour and write. There is one example.';
-  const audioUrl = realTaskData?.audioUrl || config?.audioUrl || realTaskData?.audio_url || config?.audio_url;
-  const imageUrl = realTaskData?.imageUrl || config?.imageUrl || realTaskData?.image_url || config?.image_url;
-  const imageRotation = config?.imageRotation || realTaskData?.imageRotation || 0;
+  // Sử dụng dữ liệu đã được chuẩn hóa bởi extractTaskData
+  const items = taskData.instructions || taskData.items || [];
+  const instructionsText = question?.title || taskData.title || taskData.instructionsText || 'Listen, colour and write. There is one example.';
+  const audioUrl = taskData.audioUrl || taskData.audio_url;
+  const imageUrl = taskData.imageUrl || taskData.image_url;
+  const imageRotation = taskData.imageRotation || 0;
   
   // State lưu nhãn màu/từ đang được chọn (dành cho click-to-color trên mobile/tablet)
   const [selectedBadge, setSelectedBadge] = useState<any>(null);
