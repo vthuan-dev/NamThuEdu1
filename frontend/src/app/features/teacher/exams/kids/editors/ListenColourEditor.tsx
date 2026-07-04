@@ -18,6 +18,7 @@ interface ColourInstruction {
   position: string;
   writeText?: string; // NEW: Optional text to write (Movers/Flyers Part 5)
   isExample: boolean;
+  hotspot?: { x: number; y: number };
 }
 
 const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
@@ -34,6 +35,7 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
   const [instructions, setInstructions] = useState<ColourInstruction[]>([]);
   const [uploadingAudio, setUploadingAudio] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [selectedInstForHotspot, setSelectedInstForHotspot] = useState<number | null>(null);
 
   // Load initial data
   useEffect(() => {
@@ -163,6 +165,27 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
     setInstructions(instructions.filter(inst => inst.id !== id));
   };
 
+  const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
+    if (selectedInstForHotspot === null) return;
+    
+    const img = e.currentTarget;
+    const rect = img.getBoundingClientRect();
+    
+    // Calculate position as percentage
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    
+    // Update instruction at selected index with hotspot
+    setInstructions(instructions.map((inst, index) => 
+      index === selectedInstForHotspot 
+        ? { ...inst, hotspot: { x, y } }
+        : inst
+    ));
+    
+    setSelectedInstForHotspot(null);
+    toast.success('✅ Đã gán vị trí vật thể trên ảnh!');
+  };
+
   const handleSave = () => {
     if (!title.trim()) {
       toast.warning('⚠️ Vui lòng nhập tiêu đề!');
@@ -182,7 +205,8 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
           colour: inst.colour,
           position: inst.position,
           write_text: inst.writeText || null, // NEW: Add write_text field
-          isExample: inst.isExample
+          isExample: inst.isExample,
+          hotspot: inst.hotspot || null
         })),
       },
     };
@@ -300,19 +324,55 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
           </label>
         ) : (
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <div className="flex items-start justify-between">
-              <img
-                src={mainImageUrl}
-                alt="Main"
-                className="max-h-64 rounded-lg object-contain"
-              />
-              <button
-                onClick={() => setMainImageUrl('')}
-                className="ml-4 rounded-lg bg-red-500 p-2 text-white transition-colors hover:bg-red-600"
-                title="Xóa ảnh"
-              >
-                <Trash2 className="h-5 w-5" />
-              </button>
+            <div className="flex items-start gap-4">
+              <div className="relative border border-slate-300 rounded-lg overflow-hidden bg-white shadow-sm inline-block">
+                <img
+                  src={mainImageUrl}
+                  alt="Main"
+                  onClick={handleImageClick}
+                  className={`max-h-[500px] w-auto object-contain select-none ${
+                    selectedInstForHotspot !== null ? 'cursor-crosshair ring-4 ring-orange-500' : ''
+                  }`}
+                />
+                
+                {/* Render các điểm neo đã vẽ */}
+                {instructions.map((inst, index) => {
+                  if (!inst.hotspot) return null;
+                  const colorMeta = colours.find(c => c.value === inst.colour);
+                  const hex = colorMeta?.color || '#3b82f6';
+                  return (
+                    <div
+                      key={inst.id}
+                      className="absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-full border-2 border-white shadow-md font-bold text-xs pointer-events-none select-none transition-all"
+                      style={{
+                        left: `${inst.hotspot.x}%`,
+                        top: `${inst.hotspot.y}%`,
+                        backgroundColor: hex,
+                        color: inst.colour === 'white' || inst.colour === 'yellow' || inst.colour === 'grey' ? '#1e293b' : '#ffffff',
+                        width: '28px',
+                        height: '28px',
+                      }}
+                      title={`${index + 1}. ${inst.objectName || '(chưa đặt tên)'}`}
+                    >
+                      {index + 1}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => setMainImageUrl('')}
+                  className="rounded-lg bg-red-500 p-2 text-white transition-colors hover:bg-red-600 self-start"
+                  title="Xóa ảnh"
+                >
+                  <Trash2 className="h-5 w-5" />
+                </button>
+                {selectedInstForHotspot !== null && (
+                  <div className="max-w-[200px] text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded p-2 animate-bounce">
+                    👉 Click lên vị trí vật thể trong tranh để gán vị trí cho câu #{selectedInstForHotspot + 1}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -361,7 +421,40 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-3">
+                    {mainImageUrl && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedInstForHotspot(index)}
+                          className={`flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg border transition-all ${
+                            selectedInstForHotspot === index
+                              ? 'bg-orange-500 text-white border-orange-600 animate-pulse'
+                              : inst.hotspot
+                              ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                              : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span>📍</span>
+                          <span>
+                            {selectedInstForHotspot === index
+                              ? 'Click lên ảnh...'
+                              : inst.hotspot
+                              ? 'Đã gán vị trí (Sửa)'
+                              : 'Gán vị trí trên ảnh'}
+                          </span>
+                        </button>
+                        {inst.hotspot && (
+                          <button
+                            type="button"
+                            onClick={() => updateInstruction(inst.id, 'hotspot', null)}
+                            className="text-xs text-red-500 hover:text-red-700 underline"
+                          >
+                            Xóa
+                          </button>
+                        )}
+                      </div>
+                    )}
                     <label className="flex items-center space-x-2 cursor-pointer">
                       <input
                         type="checkbox"
