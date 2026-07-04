@@ -586,58 +586,97 @@ function McqBlock({
   questions: IeltsQuestion[];
   section: IeltsListeningSection;
 }) {
+  // Group consecutive questions that have identical options (keys & values)
+  const groups = useMemo(() => {
+    const res: {
+      key: string;
+      title?: string;
+      instruction?: string;
+      stem: string;
+      options: Record<string, string>;
+      questions: IeltsQuestion[];
+    }[] = [];
+
+    questions.forEach((q) => {
+      const qOptions = q.options ?? {};
+      const stem = cleanQuestionText((q.questionText || "").trim(), q.questionNumber);
+      const title =
+        (q.data?.taskTitle as string) ||
+        (q.data?.task_title as string) ||
+        undefined;
+      const instruction =
+        (q.data?.taskInstruction as string) ||
+        (q.data?.task_instruction as string) ||
+        undefined;
+
+      const last = res[res.length - 1];
+      const sameGroup =
+        last &&
+        last.title === title &&
+        JSON.stringify(last.options) === JSON.stringify(qOptions) &&
+        Object.keys(qOptions).length > 0 &&
+        normalizeQuestionType(q.questionType) === "multiple_choice_group";
+
+      if (sameGroup) {
+        last.questions.push(q);
+      } else {
+        res.push({
+          key: `mcq-group-${q.qId}`,
+          title,
+          instruction,
+          stem,
+          options: qOptions,
+          questions: [q],
+        });
+      }
+    });
+    return res;
+  }, [questions]);
+
   return (
     <div className="space-y-3">
       {(() => {
         let lastTitle: string | undefined;
-        return questions.map((q) => {
-          const title =
-            (q.data?.taskTitle as string) ||
-            (q.data?.task_title as string) ||
-            undefined;
-          const instruction =
-            (q.data?.taskInstruction as string) ||
-            (q.data?.task_instruction as string) ||
-            undefined;
-          const showTitle = !!title && title !== lastTitle;
-          if (title) lastTitle = title;
-          const stem = cleanQuestionText(
-            (q.questionText || "").trim(),
-            q.questionNumber
-          );
+        return groups.map((g) => {
+          const isGroup = g.questions.length > 1;
+          const first = g.questions[0].questionNumber;
+          const last = g.questions[g.questions.length - 1].questionNumber;
+          const range = isGroup ? `${first}–${last}` : `${first}`;
+          const showTitle = !!g.title && g.title !== lastTitle;
+          if (g.title) lastTitle = g.title;
 
           return (
             <div
-              key={q.qId}
-              id={`ielts-row-${q.questionNumber}`}
+              key={g.key}
+              id={`ielts-row-${first}`}
               className="rounded-lg border border-gray-200 bg-white overflow-hidden shadow-sm"
             >
               {showTitle && (
                 <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
-                  <h3 className="text-sm font-bold text-gray-900 whitespace-pre-wrap">{title}</h3>
+                  <h3 className="text-sm font-bold text-gray-900 whitespace-pre-wrap">{g.title}</h3>
                 </div>
               )}
 
-              {instruction && instruction !== section.instructions && (
+              {g.instruction && g.instruction !== section.instructions && (
                 <p className="px-4 pt-2.5 text-xs font-semibold text-[#FF6B35] italic whitespace-pre-wrap">
-                  {instruction}
+                  {g.instruction}
                 </p>
               )}
 
               {/* Số câu + đề bài */}
               <div className="flex items-start gap-2.5 px-4 py-2.5">
                 <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded bg-[#fff0eb] text-[#FF6B35] font-bold text-xs border border-[#ffc1ad]">
-                  {q.questionNumber}
+                  {isGroup ? `Câu ${range}` : first}
                 </span>
                 <span className="text-[15px] leading-relaxed text-[#1a1a1a] font-medium whitespace-pre-wrap">
-                  {stem}
+                  {g.stem}
                 </span>
               </div>
 
               {/* Các lựa chọn A/B/C — chỉ để đọc, học viên chọn ở dropdown bên phải */}
-              {q.options && (
+              {Object.keys(g.options).length > 0 && (
                 <ul className="px-4 pb-3 space-y-1">
-                  {Object.entries(q.options).map(([letter, text]) => (
+                  {Object.entries(g.options).map(([letter, text]) => (
                     <li key={letter} className="flex items-start gap-2.5">
                       <span className="flex-shrink-0 inline-flex items-center justify-center w-6 h-6 rounded bg-gray-100 text-[#677788] text-xs font-bold">
                         {letter}
@@ -648,6 +687,14 @@ function McqBlock({
                     </li>
                   ))}
                 </ul>
+              )}
+
+              {isGroup && (
+                <div className="px-4 py-2 border-t border-gray-50 bg-gray-50/30">
+                  <p className="text-xs text-gray-500 italic">
+                    → Trả lời cho câu {g.questions.map((q) => q.questionNumber).join(", ")} ở bảng điền đáp án bên phải.
+                  </p>
+                </div>
               )}
             </div>
           );

@@ -159,7 +159,7 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
         transcript: incoming.transcript ?? "",
         questions: (incoming.questions ?? emptySec.questions).map((q: any) => {
           const qType = q.questionType ?? "multiple-choice";
-          const isMcq = qType === "multiple-choice";
+          const isMcq = qType === "multiple-choice" || qType === "multiple-choice-group";
           const imgComp = isImageCompletion(qType);
           const correctAnswer = q.correctAnswer ?? (isMcq ? "A" : "");
           return {
@@ -255,6 +255,103 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
     [groupRangeOf]
   );
 
+  /**
+   * Thêm 1 đáp án (option) cho MCQ — áp cho cả nhóm. Chữ cái kế tiếp theo
+   * số option hiện có (A,B,C,D → E). correctAnswer không đổi.
+   */
+  const addOptionAt = useCallback(
+    (secNum: number, qIdx: number) => {
+      const LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"];
+      setSections((prev) =>
+        prev.map((s) => {
+          if (s.sectionNumber !== secNum) return s;
+          const [start, end] = groupRangeOf(s.questions, qIdx);
+          const base = s.questions[start].options || {};
+          const keys = Object.keys(base).filter((k) => /^[A-Za-z]$/.test(k)).sort();
+          if (keys.length >= LETTERS.length) return s;
+          const nextLetter = LETTERS[keys.length];
+          return {
+            ...s,
+            questions: s.questions.map((q, i) =>
+              // Mỗi câu GIỮ NGUYÊN text riêng, chỉ thêm chữ cái mới (rỗng).
+              i >= start && i <= end
+                ? { ...q, options: { ...(q.options || {}), [nextLetter]: "" } }
+                : q
+            ),
+          };
+        })
+      );
+    },
+    [groupRangeOf]
+  );
+
+  /**
+   * Xóa 1 đáp án (option) cho MCQ — áp cho cả nhóm. Sau khi xóa sẽ ĐÁNH LẠI
+   * chữ cái liên tục (A,B,C…) tránh lỗ hổng, đồng thời cập nhật correctAnswer
+   * của TỪNG câu trong nhóm theo mapping mới (hỗ trợ cả multi-select "A,C").
+   * Mỗi câu giữ NGUYÊN text riêng của mình (Q17.A khác Q18.A).
+   */
+  const removeOptionAt = useCallback(
+    (secNum: number, qIdx: number, keyToRemove: string) => {
+      const LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"];
+      setSections((prev) =>
+        prev.map((s) => {
+          if (s.sectionNumber !== secNum) return s;
+          const [start, end] = groupRangeOf(s.questions, qIdx);
+          const base = s.questions[start].options || {};
+          const keys = Object.keys(base).filter((k) => /^[A-Za-z]$/.test(k)).sort();
+          if (keys.length <= 2) return s; // giữ tối thiểu 2 đáp án
+
+          // Mapping chữ cái cũ → mới (dựa trên cấu trúc key của nhóm).
+          const remaining = keys.filter((k) => k !== keyToRemove);
+          const remap: Record<string, string> = {};
+          remaining.forEach((oldKey, i) => {
+            remap[oldKey] = LETTERS[i];
+          });
+
+          const remapAnswer = (ans: string): string => {
+            const parts = (ans || "")
+              .split(",")
+              .map((p) => p.trim())
+              .filter(Boolean);
+            const mapped = parts
+              .filter((p) => p !== keyToRemove)
+              .map((p) => remap[p] ?? p);
+            return mapped.join(",");
+          };
+
+          return {
+            ...s,
+            questions: s.questions.map((q, i) => {
+               if (i < start || i > end) return q;
+               const isMcq = q.questionType === "multiple-choice" || q.questionType === "multiple-choice-group";
+              // Dựng lại options của TỪNG câu, giữ text riêng theo mapping.
+              const qKeys = Object.keys(q.options || {})
+                .filter((k) => /^[A-Za-z]$/.test(k))
+                .sort();
+              const qRemaining = qKeys.filter((k) => k !== keyToRemove);
+              const nextOptions: Record<string, string> = {};
+              qRemaining.forEach((oldKey, idx) => {
+                nextOptions[LETTERS[idx]] = (q.options as any)?.[oldKey] ?? "";
+              });
+              const nextAnswer = remapAnswer(q.correctAnswer);
+              return {
+                ...q,
+                options: nextOptions,
+                // MCQ chọn 1: nếu đáp án đúng bị xóa → về A; multi/khác giữ mapping.
+                correctAnswer:
+                  isMcq && (q.selectCount ?? 1) <= 1
+                    ? nextAnswer || "A"
+                    : nextAnswer,
+              };
+            }),
+          };
+        })
+      );
+    },
+    [groupRangeOf]
+  );
+
   const applyInlineFormText = useCallback(
     (secNum: number, qIdx: number, formText: string) => {
       setSections((prev) =>
@@ -323,12 +420,12 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
             taskImage: isImageCompletion(newType) ? q.taskImage : undefined,
             taskImageFileName: isImageCompletion(newType) ? q.taskImageFileName : undefined,
             correctAnswer:
-              newType === "multiple-choice" && !q.correctAnswer?.trim()
+              (newType === "multiple-choice" || newType === "multiple-choice-group") && !q.correctAnswer?.trim()
                 ? "A"
                 : "",
             options: isListeningMatching(newType)
               ? (q.options && Object.keys(q.options).length ? q.options : { A: "", B: "", C: "" })
-              : newType === "multiple-choice"
+              : (newType === "multiple-choice" || newType === "multiple-choice-group")
                 ? (q.options ?? { A: "", B: "", C: "", D: "" })
                 : undefined,
           });
@@ -877,6 +974,8 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
                   onPatchGroup={patchGroupAt}
                   onApplyInlineFormText={applyInlineFormText}
                   onChangeQuestionType={changeQuestionType}
+                  onAddOption={addOptionAt}
+                  onRemoveOption={removeOptionAt}
                   groupQuestions={groupQuestions}
                 />
               </>
@@ -944,6 +1043,8 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
   onPatchGroup,
   onApplyInlineFormText,
   onChangeQuestionType,
+  onAddOption,
+  onRemoveOption,
 }: {
   question: ListeningQuestion;
   sectionNumber: number;
@@ -961,8 +1062,10 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
   onPatchGroup?: (secNum: number, qIdx: number, patch: Partial<ListeningQuestion>) => void;
   onApplyInlineFormText: (secNum: number, qIdx: number, formText: string) => void;
   onChangeQuestionType: (secNum: number, qIdx: number, newType: string) => void;
+  onAddOption?: (secNum: number, qIdx: number) => void;
+  onRemoveOption?: (secNum: number, qIdx: number, key: string) => void;
 }) {
-  const isMcq = question.questionType === "multiple-choice";
+  const isMcq = question.questionType === "multiple-choice" || question.questionType === "multiple-choice-group";
   const isMatching = isListeningMatching(question.questionType);
   const completion = isListeningCompletion(question.questionType);
   const isImgCompletion = isImageCompletion(question.questionType);
@@ -1324,44 +1427,114 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
                         placeholder={`Đáp án ${k}`}
                         className="flex-1 bg-transparent text-xs outline-none"
                       />
+                      {optionKeys.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            onRemoveOption?.(sectionNumber, index, k);
+                          }}
+                          className="p-0.5 rounded text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-all cursor-pointer flex-shrink-0"
+                          title="Xoá đáp án (áp dụng cho cả nhóm)"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </label>
                   ))}
                 </div>
+                {optionKeys.length < LETTERS.length && (
+                  <button
+                    type="button"
+                    onClick={() => onAddOption?.(sectionNumber, index)}
+                    className="text-[12px] font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                  >
+                    + Thêm đáp án
+                  </button>
+                )}
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-2">
-                {(Object.keys(question.options).filter((k) => k.length === 1) as string[])
-                  .sort()
-                  .map((k) => (
-                  <label
-                    key={k}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-gray-200 hover:border-blue-300 transition-all cursor-pointer text-xs"
-                    style={{
-                      background: question.correctAnswer === k ? "#ECFDF5" : "#FFFFFF",
-                      borderColor: question.correctAnswer === k ? "#86EFAC" : "#E5E7EB",
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name={`correct-${question.id}`}
-                      checked={question.correctAnswer === k}
-                      onChange={() => handleChange({ correctAnswer: k })}
-                      className="w-3.5 h-3.5 accent-emerald-500"
-                    />
-                    <span className="font-bold text-gray-700">{k}.</span>
-                    <input
-                      type="text"
-                      value={(question.options as any)![k] || ""}
-                      onChange={(e) =>
-                        handleChange({
-                          options: { ...question.options!, [k]: e.target.value } as any,
-                        })
-                      }
-                      placeholder={`Đáp án ${k}`}
-                      className="flex-1 bg-transparent text-xs outline-none"
-                    />
-                  </label>
-                ))}
+              <div className="space-y-2">
+                {isGrouped && !isGroupStart ? (
+                  <div className="flex items-center gap-2 p-2 rounded-lg border border-gray-200 bg-gray-50/50">
+                    <span className="text-xs font-semibold text-gray-600 mr-2">Đáp án đúng cho câu {question.questionNumber}:</span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {optionKeys.map((k) => (
+                        <button
+                          key={k}
+                          type="button"
+                          onClick={() => handleChange({ correctAnswer: k })}
+                          className={`w-8 h-8 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center justify-center border ${
+                            question.correctAnswer === k
+                              ? "bg-emerald-500 border-emerald-600 text-white shadow-sm font-extrabold"
+                              : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                          }`}
+                        >
+                          {k}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(Object.keys(question.options).filter((k) => k.length === 1) as string[])
+                        .sort()
+                        .map((k) => (
+                        <label
+                          key={k}
+                          className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-gray-200 hover:border-blue-300 transition-all cursor-pointer text-xs"
+                          style={{
+                            background: question.correctAnswer === k ? "#ECFDF5" : "#FFFFFF",
+                            borderColor: question.correctAnswer === k ? "#86EFAC" : "#E5E7EB",
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name={`correct-${question.id}`}
+                            checked={question.correctAnswer === k}
+                            onChange={() => handleChange({ correctAnswer: k })}
+                            className="w-3.5 h-3.5 accent-emerald-500"
+                          />
+                          <span className="font-bold text-gray-700">{k}.</span>
+                          <input
+                            type="text"
+                            value={(question.options as any)![k] || ""}
+                            onChange={(e) =>
+                              handleChange({
+                                options: { ...question.options!, [k]: e.target.value } as any,
+                              })
+                            }
+                            placeholder={`Đáp án ${k}`}
+                            className="flex-1 bg-transparent text-xs outline-none"
+                          />
+                          {optionKeys.length > 2 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                onRemoveOption?.(sectionNumber, index, k);
+                              }}
+                              className="p-0.5 rounded text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-all cursor-pointer flex-shrink-0"
+                              title="Xoá đáp án (áp dụng cho cả nhóm)"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                    {optionKeys.length < LETTERS.length && (
+                      <button
+                        type="button"
+                        onClick={() => onAddOption?.(sectionNumber, index)}
+                        className="text-[12px] font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer mt-1"
+                      >
+                        + Thêm đáp án
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             )
           ) : !isImgCompletion ? (

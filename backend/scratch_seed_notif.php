@@ -88,7 +88,7 @@ echo "👥 Có {$students->count()} học viên để seed.\n\n";
 // Mix: vài bài nộp thường + vài bài auto-submit (timeout / inactive)
 $scenarios = [
     ['reason' => null,        'ago' => 2,  'status' => 'submitted'],
-    ['reason' => 'timeout',   'ago' => 8,  'status' => 'grading_subjective'],
+    ['reason' => 'timeout',   'ago' => 8,  'status' => 'submitted'],
     ['reason' => null,        'ago' => 15, 'status' => 'submitted'],
     ['reason' => 'inactive',  'ago' => 25, 'status' => 'submitted'],
 ];

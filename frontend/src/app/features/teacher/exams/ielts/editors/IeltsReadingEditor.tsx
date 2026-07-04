@@ -124,7 +124,7 @@ function emptyQuestion(type: string): ReadingQuestion {
     id: uid("q"),
     questionText: "",
     correctAnswer: "",
-    options: type === "multiple-choice" ? { A: "", B: "", C: "", D: "" } : undefined,
+    options: (type === "multiple-choice" || type === "multiple-choice-group") ? { A: "", B: "", C: "", D: "" } : undefined,
   };
 }
 
@@ -141,7 +141,7 @@ function emptyGroup(type = "multiple-choice"): ReadingGroup {
     questionType: type,
     instruction: "",
     choices: isMatchingType(type) ? defaultChoices(type) : undefined,
-    selectCount: type === "multiple-choice" ? 1 : undefined,
+    selectCount: (type === "multiple-choice" || type === "multiple-choice-group") ? 1 : undefined,
     wordLimit: isCompletionType(type) ? "" : undefined,
     questions: [emptyQuestion(type)],
   };
@@ -153,7 +153,7 @@ function toQuestion(raw: any, type: string): ReadingQuestion {
     questionText: raw.questionText || "",
     correctAnswer: raw.correctAnswer || "",
     options:
-      type === "multiple-choice"
+      (type === "multiple-choice" || type === "multiple-choice-group")
         ? raw.options && typeof raw.options === "object"
           ? { A: "", B: "", C: "", D: "", ...raw.options }
           : { A: "", B: "", C: "", D: "" }
@@ -190,7 +190,7 @@ function deriveGroups(questions: any[]): ReadingGroup[] {
             ? { ...q.options }
             : defaultChoices(type)
           : undefined,
-        selectCount: type === "multiple-choice" ? 1 : undefined,
+        selectCount: (type === "multiple-choice" || type === "multiple-choice-group") ? 1 : undefined,
         wordLimit: isCompletionType(type) ? q.wordLimit || q.word_limit || "" : undefined,
         questions: [toQuestion(q, type)],
       });
@@ -205,7 +205,7 @@ function normalizeGroup(raw: any): ReadingGroup {
     id: raw.id || uid("g"),
     questionType: type,
     instruction: raw.instruction || "",
-    selectCount: type === "multiple-choice" ? raw.selectCount || 1 : undefined,
+    selectCount: (type === "multiple-choice" || type === "multiple-choice-group") ? raw.selectCount || 1 : undefined,
     wordLimit: isCompletionType(type) ? raw.wordLimit || "" : undefined,
     useWordBank: isCompletionType(type) ? !!raw.useWordBank : undefined,
     choices:
@@ -356,13 +356,13 @@ export function IeltsReadingEditor({ initialData, onSave, testType }: Props) {
             ? g.choices
             : defaultChoices(t)
           : undefined;
-        g.selectCount = t === "multiple-choice" ? 1 : undefined;
+        g.selectCount = (t === "multiple-choice" || t === "multiple-choice-group") ? 1 : undefined;
         g.wordLimit = isCompletionType(t) ? "" : undefined;
         g.useWordBank = isCompletionType(t) ? false : undefined;
         g.questions = g.questions.map((q) => ({
           ...q,
           options:
-            t === "multiple-choice"
+            (t === "multiple-choice" || t === "multiple-choice-group")
               ? q.options ?? { A: "", B: "", C: "", D: "" }
               : undefined,
           correctAnswer: "",
@@ -646,7 +646,7 @@ function GroupCard({
   onChangeQuestion: (qIdx: number, patch: Partial<ReadingQuestion>) => void;
 }) {
   const matching = isMatchingType(group.questionType);
-  const isMcq = group.questionType === "multiple-choice";
+  const isMcq = group.questionType === "multiple-choice" || group.questionType === "multiple-choice-group";
   const completion = isCompletionType(group.questionType);
   const endNumber = startNumber + group.questions.length - 1;
   const hint = TYPE_HINTS[group.questionType];
@@ -805,7 +805,7 @@ function QuestionRow({
   onChange: (patch: Partial<ReadingQuestion>) => void;
   onRemove: () => void;
 }) {
-  const isMcq = groupType === "multiple-choice";
+  const isMcq = groupType === "multiple-choice" || groupType === "multiple-choice-group";
   const isMultiMcq = isMcq && selectCount > 1;
   const isTrueFalse = TRUE_FALSE_TYPES.includes(groupType);
   const matching = isMatchingType(groupType);
@@ -829,6 +829,45 @@ function QuestionRow({
       next.add(k);
     }
     onChange({ correctAnswer: Array.from(next).sort().join(",") });
+  };
+
+  // MCQ: các key đáp án hiện có (A,B,C…) của RIÊNG câu này.
+  const optionKeys = Object.keys(question.options ?? {})
+    .filter((k) => /^[A-Za-z]$/.test(k))
+    .sort();
+
+  // Thêm 1 đáp án (chữ cái kế tiếp). Tối đa 8 (A–H) đủ cho Choose THREE.
+  const addOption = () => {
+    const nextLetter = LETTER_SYMBOLS[optionKeys.length];
+    if (!nextLetter) return;
+    onChange({
+      options: { ...(question.options ?? {}), [nextLetter]: "" },
+    });
+  };
+
+  // Xóa 1 đáp án → đánh lại chữ cái liên tục + map lại correctAnswer
+  // (hỗ trợ cả multi-select "A,C"). Giữ tối thiểu 2 đáp án.
+  const removeOption = (keyToRemove: string) => {
+    if (optionKeys.length <= 2) return;
+    const remaining = optionKeys.filter((k) => k !== keyToRemove);
+    const nextOptions: Record<string, string> = {};
+    const remap: Record<string, string> = {};
+    remaining.forEach((oldKey, i) => {
+      const newKey = LETTER_SYMBOLS[i];
+      nextOptions[newKey] = question.options?.[oldKey] ?? "";
+      remap[oldKey] = newKey;
+    });
+    const nextAnswer = (question.correctAnswer || "")
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean)
+      .filter((p) => p !== keyToRemove)
+      .map((p) => remap[p] ?? p)
+      .join(",");
+    onChange({
+      options: nextOptions,
+      correctAnswer: isMultiMcq ? nextAnswer : nextAnswer || "",
+    });
   };
 
   return (
@@ -892,7 +931,7 @@ function QuestionRow({
                 </p>
               )}
               <div className="grid grid-cols-2 gap-2">
-                {(["A", "B", "C", "D"] as const).map((k) => {
+                {optionKeys.map((k) => {
                   const checked = isMultiMcq
                     ? selectedSet.has(k)
                     : question.correctAnswer === k;
@@ -926,10 +965,33 @@ function QuestionRow({
                         placeholder={`Đáp án ${k}`}
                         className="flex-1 bg-transparent text-xs outline-none"
                       />
+                      {optionKeys.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            removeOption(k);
+                          }}
+                          className="p-0.5 rounded text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-all cursor-pointer flex-shrink-0"
+                          title="Xoá đáp án này"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </label>
                   );
                 })}
               </div>
+              {optionKeys.length < LETTER_SYMBOLS.length && (
+                <button
+                  type="button"
+                  onClick={addOption}
+                  className="inline-flex items-center gap-1 text-[12px] font-semibold text-emerald-700 hover:text-emerald-800 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Thêm đáp án
+                </button>
+              )}
             </>
           ) : isTrueFalse ? (
             <div className="flex flex-wrap gap-2">

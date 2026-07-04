@@ -2922,8 +2922,90 @@ class StudentTestController extends Controller
         $maxScore     = 0;
         $skillBuckets = []; // ['listening' => ['correct'=>0,'total'=>0], ...]
 
+        // Pre-load all questions in this grading run
+        $loadedQuestions = [];
+        foreach ($answers as $sa) {
+            $q = Question::with('answers')->find($sa->question_id);
+            if ($q && (int) $q->exam_id === (int) $examId) {
+                $loadedQuestions[$sa->question_id] = $q;
+            }
+        }
+
+        // Group swappable MCQ questions (same section, same type = multiple_choice, identical non-empty options)
+        $optionsHashToGroup = [];
+        $precomputedResults = []; // saId -> ['is_correct' => bool, 'points' => float]
+        
+        foreach ($loadedQuestions as $qId => $q) {
+            $qType = strtolower($q->qType ?? '');
+            if ($qType === 'multiple_choice_group' || $qType === 'multiple-choice-group') {
+                $options = $q->qData['options'] ?? null;
+                if ($options && is_array($options)) {
+                    ksort($options);
+                    $qSection = strtolower($q->qSection ?? $q->qSkill ?? '');
+                    $hash = $qSection . '_' . json_encode($options);
+                    $optionsHashToGroup[$hash][] = $qId;
+                }
+            }
+        }
+
+        $swappableGroups = [];
+        foreach ($optionsHashToGroup as $hash => $qIds) {
+            if (count($qIds) > 1) {
+                $groupId = 'group_' . min($qIds);
+                $swappableGroups[$groupId] = $qIds;
+            }
+        }
+
+        foreach ($swappableGroups as $groupId => $qIds) {
+            // 1. Gather all correct letters in this group
+            $correctLetters = [];
+            foreach ($qIds as $qId) {
+                $q = $loadedQuestions[$qId] ?? null;
+                if (!$q) continue;
+                $sorted = $q->answers->sortBy(fn($a) => $a->aOrder !== null ? $a->aOrder : $a->aId)->values();
+                $letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+                foreach ($sorted as $idx => $ans) {
+                    if ($ans->aIs_correct && isset($letters[$idx])) {
+                        $correctLetters[] = $letters[$idx];
+                    }
+                }
+            }
+            
+            // 2. Gather normalized student answers in this group
+            $groupSas = []; // saId -> normalized_student_letter
+            $saIdToQPoints = [];
+            foreach ($answers as $sa) {
+                if (in_array($sa->question_id, $qIds)) {
+                    $q = $loadedQuestions[$sa->question_id] ?? null;
+                    $studentText = trim($sa->saAnswer_text ?? '');
+                    $groupSas[$sa->saId] = strtoupper($studentText);
+                    $saIdToQPoints[$sa->saId] = $q ? ($q->qPoints ?? 1) : 1;
+                }
+            }
+            
+            // 3. Match student answers to correct letters (order independent)
+            $remainingCorrect = $correctLetters;
+            foreach ($groupSas as $saId => $studentLetter) {
+                $isCorrect = false;
+                if ($studentLetter !== '') {
+                    $foundIdx = array_search($studentLetter, $remainingCorrect, true);
+                    if ($foundIdx !== false) {
+                        $isCorrect = true;
+                        unset($remainingCorrect[$foundIdx]);
+                        $remainingCorrect = array_values($remainingCorrect);
+                    }
+                }
+                
+                $points = $isCorrect ? $saIdToQPoints[$saId] : 0;
+                $precomputedResults[$saId] = [
+                    'is_correct' => $isCorrect,
+                    'points' => $points,
+                ];
+            }
+        }
+
         foreach ($answers as $submissionAnswer) {
-            $question = Question::with('answers')->find($submissionAnswer->question_id);
+            $question = $loadedQuestions[$submissionAnswer->question_id] ?? null;
             if (!$question || (int) $question->exam_id !== (int) $examId) {
                 return ['error' => 'Dữ liệu câu hỏi không hợp lệ cho bài thi này.', 'scorePercentage' => 0, 'vstepMeta' => null];
             }
@@ -2965,8 +3047,35 @@ class StudentTestController extends Controller
                 continue;
             }
 
-            $correctAnswer = $question->answers->where('aIs_correct', true)->first();
             $maxScore += $question->qPoints;
+
+            // Check if we have a precomputed group-grading result
+            if (isset($precomputedResults[$submissionAnswer->saId])) {
+                $res = $precomputedResults[$submissionAnswer->saId];
+                $isCorrect = $res['is_correct'];
+                $pointsAwarded = $res['points'];
+                
+                $submissionAnswer->update([
+                    'saIs_correct'     => $isCorrect,
+                    'saPoints_awarded' => $pointsAwarded,
+                ]);
+                
+                if ($isCorrect) {
+                    $totalScore += $pointsAwarded;
+                    if ($isVstep && $qSection) {
+                        $skillBuckets[$qSection]['correct'] = ($skillBuckets[$qSection]['correct'] ?? 0) + 1;
+                        $skillBuckets[$qSection]['total']   = ($skillBuckets[$qSection]['total']   ?? 0) + 1;
+                    }
+                } else {
+                    if ($isVstep && $qSection) {
+                        $skillBuckets[$qSection]['correct'] = ($skillBuckets[$qSection]['correct'] ?? 0);
+                        $skillBuckets[$qSection]['total']   = ($skillBuckets[$qSection]['total']   ?? 0) + 1;
+                    }
+                }
+                continue;
+            }
+
+            $correctAnswer = $question->answers->where('aIs_correct', true)->first();
 
             // Check if student answer is correct via two strategies:
             // 1. Direct text match (e.g., student sends full answer text)
@@ -2976,8 +3085,8 @@ class StudentTestController extends Controller
 
             if ($correctAnswer && $this->isCorrectAnswer($studentText, $correctAnswer->aContent)) {
                 $isCorrect = true;
-            } elseif (preg_match('/^[A-Da-d]$/', $studentText)) {
-                $letterIdx = ord(strtoupper($studentText)) - ord('A'); // A=0,B=1,C=2,D=3
+            } elseif (preg_match('/^[A-Ha-h]$/', $studentText)) {
+                $letterIdx = ord(strtoupper($studentText)) - ord('A'); // A=0,B=1,…,H=7
                 // Prefer aOrder column if present, else fallback to insertion order (aId)
                 $firstAnswer    = $question->answers->first();
                 $hasOrder       = $firstAnswer && $firstAnswer->aOrder !== null;

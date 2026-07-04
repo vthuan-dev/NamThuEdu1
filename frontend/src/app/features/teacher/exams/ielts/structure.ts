@@ -195,6 +195,7 @@ export const IELTS_BAND = {
 // IELTS Reading question types (most common)
 export const IELTS_READING_QUESTION_TYPES = [
   { value: "multiple-choice", label: "Multiple choice (MCQ)" },
+  { value: "multiple-choice-group", label: "Multiple choice (Choose TWO/THREE)" },
   { value: "true-false-not-given", label: "True / False / Not Given" },
   { value: "yes-no-not-given", label: "Yes / No / Not Given" },
   { value: "matching-headings", label: "Matching headings" },
@@ -210,6 +211,7 @@ export const IELTS_READING_QUESTION_TYPES = [
 // IELTS Listening question types (similar to Reading + audio specifics)
 export const IELTS_LISTENING_QUESTION_TYPES = [
   { value: "multiple-choice", label: "Multiple choice (MCQ)" },
+  { value: "multiple-choice-group", label: "Multiple choice (Choose TWO/THREE)" },
   { value: "form-completion", label: "Form completion" },
   { value: "note-completion", label: "Note completion" },
   { value: "table-completion", label: "Table completion" },

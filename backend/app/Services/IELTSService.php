@@ -890,11 +890,18 @@ class IELTSService
         }
 
         if ($qType === 'multiple_choice' && is_array($options)) {
-            foreach (self::MCQ_LETTERS as $idx => $letter) {
+            // Lặp theo CÁC KEY ĐÁP ÁN THỰC TẾ (A–H), không cứng A–D. Đề dạng
+            // "Choose TWO/THREE letters" có 5–8 lựa chọn nên phải tạo đủ row.
+            $letters = array_values(array_filter(
+                array_keys($options),
+                fn ($k) => preg_match('/^[A-Za-z]$/', (string) $k) === 1
+            ));
+            sort($letters);
+            foreach ($letters as $letter) {
                 Answer::create([
                     'question_id' => $question->qId,
                     'aContent'    => (string) ($options[$letter] ?? ''),
-                    'aIs_correct' => (strtoupper($correctAnswer) === $letter),
+                    'aIs_correct' => (strtoupper($correctAnswer) === strtoupper((string) $letter)),
                 ]);
             }
             return;
