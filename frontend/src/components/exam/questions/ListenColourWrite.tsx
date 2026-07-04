@@ -17,12 +17,33 @@ export function ListenColourWrite({
   userAnswer,
   onAnswerChange
 }: ListenColourWriteProps) {
-  // Sử dụng dữ liệu đã được chuẩn hóa bởi extractTaskData
-  const items = taskData.instructions || taskData.items || [];
-  const instructionsText = question?.title || taskData.title || taskData.instructionsText || 'Listen, colour and write. There is one example.';
-  const audioUrl = taskData.audioUrl || taskData.audio_url;
-  const imageUrl = taskData.imageUrl || taskData.image_url;
-  const imageRotation = taskData.imageRotation || 0;
+  // Lấy danh sách câu hỏi: đảm bảo phải là Array (tránh trùng tên với instructions text dạng string)
+  const items = (Array.isArray(taskData.instructions) ? taskData.instructions : null) || 
+                (Array.isArray(taskData.items) ? taskData.items : null) || 
+                (Array.isArray(taskData.task_data?.instructions) ? taskData.task_data.instructions : null) ||
+                (Array.isArray(taskData.config?.instructions) ? taskData.config.instructions : null) || 
+                [];
+                
+  const instructionsText = question?.title || 
+                           taskData.title || 
+                           (typeof taskData.instructions === 'string' ? taskData.instructions : null) || 
+                           taskData.instructionsText || 
+                           'Listen, colour and write. There is one example.';
+                           
+  const audioUrl = taskData.audioUrl || 
+                   taskData.audio_url || 
+                   taskData.task_data?.mainAudioUrl || 
+                   taskData.config?.mainAudioUrl;
+                   
+  const imageUrl = taskData.imageUrl || 
+                   taskData.image_url || 
+                   taskData.task_data?.mainImageUrl || 
+                   taskData.config?.mainImageUrl;
+                   
+  const imageRotation = taskData.imageRotation || 
+                        taskData.task_data?.imageRotation || 
+                        taskData.config?.imageRotation || 
+                        0;
   
   // State lưu nhãn màu/từ đang được chọn (dành cho click-to-color trên mobile/tablet)
   const [selectedBadge, setSelectedBadge] = useState<any>(null);
