@@ -250,7 +250,7 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
     { value: 'brown', label: '🟤 Nâu', color: '#92400e' },
     { value: 'black', label: '⚫ Đen', color: '#000000' },
     { value: 'white', label: '⚪ Trắng', color: '#ffffff' },
-    { value: 'grey', label: '⚪ Xám', color: '#6b7280' },
+    { value: 'grey', label: '🩶 Xám', color: '#6b7280' },
   ];
 
   return (
