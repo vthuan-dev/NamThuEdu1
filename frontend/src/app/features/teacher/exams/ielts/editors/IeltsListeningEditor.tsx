@@ -1093,6 +1093,7 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
   const handleChange = (patch: Partial<ListeningQuestion>) => onPatch(sectionNumber, index, patch);
   const handleGroup = (patch: Partial<ListeningQuestion>) =>
     (onPatchGroup ?? ((s, _i, p) => onPatch(s, index, p)))(sectionNumber, index, patch);
+  const [showGuide, setShowGuide] = useState(false);
   const formText = buildInlineFormText(groupQuestions.length ? groupQuestions : [question]);
   const formBlankCount = (formText.match(/_{3,}/g) ?? []).length;
   const formTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1245,7 +1246,40 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
                 Dùng cài đặt chung ở câu {groupStartNumber}
               </span>
             )}
+            {question.questionType === "multiple-choice-group" && (
+              <button
+                type="button"
+                onClick={() => setShowGuide(prev => !prev)}
+                className="inline-flex items-center gap-1 px-2 py-1.5 border border-blue-200 rounded-md bg-blue-50 text-blue-700 text-xs font-bold hover:bg-blue-100 cursor-pointer transition-all ml-auto"
+              >
+                ℹ️ {showGuide ? "Ẩn hướng dẫn" : "Hiện hướng dẫn"}
+              </button>
+            )}
           </div>
+
+          {question.questionType === "multiple-choice-group" && showGuide && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3 text-xs text-blue-900 space-y-1.5 animate-fadeIn">
+              <p className="font-bold text-blue-800 flex items-center gap-1">
+                Hướng dẫn soạn câu MCQ chọn 2/3 đáp án (Choose TWO/THREE):
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-gray-700">
+                <li><strong>Bước 1:</strong> Chọn loại <em>Multiple choice (Choose TWO/THREE)</em> cho các câu thuộc nhóm câu hỏi này (ví dụ: câu 1 và câu 2).</li>
+                <li><strong>Bước 2 (Tại câu đầu nhóm):</strong> Nhập đề bài chung, bấm <strong>+ Thêm đáp án</strong> để nhập đầy đủ các lựa chọn (A-E/H), và tích chọn đáp án đúng thứ nhất.</li>
+                <li><strong>Bước 3 (Tại các câu tiếp theo):</strong> Hệ thống tự ẩn bộ đáp án để giao diện gọn gàng, bạn chỉ cần click chọn đáp án đúng tiếp theo tại hàng nút chữ cái (A, B, C, D...).</li>
+              </ul>
+              <div className="mt-2 pt-2 border-t border-blue-100/50">
+                <p className="font-semibold text-blue-800 mb-1">Giao diện học viên khi làm bài sẽ trông như thế này:</p>
+                <img
+                  src="/images/ielts_student_grouped_mcq_ui.png"
+                  alt="Student MCQ Group UI Preview"
+                  className="rounded border border-blue-200 shadow-sm max-w-[280px] sm:max-w-[400px] h-auto"
+                />
+              </div>
+              <p className="text-[10px] text-gray-500 italic mt-1 border-t border-blue-100/50 pt-1">
+                * Lưu ý: Học viên sẽ nhìn thấy 1 bảng câu hỏi gộp duy nhất bên trái (Câu 1–2) và điền đáp án vào các ô tương ứng bên phải.
+              </p>
+            </div>
+          )}
 
           {!isImgCompletion && (
             !isInlineForm && (
