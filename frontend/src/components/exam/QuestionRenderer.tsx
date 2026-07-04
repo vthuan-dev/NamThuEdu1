@@ -83,7 +83,7 @@ export function QuestionRenderer(props: QuestionRendererProps) {
     ...props,
     // Contract cũ
     taskData: extractTaskData(props.question),
-    interactiveMode: props.mode === 'student',
+    interactiveMode: props.mode === 'student' || props.mode === 'preview',
     userAnswer: props.answer,
     onAnswerChange: props.onAnswer,
   };
