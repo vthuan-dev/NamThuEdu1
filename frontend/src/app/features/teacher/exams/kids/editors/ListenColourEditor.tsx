@@ -239,7 +239,10 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
   const colours = [
     { value: 'red', label: '🔴 Đỏ', color: '#ef4444' },
     { value: 'blue', label: '🔵 Xanh dương', color: '#3b82f6' },
+    { value: 'light_blue', label: '🩵 Xanh da trời (Light blue)', color: '#38bdf8' },
+    { value: 'dark_blue', label: '💙 Xanh dương đậm (Dark blue)', color: '#1d4ed8' },
     { value: 'green', label: '🟢 Xanh lá', color: '#22c55e' },
+    { value: 'light_green', label: '🥬 Xanh lá nhạt (Light green)', color: '#4ade80' },
     { value: 'yellow', label: '🟡 Vàng', color: '#eab308' },
     { value: 'orange', label: '🟠 Cam', color: '#f97316' },
     { value: 'purple', label: '🟣 Tím', color: '#a855f7' },

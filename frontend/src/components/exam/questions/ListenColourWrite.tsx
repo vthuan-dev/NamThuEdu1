@@ -33,7 +33,10 @@ export function ListenColourWrite({
   const colours = [
     { value: 'red', label: 'Đỏ', hex: '#ef4444' },
     { value: 'blue', label: 'Xanh dương', hex: '#3b82f6' },
+    { value: 'light_blue', label: 'Xanh da trời (Light blue)', hex: '#38bdf8' },
+    { value: 'dark_blue', label: 'Xanh dương đậm (Dark blue)', hex: '#1d4ed8' },
     { value: 'green', label: 'Xanh lá', hex: '#22c55e' },
+    { value: 'light_green', label: 'Xanh lá nhạt (Light green)', hex: '#4ade80' },
     { value: 'yellow', label: 'Vàng', hex: '#eab308' },
     { value: 'orange', label: 'Cam', hex: '#f97316' },
     { value: 'purple', label: 'Tím', hex: '#a855f7' },
