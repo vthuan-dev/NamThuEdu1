@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Volume2, Palette, Edit2, CheckCircle2, XCircle } from 'lucide-react';
 import { getFullMediaUrl } from '../../../utils/mediaUtils';
 
@@ -26,7 +26,8 @@ export function ListenColourWrite({
   const audioUrl = realTaskData?.audioUrl || config?.audioUrl || realTaskData?.audio_url || config?.audio_url;
   const imageUrl = realTaskData?.imageUrl || config?.imageUrl || realTaskData?.image_url || config?.image_url;
   
-  const [activeColor, setActiveColor] = useState<string | null>(null);
+  // State lưu nhãn màu/từ đang được chọn (dành cho click-to-color trên mobile/tablet)
+  const [selectedBadge, setSelectedBadge] = useState<any>(null);
 
   const colours = [
     { value: 'red', label: 'Đỏ', hex: '#ef4444' },
@@ -46,33 +47,64 @@ export function ListenColourWrite({
   const itemsWithHotspot = items.filter((item: any) => item.hotspot);
   const itemsWithoutHotspot = items.filter((item: any) => !item.hotspot);
 
-  // Xử lý sự kiện kéo bắt đầu từ bảng màu
-  const handleDragStart = (e: React.DragEvent, color: string) => {
-    e.dataTransfer.setData('text/plain', `color:${color}`);
+  // Tạo danh sách các nhãn kéo thả bên ngoài (chỉ lấy các câu hỏi thực tế, không lấy câu ví dụ)
+  // Các nhãn này tương ứng với đáp án đúng để học viên chọn kéo vào (số hotspot trên hình > số nhãn kéo thả)
+  const draggableBadges = useMemo(() => {
+    const badges = items
+      .filter((item: any) => {
+        const isExample = item.isExample || item.is_example;
+        const hasAnswer = item.colour || item.writeText || item.write_text;
+        return !isExample && hasAnswer && item.hotspot;
+      })
+      .map((item: any) => {
+        const originalIndex = items.findIndex((x: any) => x.id === item.id);
+        const val = item.colour || item.writeText || item.write_text;
+        const isWrite = !!(item.writeText || item.write_text);
+        return {
+          id: item.id,
+          originalIndex,
+          type: isWrite ? 'text' : 'color',
+          value: val,
+          label: isWrite ? val : (colours.find(c => c.value === val)?.label || val),
+        };
+      });
+
+    // Sắp xếp trộn đều (deterministic shuffle theo ID để không bị re-render đổi thứ tự liên tục)
+    return [...badges].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  }, [items]);
+
+  // Xử lý kéo nhãn
+  const handleDragStart = (e: React.DragEvent, badge: any) => {
+    e.dataTransfer.setData('application/json', JSON.stringify(badge));
   };
 
-  // Thả màu vào hotspot
-  const handleHotspotDrop = (e: React.DragEvent, itemIdx: number, isWrite: boolean) => {
+  // Thả nhãn vào hotspot
+  const handleHotspotDrop = (e: React.DragEvent, originalIndex: number) => {
     e.preventDefault();
-    if (!interactiveMode || isWrite) return;
-    const data = e.dataTransfer.getData('text/plain');
-    if (data.startsWith('color:')) {
-      const color = data.split(':')[1];
-      onAnswerChange?.({
-        ...userAnswer,
-        [itemIdx]: color
-      });
+    if (!interactiveMode) return;
+    try {
+      const jsonStr = e.dataTransfer.getData('application/json');
+      if (jsonStr) {
+        const badge = JSON.parse(jsonStr);
+        onAnswerChange?.({
+          ...userAnswer,
+          [originalIndex]: badge.value
+        });
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  // Click vào hotspot (cho chế độ click để tô màu trên thiết bị di động/máy tính)
-  const handleHotspotClick = (itemIdx: number, isWrite: boolean) => {
-    if (!interactiveMode || isWrite) return;
-    if (activeColor) {
+  // Click vào hotspot (dành cho click-to-assign)
+  const handleHotspotClick = (originalIndex: number) => {
+    if (!interactiveMode) return;
+    if (selectedBadge) {
       onAnswerChange?.({
         ...userAnswer,
-        [itemIdx]: activeColor
+        [originalIndex]: selectedBadge.value
       });
+      setSelectedBadge(null); // Reset sau khi gán
     }
   };
 
@@ -112,8 +144,7 @@ export function ListenColourWrite({
             />
             
             {/* Vẽ các điểm neo (Hotspots) trên ảnh */}
-            {itemsWithHotspot.map((item: any, idx: number) => {
-              // Tìm chỉ số gốc trong mảng items để map với userAnswer
+            {itemsWithHotspot.map((item: any) => {
               const originalIndex = items.findIndex((x: any) => x.id === item.id);
               const isExample = item.isExample || item.is_example;
               const isWrite = !!(item.writeText || item.write_text);
@@ -130,27 +161,33 @@ export function ListenColourWrite({
                 <div key={item.id}>
                   {/* Điểm neo hình tròn */}
                   <div
-                    onClick={() => handleHotspotClick(originalIndex, isWrite)}
+                    onClick={() => handleHotspotClick(originalIndex)}
                     onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => handleHotspotDrop(e, originalIndex, isWrite)}
-                    className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-full border-2 shadow-md transition-all select-none ${
-                      isWrite ? 'bg-white border-blue-500' : 'bg-slate-200/90 border-white'
-                    } ${
+                    onDrop={(e) => handleHotspotDrop(e, originalIndex)}
+                    className={`absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center rounded-full border-2 shadow-md transition-all select-none w-8 h-8 ${
                       interactiveMode && !isExample
                         ? 'cursor-pointer hover:scale-125 hover:shadow-lg active:scale-95'
                         : 'pointer-events-none'
+                    } ${
+                      currentAnswer
+                        ? 'border-white'
+                        : isExample
+                        ? 'border-amber-400 bg-amber-100'
+                        : 'border-slate-400 bg-slate-100/90'
                     }`}
                     style={{
                       left: `${item.hotspot.x}%`,
                       top: `${item.hotspot.y}%`,
-                      width: '32px',
-                      height: '32px',
                       backgroundColor: !isWrite && hexColor ? hexColor : undefined,
                     }}
-                    title={isExample ? 'Ví dụ mẫu' : `Câu ${originalIndex + 1}`}
+                    title={isExample ? 'Ví dụ mẫu' : `Chủ thể #${originalIndex + 1}`}
                   >
-                    {isWrite ? (
-                      <Edit2 className="w-4 h-4 text-blue-600" />
+                    {isWrite && currentAnswer ? (
+                      <span className="text-[10px] font-extrabold text-blue-700 truncate max-w-full px-0.5">
+                        {currentAnswer}
+                      </span>
+                    ) : isWrite ? (
+                      <Edit2 className="w-3.5 h-3.5 text-slate-500" />
                     ) : (
                       <span 
                         className={`text-xs font-bold ${
@@ -163,9 +200,25 @@ export function ListenColourWrite({
                       </span>
                     )}
 
+                    {/* Nút xóa lựa chọn nhanh ở góc trên bên phải điểm neo */}
+                    {currentAnswer && interactiveMode && !isExample && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const updatedAnswers = { ...userAnswer };
+                          delete updatedAnswers[originalIndex];
+                          onAnswerChange?.(updatedAnswers);
+                        }}
+                        className="absolute -top-2.5 -right-2.5 bg-red-500 hover:bg-red-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] border border-white shadow-sm cursor-pointer"
+                        title="Xóa lựa chọn"
+                      >
+                        ✕
+                      </button>
+                    )}
+
                     {/* Hiển thị check đúng/sai khi xem kết quả */}
                     {!interactiveMode && !isExample && (
-                      <div className="absolute -top-3 -right-3 bg-white rounded-full">
+                      <div className="absolute -top-3 -right-3 bg-white rounded-full shadow-sm">
                         {currentAnswer === (item.colour || item.writeText || item.write_text) ? (
                           <CheckCircle2 className="w-4 h-4 text-emerald-500 fill-white" />
                         ) : (
@@ -174,33 +227,6 @@ export function ListenColourWrite({
                       </div>
                     )}
                   </div>
-
-                  {/* Input nhập chữ nếu là dạng viết (isWrite) */}
-                  {isWrite && (
-                    <div 
-                      className="absolute -translate-x-1/2 mt-5 pointer-events-auto"
-                      style={{
-                        left: `${item.hotspot.x}%`,
-                        top: `${item.hotspot.y}%`,
-                      }}
-                    >
-                      <input
-                        type="text"
-                        placeholder="Nhập từ..."
-                        value={currentAnswer || ''}
-                        disabled={!interactiveMode || isExample}
-                        onChange={(e) => {
-                          onAnswerChange?.({
-                            ...userAnswer,
-                            [originalIndex]: e.target.value
-                          });
-                        }}
-                        className={`w-24 text-center px-1.5 py-0.5 text-xs border rounded shadow-md font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white/95 text-slate-800 ${
-                          isExample ? 'border-amber-300 bg-amber-50 text-amber-900' : 'border-slate-300'
-                        }`}
-                      />
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -208,40 +234,53 @@ export function ListenColourWrite({
         </div>
       )}
 
-      {/* Bảng màu sắc & Bút vẽ cho học viên */}
-      {interactiveMode && (
+      {/* Danh sách các nhãn kéo thả (Draggable Badges) */}
+      {interactiveMode && draggableBadges.length > 0 && (
         <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
             <Palette className="w-5 h-5 text-orange-500" />
-            <span>🎨 Hộp bút màu (Chọn màu để tô hoặc kéo thả vào chấm số trên tranh):</span>
+            <span>🎨 Danh sách nhãn kéo thả (Kéo nhãn thả vào vòng tròn trên ảnh):</span>
           </div>
           
           <div className="flex flex-wrap gap-2.5">
-            {colours.map((color) => (
-              <button
-                key={color.value}
-                draggable
-                onDragStart={(e) => handleDragStart(e, color.value)}
-                onClick={() => setActiveColor(activeColor === color.value ? null : color.value)}
-                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all cursor-pointer ${
-                  activeColor === color.value
-                    ? 'border-orange-500 bg-orange-50 scale-105 shadow-sm'
-                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-                }`}
-                title="Kéo thả màu này lên tranh hoặc click chọn rồi click vào điểm neo"
-              >
-                <span 
-                  className="w-4 h-4 rounded-full border border-black/10 inline-block shadow-sm"
-                  style={{ backgroundColor: color.hex }}
-                />
-                <span className="text-slate-700">{color.label}</span>
-              </button>
-            ))}
+            {draggableBadges.map((badge) => {
+              const isSelected = selectedBadge?.id === badge.id;
+              const colorHex = badge.type === 'color' ? colours.find(c => c.value === badge.value)?.hex : null;
+
+              return (
+                <button
+                  key={badge.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, badge)}
+                  onClick={() => setSelectedBadge(isSelected ? null : badge)}
+                  className={`flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all cursor-grab active:cursor-grabbing ${
+                    isSelected
+                      ? 'border-orange-500 bg-orange-50 scale-105 shadow-sm ring-2 ring-orange-400'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                  title="Kéo thả nhãn này lên tranh hoặc click chọn rồi click vào điểm neo trên ảnh"
+                >
+                  {badge.type === 'color' ? (
+                    <>
+                      <span 
+                        className="w-4 h-4 rounded-full border border-black/10 inline-block shadow-sm"
+                        style={{ backgroundColor: colorHex || undefined }}
+                      />
+                      <span className="text-slate-700">{badge.label}</span>
+                    </>
+                  ) : (
+                    <span className="text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 font-mono">
+                      📝 {badge.value}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
-          {activeColor && (
+          {selectedBadge && (
             <p className="text-xs text-orange-600 bg-orange-50/50 border border-orange-200 rounded-lg p-2 animate-pulse inline-block">
-              👉 Đang chọn màu: <strong>{colours.find(c => c.value === activeColor)?.label}</strong>. Hãy click vào điểm số trên bức tranh để tô màu!
+              👉 Đang chọn nhãn: <strong>{selectedBadge.label}</strong>. Hãy click vào vị trí vòng tròn trên bức tranh để gán!
             </p>
           )}
         </div>
