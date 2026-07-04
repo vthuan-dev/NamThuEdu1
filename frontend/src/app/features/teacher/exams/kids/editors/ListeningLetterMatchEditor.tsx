@@ -509,9 +509,11 @@ const ListeningLetterMatchEditor: React.FC<ListeningLetterMatchEditorProps> = ({
           <h4 className="flex items-center gap-2 text-base font-semibold text-slate-900">
             <span className="text-lg">🖼️</span> Options (Chữ cái A-H + Hình ảnh) - {options.length} mục
           </h4>
-          <p className="text-sm text-slate-500 mt-1">
-            💡 Cần đủ 8 options (A-H) với 2 distractors (không được ghép)
-          </p>
+          <div className="text-sm text-slate-600 mt-2 space-y-1 bg-amber-50 border border-amber-200 rounded-lg p-3 text-[12.5px] text-amber-900">
+            <p className="font-bold flex items-center gap-1 text-amber-800">💡 Lưu ý về 2 đáp án nhiễu (Distractors) dư ra:</p>
+            <p>1. Giáo viên hãy nhập đầy đủ mô tả và tải ảnh cho cả <strong>8 Options (A đến H)</strong>.</p>
+            <p>2. Ở phần <strong>🔤 Chủ thể</strong> phía trên, giáo viên chỉ cần chọn chữ cái đúng cho 6 chủ thể. <strong>2 chữ cái còn dư ra</strong> (không được gán cho chủ thể nào) sẽ tự động trở thành đáp án nhiễu để học sinh kéo thả.</p>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

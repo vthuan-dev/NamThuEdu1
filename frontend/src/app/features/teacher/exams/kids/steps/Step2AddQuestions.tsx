@@ -127,7 +127,7 @@ const KIDS_TASK_GUIDES: Record<string, { rules: string[]; steps: string[]; note?
     rules: [
       "Tổng số chủ thể: Cần tạo đủ <strong>6 chủ thể</strong> (ví dụ: các nhân vật như <em>her son</em>, <em>her uncle</em>, <em>Jane</em>...).",
       "Ví dụ mẫu (Example): Tích chọn <strong>'Ví dụ mẫu'</strong> cho đúng 1 chủ thể đầu tiên. Chỗ này sẽ tự điền sẵn đáp án khi học sinh làm bài thi thử.",
-      "Tổng số hình ảnh (Options A-H): Phải điền đầy đủ mô tả và tải lên đúng <strong>8 hình ảnh</strong> tương ứng từ A đến H. Sẽ có 2 đáp án nhiễu (distractors) không được ghép với chủ thể nào.",
+      "Đáp án nhiễu (Distractors): Phải tải lên đủ <strong>8 hình ảnh (A-H)</strong>. Chỉ chọn đáp án đúng cho 6 chủ thể, 2 chữ cái còn dư ra (không gán cho bất kỳ chủ thể nào) sẽ tự động làm đáp án nhiễu (distractors) để học sinh kéo thả.",
     ],
     steps: [
       "Tải lên file audio nghe tại mục <strong>🎵 File Audio</strong>.",
