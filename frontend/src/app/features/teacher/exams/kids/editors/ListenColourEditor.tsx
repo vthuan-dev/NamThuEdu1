@@ -30,6 +30,10 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
   questionId,
 }) => {
   const toast = useToastContext();
+  
+  // DEBUG: Log initialData khi component mount
+  console.log('🔍 ListenColourEditor initialData:', initialData);
+  
   const [title, setTitle] = useState('');
   const [mainAudioUrl, setMainAudioUrl] = useState('');
   const [mainImageUrl, setMainImageUrl] = useState('');
@@ -47,12 +51,19 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
       setMainImageUrl(initialData.config?.mainImageUrl || '');
       setImageRotation(initialData.config?.imageRotation || 0);
       
-      // Map instructions with writeText support
-      const mappedInstructions = (initialData.config?.instructions || []).map((inst: any) => ({
-        ...inst,
-        writeText: inst.writeText || inst.write_text || ''
+      // Map instructions with writeText support and ensure all fields are loaded correctly
+      const mappedInstructions = (initialData.config?.instructions || []).map((inst: any, index: number) => ({
+        id: inst.id || `inst-${index + 1}`, // Ensure ID exists
+        objectName: inst.objectName || inst.object_name || '',
+        colour: inst.colour || '',
+        position: inst.position || '',
+        writeText: inst.writeText || inst.write_text || '',
+        isExample: inst.isExample || inst.is_example || false,
+        hotspot: inst.hotspot || null
       }));
       setInstructions(mappedInstructions);
+      
+      console.log('📦 Loaded instructions from DB:', mappedInstructions);
     }
   }, [initialData]);
 
@@ -229,6 +240,15 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
       return;
     }
 
+    // Collect all colour/writeText values from instructions (for draggable badges)
+    const allColours = new Set<string>();
+    const allTexts = new Set<string>();
+    
+    instructions.forEach(inst => {
+      if (inst.colour) allColours.add(inst.colour);
+      if (inst.writeText) allTexts.add(inst.writeText);
+    });
+
     const questionData = {
       type: 'listen_colour_write',
       title,
@@ -242,10 +262,15 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
           objectName: inst.objectName,
           colour: inst.colour,
           position: inst.position,
-          write_text: inst.writeText || null, // NEW: Add write_text field
+          write_text: inst.writeText || null,
           isExample: inst.isExample,
           hotspot: inst.hotspot || null
         })),
+        // Add distractor support: collect all unique colours and texts for badge display
+        allLabels: {
+          colours: Array.from(allColours),
+          texts: Array.from(allTexts)
+        }
       },
     };
 
@@ -466,6 +491,72 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Preview của các label sẽ hiển thị cho học viên */}
+        {instructions.length > 0 && (() => {
+          const allColours = [...new Set(instructions.map(i => i.colour).filter(Boolean))];
+          const allTexts = [...new Set(instructions.map(i => i.writeText).filter(Boolean))];
+          const totalLabels = allColours.length + allTexts.length;
+          
+          if (totalLabels > 0) {
+            return (
+              <div className="mb-4 rounded-lg border-2 border-blue-200 bg-blue-50/50 p-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <span className="text-sm font-bold text-blue-800">
+                    🏷️ Preview Labels (Học viên sẽ thấy {totalLabels} labels này)
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {allColours.map((colour, idx) => {
+                    const colorMeta = colours.find(c => c.value === colour);
+                    if (!colorMeta) {
+                      // Fallback nếu không tìm thấy metadata - hiển thị cảnh báo
+                      return (
+                        <div
+                          key={`colour-${idx}`}
+                          className="flex items-center gap-2 rounded-xl border-2 border-orange-300 bg-orange-50 px-3 py-2"
+                        >
+                          <span className="w-4 h-4 rounded-full border border-black/20 inline-block bg-gray-400" />
+                          <span className="text-xs font-bold text-orange-700">
+                            ⚠️ {colour} (chưa định nghĩa)
+                          </span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div
+                        key={`colour-${idx}`}
+                        className="flex items-center gap-2 rounded-xl border-2 border-slate-300 bg-white px-3 py-2"
+                      >
+                        <span 
+                          className="w-4 h-4 rounded-full border border-black/10 inline-block shadow-sm"
+                          style={{ backgroundColor: colorMeta.color }}
+                        />
+                        <span className="text-xs font-bold text-slate-700">
+                          {colorMeta.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {allTexts.map((text, idx) => (
+                    <div
+                      key={`text-${idx}`}
+                      className="flex items-center gap-2 rounded-xl border-2 border-blue-300 bg-blue-100 px-3 py-2"
+                    >
+                      <span className="text-xs font-bold text-blue-700 font-mono">
+                        📝 {text}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-blue-600">
+                  💡 Bao gồm cả labels từ vật thể nhiễu (nếu có). Học viên có thể kéo bất kỳ label nào vào bất kỳ hotspot nào.
+                </p>
+              </div>
+            );
+          }
+          return null;
+        })()}
 
         {instructions.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center">

@@ -2899,6 +2899,60 @@ class StudentTestController extends Controller
                 if ($gradable === 0) return ['manual' => true, 'ratio' => 0.0];
                 return ['manual' => false, 'ratio' => $correct / $gradable];
             }
+            case 'listen_colour_write':
+            case 'listen_colour': {
+                // Tô màu / viết từ: kiểm tra colour hoặc writeText/write_text đúng
+                $instructions = $data['instructions'] ?? [];
+                
+                // DEBUG: Log để kiểm tra
+                Log::info('🎨 Grading listen_colour_write', [
+                    'instructions_count' => count($instructions),
+                    'student_answer_map' => $map,
+                    'instructions' => array_map(function($inst, $idx) {
+                        return [
+                            'index' => $idx,
+                            'objectName' => $inst['objectName'] ?? $inst['object_name'] ?? 'N/A',
+                            'isExample' => $inst['isExample'] ?? $inst['is_example'] ?? false,
+                            'correctAnswer' => $inst['colour'] ?? $inst['writeText'] ?? $inst['write_text'] ?? null,
+                        ];
+                    }, $instructions, array_keys($instructions))
+                ]);
+                
+                $gradable = 0; $correct = 0;
+                foreach ($instructions as $i => $inst) {
+                    // Bỏ qua câu ví dụ
+                    if (!empty($inst['isExample']) || !empty($inst['is_example'])) continue;
+                    
+                    // Lấy đáp án đúng (ưu tiên colour, nếu không có thì dùng writeText/write_text)
+                    $correctAnswer = $inst['colour'] ?? $inst['writeText'] ?? $inst['write_text'] ?? null;
+                    
+                    // ⚠️ BỎ QUA DISTRACTORS (không có đáp án đúng)
+                    if (empty($correctAnswer)) {
+                        Log::info("🎨 Skipping distractor at index $i (no correct answer)");
+                        continue;
+                    }
+                    
+                    $gradable++;
+                    $studentAnswer = $map[(string) $i] ?? '';
+                    
+                    // DEBUG
+                    Log::info("🎨 Checking index $i", [
+                        'objectName' => $inst['objectName'] ?? $inst['object_name'] ?? 'N/A',
+                        'correct' => $correctAnswer,
+                        'student' => $studentAnswer,
+                        'match' => $eq($studentAnswer, $correctAnswer)
+                    ]);
+                    
+                    // So sánh (normalize để không phân biệt hoa thường, khoảng trắng)
+                    if ($eq($studentAnswer, $correctAnswer)) {
+                        $correct++;
+                    }
+                }
+                if ($gradable === 0) return ['manual' => false, 'ratio' => 0.0];
+                
+                Log::info("🎨 Final score: $correct / $gradable");
+                return ['manual' => false, 'ratio' => $correct / $gradable];
+            }
             default:
                 // Nói / viết tự do / dạng chưa hỗ trợ → giáo viên chấm tay
                 return ['manual' => true, 'ratio' => 0.0];

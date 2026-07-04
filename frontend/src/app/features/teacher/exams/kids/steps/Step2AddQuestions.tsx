@@ -513,7 +513,18 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
   };
 
   const handleCancelEditor = () => {
-    setShowEditor(false);
+    const confirmed = window.confirm(
+      'Còn có dữ liệu chưa được lưu, bạn có chắc chắn muốn thoát ra không? Tất cả dữ liệu từ lúc thi còn câu hỏi này sẽ bị xóa.'
+    );
+    
+    if (confirmed) {
+      // Reset toàn bộ state khi cancel để cho phép chọn lại từ đầu
+      setShowEditor(false);
+      setSelectedTaskType(null);
+      setSelectedPart(null);
+      setSelectedSubPart(null);
+      setShowTaskTypeSelector(false);
+    }
   };
 
   // Component editor tương ứng với dạng bài đang chọn

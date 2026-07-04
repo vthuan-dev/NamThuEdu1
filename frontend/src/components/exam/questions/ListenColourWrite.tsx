@@ -18,9 +18,9 @@ export function ListenColourWrite({
   onAnswerChange
 }: ListenColourWriteProps) {
   // Lấy danh sách câu hỏi: đảm bảo phải là Array (tránh trùng tên với instructions text dạng string)
-  const items = (Array.isArray(taskData.instructions) ? taskData.instructions : null) || 
+  const items = (Array.isArray(taskData.task_data?.instructions) ? taskData.task_data.instructions : null) ||
+                (Array.isArray(taskData.instructions) ? taskData.instructions : null) || 
                 (Array.isArray(taskData.items) ? taskData.items : null) || 
-                (Array.isArray(taskData.task_data?.instructions) ? taskData.task_data.instructions : null) ||
                 (Array.isArray(taskData.config?.instructions) ? taskData.config.instructions : null) || 
                 [];
                 
@@ -72,6 +72,44 @@ export function ListenColourWrite({
   // Tạo danh sách các nhãn kéo thả bên ngoài (chỉ lấy các câu hỏi thực tế, không lấy câu ví dụ)
   // Các nhãn này tương ứng với đáp án đúng để học viên chọn kéo vào (số hotspot trên hình > số nhãn kéo thả)
   const draggableBadges = useMemo(() => {
+    // Check if teacher provided explicit distractor labels
+    const allLabels = taskData.config?.allLabels || taskData.task_data?.allLabels || taskData.allLabels;
+    
+    if (allLabels && (allLabels.colours || allLabels.texts)) {
+      // New format: use explicit labels (includes distractors)
+      const badges = [];
+      
+      // Add colour badges
+      if (Array.isArray(allLabels.colours)) {
+        allLabels.colours.forEach((colour: string, idx: number) => {
+          badges.push({
+            id: `colour_${idx}`,
+            originalIndex: -1, // Not tied to specific item
+            type: 'color',
+            value: colour,
+            label: colours.find(c => c.value === colour)?.label || colour,
+          });
+        });
+      }
+      
+      // Add text badges
+      if (Array.isArray(allLabels.texts)) {
+        allLabels.texts.forEach((text: string, idx: number) => {
+          badges.push({
+            id: `text_${idx}`,
+            originalIndex: -1,
+            type: 'text',
+            value: text,
+            label: text,
+          });
+        });
+      }
+      
+      // Shuffle deterministically
+      return [...badges].sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    }
+    
+    // Old format: extract from items (backward compatibility)
     const badges = items
       .filter((item: any) => {
         const isExample = item.isExample || item.is_example;
@@ -312,6 +350,138 @@ export function ListenColourWrite({
               👉 Đang chọn nhãn: <strong>{selectedBadge.label}</strong>. Hãy click vào vị trí vòng tròn trên bức tranh để gán!
             </p>
           )}
+        </div>
+      )}
+      
+      {/* Review mode: Hiển thị đáp án chi tiết - KIDS FRIENDLY 🎨 */}
+      {!interactiveMode && itemsWithHotspot.length > 0 && (
+        <div className="p-6 bg-gradient-to-br from-yellow-50 via-orange-50 to-pink-50 rounded-3xl border-4 border-yellow-400 space-y-4 shadow-lg">
+          <div className="flex items-center gap-3 text-2xl font-black text-orange-600">
+            <span className="text-4xl">📊</span>
+            <span>Xem kết quả của bạn!</span>
+          </div>
+          
+          <div className="space-y-3">
+            {itemsWithHotspot.map((item: any) => {
+              const originalIndex = items.findIndex((x: any) => x.id === item.id);
+              const isExample = item.isExample || item.is_example;
+              if (isExample) return null; // Bỏ qua câu ví dụ
+              
+              const correctAnswer = item.colour || item.writeText || item.write_text || '';
+              const studentAnswer = userAnswer?.[originalIndex] || '';
+              const isCorrect = correctAnswer === studentAnswer;
+              
+              const correctColorMeta = colours.find(c => c.value === correctAnswer);
+              const studentColorMeta = colours.find(c => c.value === studentAnswer);
+              
+              return (
+                <div 
+                  key={item.id} 
+                  className={`p-5 rounded-2xl border-4 shadow-md transition-all ${
+                    isCorrect 
+                      ? 'bg-gradient-to-r from-green-100 to-emerald-100 border-green-400' 
+                      : 'bg-gradient-to-r from-red-100 to-pink-100 border-red-400'
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    {/* Big emoji feedback */}
+                    <div className="text-6xl flex-shrink-0">
+                      {isCorrect ? '🎉' : '😅'}
+                    </div>
+                    
+                    <div className="flex-1 space-y-3">
+                      {/* Question title */}
+                      <p className="font-black text-xl text-slate-800">
+                        Câu #{originalIndex + 1}: {item.objectName || item.object || '(chưa đặt tên)'}
+                      </p>
+                      
+                      {/* Correct answer */}
+                      <div className="flex items-center gap-3 p-3 bg-white rounded-xl border-2 border-green-300">
+                        <span className="text-xl">✅</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-green-700">Đáp án đúng:</span>
+                          {correctColorMeta ? (
+                            <div className="flex items-center gap-2 bg-green-50 px-3 py-1.5 rounded-full border-2 border-green-300">
+                              <span 
+                                className="w-6 h-6 rounded-full border-2 border-white shadow-sm inline-block"
+                                style={{ backgroundColor: correctColorMeta.hex }}
+                              />
+                              <span className="font-black text-base text-green-800">{correctColorMeta.label}</span>
+                            </div>
+                          ) : (
+                            <span className="font-black text-base text-green-800 font-mono bg-green-50 px-3 py-1.5 rounded-full border-2 border-green-300">
+                              📝 {correctAnswer}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Student answer */}
+                      <div className={`flex items-center gap-3 p-3 rounded-xl border-2 ${
+                        isCorrect 
+                          ? 'bg-white border-green-300' 
+                          : 'bg-white border-red-300'
+                      }`}>
+                        <span className="text-xl">{isCorrect ? '😊' : '❌'}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-slate-700">Bạn chọn:</span>
+                          {studentAnswer ? (
+                            studentColorMeta ? (
+                              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border-2 ${
+                                isCorrect 
+                                  ? 'bg-green-50 border-green-300' 
+                                  : 'bg-red-50 border-red-300'
+                              }`}>
+                                <span 
+                                  className="w-6 h-6 rounded-full border-2 border-white shadow-sm inline-block"
+                                  style={{ backgroundColor: studentColorMeta.hex }}
+                                />
+                                <span className={`font-black text-base ${
+                                  isCorrect ? 'text-green-800' : 'text-red-800'
+                                }`}>
+                                  {studentColorMeta.label}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className={`font-black text-base font-mono px-3 py-1.5 rounded-full border-2 ${
+                                isCorrect 
+                                  ? 'bg-green-50 border-green-300 text-green-800' 
+                                  : 'bg-red-50 border-red-300 text-red-800'
+                              }`}>
+                                📝 {studentAnswer}
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-gray-500 italic text-sm bg-gray-100 px-3 py-1.5 rounded-full border-2 border-gray-300">
+                              Chưa trả lời 😢
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Encouragement message */}
+                      {isCorrect ? (
+                        <p className="text-base font-bold text-green-700 bg-green-50 px-4 py-2 rounded-xl border-2 border-green-300 text-center">
+                          Tuyệt vời! Bạn làm đúng rồi! 🌟
+                        </p>
+                      ) : (
+                        <p className="text-base font-bold text-orange-700 bg-orange-50 px-4 py-2 rounded-xl border-2 border-orange-300 text-center">
+                          Lần sau cẩn thận hơn nhé! Bạn làm được mà! 💪
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          
+          {/* Overall encouragement */}
+          <div className="text-center p-4 bg-gradient-to-r from-purple-100 to-pink-100 rounded-2xl border-4 border-purple-400">
+            <p className="text-xl font-black text-purple-700">
+              Bạn đã cố gắng rất tốt! Tiếp tục phát huy nhé! 🚀✨
+            </p>
+          </div>
         </div>
       )}
 

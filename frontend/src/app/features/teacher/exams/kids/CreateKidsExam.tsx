@@ -92,6 +92,12 @@ const CreateKidsExam: React.FC = () => {
           // Get base config
           const baseConfig = q.kids_task_config?.task_data || {};
           
+          // DEBUG: Log raw config from database
+          if (q.kids_task_config?.task_type === 'listen_colour_write') {
+            console.log('🔍 RAW baseConfig from DB:', JSON.stringify(baseConfig, null, 2));
+            console.log('🔍 Instructions count:', baseConfig.instructions?.length);
+          }
+          
           // Convert relative URLs to full URLs
           const audioUrl = audioMedia ? getFullMediaUrl(audioMedia.file_url) : null;
           const imageUrl = imageMedia ? getFullMediaUrl(imageMedia.file_url) : null;
@@ -102,6 +108,12 @@ const CreateKidsExam: React.FC = () => {
             ...(audioUrl && { audioUrl }),
             ...(imageUrl && { imageUrl }),
           });
+          
+          // DEBUG: Log after ensureItemIds
+          if (q.kids_task_config?.task_type === 'listen_colour_write') {
+            console.log('🔍 After ensureItemIds:', JSON.stringify(configWithMedia, null, 2));
+            console.log('🔍 Instructions count after:', configWithMedia.instructions?.length);
+          }
 
           return {
             qId: q.qId,

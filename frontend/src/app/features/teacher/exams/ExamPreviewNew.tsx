@@ -31,13 +31,15 @@ export function ExamPreviewNew() {
 
   return (
     <div className="relative">
-      {/* Back button overlay */}
+      {/* Back button overlay - Navigate to exam list */}
       <div className="absolute top-4 left-4 z-50">
         <button
-          onClick={() => navigate(-1)}
-          className="p-3 bg-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110"
+          onClick={() => navigate('/giao-vien/nganhang-de')}
+          className="px-4 py-2 bg-white rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 flex items-center gap-2 font-medium text-gray-700 hover:text-orange-600"
+          title="Quay lại danh sách đề thi"
         >
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
+          <ArrowLeft className="w-5 h-5" />
+          <span className="hidden sm:inline">Quay lại</span>
         </button>
       </div>
 
