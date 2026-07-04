@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Upload, Trash2, Save, X, Volume2, Image as ImageIcon } from 'lucide-react';
 import { uploadKidsMedia } from '../../../../../../services/kidsExamApi';
 import { useToastContext } from '../../../../../../contexts/ToastContext';
+import { getFullMediaUrl } from '../../../../../../utils/mediaUtils';
 
 interface ListenColourEditorProps {
   onSave: (data: any) => void;
@@ -286,7 +287,7 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
         ) : (
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-center justify-between">
-              <audio controls src={mainAudioUrl} className="flex-1">
+              <audio controls src={getFullMediaUrl(mainAudioUrl)} className="flex-1">
                 Trình duyệt không hỗ trợ audio
               </audio>
               <button
@@ -327,7 +328,7 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
             <div className="flex items-start gap-4">
               <div className="relative border border-slate-300 rounded-lg overflow-hidden bg-white shadow-sm inline-block">
                 <img
-                  src={mainImageUrl}
+                  src={getFullMediaUrl(mainImageUrl)}
                   alt="Main"
                   onClick={handleImageClick}
                   className={`max-h-[500px] w-auto object-contain select-none ${

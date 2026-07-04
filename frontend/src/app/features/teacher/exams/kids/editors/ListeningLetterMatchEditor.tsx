@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Save, X, Plus, Trash2, Upload, Volume2 } from 'lucide-react';
 import { uploadKidsMedia } from '../../../../../../services/kidsExamApi';
 import { useToastContext } from '../../../../../../contexts/ToastContext';
+import { getFullMediaUrl } from '../../../../../../utils/mediaUtils';
 
 interface ListeningLetterMatchEditorProps {
   onSave: (data: any) => void;
@@ -380,7 +381,7 @@ const ListeningLetterMatchEditor: React.FC<ListeningLetterMatchEditorProps> = ({
             {audioUrl && (
               <div className="flex items-center space-x-2">
                 <Volume2 className="h-5 w-5 text-slate-500" />
-                <audio controls src={audioUrl} className="h-10">
+                <audio controls src={getFullMediaUrl(audioUrl)} className="h-10">
                   Your browser does not support the audio element.
                 </audio>
                 <button
@@ -551,7 +552,7 @@ const ListeningLetterMatchEditor: React.FC<ListeningLetterMatchEditorProps> = ({
                   {option.imageUrl ? (
                     <div className="relative">
                       <img
-                        src={option.imageUrl}
+                        src={getFullMediaUrl(option.imageUrl)}
                         alt={`Option ${option.letter}`}
                         className="h-32 w-full rounded-lg border border-slate-200 object-cover"
                       />
