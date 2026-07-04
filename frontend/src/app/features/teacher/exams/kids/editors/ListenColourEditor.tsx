@@ -158,6 +158,24 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
     setInstructions([...instructions, newInstruction]);
   };
 
+  const addDistractor = () => {
+    const newId = Date.now().toString();
+    const newInstruction: ColourInstruction = {
+      id: newId,
+      objectName: 'vật thể nhiễu',
+      colour: '',
+      position: '',
+      writeText: '',
+      isExample: false,
+    };
+    const updated = [...instructions, newInstruction];
+    setInstructions(updated);
+    
+    // Kích hoạt ngay chế độ click gán vị trí trên ảnh cho vật thể nhiễu mới tạo này
+    setSelectedInstForHotspot(updated.length - 1);
+    toast.info('👉 Hãy click lên vị trí vật thể nhiễu trên bức tranh để gán!');
+  };
+
   const updateInstruction = (id: string, field: keyof ColourInstruction, value: any) => {
     setInstructions(instructions.map(inst => 
       inst.id === id ? { ...inst, [field]: value } : inst
@@ -429,19 +447,30 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
           <h4 className="text-sm font-semibold text-slate-900">
             🎨 Danh sách hướng dẫn tô màu
           </h4>
-          <button
-            onClick={addInstruction}
-            className="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"
-          >
-            <Upload className="h-4 w-4" />
-            <span>Thêm hướng dẫn</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={addInstruction}
+              className="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600 cursor-pointer"
+            >
+              <Upload className="h-4 w-4" />
+              <span>Thêm hướng dẫn</span>
+            </button>
+            <button
+              type="button"
+              onClick={addDistractor}
+              className="flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700 cursor-pointer"
+              title="Thêm vật thể nhiễu không có màu/từ viết đúng để đánh lạc hướng học viên"
+            >
+              <span>➕ ⚠️</span>
+              <span>Thêm vật thể nhiễu</span>
+            </button>
+          </div>
         </div>
 
         {instructions.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
             <div className="mb-3 text-4xl">🎨</div>
-            <p className="text-sm text-slate-500">Chưa có hướng dẫn nào. Nhấn "Thêm hướng dẫn" để bắt đầu!</p>
+            <p className="text-sm text-slate-500">Chưa có hướng dẫn nào. Nhấn "Thêm hướng dẫn" hoặc "Thêm vật thể nhiễu" để bắt đầu!</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -583,19 +612,37 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
                   </div>
                 </div>
 
-                {/* Preview */}
-                {inst.objectName && inst.colour && (
-                  <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
-                    <p className="text-sm text-slate-700">
-                      <span className="font-semibold">Hướng dẫn:</span> Tô màu{' '}
-                      <span className="font-semibold" style={{ color: colours.find(c => c.value === inst.colour)?.color }}>
-                        {colours.find(c => c.value === inst.colour)?.label}
-                      </span>
-                      {' '}cho <span className="font-semibold">{inst.objectName}</span>
-                      {inst.position && <span> {inst.position}</span>}
-                    </p>
-                  </div>
-                )}
+                 {/* Preview / Warning block */}
+                 {inst.objectName && (
+                   <div className="mt-3 rounded-lg border p-3 bg-white">
+                     {inst.colour ? (
+                       <p className="text-sm text-slate-700">
+                         <span className="font-semibold">Hướng dẫn:</span> Tô màu{' '}
+                         <span className="font-semibold" style={{ color: colours.find(c => c.value === inst.colour)?.color }}>
+                           {colours.find(c => c.value === inst.colour)?.label}
+                         </span>
+                         {' '}cho <span className="font-semibold">{inst.objectName}</span>
+                         {inst.position && <span> {inst.position}</span>}
+                         {inst.writeText && (
+                           <> và viết chữ <span className="font-mono font-bold text-blue-700">"{inst.writeText}"</span></>
+                         )}
+                       </p>
+                     ) : inst.writeText ? (
+                       <p className="text-sm text-slate-700">
+                         <span className="font-semibold">Hướng dẫn:</span> Viết chữ <span className="font-mono font-bold text-blue-700">"{inst.writeText}"</span> cho <span className="font-semibold">{inst.objectName}</span>
+                         {inst.position && <span> {inst.position}</span>}
+                       </p>
+                     ) : (
+                       <p className="text-sm text-amber-700 bg-amber-50/50 p-1.5 rounded border border-dashed border-amber-200 flex items-center gap-1.5">
+                         <span>⚠️</span>
+                         <span>
+                           <strong>Vật thể nhiễu (Distractor):</strong> Đã được gán điểm neo trên hình nhưng không có màu sắc/từ viết đúng. 
+                           Điểm neo này sẽ bỏ trống ở trang học viên.
+                         </span>
+                       </p>
+                     )}
+                   </div>
+                 )}
               </div>
             ))}
           </div>
