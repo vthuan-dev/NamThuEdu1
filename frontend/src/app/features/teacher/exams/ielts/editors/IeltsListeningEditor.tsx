@@ -67,93 +67,95 @@ const QUESTION_TYPE_GUIDES: Record<string, { title: string; steps: string[]; not
   "multiple-choice": {
     title: "Hướng dẫn soạn câu Trắc nghiệm (MCQ chọn 1 đáp án):",
     steps: [
-      "Bước 1: Nhập nội dung câu hỏi riêng của từng câu.",
-      "Bước 2: Sử dụng nút '+ Thêm đáp án' để tạo các lựa chọn từ A đến D/H.",
-      "Bước 3: Click chọn nút Radio tròn tương ứng để đặt chữ cái đó làm đáp án đúng duy nhất.",
+      "Bước 1: Nhập nội dung câu hỏi riêng biệt cho từng câu vào ô <strong>'Nội dung câu hỏi...'</strong>.",
+      "Bước 2: Sử dụng nút <strong>'+ Thêm đáp án'</strong> để tạo các lựa chọn lựa từ A đến D (hoặc tối đa H). Bấm biểu tượng <strong>'Thùng rác'</strong> bên cạnh mỗi lựa chọn để xóa bớt đáp án thừa.",
+      "Bước 3: Click chọn nút Radio tròn tương ứng để đặt chữ cái đó làm đáp án đúng duy nhất của câu hỏi.",
     ],
-    note: "* Học viên sẽ thấy câu hỏi kèm danh sách đáp án, và chọn câu trả lời tại menu điền đáp án bên phải.",
+    note: "* Học viên sẽ nhìn thấy câu hỏi kèm danh sách đáp án, và chọn câu trả lời tương ứng tại menu điền đáp án bên phải.",
   },
   "multiple-choice-group": {
-    title: "Hướng dẫn soạn câu MCQ chọn 2/3 đáp án (Choose TWO/THREE):",
+    title: "Hướng dẫn soạn câu MCQ chọn nhiều đáp án (Choose TWO/THREE):",
     steps: [
-      "Bước 1: Chọn loại <em>Multiple choice (Choose TWO/THREE)</em> cho các câu thuộc nhóm câu hỏi này (ví dụ: câu 1 và câu 2).",
-      "Bước 2 (Tại câu đầu nhóm): Nhập đề bài chung, bấm <strong>+ Thêm đáp án</strong> để nhập đầy đủ các lựa chọn (A-E/H), và tích chọn đáp án đúng thứ nhất.",
-      "Bước 3 (Tại các câu tiếp theo): Hệ thống tự ẩn bộ đáp án để giao diện gọn gàng, bạn chỉ cần click chọn đáp án đúng tiếp theo tại hàng nút chữ cái (A, B, C, D...).",
+      "Bước 1: Đảm bảo chọn loại <em>Multiple choice (Choose TWO/THREE)</em> cho các câu thuộc nhóm câu hỏi này (ví dụ: câu 17 và câu 18 là cùng một nhóm).",
+      "Bước 2 (Tại câu đầu nhóm): Nhập đề bài lớn chung của nhóm câu hỏi (VD: <em>'Which TWO things does Heather explain about kilns?'</em>). Nhập các lựa chọn bằng cách bấm <strong>'+ Thêm đáp án'</strong> (ví dụ A đến E). Tích chọn đáp án đúng thứ nhất (ví dụ: dòng A).",
+      "Bước 3 (Tại các câu tiếp theo của nhóm): Bộ lựa chọn A-E sẽ tự động ẩn đi và kế thừa hoàn toàn từ câu đầu nhóm để giữ giao diện gọn gàng. Bạn chỉ cần click chọn đáp án đúng tiếp theo tại hàng nút chữ cái <strong>[A] [B] [C] [D] [E]</strong> (ví dụ chọn C cho câu 18).",
     ],
-    note: "* Học viên sẽ nhìn thấy 1 bảng câu hỏi gộp duy nhất bên trái (Câu 1–2) và điền đáp án vào các ô tương ứng bên phải.",
+    note: "* Học viên sẽ nhìn thấy 1 bảng câu hỏi gộp duy nhất bên trái (Câu 17–18) và điền đáp án vào các ô tương ứng bên phải. Hệ thống tự động chấm chéo không phân biệt thứ tự học viên điền.",
   },
   "form-completion": {
     title: "Hướng dẫn soạn Form completion (Điền biểu mẫu):",
     steps: [
-      "Bước 1: Soạn toàn bộ biểu mẫu trong khung nhập liệu lớn 'Nội dung form'.",
-      "Bước 2: Mỗi ô điền đáp án, hãy gõ ít nhất 3 dấu gạch dưới liên tiếp '___'. Hệ thống tự động đếm số '___' để sinh ra các câu tương ứng.",
-      "Bước 3: Với mỗi câu sinh ra bên dưới, hãy điền đáp án đúng vào ô 'Đáp án đúng'.",
-      "Bước 4: Có thể đặt giới hạn từ (VD: ONE WORD ONLY) và bật checkbox 'Dùng word bank' nếu muốn học viên chọn từ danh sách từ cho sẵn.",
+      "Bước 1: Soạn toàn bộ biểu mẫu trong khung nhập liệu lớn <strong>'Nội dung form'</strong>.",
+      "Bước 2: Tại mỗi chỗ trống cần học viên điền, hãy gõ ít nhất 3 dấu gạch dưới liên tiếp <strong>'___'</strong>. Hệ thống sẽ tự động quét số lượng '___' để sinh ra các câu hỏi tương ứng bên dưới.",
+      "Bước 3: Với mỗi câu hỏi được tự động sinh ra ở dưới, hãy điền đáp án đúng vào ô <strong>'Đáp án đúng'</strong>.",
+      "Bước 4: Thiết lập giới hạn từ (VD: <em>ONE WORD AND/OR A NUMBER</em>) và bật checkbox <strong>'Dùng word bank'</strong> nếu muốn học viên chọn từ danh sách từ cho sẵn thay vì tự gõ.",
     ],
+    note: "* Ví dụ form: <em>Name: ___1___ / Phone: ___2___</em>. Hệ thống sẽ sinh câu 1 và câu 2 để học viên điền.",
   },
   "note-completion": {
     title: "Hướng dẫn soạn Note completion (Hoàn thành ghi chú):",
     steps: [
-      "Bước 1: Soạn nội dung từng câu ghi chú riêng biệt.",
-      "Bước 2: Điền đáp án đúng cho từng câu tương ứng.",
-      "Bước 3: Có thể cấu hình giới hạn số lượng từ cho phép nhập ở phần cài đặt.",
+      "Bước 1: Soạn nội dung từng câu ghi chú riêng biệt, ví dụ: <em>'The local museum reopened in ___'</em>.",
+      "Bước 2: Nhập từ/cụm từ đáp án chính xác vào ô <strong>'Đáp án đúng'</strong> phía dưới.",
+      "Bước 3: Cấu hình giới hạn từ phù hợp (VD: <em>NO MORE THAN TWO WORDS</em>) ở phần cài đặt.",
     ],
   },
   "table-completion": {
     title: "Hướng dẫn soạn Table completion (Hoàn thành bảng):",
     steps: [
-      "Bước 1: Soạn nội dung dòng/cột tương ứng của bảng.",
-      "Bước 2: Nhập đáp án đúng tương ứng cho từng câu.",
+      "Bước 1: Soạn nội dung ô/hàng của bảng tương ứng với từng câu, ví dụ: <em>'Location: ___'</em>.",
+      "Bước 2: Nhập đáp án đúng tương ứng cho câu đó vào ô <strong>'Đáp án đúng'</strong>.",
     ],
   },
   "flow-chart-completion": {
     title: "Hướng dẫn soạn Flow-chart completion (Hoàn thành sơ đồ tiến trình):",
     steps: [
-      "Bước 1: Soạn nội dung các bước của tiến trình.",
-      "Bước 2: Nhập đáp án đúng cho từng bước tương ứng.",
+      "Bước 1: Soạn nội dung mô tả bước tiến trình của câu hỏi tương ứng.",
+      "Bước 2: Nhập đáp án đúng chính xác cần điền vào ô <strong>'Đáp án đúng'</strong>.",
     ],
   },
   "summary-completion": {
     title: "Hướng dẫn soạn Summary completion (Hoàn thành bản tóm tắt):",
     steps: [
-      "Bước 1: Soạn nội dung câu tóm tắt.",
-      "Bước 2: Nhập đáp án đúng tương ứng.",
+      "Bước 1: Soạn nội dung đoạn tóm tắt chứa dấu trống <strong>'___'</strong> tương ứng với câu hỏi.",
+      "Bước 2: Nhập từ/cụm từ đáp án chính xác vào ô <strong>'Đáp án đúng'</strong>.",
     ],
   },
   "sentence-completion": {
     title: "Hướng dẫn soạn Sentence completion (Hoàn thành câu):",
     steps: [
-      "Bước 1: Soạn nội dung câu chưa hoàn chỉnh.",
-      "Bước 2: Nhập từ/cụm từ chính xác cần điền vào ô đáp án đúng.",
+      "Bước 1: Soạn nội dung câu chưa hoàn chỉnh có chứa ô trống <strong>'___'</strong>.",
+      "Bước 2: Nhập đáp án đúng chính xác cần điền vào ô <strong>'Đáp án đúng'</strong>.",
     ],
   },
   "short-answer": {
     title: "Hướng dẫn soạn Short-answer (Trả lời ngắn):",
     steps: [
-      "Bước 1: Nhập câu hỏi ngắn cần trả lời.",
-      "Bước 2: Nhập các đáp án đúng được chấp nhận.",
+      "Bước 1: Nhập câu hỏi ngắn cần trả lời, ví dụ: <em>'What is the maximum weight allowance?'</em>.",
+      "Bước 2: Nhập từ/cụm từ chính xác được chấp nhận làm câu trả lời vào ô <strong>'Đáp án đúng'</strong>.",
     ],
   },
   "matching": {
     title: "Hướng dẫn soạn câu Matching (Nối chéo / Ghép cặp):",
     steps: [
-      "Bước 1 (Tại câu đầu nhóm): Nhập danh sách các lựa chọn để ghép (ví dụ A: ..., B: ...) tại khung 'Bảng lựa chọn'.",
+      "Bước 1 (Tại câu đầu nhóm): Soạn danh sách các lựa chọn để ghép (ví dụ A: Name 1, B: Name 2...) tại khung <strong>'Bảng lựa chọn'</strong>.",
       "Bước 2 (Tại từng câu hỏi): Nhập tên mục cần ghép (ví dụ: tên một người, địa điểm...).",
-      "Bước 3: Tại mỗi mục câu hỏi, chọn chữ cái tương ứng đúng từ dropdown đáp án.",
+      "Bước 3: Tại từng câu hỏi, chọn chữ cái tương ứng đúng (A, B, C...) từ dropdown đáp án.",
     ],
+    note: "* Học viên sẽ thấy một bảng lựa chọn chung phía trên và các dropdown điền đáp án tương ứng ở từng câu.",
   },
   "plan-map-diagram": {
     title: "Hướng dẫn soạn Plan / Map / Diagram labelling (Nhãn sơ đồ/bản đồ):",
     steps: [
-      "Bước 1: Nhập câu hỏi hoặc mô tả nhãn cần điền.",
-      "Bước 2: Nhập đáp án đúng cho từng nhãn.",
+      "Bước 1: Nhập nhãn hoặc mô tả câu hỏi cần dán nhãn tương ứng trên sơ đồ/bản đồ.",
+      "Bước 2: Điền đáp án đúng tương ứng với sơ đồ.",
     ],
   },
   "image-completion": {
     title: "Hướng dẫn soạn câu hỏi kèm hình ảnh (Image / Table):",
     steps: [
-      "Bước 1: Tải lên hình ảnh đề bài chứa bản đồ/bảng biểu (áp dụng chung cho cả nhóm câu hỏi).",
-      "Bước 2: Tại từng câu hỏi được sinh ra, nhập đáp án đúng tương ứng với nhãn/chỗ trống trên ảnh.",
+      "Bước 1: Tải lên hình ảnh đề bài chứa bản đồ/bảng biểu (ảnh này sẽ dùng chung cho toàn bộ nhóm câu hỏi).",
+      "Bước 2: Tại từng câu hỏi được tự động sinh ra ở dưới, giáo viên chỉ cần nhập câu trả lời đúng tương ứng với nhãn/chỗ trống trên ảnh đề đã tải lên.",
     ],
   },
 };
