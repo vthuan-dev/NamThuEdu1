@@ -246,17 +246,20 @@ export function Header({ breadcrumb, action }: HeaderProps) {
         const items: RecentSubmission[] = res?.data?.data ?? res?.data ?? [];
         if (!Array.isArray(items)) return;
 
+        // First load: populate the list immediately so teacher sees recent submissions
         if (seenSubmissionIdsRef.current === null) {
           seenSubmissionIdsRef.current = new Set(items.map((i) => i.id));
+          setRecentSubmissions(items); // show existing submissions right away
           return;
         }
 
         const newOnes = items.filter((i) => !seenSubmissionIdsRef.current!.has(i.id));
-        if (newOnes.length === 0) return;
-
-        newOnes.forEach((i) => seenSubmissionIdsRef.current!.add(i.id));
-        setUnread((c) => c + newOnes.length);
-        playSound();
+        if (newOnes.length > 0) {
+          newOnes.forEach((i) => seenSubmissionIdsRef.current!.add(i.id));
+          setUnread((c) => c + newOnes.length);
+          playSound();
+        }
+        // Always update list to reflect latest (includes auto_submitted flag etc.)
         setRecentSubmissions(items);
       })
       .catch(() => {});
@@ -586,7 +589,14 @@ export function Header({ breadcrumb, action }: HeaderProps) {
               {recentSubmissions.length > 0 && (
                 <div className="border-b border-slate-100">
                   <div className="px-4 py-2.5 flex items-center justify-between bg-rose-50/60">
-                    <p className="text-[11px] font-bold text-rose-700 uppercase tracking-wide">Bài vừa nộp</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-[11px] font-bold text-rose-700 uppercase tracking-wide">Bài vừa nộp</p>
+                      {recentSubmissions.some(s => s.auto_submitted) && (
+                        <span className="text-[9px] font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">
+                          Có tự động nộp
+                        </span>
+                      )}
+                    </div>
                     <Link
                       to="/giao-vien/cham-diem"
                       onClick={() => setBellOpen(false)}
@@ -601,15 +611,26 @@ export function Header({ breadcrumb, action }: HeaderProps) {
                         key={`sub-${s.id}`}
                         to="/giao-vien/cham-diem"
                         onClick={() => setBellOpen(false)}
-                        className="flex items-start gap-2.5 px-4 py-2.5 hover:bg-rose-50/40 transition-colors cursor-pointer"
+                        className={`flex items-start gap-2.5 px-4 py-2.5 transition-colors cursor-pointer ${
+                          s.auto_submitted
+                            ? "bg-amber-50/50 hover:bg-amber-50"
+                            : "hover:bg-rose-50/40"
+                        }`}
                       >
-                        <div className="w-7 h-7 bg-gradient-to-tr from-rose-500 to-pink-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 mt-0.5">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 mt-0.5 ${
+                          s.auto_submitted
+                            ? "bg-gradient-to-tr from-amber-500 to-orange-500"
+                            : "bg-gradient-to-tr from-rose-500 to-pink-500"
+                        }`}>
                           {s.avatar || getInitials(s.student_name)}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs text-slate-700 leading-snug">
                             <span className="font-semibold text-slate-900">{s.student_name}</span>
-                            <span className="text-slate-500"> vừa nộp bài </span>
+                            {s.auto_submitted
+                              ? <span className="text-amber-600 font-medium"> đã hết giờ — tự nộp </span>
+                              : <span className="text-slate-500"> vừa nộp bài </span>
+                            }
                             <span className="font-medium text-slate-800 truncate block mt-0.5">{s.exam_title}</span>
                           </p>
                           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -618,7 +639,9 @@ export function Header({ breadcrumb, action }: HeaderProps) {
                               <span className="text-[9px] font-semibold text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded">{s.age_label}</span>
                             )}
                             {s.auto_submitted && (
-                              <span className="text-[9px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">Tự động nộp</span>
+                              <span className="text-[9px] font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                ⏰ Tự động nộp
+                              </span>
                             )}
                             <span className="text-[10px] text-slate-400">{fmtAgo(s.elapsed_min)}</span>
                           </div>
