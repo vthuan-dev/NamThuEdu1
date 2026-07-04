@@ -32,6 +32,7 @@ const ListeningLetterMatchEditor: React.FC<ListeningLetterMatchEditorProps> = ({
   const toast = useToastContext();
   const [title, setTitle] = useState(initialData?.title || 'Match with Letters (Listening)');
   const [points, setPoints] = useState(initialData?.points || 5);
+  const [showGuide, setShowGuide] = useState(true);
   const [audioUrl, setAudioUrl] = useState('');
   const [uploadingAudio, setUploadingAudio] = useState(false);
   const [uploadingImage, setUploadingImage] = useState<string | null>(null);
@@ -307,6 +308,14 @@ const ListeningLetterMatchEditor: React.FC<ListeningLetterMatchEditorProps> = ({
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setShowGuide(prev => !prev)}
+              type="button"
+              className="flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-medium text-orange-700 transition-colors hover:bg-orange-100 cursor-pointer"
+            >
+              <span>ℹ️</span>
+              <span>{showGuide ? 'Ẩn hướng dẫn' : 'Hiện hướng dẫn'}</span>
+            </button>
+            <button
               onClick={onCancel}
               className="flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
             >
@@ -323,6 +332,35 @@ const ListeningLetterMatchEditor: React.FC<ListeningLetterMatchEditorProps> = ({
           </div>
         </div>
       </div>
+
+      {showGuide && (
+        <div className="rounded-xl border border-orange-200 bg-orange-50/50 p-5 space-y-3 text-sm text-slate-700 animate-fadeIn shadow-sm">
+          <h4 className="flex items-center gap-2 font-bold text-orange-800 text-base">
+            ℹ️ Hướng dẫn chi tiết soạn đề bài nghe ghép chữ cái (Movers & Flyers Listening Part 3):
+          </h4>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <p className="font-semibold text-slate-800">📌 Quy chuẩn cấu trúc đề:</p>
+              <ul className="list-disc pl-4 space-y-1.5 text-slate-600">
+                <li><strong>Tổng số chủ thể:</strong> Cần tạo đủ <strong>6 chủ thể</strong> (ví dụ: các nhân vật như <em>her son</em>, <em>her uncle</em>, <em>Jane</em>...).</li>
+                <li><strong>Ví dụ mẫu (Example):</strong> Tích chọn <strong>'Ví dụ mẫu'</strong> cho đúng 1 chủ thể đầu tiên. Chỗ này sẽ tự điền sẵn đáp án khi học sinh làm bài thi thử.</li>
+                <li><strong>Tổng số hình ảnh (Options A-H):</strong> Phải điền đầy đủ mô tả và tải lên đúng <strong>8 hình ảnh</strong> tương ứng từ A đến H. Sẽ có 2 đáp án nhiễu (distractors) không được ghép với chủ thể nào.</li>
+              </ul>
+            </div>
+            <div className="space-y-2">
+              <p className="font-semibold text-slate-800">🚀 Các bước thực hiện nhanh:</p>
+              <ol className="list-decimal pl-4 space-y-1.5 text-slate-600">
+                <li>Tải lên file audio nghe tại mục <strong>🎵 File Audio</strong>.</li>
+                <li>Soạn 8 hình ảnh tại phần <strong>🖼️ Options</strong> bằng cách gõ mô tả ngắn (VD: <em>swimming</em>) và dán hình ảnh (Ctrl+V hoặc tải từ máy).</li>
+                <li>Tại phần <strong>🔤 Chủ thể</strong>, thêm đủ 6 chủ thể. Với từng chủ thể, chọn Chữ cái đáp án đúng tương ứng (A-H) từ menu thả xuống.</li>
+              </ol>
+            </div>
+          </div>
+          <p className="text-xs text-slate-500 italic border-t border-orange-100/50 pt-2 mt-1">
+            * Học viên sẽ kéo thả các chữ cái (A-H) tương ứng với các tranh vào ô trống bên cạnh mỗi chủ thể khi làm bài.
+          </p>
+        </div>
+      )}
 
       {/* Basic Info */}
       <div className="rounded-xl border border-slate-200 bg-white p-5">
@@ -599,22 +637,6 @@ const ListeningLetterMatchEditor: React.FC<ListeningLetterMatchEditorProps> = ({
             </div>
           ))}
         </div>
-      </div>
-
-      {/* Instructions */}
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
-          <span>💡</span> Hướng dẫn:
-        </h4>
-        <ul className="space-y-1 text-sm text-slate-600">
-          <li>• Upload file audio chứa hướng dẫn ghép nối</li>
-          <li>• Thêm 6 chủ thể cần ghép nối (VD: her son, her uncle)</li>
-          <li>• Cần đủ 8 options (A-H) với hình ảnh và mô tả</li>
-          <li>• Chọn chữ cái đúng cho mỗi chủ thể</li>
-          <li>• 2 options sẽ là distractors (không được ghép)</li>
-          <li>• Đánh dấu 1 chủ thể làm ví dụ mẫu</li>
-          <li>• Phù hợp cho Movers và Flyers Listening Part 3</li>
-        </ul>
       </div>
     </div>
   );
