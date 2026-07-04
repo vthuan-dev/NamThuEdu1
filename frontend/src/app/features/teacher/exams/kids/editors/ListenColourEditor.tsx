@@ -554,13 +554,13 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
                   {/* Position */}
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">
-                      Vị trí
+                      Vị trí (Tùy chọn)
                     </label>
                     <input
                       type="text"
                       value={inst.position}
                       onChange={(e) => updateInstruction(inst.id, 'position', e.target.value)}
-                      placeholder="VD: trên bàn"
+                      placeholder="VD: trên bàn (không bắt buộc)"
                       className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
                     />
                   </div>
