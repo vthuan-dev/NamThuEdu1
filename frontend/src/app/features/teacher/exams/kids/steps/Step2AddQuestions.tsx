@@ -757,6 +757,18 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
                   </ol>
                 </div>
               </div>
+              {(selectedTaskType === 'listen_colour' || selectedTaskType === 'listen_colour_write') && (
+                <div className="mt-3 border-t border-orange-100/50 pt-3">
+                  <p className="font-semibold text-slate-800 mb-2 flex items-center gap-1">
+                    <span>📱</span> Giao diện làm bài thực tế của Học viên (kéo thả bút màu vào chấm tròn):
+                  </p>
+                  <img
+                    src="/images/kids_student_listen_colour_mockup.png"
+                    alt="Listen and Colour Student View Preview"
+                    className="max-h-64 rounded-lg border border-slate-200 shadow-sm"
+                  />
+                </div>
+              )}
               {KIDS_TASK_GUIDES[selectedTaskType].note && (
                 <p className="text-xs text-slate-500 italic border-t border-orange-100/50 pt-2 mt-1">
                   {KIDS_TASK_GUIDES[selectedTaskType].note}
