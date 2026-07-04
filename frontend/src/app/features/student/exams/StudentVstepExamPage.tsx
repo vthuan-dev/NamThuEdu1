@@ -2604,6 +2604,28 @@ function SpeakingMindmap({ part }: { part: SpeakingPart }) {
   );
 }
 
+// Shared fallback component for missing part content
+function MissingPartContent({ partNumber }: { partNumber: number }) {
+  const PART_NAMES: Record<number, string> = {
+    1: "Social Interaction",
+    2: "Solution Discussion",
+    3: "Topic Development",
+  };
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 py-10 px-6 bg-slate-50 border border-dashed border-slate-300 rounded-2xl text-center">
+      <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+        <span className="text-2xl">⚠️</span>
+      </div>
+      <p className="text-sm font-semibold text-slate-700">
+        Nội dung Part {partNumber} ({PART_NAMES[partNumber]}) chưa được giáo viên nhập.
+      </p>
+      <p className="text-xs text-slate-500">
+        Vui lòng liên hệ giáo viên để kiểm tra lại đề thi.
+      </p>
+    </div>
+  );
+}
+
 function formatPartContent(part: SpeakingPart, partNumber: number): React.ReactNode {
   const inst = SPEAKING_INSTRUCTIONS[partNumber];
   const Header = inst && (
@@ -2614,7 +2636,12 @@ function formatPartContent(part: SpeakingPart, partNumber: number): React.ReactN
       </ul>
     </div>
   );
-  if (partNumber === 1 && part.part1Data) {
+
+  // ── Part 1: Social Interaction ──────────────────────────────────────────
+  if (partNumber === 1) {
+    if (!part.part1Data || part.part1Data.length === 0) {
+      return <>{Header}<MissingPartContent partNumber={1} /></>;
+    }
     return (
       <>{Header}<div className="text-[14px] text-slate-700 leading-[1.9]">
         {part.part1Data.map((topic, i) => {
@@ -2624,7 +2651,12 @@ function formatPartContent(part: SpeakingPart, partNumber: number): React.ReactN
       </div></>
     );
   }
-  if (partNumber === 2 && part.part2Data) {
+
+  // ── Part 2: Solution Discussion ─────────────────────────────────────────
+  if (partNumber === 2) {
+    if (!part.part2Data) {
+      return <>{Header}<MissingPartContent partNumber={2} /></>;
+    }
     const hasSolutions = part.part2Data.solutions && part.part2Data.solutions.some(s => s && s.trim().length > 0);
     return (
       <>{Header}<div className="text-[14px] text-slate-700 leading-[1.9] space-y-2">
@@ -2642,16 +2674,18 @@ function formatPartContent(part: SpeakingPart, partNumber: number): React.ReactN
       </div></>
     );
   }
-  if (partNumber === 3 && part.part3Data) {
-    const followUp = part.part3Data.followUpQuestions || [];
 
+  // ── Part 3: Topic Development ───────────────────────────────────────────
+  if (partNumber === 3) {
+    if (!part.part3Data) {
+      return <>{Header}<MissingPartContent partNumber={3} /></>;
+    }
+    const followUp = part.part3Data.followUpQuestions || [];
     return (
       <>
         {Header}
         <div className="flex flex-col items-center gap-6 w-full max-w-3xl mx-auto my-6">
           <SpeakingMindmap part={part} />
-
-          {/* Follow-up Questions */}
           {followUp.length > 0 && (
             <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 mt-2 shadow-sm text-left">
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
@@ -2672,7 +2706,9 @@ function formatPartContent(part: SpeakingPart, partNumber: number): React.ReactN
       </>
     );
   }
-  return null;
+
+  // ── Unknown part number fallback ────────────────────────────────────────
+  return <MissingPartContent partNumber={partNumber} />;
 }
 
 function SpeakingPrepOverlay({ prepSec, partNumber, onDone, onSkip }: { prepSec: number; partNumber: number; onDone: () => void; onSkip: () => void }) {

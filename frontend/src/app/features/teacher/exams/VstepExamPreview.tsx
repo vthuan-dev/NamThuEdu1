@@ -1107,6 +1107,28 @@ const SPEAKING_INSTRUCTIONS: Record<number, { title: string; lines: string[] }> 
   },
 };
 
+// Shared fallback when teacher hasn't set up part content yet
+function MissingPartContent({ partNumber }: { partNumber: number }) {
+  const PART_NAMES: Record<number, string> = {
+    1: "Social Interaction",
+    2: "Solution Discussion",
+    3: "Topic Development",
+  };
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 py-10 px-6 bg-slate-50 border border-dashed border-slate-300 rounded-2xl text-center">
+      <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+        <span className="text-2xl">⚠️</span>
+      </div>
+      <p className="text-sm font-semibold text-slate-700">
+        Nội dung Part {partNumber} ({PART_NAMES[partNumber]}) chưa được nhập.
+      </p>
+      <p className="text-xs text-slate-500">
+        Vui lòng quay lại chỉnh sửa đề thi để nhập nội dung cho part này.
+      </p>
+    </div>
+  );
+}
+
 /* ── Format part content as image-3 style text ──────── */
 function formatPartContent(part: SpeakingPart, partNumber: number): React.ReactNode {
   const inst = SPEAKING_INSTRUCTIONS[partNumber];
@@ -1121,7 +1143,11 @@ function formatPartContent(part: SpeakingPart, partNumber: number): React.ReactN
     </div>
   );
 
-  if (partNumber === 1 && part.part1Data) {
+  // ── Part 1: Social Interaction ──────────────────────────────────────────
+  if (partNumber === 1) {
+    if (!part.part1Data || part.part1Data.length === 0) {
+      return <>{Header}<MissingPartContent partNumber={1} /></>;
+    }
     return (
       <>
         {Header}
@@ -1142,7 +1168,12 @@ function formatPartContent(part: SpeakingPart, partNumber: number): React.ReactN
       </>
     );
   }
-  if (partNumber === 2 && part.part2Data) {
+
+  // ── Part 2: Solution Discussion ─────────────────────────────────────────
+  if (partNumber === 2) {
+    if (!part.part2Data) {
+      return <>{Header}<MissingPartContent partNumber={2} /></>;
+    }
     const hasSolutions = part.part2Data.solutions && part.part2Data.solutions.some(s => s && s.trim().length > 0);
     return (
       <>
@@ -1167,7 +1198,12 @@ function formatPartContent(part: SpeakingPart, partNumber: number): React.ReactN
       </>
     );
   }
-  if (partNumber === 3 && part.part3Data) {
+
+  // ── Part 3: Topic Development ───────────────────────────────────────────
+  if (partNumber === 3) {
+    if (!part.part3Data) {
+      return <>{Header}<MissingPartContent partNumber={3} /></>;
+    }
     return (
       <>
         {Header}
@@ -1184,15 +1220,21 @@ function formatPartContent(part: SpeakingPart, partNumber: number): React.ReactN
               </ul>
             </>
           )}
-          <p className="italic text-slate-500 mt-2">Please address the following questions:</p>
-          {part.part3Data.followUpQuestions.map((q, i) => (
-            <p key={i}>{i + 1}. {q}</p>
-          ))}
+          {part.part3Data.followUpQuestions?.length > 0 && (
+            <>
+              <p className="italic text-slate-500 mt-2">Please address the following questions:</p>
+              {part.part3Data.followUpQuestions.map((q, i) => (
+                <p key={i}>{i + 1}. {q}</p>
+              ))}
+            </>
+          )}
         </div>
       </>
     );
   }
-  return null;
+
+  // ── Unknown part number fallback ──────────────────────────────────────
+  return <MissingPartContent partNumber={partNumber} />;
 }
 
 /* ── Build TTS prompt — chỉ thông báo NGẮN GỌN Part + thời gian ──
