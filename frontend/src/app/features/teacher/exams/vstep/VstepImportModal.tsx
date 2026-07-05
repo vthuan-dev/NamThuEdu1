@@ -122,7 +122,7 @@ const SAMPLE: ImportPayload = {
 
 type SkillStatus = 'idle' | 'running' | 'done' | 'error';
 
-export function VstepImportModal({ open, examId, onClose, onSuccess, limitToSkill }: Props) {
+export function VstepImportModal({ open, examId, onClose, onSuccess, limitToSkill, onEnsureExam }: Props) {
   const [payload, setPayload]   = useState<ImportPayload | null>(null);
   const [fileName, setFileName] = useState('');
   const [parseError, setError]  = useState('');
