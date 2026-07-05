@@ -5,6 +5,7 @@ import { useToast } from "../../../../../hooks/useToast";
 import { useTranslation } from "react-i18next";
 import { QuillEditor } from "../../../../../components/ui/QuillEditor";
 import { saveVstepPart, publishVstepExam, loadVstepExam } from "../../../../../services/vstepApi";
+import { teacherApi } from "../../../../../services/teacherApi";
 import { VstepImportModal } from "./VstepImportModal";
 import "react-quill-new/dist/quill.snow.css";
 
@@ -168,10 +169,31 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
             console.warn("⚠️ No data in response:", response);
           }
         })
-        .catch((err) => {
+        .catch(async (err) => {
           console.error('❌ Load error:', err);
           console.log('Exam not found or error loading, starting fresh:', err);
-          // Not an error - just means it's a new exam
+          if (!isFullTest && !isEditMode) {
+            try {
+              console.log("Auto-creating VSTEP Reading exam draft in DB...");
+              const res = await teacherApi.exams.create({
+                eTitle: examTitle,
+                eType: "VSTEP",
+                eSkill: "reading",
+                eScope: "skill",
+                eDuration_minutes: 60,
+                eIs_private: false,
+                eSource_type: "manual",
+              } as any);
+              if (res.status === 'success' && res.data) {
+                const newId = String(res.data.eId);
+                console.log("New VSTEP Reading exam draft created:", newId);
+                setExamId(newId);
+                navigate(`/giao-vien/de-thi/vstep/reading/sua/${newId}`, { replace: true });
+              }
+            } catch (createErr) {
+              console.error("Failed to auto-create VSTEP Reading exam draft:", createErr);
+            }
+          }
         })
         .finally(() => setIsLoading(false));
     } else if (!isFullTest && !params.examId) {
