@@ -58,6 +58,7 @@ interface Props {
   examId: string;
   onClose: () => void;
   onSuccess: () => void;
+  limitToSkill?: 'listening' | 'reading' | 'writing';
 }
 
 const SAMPLE: ImportPayload = {
@@ -119,7 +120,7 @@ const SAMPLE: ImportPayload = {
 
 type SkillStatus = 'idle' | 'running' | 'done' | 'error';
 
-export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
+export function VstepImportModal({ open, examId, onClose, onSuccess, limitToSkill }: Props) {
   const [payload, setPayload]   = useState<ImportPayload | null>(null);
   const [fileName, setFileName] = useState('');
   const [parseError, setError]  = useState('');
@@ -173,6 +174,10 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
         const parsed = JSON.parse(text) as ImportPayload;
         if (!parsed.listening && !parsed.reading && !parsed.writing) {
           throw new Error('JSON phải có ít nhất 1 trong 3 key: listening, reading, writing');
+        }
+        if (limitToSkill && !parsed[limitToSkill]) {
+          const skillLabel = limitToSkill === 'reading' ? 'Reading' : limitToSkill === 'listening' ? 'Listening' : 'Writing';
+          throw new Error(`File JSON không chứa dữ liệu phần thi ${skillLabel}`);
         }
         setSourceKind('json');
         setParseMethod('json');
@@ -299,6 +304,10 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
       if (!data.listening && !data.reading && !data.writing) {
         throw new Error('Gemini không nhận dạng được nội dung VSTEP trong PDF này.');
       }
+      if (limitToSkill && !data[limitToSkill]) {
+        const skillLabel = limitToSkill === 'reading' ? 'Reading' : limitToSkill === 'listening' ? 'Listening' : 'Writing';
+        throw new Error(`File PDF không chứa dữ liệu phần thi ${skillLabel}`);
+      }
       setPdfProgress(p => ({ ...p, label: 'Hoàn tất', done: 100 }));
       setParseMethod('ai');
       setPayload(data);
@@ -327,6 +336,10 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
       const data = json.data as ImportPayload;
       if (!data?.listening && !data?.reading && !data?.writing) {
         throw new Error('AI không nhận dạng được nội dung VSTEP trong file này.');
+      }
+      if (limitToSkill && !data[limitToSkill]) {
+        const skillLabel = limitToSkill === 'reading' ? 'Reading' : limitToSkill === 'listening' ? 'Listening' : 'Writing';
+        throw new Error(`Tài liệu không chứa dữ liệu phần thi ${skillLabel}`);
       }
       setPdfProgress(p => ({ ...p, label: 'Hoàn tất', done: 100 }));
       setParseMethod('ai');
@@ -368,15 +381,15 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
     setImporting(true);
 
     const totalCalls =
-      (payload.listening?.parts.reduce((s, p) => s + p.sections.length, 0) || 0) +
-      (payload.reading?.parts.length   || 0) +
-      (payload.writing?.tasks.length   || 0);
+      (!limitToSkill || limitToSkill === 'listening' ? (payload.listening?.parts.reduce((s, p) => s + p.sections.length, 0) || 0) : 0) +
+      (!limitToSkill || limitToSkill === 'reading'   ? (payload.reading?.parts.length   || 0) : 0) +
+      (!limitToSkill || limitToSkill === 'writing'   ? (payload.writing?.tasks.length   || 0) : 0);
     let done = 0;
     setProgress({ current: 0, total: totalCalls, label: 'Bắt đầu...' });
 
     try {
       // ─ Listening ─
-      if (payload.listening?.parts.length) {
+      if ((!limitToSkill || limitToSkill === 'listening') && payload.listening?.parts.length) {
         setStatus(p => ({ ...p, listening: 'running' }));
         for (const part of payload.listening.parts) {
           for (const sec of part.sections) {
@@ -397,7 +410,7 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
       }
 
       // ─ Reading ─
-      if (payload.reading?.parts.length) {
+      if ((!limitToSkill || limitToSkill === 'reading') && payload.reading?.parts.length) {
         setStatus(p => ({ ...p, reading: 'running' }));
         for (const part of payload.reading.parts) {
           setProgress({
@@ -418,7 +431,7 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
       }
 
       // ─ Writing ─
-      if (payload.writing?.tasks.length) {
+      if ((!limitToSkill || limitToSkill === 'writing') && payload.writing?.tasks.length) {
         setStatus(p => ({ ...p, writing: 'running' }));
         for (const task of payload.writing.tasks) {
           setProgress({
@@ -500,8 +513,12 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
               <FileJson className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="font-bold text-gray-900">Import đề thi VSTEP</h2>
-              <p className="text-xs text-gray-500">Listening · Reading · Writing (không gồm Speaking)</p>
+              <h2 className="font-bold text-gray-900">Import đề thi VSTEP {limitToSkill ? (limitToSkill === 'reading' ? 'Reading' : limitToSkill === 'listening' ? 'Listening' : 'Writing') : ''}</h2>
+              <p className="text-xs text-gray-500">
+                {limitToSkill
+                  ? `Chỉ import phần thi ${limitToSkill === 'reading' ? 'Reading' : limitToSkill === 'listening' ? 'Listening' : 'Writing'}`
+                  : 'Listening · Reading · Writing (không gồm Speaking)'}
+              </p>
             </div>
           </div>
           <button
@@ -671,10 +688,16 @@ export function VstepImportModal({ open, examId, onClose, onSuccess }: Props) {
                 )}
               </div>
               {/* Skill summary */}
-              <div className="grid grid-cols-3 gap-2">
-                <SkillCard icon={Headphones} color="purple" label="Listening" count={summary?.listening || 0} unit="câu hỏi" status={status.listening} />
-                <SkillCard icon={BookOpen} color="blue" label="Reading" count={summary?.reading || 0} unit="parts" status={status.reading} />
-                <SkillCard icon={PenTool} color="emerald" label="Writing" count={summary?.writing || 0} unit="tasks" status={status.writing} />
+              <div className={`grid ${limitToSkill ? 'grid-cols-1 max-w-xs mx-auto w-full' : 'grid-cols-3'} gap-2`}>
+                {(!limitToSkill || limitToSkill === 'listening') && (
+                  <SkillCard icon={Headphones} color="purple" label="Listening" count={summary?.listening || 0} unit="câu hỏi" status={status.listening} />
+                )}
+                {(!limitToSkill || limitToSkill === 'reading') && (
+                  <SkillCard icon={BookOpen} color="blue" label="Reading" count={summary?.reading || 0} unit="parts" status={status.reading} />
+                )}
+                {(!limitToSkill || limitToSkill === 'writing') && (
+                  <SkillCard icon={PenTool} color="emerald" label="Writing" count={summary?.writing || 0} unit="tasks" status={status.writing} />
+                )}
               </div>
 
               {/* JSON viewer */}

@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router";
-import { ArrowLeft, Save, BookOpen, FileText, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Save, BookOpen, FileText, CheckCircle2, Sparkles } from "lucide-react";
 import { useToast } from "../../../../../hooks/useToast";
 import { useTranslation } from "react-i18next";
 import { QuillEditor } from "../../../../../components/ui/QuillEditor";
 import { saveVstepPart, publishVstepExam, loadVstepExam } from "../../../../../services/vstepApi";
+import { VstepImportModal } from "./VstepImportModal";
 import "react-quill-new/dist/quill.snow.css";
 
 interface Question {
@@ -61,6 +62,8 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
   const [currentPart, setCurrentPart] = useState<1 | 2 | 3 | 4>(1);
   const [showTip, setShowTip] = useState(true);
   const [savedParts, setSavedParts] = useState<Set<number>>(new Set());
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [reloadTrigger, setReloadTrigger] = useState(0);
   const [parts, setParts] = useState<ReadingPart[]>(
     VSTEP_READING_PARTS.map((p) => ({
       partNumber: p.part as 1 | 2 | 3 | 4,
@@ -176,7 +179,7 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
       console.log('Adding exam ID to URL:', examId);
       setSearchParams({ id: examId }, { replace: true });
     }
-  }, [propExamId]); // Re-run when propExamId changes (important for Full Test)
+  }, [propExamId, reloadTrigger]); // Re-run when propExamId or reloadTrigger changes
 
   // Auto-hide tip after 10 seconds
   useEffect(() => {
@@ -501,6 +504,14 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
               </div>
               <div className="flex items-center gap-3">
                 <button
+                  onClick={() => setShowImportModal(true)}
+                  disabled={isLoading}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white rounded-lg hover:from-violet-700 hover:to-fuchsia-700 transition-all disabled:opacity-50"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Nhập từ PDF / Word
+                </button>
+                <button
                   onClick={handleSave}
                   disabled={isSaving || isLoading}
                   className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -760,6 +771,17 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
         </div>
         )}
       </div>
+
+      <VstepImportModal
+        open={showImportModal}
+        examId={examId}
+        limitToSkill="reading"
+        onClose={() => setShowImportModal(false)}
+        onSuccess={() => {
+          success('Import đề thành công!');
+          setReloadTrigger(prev => prev + 1);
+        }}
+      />
     </div>
   );
 };
