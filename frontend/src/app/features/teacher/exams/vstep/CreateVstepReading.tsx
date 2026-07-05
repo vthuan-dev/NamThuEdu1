@@ -212,6 +212,32 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
     return () => clearTimeout(timer);
   }, []);
 
+  /**
+   * Ensures the exam exists in DB before saving.
+   * If examId is a temp client-side ID (starts with 'vstep-'),
+   * creates a real draft exam in DB and returns the new real ID.
+   */
+  const ensureExam = async (): Promise<string> => {
+    if (!examId.startsWith('vstep-')) return examId; // already a real DB id
+    const res = await teacherApi.exams.create({
+      eTitle: examTitle,
+      eType: 'VSTEP',
+      eSkill: 'reading',
+      eScope: 'skill',
+      eDuration_minutes: 60,
+      eIs_private: false,
+      eSource_type: 'manual',
+    } as any);
+    if (res.status === 'success' && res.data) {
+      const newId = String(res.data.eId);
+      setExamId(newId);
+      navigate(`/giao-vien/de-thi/vstep/reading/sua/${newId}`, { replace: true });
+      return newId;
+    }
+    throw new Error('Không thể tạo đề thi trong cơ sở dữ liệu.');
+  };
+
+
   const updatePassage = (content: string) => {
     setParts((prev) =>
       prev.map((p) =>
@@ -798,6 +824,7 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
         open={showImportModal}
         examId={examId}
         limitToSkill="reading"
+        onEnsureExam={ensureExam}
         onClose={() => setShowImportModal(false)}
         onSuccess={() => {
           success('Import đề thành công!');

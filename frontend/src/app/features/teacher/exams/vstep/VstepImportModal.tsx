@@ -59,6 +59,8 @@ interface Props {
   onClose: () => void;
   onSuccess: () => void;
   limitToSkill?: 'listening' | 'reading' | 'writing';
+  /** Called when examId is a temp ID — should create the exam in DB and return the real numeric ID */
+  onEnsureExam?: () => Promise<string>;
 }
 
 const SAMPLE: ImportPayload = {
@@ -380,6 +382,19 @@ export function VstepImportModal({ open, examId, onClose, onSuccess, limitToSkil
     if (!payload || !examId) return;
     setImporting(true);
 
+    // If this is a temp ID (not yet persisted in DB), create the exam first
+    let effectiveExamId = examId;
+    if (examId.startsWith('vstep-') && onEnsureExam) {
+      try {
+        setProgress({ current: 0, total: 1, label: 'Đang tạo đề thi...' });
+        effectiveExamId = await onEnsureExam();
+      } catch (err: any) {
+        setError('Không thể tạo đề thi. Vui lòng thử lại.');
+        setImporting(false);
+        return;
+      }
+    }
+
     const totalCalls =
       (!limitToSkill || limitToSkill === 'listening' ? (payload.listening?.parts.reduce((s, p) => s + p.sections.length, 0) || 0) : 0) +
       (!limitToSkill || limitToSkill === 'reading'   ? (payload.reading?.parts.length   || 0) : 0) +
@@ -397,7 +412,7 @@ export function VstepImportModal({ open, examId, onClose, onSuccess, limitToSkil
               current: ++done, total: totalCalls,
               label: `Listening Part ${part.partNumber} • Section ${sec.sectionNumber}`,
             });
-            await saveVstepListeningSection(examId, part.partNumber, sec.sectionNumber, {
+            await saveVstepListeningSection(effectiveExamId, part.partNumber, sec.sectionNumber, {
               sectionName: sec.sectionName,
               audioUrl:    sec.audioUrl   ?? '',
               audioDuration: sec.audioDuration ?? 0,
@@ -417,7 +432,7 @@ export function VstepImportModal({ open, examId, onClose, onSuccess, limitToSkil
             current: ++done, total: totalCalls,
             label: `Reading Part ${part.partNumber}`,
           });
-          await saveVstepPart(examId, part.partNumber, {
+          await saveVstepPart(effectiveExamId, part.partNumber, {
             partNumber:   part.partNumber,
             partName:     part.partName ?? `Part ${part.partNumber}`,
             passage:      part.passage,
@@ -438,7 +453,7 @@ export function VstepImportModal({ open, examId, onClose, onSuccess, limitToSkil
             current: ++done, total: totalCalls,
             label: `Writing Task ${task.taskNumber}`,
           });
-          await saveVstepWritingTask(examId, task.taskNumber, {
+          await saveVstepWritingTask(effectiveExamId, task.taskNumber, {
             taskNumber: task.taskNumber,
             taskName:   task.taskName ?? `Task ${task.taskNumber}`,
             prompt:     task.prompt,
