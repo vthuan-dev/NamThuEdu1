@@ -459,17 +459,13 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
 
     // Validate parts (in edit mode, skip empty parts with no content)
     for (const part of parts) {
-      const wc = countWords(part.passage);
       const hasAnyQuestion = part.questions.some(q => q.questionText.trim());
       const hasContent = part.passage.trim() || hasAnyQuestion;
 
       // In edit mode, skip completely empty parts
       if (isEditMode && !hasContent) continue;
-
-      if (wc < part.wordCount[0] || wc > part.wordCount[1]) {
-        error(t('vstep.reading.toast.invalidWordCount', { part: part.partNumber, current: wc, min: part.wordCount[0], max: part.wordCount[1] }));
-        return;
-      }
+      // In create mode, skip completely empty parts too
+      if (!hasContent) continue;
       
       for (const q of part.questions) {
         if (!q.questionText.trim()) {
