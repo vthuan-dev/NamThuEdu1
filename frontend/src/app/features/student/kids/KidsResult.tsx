@@ -16,6 +16,7 @@ import { getFullMediaUrl } from '../../../../utils/mediaUtils';
 import { parseKidsAnswer } from './player/kidsAnswer';
 import { buildReviewRows, buildCorrectAnswerMap, MANUAL_REVIEW_TYPES } from './player/kidsAnswerKey';
 import { QuestionRenderer } from '../../../../components/exam/QuestionRenderer';
+import { ListenColourWrite } from '../../../../components/exam/questions/ListenColourWrite';
 
 const BASE = '/hoc-vien';
 
@@ -471,7 +472,16 @@ export function KidsResult() {
 
                     {/* Body: real component for correct answer, rich card for manual */}
                     <div className="px-3 pb-3 pt-1">
-                      {isManual || rows.length === 0 ? (
+                      {(taskType === 'listen_colour' || taskType === 'listen_colour_write') ? (
+                        /* Nghe & tô màu: dùng component review chuyên dụng — hiện nhãn
+                           vật thể + đúng/sai chồng lên ảnh (thay vì chỉ ảnh + text thô). */
+                        <ListenColourWrite
+                          question={q}
+                          taskData={taskData}
+                          interactiveMode={false}
+                          userAnswer={answerMap}
+                        />
+                      ) : isManual || rows.length === 0 ? (
                         <div className="space-y-2">
                           {/* Instructions */}
                           {taskData?.instructions && (
