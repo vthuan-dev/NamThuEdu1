@@ -11,6 +11,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Volume2, AlertTriangle, PartyPopper, X, ListChecks } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
+import { api } from '../../../../services/api';
 import { QuestionRenderer } from '../../../../components/exam/QuestionRenderer';
 import { useExamSession } from '../../../../hooks/exam/useExamSession';
 import {
@@ -595,7 +596,7 @@ export function KidsTestTaking() {
           setIsRestarting(true);
           try {
             const examKey = exam?.id ?? exam?.eId ?? assignmentId;
-            if (direct) {
+            if (isDirect) {
               await api.post(`/student/exams/${examKey}/start-kids`, { restart: true });
             } else {
               await api.post(`/student/tests/${assignmentId}/start`, { restart: true });
@@ -606,7 +607,7 @@ export function KidsTestTaking() {
             }
             window.location.reload();
           } catch (err: any) {
-            toast.error(err?.response?.data?.message || "Không thể hủy và khởi động lại bài thi.");
+            setLoadError(err?.response?.data?.message || "Không thể hủy và khởi động lại bài thi.");
           } finally {
             setIsRestarting(false);
           }

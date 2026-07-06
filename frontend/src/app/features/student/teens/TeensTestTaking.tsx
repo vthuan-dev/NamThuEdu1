@@ -21,6 +21,7 @@ import {
   Flag, Clock, ListChecks, Loader2, PenLine, Send, Mic, Square, BookOpen, GripVertical, X,
 } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
+import { api } from '../../../../services/api';
 import { useExamSession } from '../../../../hooks/exam/useExamSession';
 import {
   SaveStatusIndicator,
@@ -32,6 +33,7 @@ import {
 import { examDraftStorage } from '../../../../lib/exam/examDraftStorage';
 import { HighlightablePassage } from '../components/HighlightablePassage';
 import { useTextHighlight } from '../../../../hooks/exam/useTextHighlight';
+import { RichText } from '../../../../components/ui/RichText';
 
 const BASE = '/hoc-vien';
 const TEAL = '#0D9488';
@@ -277,7 +279,7 @@ function QuestionRenderer({ q, value, onChange }:
                 background: active ? '#F0FDFA' : '#fff',
                 color: active ? TEAL : '#475569',
               }}>
-              {opt.content}
+              <RichText text={opt.content} />
             </button>
           );
         })}
@@ -304,8 +306,7 @@ function QuestionRenderer({ q, value, onChange }:
               }}>
               {opt.label}
             </span>
-            <span className="flex-1 text-[15px] font-medium" style={{ color: active ? '#0F2A28' : '#334155' }}
-              dangerouslySetInnerHTML={{ __html: opt.content }} />
+            <RichText className="flex-1 text-[15px] font-medium" text={opt.content} />
             {active && <CheckCircle2 className="w-5 h-5 flex-shrink-0" style={{ color: TEAL }} />}
           </button>
         );
@@ -833,8 +834,8 @@ export function TeensTestTaking() {
                       <img src={gq.qImage_url} alt="" className="w-full max-h-72 object-contain rounded-xl mb-4 bg-slate-50" />
                     )}
 
-                    <h2 className="text-base font-bold leading-snug text-slate-900"
-                      dangerouslySetInnerHTML={{ __html: gq?.qContent ?? `Câu ${idx + 1}` }} />
+                    <RichText as="h2" className="text-base font-bold leading-snug text-slate-900"
+                      text={gq?.qContent ?? `Câu ${idx + 1}`} />
 
                     <QuestionRenderer q={gq} value={gSelected} onChange={(v) => setAnswerFor(gq, v)} />
                   </section>
@@ -898,8 +899,8 @@ export function TeensTestTaking() {
             )}
 
             {/* Đề bài */}
-            <h2 className="text-base sm:text-lg font-bold leading-snug text-slate-900"
-              dangerouslySetInnerHTML={{ __html: q?.qContent ?? `Câu ${current + 1}` }} />
+            <RichText as="h2" className="text-base sm:text-lg font-bold leading-snug text-slate-900"
+              text={q?.qContent ?? `Câu ${current + 1}`} />
 
             {/* Renderer theo dạng câu */}
             {isSpeakingQuestion(q) ? (
@@ -1182,7 +1183,7 @@ export function TeensTestTaking() {
             }
             window.location.reload();
           } catch (err: any) {
-            toast.error(err?.response?.data?.message || "Không thể hủy và khởi động lại bài thi.");
+            setLoadError(err?.response?.data?.message || "Không thể hủy và khởi động lại bài thi.");
           } finally {
             setIsRestarting(false);
           }

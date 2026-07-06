@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useToast } from "../../../../../hooks/useToast";
 import { api } from "../../../../../services/api";
+import { RichTextInput } from "../../../../../components/ui/RichTextInput";
 
 const TEAL = "#0D9488";
 const TEAL_MID = "#14B8A6";
@@ -36,6 +37,10 @@ const newSPart = (): SPart => ({ id: uid(), qContent: "", prepSeconds: 30, speak
 
 const btnPrimary = "inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-60";
 const inputCls = "w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-[15px] outline-none focus:border-teal-400 transition-colors";
+
+/** Bỏ tag HTML để kiểm tra nội dung có "rỗng thật" hay không (tránh lưu "<br>" rỗng). */
+const stripHtml = (html: string): string =>
+  html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
 
 export function CreateTeensExam() {
   const { skill: skillParam } = useParams<{ skill: string }>();
@@ -112,16 +117,16 @@ export function CreateTeensExam() {
         const g = groups[gi];
         for (let qi = 0; qi < g.questions.length; qi++) {
           const q = g.questions[qi];
-          if (!q.qContent.trim()) return `Phần ${gi + 1}, câu ${qi + 1}: chưa nhập câu hỏi.`;
-          const filled = q.options.filter((o) => o.content.trim());
+          if (!stripHtml(q.qContent)) return `Phần ${gi + 1}, câu ${qi + 1}: chưa nhập câu hỏi.`;
+          const filled = q.options.filter((o) => stripHtml(o.content));
           if (filled.length < 2) return `Phần ${gi + 1}, câu ${qi + 1}: cần ít nhất 2 lựa chọn.`;
-          if (!q.options.some((o) => o.isCorrect && o.content.trim())) return `Phần ${gi + 1}, câu ${qi + 1}: chưa chọn đáp án đúng.`;
+          if (!q.options.some((o) => o.isCorrect && stripHtml(o.content))) return `Phần ${gi + 1}, câu ${qi + 1}: chưa chọn đáp án đúng.`;
         }
       }
     } else {
       if (scope === "part" && (scopePart < 1 || scopePart > parts.length)) return "Vui lòng chọn part hợp lệ.";
       for (let pi = 0; pi < parts.length; pi++) {
-        if (!parts[pi].qContent.trim()) return `Part ${pi + 1}: chưa nhập đề nói.`;
+        if (!stripHtml(parts[pi].qContent)) return `Part ${pi + 1}: chưa nhập đề nói.`;
       }
     }
     return null;
@@ -146,7 +151,7 @@ export function CreateTeensExam() {
           audio_url: g.audioUrl || null,
           questions: g.questions.map((q) => ({
             qContent: q.qContent.trim(),
-            options: q.options.filter((o) => o.content.trim()).map((o) => ({ content: o.content.trim(), isCorrect: o.isCorrect })),
+            options: q.options.filter((o) => stripHtml(o.content)).map((o) => ({ content: o.content.trim(), isCorrect: o.isCorrect })),
           })),
         }));
       } else {
@@ -303,9 +308,11 @@ export function CreateTeensExam() {
                           </button>
                         )}
                       </div>
-                      <input className={inputCls + " mb-3 bg-white"} value={q.qContent}
-                        onChange={(e) => updateQuestion(g.id, q.id, (x) => ({ ...x, qContent: e.target.value }))}
-                        placeholder="Nội dung câu hỏi…" />
+                      <div className="mb-3">
+                        <RichTextInput value={q.qContent}
+                          onChange={(html) => updateQuestion(g.id, q.id, (x) => ({ ...x, qContent: html }))}
+                          placeholder="Nội dung câu hỏi…" />
+                      </div>
                       <div className="space-y-2">
                         {q.options.map((opt, oi) => (
                           <div key={opt.id} className="flex items-center gap-2">
@@ -316,9 +323,11 @@ export function CreateTeensExam() {
                               title="Chọn làm đáp án đúng">
                               {opt.isCorrect ? <CheckCircle2 className="w-4 h-4" /> : String.fromCharCode(65 + oi)}
                             </button>
-                            <input className={inputCls + " bg-white py-2"} value={opt.content}
-                              onChange={(e) => updateQuestion(g.id, q.id, (x) => ({ ...x, options: x.options.map((o) => (o.id === opt.id ? { ...o, content: e.target.value } : o)) }))}
-                              placeholder={`Lựa chọn ${String.fromCharCode(65 + oi)}`} />
+                            <div className="flex-1">
+                              <RichTextInput value={opt.content}
+                                onChange={(html) => updateQuestion(g.id, q.id, (x) => ({ ...x, options: x.options.map((o) => (o.id === opt.id ? { ...o, content: html } : o)) }))}
+                                placeholder={`Lựa chọn ${String.fromCharCode(65 + oi)}`} />
+                            </div>
                             {q.options.length > 2 && (
                               <button onClick={() => updateQuestion(g.id, q.id, (x) => ({ ...x, options: x.options.filter((o) => o.id !== opt.id) }))}
                                 className="text-slate-300 hover:text-rose-500 flex-shrink-0">
@@ -363,9 +372,11 @@ export function CreateTeensExam() {
                   )}
                 </div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Đề nói *</label>
-                <textarea className={inputCls + " resize-y min-h-[90px] mb-3"} value={p.qContent}
-                  onChange={(e) => updatePart(p.id, (x) => ({ ...x, qContent: e.target.value }))}
-                  placeholder="VD: Describe your favourite hobby. You should say what it is, when you do it, and why you enjoy it." />
+                <div className="mb-3">
+                  <RichTextInput value={p.qContent}
+                    onChange={(html) => updatePart(p.id, (x) => ({ ...x, qContent: html }))}
+                    placeholder="VD: Describe your favourite hobby. You should say what it is, when you do it, and why you enjoy it." />
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Chuẩn bị (giây)</label>
