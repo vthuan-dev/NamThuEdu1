@@ -1,6 +1,54 @@
 /**
  * Utility functions for exam calculations
  */
+import DOMPurify from "dompurify";
+
+/**
+ * Các thẻ inline an toàn được phép giữ lại trong nội dung câu hỏi / phương án.
+ * Chỉ cho phép định dạng chữ cơ bản — KHÔNG cho phép thẻ khối, script, style...
+ */
+export const INLINE_ALLOWED_TAGS = [
+  "b",
+  "strong",
+  "i",
+  "em",
+  "u",
+  "s",
+  "sup",
+  "sub",
+  "br",
+  "span",
+] as const;
+
+/**
+ * Phát hiện chuỗi có chứa thẻ HTML hay không (để quyết định render rich text
+ * hay plain text). Chỉ cần bắt được dạng `<tag ...>` hoặc `<tag>`.
+ *
+ * @param str - Chuỗi cần kiểm tra
+ * @returns true nếu chuỗi chứa ít nhất một thẻ HTML
+ */
+export const containsHtml = (str?: string | null): boolean => {
+  if (!str) return false;
+  return /<\/?[a-z][\s\S]*>/i.test(str);
+};
+
+/**
+ * Sanitize chuỗi HTML, CHỈ giữ lại các thẻ inline an toàn (đậm/nghiêng/gạch
+ * chân/sup/sub). Loại bỏ mọi thẻ khối, script, style, sự kiện on* — an toàn XSS
+ * và loại được style rác do Word/PDF chèn vào.
+ *
+ * @param html - Chuỗi HTML thô
+ * @returns Chuỗi HTML đã được làm sạch, an toàn để render với dangerouslySetInnerHTML
+ */
+export const sanitizeInlineHtml = (html?: string | null): string => {
+  if (!html) return "";
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [...INLINE_ALLOWED_TAGS],
+    // Cho phép class trên <span> để giữ tương thích với formatErrorSentence,
+    // nhưng loại bỏ style inline (nguồn gốc style rác từ Word).
+    ALLOWED_ATTR: ["class"],
+  });
+};
 
 /**
  * Sanitize imported passage HTML (from docx/PDF paste) so text wraps by whole

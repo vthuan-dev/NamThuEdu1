@@ -27,6 +27,7 @@ import {
 } from "../../../../services/vstepApi";
 import { api } from "../../../../services/api";
 import { sanitizePassageHtml } from "../../../../utils/examUtils";
+import { RichText } from "../../../../components/ui/RichText";
 
 /* ============================================================
  *  TYPES
@@ -820,6 +821,12 @@ function WritingView({
     return segs;
   }, [task.prompt]);
 
+  // Đề Writing được giáo viên soạn bằng QuillEditor → nội dung là HTML
+  // (chứa <p>, <ul>, <strong>, &nbsp;...). Segment-parser bên dưới chỉ xử lý
+  // plain-text nên nếu prompt là HTML sẽ hiển thị nguyên thẻ. Phát hiện HTML
+  // để render đúng qua sanitizePassageHtml + dangerouslySetInnerHTML.
+  const promptIsHtml = /<\/?[a-z][\s\S]*>/i.test(task.prompt || "");
+
   // Task 1 = has stimulus/intro → blockquote style
   // Task 2 = no stimulus → context in bordered box, task italic
   const hasStimulus = parsedSegments.some((s) => s.type === "stimulus");
@@ -910,7 +917,14 @@ function WritingView({
 
         {/* ── Prompt — no card, plain on bg ───────────────── */}
         <div className="space-y-4">
-          {renderBlocks.map((block, i) => renderBlock(block, i))}
+          {promptIsHtml ? (
+            <article
+              className="vstep-writing-prompt prose prose-sm max-w-none text-slate-800 leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: sanitizePassageHtml(task.prompt || "") }}
+            />
+          ) : (
+            renderBlocks.map((block, i) => renderBlock(block, i))
+          )}
         </div>
 
         {/* ── Answer area ─────────────────────────────────── */}
@@ -1645,7 +1659,7 @@ function QuestionCard({
           </span>
           <span className="text-slate-400 font-semibold">:</span>
         </div>
-        <p className="text-slate-800 font-medium flex-1">{q.questionText}</p>
+        <RichText as="p" className="text-slate-800 font-medium flex-1" text={q.questionText} />
       </div>
       <div className="space-y-1.5 ml-10">
         {letters.map((l) => {
@@ -1669,7 +1683,7 @@ function QuestionCard({
               >
                 {l}
               </span>
-              <span className={isSel ? "text-emerald-900 font-medium" : "text-slate-700"}>{text}</span>
+              <RichText className={isSel ? "text-emerald-900 font-medium" : "text-slate-700"} text={text} />
             </button>
           );
         })}

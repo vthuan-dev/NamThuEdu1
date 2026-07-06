@@ -30,6 +30,7 @@ import { usePageTitle } from "../../../../hooks/usePageTitle";
 import { useExamSession } from "../../../../hooks/exam/useExamSession";
 import { PassageSplitLayout } from "../components/PassageSplitLayout";
 import { sanitizePassageHtml } from "../../../../utils/examUtils";
+import { RichText } from "../../../../components/ui/RichText";
 
 /* ============================================================
  *  TYPES (identical to VstepExamPreview)
@@ -1030,6 +1031,10 @@ export function StudentVstepExamPage() {
    * - Speaking: đã thu âm xong tất cả parts
    * Nếu chưa đủ → nút Nộp bài DISABLED + tooltip giải thích lý do.
    */
+  // Soft-lock: LUÔN cho phép bấm Nộp bài (giống phòng thi thật + Kids/Teens).
+  // Còn thiếu câu/phần → chỉ cảnh báo trong dialog xác nhận, KHÔNG khoá nút.
+  // Lý do: khoá cứng khiến học viên kẹt hẳn nếu thu âm/upload Speaking lỗi
+  // (đặc biệt trên iOS) hoặc viết ngắn — không bao giờ nộp được bài.
   const submitGate = useMemo(() => {
     const reasons: string[] = [];
     const lrRemain = Math.max(0, stats.totalMCQ - stats.answeredMCQ);
@@ -1039,11 +1044,11 @@ export function StudentVstepExamPage() {
     if (wRemain > 0) reasons.push(`còn ${wRemain} bài viết`);
     if (sRemain > 0) reasons.push(`còn ${sRemain} phần nói`);
     return {
-      canSubmit: reasons.length === 0,
+      canSubmit: true,
       reasons,
       tooltip: reasons.length === 0
         ? "Sẵn sàng nộp bài"
-        : `Chưa đủ điều kiện: ${reasons.join(", ")}`,
+        : `Bạn ${reasons.join(", ")} — vẫn có thể nộp bài`,
     };
   }, [stats, speakingParts.length]);
 
@@ -2139,6 +2144,12 @@ function WritingView({
   const [minW, maxW] = range as [number, number];
   const inRange = wordCount >= minW && (maxW === 0 || wordCount <= maxW);
 
+  // Đề Writing được giáo viên soạn bằng QuillEditor → nội dung là HTML
+  // (chứa <p>, <ul>, <strong>, &nbsp;...). Segment-parser bên dưới chỉ xử lý
+  // plain-text nên nếu prompt là HTML sẽ hiển thị nguyên thẻ. Phát hiện HTML
+  // để render đúng qua sanitizePassageHtml + dangerouslySetInnerHTML.
+  const promptIsHtml = /<\/?[a-z][\s\S]*>/i.test(task.prompt || "");
+
   type SegType = "time" | "intro" | "context" | "stimulus" | "task" | "requirement";
   interface Seg { type: SegType; text: string }
 
@@ -2342,7 +2353,14 @@ function WritingView({
       <div className={`mx-auto px-8 py-8 ${reviewScores ? "max-w-[1400px] flex gap-6 items-start" : "max-w-4xl"}`}>
         <div className={`space-y-5 ${reviewScores ? "flex-1 min-w-0" : ""}`}>
           <div className="space-y-4">
-            {renderBlocks.map((block, i) => renderBlock(block, i))}
+            {promptIsHtml ? (
+              <article
+                className="vstep-writing-prompt prose prose-sm max-w-none text-slate-800 leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: sanitizePassageHtml(task.prompt || "") }}
+              />
+            ) : (
+              renderBlocks.map((block, i) => renderBlock(block, i))
+            )}
           </div>
           <div className="bg-white border border-slate-300 rounded-sm overflow-hidden">
             <div className="px-4 py-2 border-b border-slate-200 flex items-center justify-between">
@@ -2825,14 +2843,30 @@ function SpeakingQuestionScreen({ part, partNumber, submissionId, onComplete, re
     try {
       const stream = existingStream || await navigator.mediaDevices.getUserMedia({ audio: true });
       setMicStream(stream); chunksRef.current = [];
-      const mr = new MediaRecorder(stream);
+      // iOS Safari KHÔNG hỗ trợ audio/webm. Chọn mimeType đầu tiên được trình
+      // duyệt hỗ trợ (mp4/m4a cho iOS, webm/ogg cho Chrome/Firefox). Nếu không
+      // set đúng, iOS ghi ra mp4 nhưng ta đóng gói Blob thành webm → file hỏng.
+      const preferredTypes = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/mp4",
+        "audio/mp4;codecs=mp4a.40.2",
+        "audio/aac",
+        "audio/ogg;codecs=opus",
+      ];
+      const canCheck = typeof MediaRecorder !== "undefined" && typeof MediaRecorder.isTypeSupported === "function";
+      const chosenType = canCheck ? preferredTypes.find((t) => MediaRecorder.isTypeSupported(t)) : undefined;
+      const mr = chosenType ? new MediaRecorder(stream, { mimeType: chosenType }) : new MediaRecorder(stream);
       mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       mr.onstop = async () => {
         const chunks = chunksRef.current;
         if (chunks.length === 0) {
           console.warn('[Speaking] onstop fired but no audio chunks — recording may have been empty');
         }
-        const blob = new Blob(chunks, { type: "audio/webm" });
+        // Dùng đúng mimeType mà recorder thực sự tạo ra (mr.mimeType) để Blob
+        // và phần mở rộng file khớp nhau, tránh file hỏng trên iOS.
+        const actualType = mr.mimeType || chosenType || "audio/webm";
+        const blob = new Blob(chunks, { type: actualType });
         const localUrl = URL.createObjectURL(blob);
         setAudioUrl(localUrl);
         stream.getTracks().forEach((t) => t.stop());
@@ -3450,7 +3484,7 @@ function QuestionCard({ q, selected, onSelect, flagged, onToggleFlag, reviewMode
           }`}>{q.questionNumber}</span>
           <span className="text-slate-400 font-semibold">:</span>
         </div>
-        <p className="text-slate-800 font-medium flex-1">{q.questionText}</p>
+        <RichText as="p" className="text-slate-800 font-medium flex-1" text={q.questionText} />
         {reviewMode && !selected && (
           <span className="flex-shrink-0 text-[10px] font-bold text-slate-400 border border-slate-300 rounded px-1.5 py-0.5 ml-1">Bỏ trống</span>
         )}
@@ -3487,7 +3521,7 @@ function QuestionCard({ q, selected, onSelect, flagged, onToggleFlag, reviewMode
               style={reviewMode ? { cursor: "default" } : { cursor: "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%237C3AED' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z'/><path d='m15 5 4 4'/></svg>\") 0 20, auto" }}
             >
               <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${dotCls}`}>{l}</span>
-              <span className={isSel || (reviewMode && isCorrect) ? "font-medium text-slate-900" : "text-slate-700"}>{text}</span>
+              <RichText className={isSel || (reviewMode && isCorrect) ? "font-medium text-slate-900" : "text-slate-700"} text={text} />
               {reviewMode && isCorrect && !isSel && <span className="ml-auto text-[10px] font-bold text-emerald-600 flex-shrink-0">✓ Đáp án</span>}
               {reviewMode && isSel && !isCorrect && <span className="ml-auto text-[10px] font-bold text-red-500 flex-shrink-0">✕ Sai</span>}
             </button>
@@ -3553,13 +3587,27 @@ function AudioPlayer({ src, reviewMode = false }: { src?: string; reviewMode?: b
     if (!a) return;
     // Review mode: cho phép play/pause/replay tự do
     if (reviewMode) {
-      if (a.paused) { a.play(); setPlaying(true); }
-      else { a.pause(); setPlaying(false); }
+      if (a.paused) {
+        a.play().then(() => setPlaying(true)).catch((err) => {
+          console.error("[AudioPlayer] play() rejected:", err);
+        });
+      } else { a.pause(); setPlaying(false); }
       return;
     }
-    // Exam mode: chỉ phát 1 lần
+    // Exam mode: chỉ phát 1 lần.
+    // QUAN TRỌNG (iOS): play() trả về Promise và có thể bị trình duyệt từ chối
+    // (autoplay policy). Chỉ đánh dấu "đã phát" (setPlayed) SAU KHI play() thành
+    // công — nếu không, học sinh bấm Play mà bị chặn sẽ mất luôn lượt nghe.
     if (played) return;
-    a.play(); setPlaying(true); setPlayed(true);
+    a.play()
+      .then(() => { setPlaying(true); setPlayed(true); })
+      .catch((err) => {
+        // iOS/Safari có thể từ chối play() nếu không đúng ngữ cảnh user-gesture.
+        // KHÔNG đánh dấu played/loadError — giữ nguyên nút Play để học sinh bấm lại,
+        // tránh mất lượt nghe "1 lần duy nhất" một cách oan uổng.
+        console.error("[AudioPlayer] play() rejected — giữ nút Play để thử lại:", err);
+        setPlaying(false);
+      });
   };
 
   const seek = (e: React.MouseEvent<HTMLDivElement>) => {

@@ -619,8 +619,15 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
     } else if (currentSkill === "writing") {
       (payload as IeltsWritingPayload).tasks.forEach((t) => {
         const txt = (answers[t.questionId] as string) ?? "";
-        if (txt.trim().length >= t.minWords) count++;
+        // Soft-count: chỉ cần có nội dung là tính đã làm (không ép đủ minWords),
+        // tránh khoá nút nộp khi học viên viết ngắn hơn khuyến nghị.
+        if (txt.trim().length > 0) count++;
       });
+    } else if (currentSkill === "speaking") {
+      // Speaking: đáp án là audio upload, không nằm trong `answers` map.
+      // Không thể đếm chính xác ở đây → coi như đã hoàn thành để không khoá nút nộp.
+      // (Soft-lock: học viên tự chịu trách nhiệm phần chưa thu.)
+      count = (payload as IeltsSpeakingPayload).parts?.length ?? 0;
     }
     return count;
   }, [answers, payload, currentSkill]);
@@ -631,14 +638,17 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
   // ── Đủ điều kiện nộp bài? ─────────────────────────────────
   // Yêu cầu: phải khoanh hết câu (Listening/Reading) hoặc viết đủ độ dài
   // tối thiểu (Writing). Nếu chưa đủ → nút Nộp bài DISABLED.
+  // Soft-lock: LUÔN cho phép bấm Nộp bài (giống phòng thi thật + Kids/Teens).
+  // Nếu còn câu chưa làm → chỉ cảnh báo trong dialog xác nhận, KHÔNG khoá nút.
   const submitGate = useMemo(() => {
     const remain = Math.max(0, totalQuestions - answeredCount);
-    if (remain === 0 || totalQuestions === 0) {
-      return { canSubmit: true, tooltip: "Sẵn sàng nộp bài" };
-    }
     return {
-      canSubmit: false,
-      tooltip: `Còn ${remain} câu chưa hoàn thành — không thể nộp bài`,
+      canSubmit: true,
+      remain,
+      tooltip:
+        remain === 0 || totalQuestions === 0
+          ? "Sẵn sàng nộp bài"
+          : `Còn ${remain} câu chưa hoàn thành — bạn vẫn có thể nộp bài`,
     };
   }, [totalQuestions, answeredCount]);
 

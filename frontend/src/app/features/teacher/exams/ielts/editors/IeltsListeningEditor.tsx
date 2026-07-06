@@ -14,6 +14,7 @@ import { IELTS_STRUCTURE, IELTS_LISTENING_QUESTION_TYPES, type IeltsTestType } f
 import { api } from "../../../../../../services/api";
 import { transcribeAudio as transcribeGroq } from "../../../../../../services/groqApi";
 import { transcribeLocal } from "../../../../../../services/whisperLocal";
+import { RichTextInput } from "../../../../../../components/ui/RichTextInput";
 
 interface ListeningQuestion {
   id: string;
@@ -1387,12 +1388,11 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
 
           {!isImgCompletion && (
             !isInlineForm && (
-              <input
-                type="text"
+              <RichTextInput
                 value={question.questionText}
-                onChange={(e) => handleChange({ questionText: e.target.value })}
+                onChange={(html) => handleChange({ questionText: html })}
                 placeholder={isMatching ? "Tên mục cần ghép (vd: kettle, alarm clock...)" : "Nội dung câu hỏi..."}
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full"
               />
             )
           )}

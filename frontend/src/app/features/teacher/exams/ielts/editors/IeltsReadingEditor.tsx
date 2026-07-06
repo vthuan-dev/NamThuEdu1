@@ -10,6 +10,7 @@ import {
   Layers,
 } from "lucide-react";
 import { IELTS_STRUCTURE, IELTS_READING_QUESTION_TYPES, type IeltsTestType } from "../structure";
+import { RichTextInput } from "../../../../../../components/ui/RichTextInput";
 
 // ─── Types ───────────────────────────────────────────────────────────────
 interface ReadingQuestion {
@@ -879,12 +880,11 @@ function QuestionRow({
 
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-start gap-2">
-            <textarea
+            <RichTextInput
               value={question.questionText}
-              onChange={(e) => onChange({ questionText: e.target.value })}
+              onChange={(html) => onChange({ questionText: html })}
               placeholder="Nội dung câu hỏi (statement / question)..."
-              rows={2}
-              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
+              className="flex-1 min-w-0"
             />
             {canRemove && (
               <button

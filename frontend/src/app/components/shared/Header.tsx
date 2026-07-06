@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, Link } from "react-router";
-import { Bell, Plus, ChevronRight, User, Settings, LogOut, ChevronDown, BookOpen, ExternalLink, Send, Volume2, VolumeX, UserCog, Check, X, Loader2 } from "lucide-react";
+import { Bell, Plus, ChevronRight, User, Settings, LogOut, ChevronDown, BookOpen, ExternalLink, Send, UserCog, Check, X, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "../ui/button";
 import { logout } from "../../../services/authApi";
@@ -79,8 +79,7 @@ export function Header({ breadcrumb, action }: HeaderProps) {
   const pollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Sound and Student Notification Hooks
-  const { playSound, isSoundEnabled, toggleSound } = useNotificationSound();
-  const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
+  const { playSound } = useNotificationSound();
   const [newStudents, setNewStudents] = useState<any[]>([]);
   const seenStudentIdsRef = useRef<Set<number> | null>(null);
   const [recentSubmissions, setRecentSubmissions] = useState<RecentSubmission[]>([]);
@@ -90,11 +89,6 @@ export function Header({ breadcrumb, action }: HeaderProps) {
   const [coInvites, setCoInvites] = useState<CoTeacherInvitation[]>([]);
   const [activeInvite, setActiveInvite] = useState<CoTeacherInvitation | null>(null);
   const [respondingAction, setRespondingAction] = useState<null | "accept" | "decline">(null);
-
-  const handleToggleSound = () => {
-    const next = toggleSound();
-    setSoundOn(next);
-  };
 
   // Lấy danh sách lời mời cùng quản lý lớp (chỉ giáo viên), cập nhật định kỳ.
   useEffect(() => {
@@ -414,23 +408,6 @@ export function Header({ breadcrumb, action }: HeaderProps) {
             {action.label}
           </Button>
         )}
-
-        {/* Notification Sound Toggle */}
-        <button
-          onClick={handleToggleSound}
-          className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all ${
-            soundOn
-              ? "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-              : "text-slate-300 hover:bg-slate-100 hover:text-slate-400"
-          }`}
-          title={soundOn ? "Tắt âm thanh" : "Bật âm thanh"}
-        >
-          {soundOn ? (
-            <Volume2 className="w-[15px] h-[15px]" />
-          ) : (
-            <VolumeX className="w-[15px] h-[15px]" />
-          )}
-        </button>
 
         {/* Bell Notification */}
         <div

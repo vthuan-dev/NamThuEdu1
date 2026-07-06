@@ -24,6 +24,7 @@
  */
 import { Flag } from "lucide-react";
 import type { IeltsQuestion, AnswerValue } from "../types";
+import { RichText } from "../../../../../../components/ui/RichText";
 
 interface IeltsQuestionRendererProps {
   question: IeltsQuestion;
@@ -57,7 +58,7 @@ export function IeltsQuestionRenderer({
           {qNum}
         </div>
         <div className="flex-1 text-sm text-gray-900 leading-relaxed whitespace-pre-wrap">
-          {question.questionText || <em className="text-gray-400">No prompt</em>}
+          {question.questionText ? <RichText text={question.questionText} /> : <em className="text-gray-400">No prompt</em>}
         </div>
         <button
           type="button"
@@ -165,7 +166,7 @@ function renderInput(
               />
               <div className="flex items-start gap-2 flex-1">
                 <span className="font-bold text-gray-900 text-sm">{letter}</span>
-                <span className="text-sm text-gray-700 leading-relaxed">{q.options![letter]}</span>
+                <RichText className="text-sm text-gray-700 leading-relaxed" text={q.options![letter]} />
               </div>
             </label>
           );
@@ -234,7 +235,7 @@ function renderInput(
               {choiceKeys.map((k) => (
                 <li key={k} className="flex gap-2 text-xs text-gray-700">
                   <span className="font-bold text-gray-900">{k}</span>
-                  <span>{choices[k]}</span>
+                  <RichText text={choices[k]} />
                 </li>
               ))}
             </ul>
@@ -278,7 +279,7 @@ function renderInput(
             {bankKeys.map((k) => (
               <li key={k} className="flex gap-2 text-xs text-gray-700">
                 <span className="font-bold text-gray-900">{k}</span>
-                <span>{bank[k]}</span>
+                <RichText text={bank[k]} />
               </li>
             ))}
           </ul>

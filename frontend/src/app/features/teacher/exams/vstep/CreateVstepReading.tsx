@@ -4,6 +4,7 @@ import { ArrowLeft, Save, BookOpen, FileText, CheckCircle2, Sparkles } from "luc
 import { useToast } from "../../../../../hooks/useToast";
 import { useTranslation } from "react-i18next";
 import { QuillEditor } from "../../../../../components/ui/QuillEditor";
+import { RichTextInput } from "../../../../../components/ui/RichTextInput";
 import { saveVstepPart, publishVstepExam, loadVstepExam } from "../../../../../services/vstepApi";
 import { teacherApi } from "../../../../../services/teacherApi";
 import { VstepImportModal } from "./VstepImportModal";
@@ -279,7 +280,7 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
   };
 
   const handleQuestionPaste = (
-    event: React.ClipboardEvent<HTMLInputElement>,
+    event: React.ClipboardEvent<HTMLElement>,
     questionId: string
   ) => {
     const value = event.clipboardData.getData('text');
@@ -760,15 +761,13 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           {t('vstep.reading.questions.label')}
                         </label>
-                        <input
-                          type="text"
+                        <RichTextInput
                           value={question.questionText}
-                          onChange={(e) =>
-                            updateQuestion(question.id, "questionText", e.target.value)
+                          onChange={(html) =>
+                            updateQuestion(question.id, "questionText", html)
                           }
                           onPaste={(event) => handleQuestionPaste(event, question.id)}
                           placeholder={t('vstep.reading.questions.placeholder')}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
                       </div>
 

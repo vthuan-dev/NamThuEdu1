@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { studentApi } from "../../../../services/studentApi";
 import { api } from "../../../../services/api";
+import { RichText } from "../../../../components/ui/RichText";
 
 type Skill = "listening" | "reading" | "writing" | "speaking";
 
@@ -326,7 +327,7 @@ function PreviewQuestionRow({ q }: { q: any }) {
           {q.questionNumber}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-sm text-slate-900 mb-1.5">{q.questionText || <em className="text-slate-400">No prompt</em>}</div>
+          <div className="text-sm text-slate-900 mb-1.5">{q.questionText ? <RichText text={q.questionText} /> : <em className="text-slate-400">No prompt</em>}</div>
 
           {/* Question type pill */}
           <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700 mb-1.5">
@@ -341,7 +342,7 @@ function PreviewQuestionRow({ q }: { q: any }) {
                   correctAnswer === k ? "text-emerald-700 font-semibold" : "text-slate-600"
                 }`}>
                   <span className="font-bold">{k}.</span>
-                  <span>{v}</span>
+                  <RichText text={v} />
                   {correctAnswer === k && <CheckCircle2 className="w-3 h-3 mt-0.5 flex-shrink-0" />}
                 </div>
               ))}

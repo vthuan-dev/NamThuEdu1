@@ -580,8 +580,19 @@ export const studentApi = {
   },
 
   uploadSpeakingAudio: (submissionId: number, partNumber: number, blob: Blob) => {
+    // Suy ra phần mở rộng từ mimeType thực của blob. iOS Safari tạo audio/mp4,
+    // Chrome/Firefox tạo audio/webm. Đặt tên file khớp để backend validate &
+    // phát lại đúng (trước đây hardcode .webm khiến file iOS bị hỏng).
+    const mime = (blob.type || '').toLowerCase();
+    const ext = mime.includes('mp4') || mime.includes('m4a') || mime.includes('aac')
+      ? 'm4a'
+      : mime.includes('ogg')
+        ? 'ogg'
+        : mime.includes('wav')
+          ? 'wav'
+          : 'webm';
     const form = new FormData();
-    form.append('audio', blob, `speaking_${submissionId}_part${partNumber}.webm`);
+    form.append('audio', blob, `speaking_${submissionId}_part${partNumber}.${ext}`);
     return api.post(`/student/submissions/${submissionId}/speaking/${partNumber}/upload`, form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });

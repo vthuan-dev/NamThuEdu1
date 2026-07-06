@@ -416,7 +416,7 @@ class IeltsExamController extends Controller
                 $audioUrl = $audioFile ? url('files/audio/' . $audioFile) : '';
 
                 $questions = $exam->questions
-                    ->where('qSkill', 'listening')
+                    ->filter(fn($q) => strtolower((string) $q->qSkill) === 'listening')
                     ->where('qPart', $n)
                     ->sortBy(fn($q) => ($q->qData['question_number'] ?? $q->qSection_order))
                     ->values()
@@ -477,7 +477,7 @@ class IeltsExamController extends Controller
                 $meta = $block->metadata ?? [];
                 $passageNum = $meta['passage_number'] ?? ($block->display_order ?? 1);
                 $questions = $exam->questions
-                    ->where('qSkill', 'reading')
+                    ->filter(fn($q) => strtolower((string) $q->qSkill) === 'reading')
                     ->where('qPart', $passageNum)
                     ->sortBy(fn($q) => ($q->qData['question_number'] ?? $q->qSection_order))
                     ->values()

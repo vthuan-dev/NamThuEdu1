@@ -23,6 +23,7 @@ import {
 } from "../../../../../services/vstepApi";
 import { transcribeAudio } from "../../../../../services/groqApi";
 import { api } from "../../../../../services/api";
+import { RichTextInput } from "../../../../../components/ui/RichTextInput";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -636,7 +637,7 @@ export const CreateVstepListening = ({
   };
 
   const handleQuestionPaste = (
-    event: React.ClipboardEvent<HTMLInputElement>,
+    event: React.ClipboardEvent<HTMLElement>,
     partNumber: number,
     sectionNumber: number,
     questionId: string
@@ -1249,16 +1250,15 @@ export const CreateVstepListening = ({
                                   {q.questionNumber}
                                 </div>
                                 <div className="flex-1 space-y-2">
-                                  <input
-                                    type="text"
+                                  <RichTextInput
                                     value={q.questionText}
-                                    onChange={(e) =>
+                                    onChange={(html) =>
                                       updateQuestion(
                                         currentPart,
                                         section.sectionNumber,
                                         q.id,
                                         "questionText",
-                                        e.target.value
+                                        html
                                       )
                                     }
                                     onPaste={(event) =>
@@ -1270,7 +1270,6 @@ export const CreateVstepListening = ({
                                       )
                                     }
                                     placeholder="Câu hỏi..."
-                                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                                   />
                                   {(["A", "B", "C", "D"] as const).map((opt) => (
                                     <div

@@ -860,6 +860,18 @@
   hyphens: none !important;
 }
 
+/*
+ * RichTextInput (contentEditable) — show a greyed placeholder when empty.
+ * :empty only matches when there are no child nodes; the browser inserts a
+ * <br> on first focus so we also guard against a lone <br>.
+ */
+.rich-text-input:empty::before,
+.rich-text-input[data-empty="true"]::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
 .prose-lg {
   font-size: 1.125em;
   line-height: 1.7777778;
