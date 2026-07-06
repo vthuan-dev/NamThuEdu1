@@ -92,6 +92,44 @@ export function CreateThptExam() {
 
   const total = useMemo(() => totalQuestions(config), [config]);
 
+  /**
+   * Các câu trắc nghiệm chưa chọn đáp án đúng (correct_id/correct_marker rỗng).
+   * Trước khi xuất bản, ràng buộc giáo viên phải chọn đáp án đúng cho tất cả.
+   */
+  const missingAnswers = useMemo<string[]>(() => {
+    const missing: string[] = [];
+    const label = (sec: ThptSection, qn: number) =>
+      `${sec.title || sectionMeta[sec.type]?.label || 'Phần'} · Câu ${qn}`;
+    for (const sec of config.sections) {
+      switch (sec.type) {
+        case 'mc_questions':
+        case 'listening':
+          for (const it of sec.items) {
+            if (!String(it.correct_id || '').trim()) missing.push(label(sec, it.question_number));
+          }
+          break;
+        case 'phonetics':
+        case 'error_identification':
+          for (const it of sec.items) {
+            if (!String(it.correct_id || '').trim()) missing.push(label(sec, it.question_number));
+          }
+          break;
+        case 'mc_cloze':
+          for (const b of sec.blanks) {
+            if (!String(b.correct_id || '').trim()) missing.push(label(sec, b.question_number));
+          }
+          break;
+        case 'reading_mixed':
+          for (const it of sec.items) {
+            if (it.kind === 'mc' && !String(it.correct_id || '').trim()) missing.push(label(sec, it.question_number));
+            if (it.kind === 'sentence_insertion' && !String(it.correct_marker || '').trim()) missing.push(label(sec, it.question_number));
+          }
+          break;
+      }
+    }
+    return missing;
+  }, [config]);
+
   // ── Init ───────────────────────────────────────────────────────────────
   useEffect(() => {
     let mounted = true;
@@ -172,6 +210,14 @@ export function CreateThptExam() {
 
   const handlePublish = async () => {
     if (!examId) return;
+    // Ràng buộc: mọi câu trắc nghiệm phải có đáp án đúng trước khi xuất bản.
+    if (missingAnswers.length > 0) {
+      const preview = missingAnswers.slice(0, 3).join(' · ');
+      toast.error(
+        `Còn ${missingAnswers.length} câu chưa chọn đáp án đúng. Vui lòng chọn đáp án trước khi xuất bản: ${preview}${missingAnswers.length > 3 ? ' …' : ''}`,
+      );
+      return;
+    }
     const wasRepublish = examStatus === 'published';
     setIsPublishing(true);
     try {

@@ -255,10 +255,9 @@ class ThptExamController extends Controller
         // Config sẽ go-live: nếu có draft đang sửa thì lấy draft, không thì dùng config hiện tại
         $configToPublish = $hasDraft ? $exam->thpt_draft_config : $exam->thpt_config;
 
-        // Tự điền đáp án mặc định (đáp án đầu / "A") cho câu trắc nghiệm CHƯA chọn,
-        // để giáo viên publish được ngay và sửa lại sau. Mỗi câu luôn có 1 đáp án.
-        $configToPublish = $this->fillDefaultThptAnswers($configToPublish);
-
+        // KHÔNG tự điền đáp án mặc định: giáo viên BẮT BUỘC phải chọn đáp án đúng
+        // cho từng câu trắc nghiệm trước khi xuất bản. Validate bên dưới sẽ chặn
+        // và trả về danh sách câu còn thiếu đáp án.
         $errors = $this->validateThptConfig($configToPublish);
         if (!empty($errors)) {
             return $this->error('Đề chưa đủ nội dung để publish.', 422, $errors);
