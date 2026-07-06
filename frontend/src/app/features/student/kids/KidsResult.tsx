@@ -479,7 +479,7 @@ export function KidsResult() {
                           )}
                           {/* Task image */}
                           {taskData?.imageUrl && (
-                            <img src={getFullMediaUrl(taskData.imageUrl)} alt="" className="w-full max-h-36 object-contain rounded-xl bg-slate-50" />
+                            <img src={getFullMediaUrl(taskData.imageUrl)} alt="" className="w-full max-h-[60vh] object-contain rounded-xl bg-slate-50" />
                           )}
                           {/* Audio */}
                           {taskData?.audioUrl && (
@@ -578,6 +578,13 @@ export function KidsResult() {
                             .qr-review .overflow-y-auto { overflow: visible !important; }
                             .qr-review .sticky { position: relative !important; top: auto !important; }
                             .qr-review [class*="grid-cols-[4"] { grid-template-columns: 1fr !important; }
+                            /* Ảnh trong đề vốn thu nhỏ cho trang thi — khi XEM LẠI cho hiển thị to
+                               hơn để học viên/phụ huynh nhìn rõ. Bỏ chiều cao cố định, đặt trần theo
+                               viewport. Không đụng ảnh dạng lưới vuông (aspect-square giữ tỉ lệ). */
+                            .qr-review img:not([class*="aspect-square"]) {
+                              height: auto !important;
+                              max-height: 60vh !important;
+                            }
                           `}</style>
                           {(() => {
                             // studentDisplayMap: bài học sinh, ô trống → hiện placeholder + đáp án đúng
