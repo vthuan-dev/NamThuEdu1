@@ -283,8 +283,8 @@ export function ListenColourWrite({
                       </button>
                     )}
 
-                    {/* Hiển thị check đúng/sai khi xem kết quả */}
-                    {!interactiveMode && !isExample && (
+                    {/* Hiển thị check đúng/sai khi xem kết quả (bỏ qua vật thể nhiễu: có điểm neo nhưng không có đáp án đúng) */}
+                    {!interactiveMode && !isExample && (item.colour || item.writeText || item.write_text) && (
                       <div className="absolute -top-3 -right-3 bg-white rounded-full shadow-sm">
                         {currentAnswer === (item.colour || item.writeText || item.write_text) ? (
                           <CheckCircle2 className="w-4 h-4 text-emerald-500 fill-white" />
@@ -368,6 +368,8 @@ export function ListenColourWrite({
               if (isExample) return null; // Bỏ qua câu ví dụ
               
               const correctAnswer = item.colour || item.writeText || item.write_text || '';
+              // Bỏ qua vật thể nhiễu (distractor): có điểm neo trên tranh nhưng không có đáp án đúng
+              if (!correctAnswer) return null;
               const studentAnswer = userAnswer?.[originalIndex] || '';
               const isCorrect = correctAnswer === studentAnswer;
               
