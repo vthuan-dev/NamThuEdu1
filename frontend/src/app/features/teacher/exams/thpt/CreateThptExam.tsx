@@ -283,7 +283,7 @@ export function CreateThptExam() {
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: THPT_THEME.bg }}>
       {/* Header */}
       <header className="sticky top-0 z-40 border-b bg-white" style={{ borderColor: '#E2E8F0' }}>
-        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center gap-3">
+        <div className="px-6 py-3 flex items-center gap-3">
           <button
             type="button"
             onClick={() => navigate('/giao-vien/de-thi')}

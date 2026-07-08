@@ -453,7 +453,7 @@ export function IeltsGradingDetail() {
     return (
       <div className="min-h-screen bg-slate-50">
         <div className="sticky top-0 z-30 bg-white border-b border-slate-200">
-          <div className="max-w-7xl mx-auto px-6 h-14 flex items-center gap-3">
+          <div className="px-6 h-14 flex items-center gap-3">
             <button
               type="button"
               onClick={() => navigate(-1)}
@@ -502,7 +502,7 @@ export function IeltsGradingDetail() {
     <div className="flex-1 min-h-0 flex flex-col bg-slate-50">
       {/* Header - compact (NẰM NGOÀI vùng cuộn → luôn cố định) */}
       <div className="flex-shrink-0 bg-white border-b border-slate-200 z-30">
-        <div className="max-w-7xl mx-auto px-6 py-2.5 flex items-center justify-between gap-4">
+        <div className="px-6 py-2.5 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
@@ -569,7 +569,7 @@ export function IeltsGradingDetail() {
       {/* Skill tab bar — chỉ hiện cho full test (single-skill thì thừa) */}
       {isFullTest && (
         <div className="flex-shrink-0 bg-white border-b border-slate-200 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="px-6 py-3">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               {availableSkills.map((sk) => {
                 const meta = IELTS_SKILLS[sk];

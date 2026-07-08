@@ -96,7 +96,7 @@ export function CreateExamSetup() {
 
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center gap-3 px-6 py-3.5">
+        <div className="flex items-center gap-3 px-6 py-3.5">
           <button
             type="button"
             onClick={() => navigate('/giao-vien/de-thi')}

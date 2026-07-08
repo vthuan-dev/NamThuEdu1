@@ -1,0 +1,1064 @@
+### D:\Project\NamThuEdu\frontend\src\app\App.tsx
+import { RouterProvider } from "react-router"; import { QueryClient, QueryClientProvider } from "@tanstack/react-query"; import { router } from "./routes"; import "../i18n"; import { ToastProvider } from "../contexts/ToastContext";
+### D:\Project\NamThuEdu\frontend\src\app\components\figma\ImageWithFallback.tsx
+import React, { useState } from 'react'  const ERROR_IMG_SRC =   'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODgiIGhlaWdodD0iODgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgc3Ryb2tlPSIjMDAwIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBvcGFjaXR5PSIuMyIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIzLjciPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjU2IiBoZWlnaHQ9IjU2IiByeD0iNiIvPjxwYXRoIGQ9Im0xNiA1OCAxNi0xOCAzMiAzMiIvPjxjaXJjbGUgY3g9IjUzIiBjeT0iMzUiIHI9IjciLz48L3N2Zz4KCg=='
+### D:\Project\NamThuEdu\frontend\src\app\components\Header.tsx
+import { Bell, Plus, ChevronRight } from "lucide-react"; import { useTranslation } from "react-i18next"; import { Button } from "./ui/button"; import { Badge } from "./ui/badge"; import { LanguageSwitcher } from "./LanguageSwitcher";
+### D:\Project\NamThuEdu\frontend\src\app\components\LanguageSwitcher.tsx
+import { useTranslation } from "react-i18next"; import { Globe } from "lucide-react"; import { Button } from "./ui/button"; import {   DropdownMenu,
+### D:\Project\NamThuEdu\frontend\src\app\components\Layout.tsx
+import { Outlet } from "react-router"; import { Sidebar } from "./Sidebar"; import { SidebarProvider, useSidebar } from "../../contexts/SidebarContext";  function LayoutContent() {
+### D:\Project\NamThuEdu\frontend\src\app\components\shared\Header.tsx
+import { useState, useEffect, useRef } from "react"; import { createPortal } from "react-dom"; import { useNavigate, Link } from "react-router"; import { Bell, Plus, ChevronRight, User, Settings, LogOut, ChevronDown, BookOpen, ExternalLink, Send, Volume2, VolumeX, UserCog, Check, X, Loader2 } from "lucide-react"; import { useTranslation } from "react-i18next";
+### D:\Project\NamThuEdu\frontend\src\app\components\shared\index.ts
+export { Header } from './Header'; export { Sidebar } from './Sidebar'; export { LanguageSwitcher } from './LanguageSwitcher'; export { Layout } from './Layout'; export { UnderConstruction } from './UnderConstruction';
+### D:\Project\NamThuEdu\frontend\src\app\components\shared\LanguageSwitcher.tsx
+import { useTranslation } from "react-i18next"; import { Globe } from "lucide-react"; import { Button } from "../ui/button"; import {   DropdownMenu,
+### D:\Project\NamThuEdu\frontend\src\app\components\shared\Layout.tsx
+import { Outlet } from "react-router"; import { Sidebar } from "./Sidebar"; import { SidebarProvider, useSidebar } from "../../../contexts/SidebarContext";  function LayoutContent() {
+### D:\Project\NamThuEdu\frontend\src\app\components\shared\Sidebar.tsx
+import { useState, useEffect, useRef } from "react"; import { Link, useLocation, useNavigate } from "react-router"; import { useTranslation } from "react-i18next"; import { logout } from "../../../services/authApi"; import { api } from "../../../services/api";
+### D:\Project\NamThuEdu\frontend\src\app\components\shared\UnderConstruction.tsx
+import { useTranslation } from "react-i18next"; import { Construction } from "lucide-react";  export function UnderConstruction() {   const { t } = useTranslation();
+### D:\Project\NamThuEdu\frontend\src\app\components\student\badges\GradeBadge.tsx
+interface GradeBadgeProps {   grade: string;   score?: number;   size?: 'sm' | 'md' | 'lg';   showScore?: boolean;
+### D:\Project\NamThuEdu\frontend\src\app\components\student\badges\index.ts
+export { SkillBadge } from './SkillBadge'; export { GradeBadge } from './GradeBadge';
+### D:\Project\NamThuEdu\frontend\src\app\components\student\badges\SkillBadge.tsx
+import { getSkillColor, getSkillIcon, getSkillName } from "../../../../utils/skillHelpers";  interface SkillBadgeProps {   skill: 'listening' | 'reading' | 'writing' | 'speaking';   size?: 'sm' | 'md' | 'lg';
+### D:\Project\NamThuEdu\frontend\src\app\components\student\dashboard\ImportantNotifications.tsx
+import { Link } from "react-router"; import { AlertCircle, Bell, X } from "lucide-react"; import { formatTimeAgo } from "../../../../utils/formatters";  const AMBER = "#F59E0B";
+### D:\Project\NamThuEdu\frontend\src\app\components\student\dashboard\index.ts
+export { ImportantNotifications } from "./ImportantNotifications"; export { InProgressTests } from "./InProgressTests"; export { UpcomingCalendar } from "./UpcomingCalendar"; export { PracticeRecommendations } from "./PracticeRecommendations";
+### D:\Project\NamThuEdu\frontend\src\app\components\student\dashboard\InProgressTests.tsx
+import { Link } from "react-router"; import { Clock, Play, AlertCircle } from "lucide-react";  const PURPLE = "#7C3AED"; const PURPLE_LIGHT = "#EDE9FE";
+### D:\Project\NamThuEdu\frontend\src\app\components\student\dashboard\PracticeRecommendations.tsx
+import { Link } from "react-router"; import { Sparkles, Play, Clock, FileQuestion } from "lucide-react"; import { getSkillColor, getSkillIcon } from "../../../../utils/skillHelpers";  const PURPLE = "#7C3AED";
+### D:\Project\NamThuEdu\frontend\src\app\components\student\dashboard\UpcomingCalendar.tsx
+import { Link } from "react-router"; import { Calendar, Clock, AlertCircle } from "lucide-react"; import { formatDate } from "../../../../utils/formatters";  const PURPLE = "#7C3AED";
+### D:\Project\NamThuEdu\frontend\src\app\components\student\ExamScheduleDetailPopup.tsx
+/**  * ExamScheduleDetailPopup — popup chi tiết lịch thi do giáo viên đặt.  * Thiết kế tối giản: điểm nhấn là vòng đếm ngược ở giữa, danh sách thông tin  * dạng hairline gọn gàng. Dùng cho chuông thông báo + luồng GV vừa đặt lịch.  */
+### D:\Project\NamThuEdu\frontend\src\app\components\student\feedback\EmptyState.tsx
+import { LucideIcon } from "lucide-react";  interface EmptyStateProps {   icon: LucideIcon;   title: string;
+### D:\Project\NamThuEdu\frontend\src\app\components\student\NotificationDropdown.tsx
+import { useState, useEffect, useRef } from "react"; import { Link } from "react-router"; import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"; import {   Bell, Check, ClipboardList, CheckCircle, AlertCircle,
+### D:\Project\NamThuEdu\frontend\src\app\components\student\progress\CircularProgress.tsx
+interface CircularProgressProps {   value: number; // 0-100   size?: number;   strokeWidth?: number;   color?: string;
+### D:\Project\NamThuEdu\frontend\src\app\components\student\StudentNavbar.tsx
+import { useState, useEffect } from "react"; import { motion, AnimatePresence } from "framer-motion"; import { Link, useLocation, useNavigate } from "react-router"; import { useTranslation } from "react-i18next"; import { logout } from "../../../services/authApi";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\accordion.tsx
+"use client";  import * as React from "react"; import * as AccordionPrimitive from "@radix-ui/react-accordion"; import { ChevronDownIcon } from "lucide-react";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\alert-dialog.tsx
+"use client";  import * as React from "react"; import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\alert.tsx
+import * as React from "react"; import { cva, type VariantProps } from "class-variance-authority";  import { cn } from "./utils";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\aspect-ratio.tsx
+"use client";  import * as AspectRatioPrimitive from "@radix-ui/react-aspect-ratio";  function AspectRatio({
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\avatar.tsx
+"use client";  import * as React from "react"; import * as AvatarPrimitive from "@radix-ui/react-avatar";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\badge.tsx
+import * as React from "react"; import { Slot } from "@radix-ui/react-slot"; import { cva, type VariantProps } from "class-variance-authority";  import { cn } from "./utils";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\breadcrumb.tsx
+import * as React from "react"; import { Slot } from "@radix-ui/react-slot"; import { ChevronRight, MoreHorizontal } from "lucide-react";  import { cn } from "./utils";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\button.tsx
+import * as React from "react"; import { Slot } from "@radix-ui/react-slot"; import { cva, type VariantProps } from "class-variance-authority";  import { cn } from "./utils";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\calendar.tsx
+"use client";  import * as React from "react"; import { ChevronLeft, ChevronRight } from "lucide-react"; import { DayPicker } from "react-day-picker";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\card.tsx
+import * as React from "react";  import { cn } from "./utils";  function Card({ className, ...props }: React.ComponentProps<"div">) {
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\carousel.tsx
+"use client";  import * as React from "react"; import useEmblaCarousel, {   type UseEmblaCarouselType,
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\chart.tsx
+"use client";  import * as React from "react"; import * as RechartsPrimitive from "recharts";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\checkbox.tsx
+"use client";  import * as React from "react"; import * as CheckboxPrimitive from "@radix-ui/react-checkbox"; import { CheckIcon } from "lucide-react";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\collapsible.tsx
+"use client";  import * as CollapsiblePrimitive from "@radix-ui/react-collapsible";  function Collapsible({
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\command.tsx
+"use client";  import * as React from "react"; import { Command as CommandPrimitive } from "cmdk"; import { SearchIcon } from "lucide-react";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\context-menu.tsx
+"use client";  import * as React from "react"; import * as ContextMenuPrimitive from "@radix-ui/react-context-menu"; import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\dialog.tsx
+"use client";  import * as React from "react"; import * as DialogPrimitive from "@radix-ui/react-dialog"; import { XIcon } from "lucide-react";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\drawer.tsx
+"use client";  import * as React from "react"; import { Drawer as DrawerPrimitive } from "vaul";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\dropdown-menu.tsx
+"use client";  import * as React from "react"; import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"; import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\form.tsx
+"use client";  import * as React from "react"; import * as LabelPrimitive from "@radix-ui/react-label"; import { Slot } from "@radix-ui/react-slot";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\hover-card.tsx
+"use client";  import * as React from "react"; import * as HoverCardPrimitive from "@radix-ui/react-hover-card";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\input-otp.tsx
+"use client";  import * as React from "react"; import { OTPInput, OTPInputContext } from "input-otp"; import { MinusIcon } from "lucide-react";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\input.tsx
+import * as React from "react";  import { cn } from "./utils";  function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\label.tsx
+"use client";  import * as React from "react"; import * as LabelPrimitive from "@radix-ui/react-label";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\menubar.tsx
+"use client";  import * as React from "react"; import * as MenubarPrimitive from "@radix-ui/react-menubar"; import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\navigation-menu.tsx
+import * as React from "react"; import * as NavigationMenuPrimitive from "@radix-ui/react-navigation-menu"; import { cva } from "class-variance-authority"; import { ChevronDownIcon } from "lucide-react";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\pagination.tsx
+import * as React from "react"; import {   ChevronLeftIcon,   ChevronRightIcon,   MoreHorizontalIcon,
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\popover.tsx
+"use client";  import * as React from "react"; import * as PopoverPrimitive from "@radix-ui/react-popover";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\progress.tsx
+"use client";  import * as React from "react"; import * as ProgressPrimitive from "@radix-ui/react-progress";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\radio-group.tsx
+"use client";  import * as React from "react"; import * as RadioGroupPrimitive from "@radix-ui/react-radio-group"; import { CircleIcon } from "lucide-react";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\resizable.tsx
+"use client";  import * as React from "react"; import { GripVerticalIcon } from "lucide-react"; import * as ResizablePrimitive from "react-resizable-panels";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\scroll-area.tsx
+"use client";  import * as React from "react"; import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\select.tsx
+"use client";  import * as React from "react"; import * as SelectPrimitive from "@radix-ui/react-select"; import {
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\separator.tsx
+"use client";  import * as React from "react"; import * as SeparatorPrimitive from "@radix-ui/react-separator";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\sheet.tsx
+"use client";  import * as React from "react"; import * as SheetPrimitive from "@radix-ui/react-dialog"; import { XIcon } from "lucide-react";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\sidebar.tsx
+"use client";  import * as React from "react"; import { Slot } from "@radix-ui/react-slot"; import { VariantProps, cva } from "class-variance-authority";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\skeleton.tsx
+import { cn } from "./utils";  function Skeleton({ className, ...props }: React.ComponentProps<"div">) {   return (     <div
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\slider.tsx
+"use client";  import * as React from "react"; import * as SliderPrimitive from "@radix-ui/react-slider";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\sonner.tsx
+export function Toaster() {   return null; }
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\switch.tsx
+"use client";  import * as React from "react"; import * as SwitchPrimitive from "@radix-ui/react-switch";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\table.tsx
+"use client";  import * as React from "react";  import { cn } from "./utils";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\tabs.tsx
+"use client";  import * as React from "react"; import * as TabsPrimitive from "@radix-ui/react-tabs";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\textarea.tsx
+import * as React from "react";  import { cn } from "./utils";  function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\toggle-group.tsx
+"use client";  import * as React from "react"; import * as ToggleGroupPrimitive from "@radix-ui/react-toggle-group"; import { type VariantProps } from "class-variance-authority";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\toggle.tsx
+"use client";  import * as React from "react"; import * as TogglePrimitive from "@radix-ui/react-toggle"; import { cva, type VariantProps } from "class-variance-authority";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\tooltip.tsx
+"use client";  import * as React from "react"; import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\use-mobile.ts
+import * as React from "react";  const MOBILE_BREAKPOINT = 768;  export function useIsMobile() {
+### D:\Project\NamThuEdu\frontend\src\app\components\ui\utils.ts
+import { clsx, type ClassValue } from "clsx"; import { twMerge } from "tailwind-merge";  export function cn(...inputs: ClassValue[]) {   return twMerge(clsx(inputs));
+### D:\Project\NamThuEdu\frontend\src\app\features\admin\classes\AdminClassManagementPage.tsx
+/**  * AdminClassManagementPage — "Quản lý lớp" (thay cho "Bàn giao lớp").  *  * Admin xem toàn bộ lớp trong hệ thống: chủ lớp, người đồng quản lý (co-teacher),  * thành viên (học viên), trạng thái; và thực hiện: đổi GV phụ trách, gỡ học viên,
+### D:\Project\NamThuEdu\frontend\src\app\features\admin\components\AdminPageSkeleton.tsx
+/**  * AdminPageSkeleton — skeleton loading variants cho admin (Data-Dense theme).  *  *  AdminPageSkeleton   — full page (Suspense fallback + dashboard)  *  AdminTableSkeleton  — table header + rows, dùng inline khi loading ? trong các list page
+### D:\Project\NamThuEdu\frontend\src\app\features\admin\components\NotificationDropdown.tsx
+import { useCallback, useEffect, useRef, useState } from "react"; import { Link } from "react-router"; import {   Bell,   UserPlus,
+### D:\Project\NamThuEdu\frontend\src\app\features\admin\components\RejectReasonModal.tsx
+import { useEffect, useState } from "react"; import { X, AlertTriangle } from "lucide-react";  /**  * RejectReasonModal — modal nhập lý do từ chối (đề thi / bài viết).
+### D:\Project\NamThuEdu\frontend\src\app\features\admin\content\AdminPostsPage.tsx
+import { useEffect, useMemo, useState } from "react"; import { CheckCircle2, Search, Trash2, XCircle } from "lucide-react"; import { adminApi, AdminPost } from "@/services/adminApi"; import { RejectReasonModal } from "../components/RejectReasonModal"; import { AdminTableSkeleton } from "../components/AdminPageSkeleton";
+### D:\Project\NamThuEdu\frontend\src\app\features\admin\courses\AdminCoursesPage.tsx
+import { useEffect, useMemo, useState } from "react"; import {   FileText,   BookOpenCheck,   FileEdit,
+### D:\Project\NamThuEdu\frontend\src\app\features\admin\courses\ExamCard.tsx
+import { useState, useRef, useEffect } from "react"; import {   MoreVertical,   Eye,   CheckCircle2,
+### D:\Project\NamThuEdu\frontend\src\app\features\admin\courses\examClassify.ts
+/**  * examClassify — phân loại đề thi của admin theo nhóm tuổi và loại đề.  *  * Dùng cho trang Quản lý đề thi (AdminCoursesPage). Metadata màu/icon đồng bộ  * với examCatalog.ts của giáo viên để giữ nhất quán toàn hệ thống.
+### D:\Project\NamThuEdu\frontend\src\app\features\admin\courses\ExamPreviewModal.tsx
+/**  * ExamPreviewModal — Modal xem trước đề thi đúng UI học viên sẽ thấy khi thi.  *  * Nhúng route preview standalone (/admin/de-thi/xem/*) vào trong một iframe  * để hiển thị NGAY tại trang quản lý, không cần mở tab/trang mới. Iframe cùng
+### D:\Project\NamThuEdu\frontend\src\app\features\admin\courses\ExamQuickViewModal.tsx
+import { X, User, Layers, ListChecks, FileText, Calendar, Hash, ExternalLink } from "lucide-react"; import { useEffect } from "react"; import type { AdminExam } from "@/services/adminApi"; import {   classifyExamType,
+### D:\Project\NamThuEdu\frontend\src\app\features\admin\courses\preview\AdminThptPreview.tsx
+/**  * AdminThptPreview — Admin xem trước đề THPT đúng UI học viên sẽ thấy khi thi.  * Khác trang học viên (StudentThptExamPage): KHÔNG tạo submission, KHÔNG đếm giờ  * thực, chỉ render nội dung đề read-friendly để kiểm duyệt.  *
+### D:\Project\NamThuEdu\frontend\src\app\features\admin\dashboard\AdminDashboard.tsx
+import { useEffect, useMemo, useState } from "react"; import { useTranslation } from "react-i18next"; import { Link } from "react-router"; import { usePageTitle, PAGE_TITLES } from "../../../../hooks/usePageTitle"; import {
+### D:\Project\NamThuEdu\frontend\src\app\features\admin\handover\AdminHandoverPage.tsx
+import { useEffect, useMemo, useState } from "react"; import { Loader2, ArrowRightLeft, Check, X, Search, Trash2, Clock, Inbox, User } from "lucide-react"; import { adminHandoverApi, HandoverRequest } from "../../../../services/classMgmtApi"; import { useToastContext } from "../../../../contexts/ToastContext";
+### D:\Project\NamThuEdu\frontend\src\app\features\admin\settings\AdminSettingsPage.tsx
+import { useEffect, useRef, useState, useCallback, useMemo } from "react"; import { useSearchParams } from "react-router"; import {   User,   Lock,
+### D:\Project\NamThuEdu\frontend\src\app\features\admin\users\AdminCredentialsModal.tsx
+import { useState, useEffect } from "react"; import { motion, AnimatePresence } from "framer-motion"; import { X, Copy, Eye, EyeOff, Check, Clock, RotateCcw, KeyRound, ShieldCheck, AlertTriangle } from "lucide-react"; import { adminApi } from "../../../../services/adminApi";
+### D:\Project\NamThuEdu\frontend\src\app\features\admin\users\AdminUsersPage.tsx
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"; import { useSearchParams } from "react-router"; import {   Lock, Search, Shield, Unlock, Users, Trash2, UserCog, X, CheckSquare, Square,   UserPlus, GraduationCap, Phone, CheckCircle2, XCircle, RefreshCw, AlertCircle, Check, Eye, EyeOff, KeyRound
+### D:\Project\NamThuEdu\frontend\src\app\features\auth\admin\AdminLogin.tsx
+import { useState, useEffect } from "react"; import { useNavigate, useSearchParams } from "react-router"; import { useTranslation } from "react-i18next"; import axios from "axios"; import { login } from "../../../../services/authApi";
+### D:\Project\NamThuEdu\frontend\src\app\features\auth\admin\AdminRegister.tsx
+import { useState } from "react"; import { Link, useNavigate } from "react-router"; import { register, RegisterFormData } from "../../../../services/authApi"; import { Eye, EyeOff, AlertCircle, CheckCircle2 } from "lucide-react"; import adminBadgeImg from "../../../../assets/auth-icons/admin-badge.svg";
+### D:\Project\NamThuEdu\frontend\src\app\features\auth\admin\index.ts
+export { AdminLogin } from './AdminLogin';
+### D:\Project\NamThuEdu\frontend\src\app\features\auth\index.ts
+/**  * Authentication Components  *   * Organized by role for better maintainability  */
+### D:\Project\NamThuEdu\frontend\src\app\features\auth\shared\AuthFooter.tsx
+import { Mail, MapPin, Phone } from "lucide-react"; import { Link } from "react-router";  export function AuthFooter() {   return (
+### D:\Project\NamThuEdu\frontend\src\app\features\auth\shared\AuthHeader.tsx
+import { GraduationCap, Phone } from "lucide-react"; import { Link } from "react-router";  export function AuthHeader() {   return (
+### D:\Project\NamThuEdu\frontend\src\app\features\auth\shared\AuthLayout.tsx
+import { Outlet } from "react-router";  export function AuthLayout() {   return <Outlet />; }
+### D:\Project\NamThuEdu\frontend\src\app\features\auth\shared\index.ts
+/**  * Shared Authentication Components  */  export { ForgotPassword } from './ForgotPassword';
+### D:\Project\NamThuEdu\frontend\src\app\features\auth\student\index.ts
+/**  * Student Authentication Components  */  export { StudentLogin } from './StudentLogin';
+### D:\Project\NamThuEdu\frontend\src\app\features\auth\student\StudentLogin.tsx
+/**  * Student Login Component  *   * Clean login form for students matching admin login style  */
+### D:\Project\NamThuEdu\frontend\src\app\features\auth\student\StudentRegister.tsx
+/**  * Enhanced Registration Component  *   * Student registration with improved UX, progress indicator, and animations  */
+### D:\Project\NamThuEdu\frontend\src\app\features\auth\teacher\index.ts
+/**  * Teacher Authentication Components  */  export { TeacherLogin } from './TeacherLogin';
+### D:\Project\NamThuEdu\frontend\src\app\features\auth\teacher\TeacherLogin.tsx
+/**  * Teacher Login Component  */  import React, { useState, useEffect, useRef } from 'react';
+### D:\Project\NamThuEdu\frontend\src\app\features\public\AboutPage.tsx
+import { useNavigate } from "react-router"; import {   GraduationCap,   Users,   Star,
+### D:\Project\NamThuEdu\frontend\src\app\features\public\components\CourseFilterTabs.tsx
+import { useMemo, useState } from "react"; import { useTranslation } from "react-i18next"; import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../components/ui/card"; import type { PublicCourse } from "../../../../services/publicApi";
+### D:\Project\NamThuEdu\frontend\src\app\features\public\components\CourseTypesSection.tsx
+import { useNavigate } from "react-router"; import { ArrowRight, Check, BookOpen, Globe, Users } from "lucide-react";  const courses = [   {
+### D:\Project\NamThuEdu\frontend\src\app\features\public\components\DemoFlashcard.tsx
+// THEME: updated to Forest+Coral /**  * Demo Flashcard - IMPROVED: Interactive vocabulary flashcard with flip animation  * CSS-only flip effect, no external libraries  */
+### D:\Project\NamThuEdu\frontend\src\app\features\public\components\Footer.tsx
+// THEME: Orange & White - Modern Educational Design /**  * Footer Component - Redesigned with complete information  * Based on NamThu Education banner and header  */
+### D:\Project\NamThuEdu\frontend\src\app\features\public\components\Header.tsx
+import { useState, useEffect } from "react"; import { useNavigate, useLocation } from "react-router"; import { motion, AnimatePresence, useAnimation } from "framer-motion"; import { GraduationCap, Phone, Mail, MapPin, Menu, X, ChevronDown, BookOpen, Zap, FileText, Info, HelpCircle, MessageCircle } from "lucide-react";
+### D:\Project\NamThuEdu\frontend\src\app\features\public\components\HeroSection.tsx
+// THEME: Orange & White - Modern Educational Design /**  * Hero Section - Modern Orange Theme  * Clean, professional design with vibrant orange accents  */
+### D:\Project\NamThuEdu\frontend\src\app\features\public\components\index.ts
+export { Header } from './Header'; export { HeroSection } from './HeroSection'; export { RoleAccessCard } from './RoleAccessCard'; export { CourseFilterTabs } from './CourseFilterTabs'; export { TeacherHighlights } from './TeacherHighlights';
+### D:\Project\NamThuEdu\frontend\src\app\features\public\components\LegalModal.tsx
+import { useEffect, useState, useRef } from "react"; import { X, Shield, FileText, ChevronDown } from "lucide-react"; import { useTranslation } from "react-i18next"; import { api } from "../../../../services/api";
+### D:\Project\NamThuEdu\frontend\src\app\features\public\components\ParticlesBackground.tsx
+import { useEffect, useMemo } from "react"; import Particles, { initParticlesEngine } from "@tsparticles/react"; import { loadSlim } from "@tsparticles/slim"; import type { Container } from "@tsparticles/engine";
+### D:\Project\NamThuEdu\frontend\src\app\features\public\components\ParticlesBackgroundWhite.tsx
+import { useEffect, useMemo } from "react"; import Particles, { initParticlesEngine } from "@tsparticles/react"; import { loadSlim } from "@tsparticles/slim";  export function ParticlesBackgroundWhite() {
+### D:\Project\NamThuEdu\frontend\src\app\features\public\components\RoleAccessCard.tsx
+import { useNavigate } from "react-router"; import { useTranslation } from "react-i18next"; import { ArrowRight, ShieldCheck, User, Users } from "lucide-react"; import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../components/ui/card";
+### D:\Project\NamThuEdu\frontend\src\app\features\public\components\StatsSection.tsx
+import { BookOpen, User, MessageCircle, FileText } from 'lucide-react'; import { useTranslation } from 'react-i18next';  const FEATURES = [   { key: 'curriculum', Icon: BookOpen,      iconBg: 'bg-orange-100',  iconColor: 'text-orange-600'  },
+### D:\Project\NamThuEdu\frontend\src\app\features\public\components\StickyContactBar.tsx
+import { useState, useEffect } from "react"; import { useTranslation } from "react-i18next"; import { useNavigate } from "react-router"; import { MessageCircle, PhoneCall, X, Facebook, UserPlus } from "lucide-react";
+### D:\Project\NamThuEdu\frontend\src\app\features\public\components\TeacherHighlights.tsx
+import { useTranslation } from "react-i18next"; import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card"; import { Award, BookOpenCheck, Clock3 } from "lucide-react";  const icons = [Award, BookOpenCheck, Clock3] as const;
+### D:\Project\NamThuEdu\frontend\src\app\features\public\components\TestimonialsSection.tsx
+// THEME: updated to Forest+Coral /**  * Testimonials Section - IMPROVED: Added social proof  * 3 testimonial cards with avatar, name, age group, rating, quote  */
+### D:\Project\NamThuEdu\frontend\src\app\features\public\index.ts
+/**  * Public Pages (Guest Users)  */  export { LandingPage } from './LandingPage';
+### D:\Project\NamThuEdu\frontend\src\app\features\public\LandingPage.backup.tsx
+/**  * Landing Page - English Learning Platform  *   * Homepage for NamThuEdu - English learning platform  * Age-based learning paths: Kids (6-12), Teens (13-17), Adults (18+)
+### D:\Project\NamThuEdu\frontend\src\app\features\public\LandingPage.tsx
+import React, { useEffect, useState } from "react"; import { Helmet } from "react-helmet-async"; import { useNavigate } from "react-router"; import { useTranslation } from "react-i18next"; import { usePageTitle, PAGE_TITLES } from "../../../hooks/usePageTitle";
+### D:\Project\NamThuEdu\frontend\src\app\features\public\LandingPageImproved.tsx
+/**  * Landing Page - IMPROVED VERSION  *   * All improvements applied:  * 1. Hero section with two-column layout
+### D:\Project\NamThuEdu\frontend\src\app\features\public\PublicBlogDetail.tsx
+import { useState, useEffect, useRef } from "react"; import { useNavigate, useParams, Link } from "react-router"; import { useTranslation } from "react-i18next"; import { motion, AnimatePresence } from "framer-motion"; import { publicBlogApi, type Blog } from "../../../services/blogApi";
+### D:\Project\NamThuEdu\frontend\src\app\features\public\PublicBlogList.tsx
+import { useState, useEffect, useCallback, memo } from "react"; import { useNavigate, useSearchParams, Link } from "react-router"; import { useTranslation } from "react-i18next"; import { usePageTitle } from "../../../hooks/usePageTitle"; import { publicBlogApi, type Blog } from "../../../services/blogApi";
+### D:\Project\NamThuEdu\frontend\src\app\features\public\PublicFeatures.tsx
+import { useNavigate } from "react-router"; import { useTranslation } from "react-i18next"; import { Header, Footer } from "./components"; import { BlogSEO } from "../../../components/shared/BlogSEO"; import { ArrowRight } from "lucide-react";
+### D:\Project\NamThuEdu\frontend\src\app\features\student\account\AccountInfoCard.tsx
+import { useState, useEffect, useRef } from 'react'; import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'; import { User, Save, Camera, ChevronDown, Loader2, MapPin, X } from 'lucide-react'; import { studentApi } from '../../../../services/studentApi'; import { useToastContext } from '../../../../contexts/ToastContext';
+### D:\Project\NamThuEdu\frontend\src\app\features\student\account\PasswordChangeCard.tsx
+import { useState } from 'react'; import { useMutation } from '@tanstack/react-query'; import { Lock, Eye, EyeOff, AlertCircle, ShieldCheck, ChevronDown } from 'lucide-react'; import { studentApi } from '../../../../services/studentApi'; import { useToastContext } from '../../../../contexts/ToastContext';
+### D:\Project\NamThuEdu\frontend\src\app\features\student\account\SecurityCard.tsx
+import { useState } from 'react'; import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'; import { Shield, Monitor, Smartphone, LogOut, Trash2, ChevronDown, Loader2, RefreshCw } from 'lucide-react'; import { studentApi } from '../../../../services/studentApi'; import { useToastContext } from '../../../../contexts/ToastContext';
+### D:\Project\NamThuEdu\frontend\src\app\features\student\adults\AdultsDashboard.tsx
+import { useState, useEffect } from 'react'; import { Link } from 'react-router'; import {   BarChart3, BookOpen, Target, Clock, TrendingUp, Award,   Flame, ArrowRight, Play, CheckCircle2, ChevronRight, Sparkles,
+### D:\Project\NamThuEdu\frontend\src\app\features\student\components\HighlightablePassage.tsx
+/**  * Component hiển thị passage với khả năng highlight text  * Học viên có thể select text và bôi màu để ghi chú  */ import { useEffect, useRef, useState, useMemo } from 'react';
+### D:\Project\NamThuEdu\frontend\src\app\features\student\components\NextGoalCard.test.tsx
+/**  * Unit tests cho NextGoalCard.  * - Ẩn hoàn toàn khi không có mục tiêu (data null).  * - Hiển thị tên mục tiêu + số ngày còn lại khi có data.  */
+### D:\Project\NamThuEdu\frontend\src\app\features\student\components\NextGoalCard.tsx
+import { useEffect, useState } from "react"; import { Target } from "lucide-react"; import { studentGoalApi } from "../../../../services/classMgmtApi";  interface NextGoal {
+### D:\Project\NamThuEdu\frontend\src\app\features\student\components\PassageSplitLayout.tsx
+import type { ReactNode } from "react"; import { BookOpen } from "lucide-react";  type PassageSplitTone = "blue" | "emerald" | "teal" | "slate";
+### D:\Project\NamThuEdu\frontend\src\app\features\student\dashboard\Profile.tsx
+import { useMemo } from 'react'; import { useQuery } from '@tanstack/react-query'; import { Camera, CheckCircle2, GraduationCap, Phone } from 'lucide-react'; import { AccountInfoCard } from '../account/AccountInfoCard'; import { PasswordChangeCard } from '../account/PasswordChangeCard';
+### D:\Project\NamThuEdu\frontend\src\app\features\student\dashboard\Progress.tsx
+import { useQuery } from "@tanstack/react-query"; import {   TrendingUp,   Target,   Star,
+### D:\Project\NamThuEdu\frontend\src\app\features\student\dashboard\StudentDashboard.tsx
+import { useState } from "react"; import { Link } from "react-router"; import { useQuery } from "@tanstack/react-query"; import { useTranslation } from "react-i18next"; import { usePageTitle, PAGE_TITLES } from "../../../../hooks/usePageTitle";
+### D:\Project\NamThuEdu\frontend\src\app\features\student\dashboard\StudentLeaderboard.tsx
+import { Trophy, Medal, Star, TrendingUp } from "lucide-react"; import { useQuery } from "@tanstack/react-query"; import { studentApi } from "../../../../services/studentApi"; import { studentRolePalette } from "../../../../utils/studentRoleTheme";
+### D:\Project\NamThuEdu\frontend\src\app\features\student\dashboard\StudentRewards.tsx
+import { Award, Gift, Sparkles, Lock, CheckCircle2 } from "lucide-react"; import { useQuery } from "@tanstack/react-query"; import { studentApi } from "../../../../services/studentApi"; import { studentRolePalette } from "../../../../utils/studentRoleTheme";
+### D:\Project\NamThuEdu\frontend\src\app\features\student\dashboard\StudentSchedule.tsx
+import { Calendar, Clock3, BookOpen, CheckCircle2, AlertCircle } from "lucide-react"; import { useQuery } from "@tanstack/react-query"; import { studentApi } from "../../../../services/studentApi";  type ScheduleItem = {
+### D:\Project\NamThuEdu\frontend\src\app\features\student\dashboard\ThemeSelectionModal.tsx
+import { motion, AnimatePresence } from 'framer-motion'; import { useTranslation } from 'react-i18next'; import { X, Sparkles, Check } from 'lucide-react'; import { useThemeContext } from '../../../../contexts/ThemeContext'; import { ThemePreference } from '../../../../themes/types';
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exam\index.ts
+export { TakeExam } from './TakeExam';
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exam\StudentExamPlayer.tsx
+
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exam\TakeExam.tsx
+import { useParams, useNavigate } from 'react-router'; import { ArrowLeft } from 'lucide-react'; import { ExamPlayer } from '../../../../components/exam';  /**
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\ielts\components\ExamComments.tsx
+/**  * ExamComments — Khu vực bình luận / thảo luận đề thi (giống study4.vn).  *  * Tính năng:  *   • Hiện danh sách bình luận (phân tầng top-level + replies)
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\ielts\components\IeltsAudioOnce.tsx
+/**  * IELTS Listening — audio component (default native player).  *  *  • Hiển thị thanh audio mặc định của trình duyệt (controls), không custom UI  *  • Tự phát khi mount (nếu trình duyệt cho phép) — nếu bị chặn thì học viên bấm play
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\ielts\components\IeltsBottomNav.tsx
+/**  * IELTS exam — Bottom navigation bar (theme NamThuEdu).  *  * Nền trắng, accent orange. Hiển thị:  *  • Question grid (1-40): đã trả lời (orange) / flagged / current
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\ielts\components\IeltsQuestionNavigator.tsx
+/**  * IELTS — right-side question navigator (theme NamThuEdu, style giống VSTEP).  *  * Hiển thị dạng panel dock bên phải, gom câu theo section/passage:  *  • Đã trả lời → cam đặc
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\ielts\components\IeltsQuestionRenderer.tsx
+/**  * IELTS — Question renderer (smart router by question type).  *  * Routes to the appropriate input UI based on `questionType`:  *  • multiple_choice            → A/B/C/D radio
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\ielts\components\IeltsSpeakingRecorder.tsx
+/**  * IELTS Speaking — audio recorder for a single part.  *  * Behaviour:  *  • Show the question / cue card based on `partNumber`
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\ielts\components\IeltsSubmitDialog.tsx
+/**  * IELTS — Submit confirmation dialog.  *  * Shows totals (answered / unanswered / flagged) and asks for confirmation.  */
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\ielts\components\IeltsTopBar.tsx
+/**  * IELTS exam — Top bar theo theme NamThuEdu (orange brand).  *  * Hiển thị: candidate name, test ID, section label.  * Timer đã được chuyển sang panel navigator bên phải để tránh trùng lặp.
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\ielts\StudentIeltsExamDetail.tsx
+/**  * StudentIeltsExamDetail — Trang chi tiết đề IELTS cho học viên (giống study4.com).  *  * Học viên thấy:  *   • Hero: tags, title, meta (duration, parts, questions, comments)
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\ielts\StudentIeltsExamPage.tsx
+/**  * IELTS — Student exam page (orchestrator).  *  * Routes by URL:  *  • /hoc-vien/lam-bai-ielts/:examId           → Full IELTS test (sequence: L → R → W → S)
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\ielts\types.ts
+/**  * IELTS student exam — shared types.  *  * Mirrors the JSON shape returned by `loadIeltsListening/Reading/Writing/Speaking`  * in `StudentTestController.php`.
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\ielts\views\IeltsListeningFullTestView.tsx
+/**  * IELTS Listening — CBT view (mô phỏng giao diện thi thật trên máy).  *  * Dùng chung cho cả PRACTICE và FULL TEST mode (chỉ khác audio + banner tip):  *   • practiceMode=true  → audio cho seek/replay tự do, banner tip "Pro tips"
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\ielts\views\IeltsListeningView.tsx
+/**  * IELTS Listening — student view (4 sections × 10 Q = 40 total).  * Layout giống study4.com:  *   ┌─ Audio bar (top, full width) ────────────────────────────┐  *   │ [Recording 1] [Recording 2] [Recording 3] [Recording 4]  │
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\ielts\views\IeltsReadingView.tsx
+/**  * IELTS Reading — student view (3 passages × ~13–14 Q = 40 total).  *  * Layout (matches CD-IELTS):  *  • Tab bar at top: Passage 1 / 2 / 3 — student can switch freely
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\ielts\views\IeltsSpeakingView.tsx
+/**  * IELTS Speaking — student view (3 parts, ~14 min total).  *  * Flow:  *  • Part 1 — Introduction & Interview: examiner asks general questions
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\ielts\views\IeltsWritingView.tsx
+/**  * IELTS Writing — student view (Task 1 + Task 2 = 60 minutes total).  *  * Layout:  *  • Tab bar: Task 1 (20 min recommended) / Task 2 (40 min recommended)
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\StudentExamBrowser.tsx
+import { useCallback, useEffect, useRef, useState, useMemo } from "react"; import { createPortal } from "react-dom"; import { Link, useNavigate } from "react-router"; import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query"; import { AnimatePresence, motion } from "framer-motion";
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\StudentVstepExamPage.tsx
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"; import { useParams, useNavigate, useLocation, Link } from "react-router"; import {   ArrowLeft,   Headphones,
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\thpt\components\ThptBottomNav.tsx
+import { ChevronLeft, ChevronRight, Send, Loader2 } from 'lucide-react';  interface Props {   activePart: number;   totalParts: number;
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\thpt\components\ThptPartNavigator.tsx
+import { useCallback, useEffect, useRef, useState } from 'react'; import { GripVertical } from 'lucide-react'; import type { ThptConfig, ThptAnswers, ThptSection } from '../types';  interface Props {
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\thpt\components\ThptSpeakingRecorder.tsx
+/**  * ThptSpeakingRecorder — ghi âm câu trả lời Nói trong đề THPT/tổng hợp.  * Upload audio qua studentApi.uploadSpeakingAudio (lưu vào sGemini_feedback.speaking_audio  * theo question_number); AI chấm chạy nền sau khi nộp.  */
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\thpt\components\ThptTopBar.tsx
+import { Clock, ChevronLeft, BookOpen } from 'lucide-react'; import { useNavigate } from 'react-router';  interface Props {   examTitle: string;
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\thpt\StudentThptExamPage.tsx
+import { useCallback, useEffect, useState } from 'react'; import { useNavigate, useParams, useSearchParams } from 'react-router'; import { Loader2, AlertCircle } from 'lucide-react'; import { api } from '../../../../../services/api'; import { useToast } from '../../../../../hooks/useToast';
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\thpt\ThptResultPage.tsx
+import { useEffect, useRef, useState } from 'react'; import { useNavigate, useParams } from 'react-router'; import {   Loader2, AlertCircle, AlertTriangle, ArrowLeft, Trophy, Clock, Target, Sparkles,   BookOpen, Headphones, PenLine, Mic, FileText, CheckCircle, XCircle,
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\thpt\types.ts
+/**  * Student-side THPT exam types (re-export base types + UI helpers)  */ export type {   ThptConfig,
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\thpt\views\SectionView.tsx
+import { useMemo, useState } from 'react'; import { CheckCircle2, XCircle, Headphones, Mic, Sparkles, Loader2 } from 'lucide-react'; import type { ThptAnswers, ThptSection, ViewMode } from '../types'; import { ThptSpeakingRecorder } from '../components/ThptSpeakingRecorder';
+### D:\Project\NamThuEdu\frontend\src\app\features\student\exams\VstepResultPage.tsx
+import { useState, useEffect, useRef, useMemo } from "react"; import { useParams, useNavigate, Link, useLocation } from "react-router"; import { useQuery, useQueryClient } from "@tanstack/react-query"; import {   ArrowLeft,
+### D:\Project\NamThuEdu\frontend\src\app\features\student\kids\KidsAnswerReview.tsx
+import { useParams, useNavigate } from 'react-router'; import { useQuery } from '@tanstack/react-query'; import { ArrowLeft, CheckCircle2, XCircle, Clock, Loader2 } from 'lucide-react'; import { studentApi } from '../../../../services/studentApi'; import { extractTaskData } from '../../../../utils/examDataExtractor';
+### D:\Project\NamThuEdu\frontend\src\app\features\student\kids\KidsDashboard.tsx
+import { useState, useEffect } from 'react'; import { Link } from 'react-router'; import { Play, ArrowRight, Flame, ChevronRight, AlertCircle, Headphones, BookOpen, PenLine, Mic, Sparkles } from 'lucide-react'; import { api } from '../../../../services/api'; import { studentApi } from '../../../../services/studentApi';
+### D:\Project\NamThuEdu\frontend\src\app\features\student\kids\KidsExamLobby.tsx
+/**  * KidsExamLobby — Phòng chờ thân thiện cho trẻ 6-12 (Cambridge YL)  *  * Khác bản người lớn (ExamLobby): KHÔNG check camera/mic/loa, không proctoring.  * Chỉ hiện thông tin bài thi vui vẻ + nút "Bắt đầu" to, rõ. Bấm là vào làm bài.
+### D:\Project\NamThuEdu\frontend\src\app\features\student\kids\KidsHistory.tsx
+/**  * KidsHistory — Lịch sử bài thi của em (Cambridge YL)  *  * Phong cách "kids" đồng bộ với KidsTests:  *  - Nền gradient rose → orange → green dịu mắt
+### D:\Project\NamThuEdu\frontend\src\app\features\student\kids\KidsPractice.tsx
+import { Link } from 'react-router'; import {   Headphones,   BookOpen,   PenLine,
+### D:\Project\NamThuEdu\frontend\src\app\features\student\kids\KidsResult.tsx
+/**  * KidsResult — Trang xem điểm vui vẻ cho trẻ 6-12 (Cambridge YL)  *  * Khác bản người lớn (ResultDetail): claymorphism, lời khen ngợi theo điểm,  * vòng tròn điểm to, sao thưởng, và trạng thái "Chờ thầy/cô chấm" thân thiện.
+### D:\Project\NamThuEdu\frontend\src\app\features\student\kids\KidsSettings.tsx
+/**  * KidsSettings — Trang cài đặt thân thiện cho trẻ 6-12 (Cambridge YL)  *  * Khác bản người lớn (Settings — tông indigo/tím): dùng claymorphism rose/cam  * đồng bộ với KidsDashboard/KidsPractice. Tái sử dụng AccountInfoCard +
+### D:\Project\NamThuEdu\frontend\src\app\features\student\kids\KidsTests.tsx
+/**  * KidsTests — Trang "Bài thi của em" cho trẻ 6-12 (Cambridge YL)  *  * 2 chế độ xem (tab):  *  1. "Tất cả bài thi"  → browseKidsExams: LUÔN lấy hết đề Cambridge YL đã publish.
+### D:\Project\NamThuEdu\frontend\src\app\features\student\kids\KidsTestTaking.tsx
+/**  * KidsTestTaking — Trang làm bài thân thiện cho trẻ 6-12 (Cambridge YL)  *  * Khác bản người lớn (TestTaking — engine VSTEP 4 kỹ năng):  * - MỘT câu hỏi mỗi màn hình, chữ to, đáp án dạng thẻ bấm to.
+### D:\Project\NamThuEdu\frontend\src\app\features\student\kids\player\kidsAnswer.ts
+/**  * Tiện ích serialize/parse đáp án cho kids task.  *  * Một kids task = MỘT câu hỏi (1 qId) nhưng có thể chứa nhiều "ô" con  * (vd: 6 chỗ trống, 5 cặp nối). Ta gói tất cả đáp án con thành 1 chuỗi JSON
+### D:\Project\NamThuEdu\frontend\src\app\features\student\kids\player\kidsAnswerKey.ts
+/**  * kidsAnswerKey — trích đáp án đúng + so khớp cho từng dạng kids task,  * dùng riêng cho trang xem lại bài (review). Chỉ phục vụ HIỂN THỊ;  * điểm thật do backend chấm.  *
+### D:\Project\NamThuEdu\frontend\src\app\features\student\kids\player\KidsTaskRenderer.tsx
+/**  * KidsTaskRenderer — render 24 dạng task cho học viên kids khi làm bài.  *  * Mỗi kids task = 1 question, nhưng có thể chứa nhiều ô con. Renderer nhận:  *  - taskType: mã dạng task (cloze_test, odd_one_out, ...)
+### D:\Project\NamThuEdu\frontend\src\app\features\student\notifications\index.ts
+export { NotificationList } from './NotificationList';
+### D:\Project\NamThuEdu\frontend\src\app\features\student\notifications\NotificationList.tsx
+import { useState } from "react"; import { Link } from "react-router"; import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"; import { useTranslation } from "react-i18next"; import {
+### D:\Project\NamThuEdu\frontend\src\app\features\student\practice\index.ts
+export { PracticeList } from './PracticeList'; export { PracticeSession } from './PracticeSession';
+### D:\Project\NamThuEdu\frontend\src\app\features\student\practice\PracticeList.tsx
+import { useState } from "react"; import { Link } from "react-router"; import { useQuery } from "@tanstack/react-query"; import {   Zap,
+### D:\Project\NamThuEdu\frontend\src\app\features\student\practice\PracticeSession.tsx
+import { useMemo, useState } from "react"; import { useNavigate, useParams } from "react-router"; import { ChevronLeft, ChevronRight, CheckCircle2, Clock, Send } from "lucide-react"; import { useMutation, useQuery } from "@tanstack/react-query"; import { studentApi } from "../../../../services/studentApi";
+### D:\Project\NamThuEdu\frontend\src\app\features\student\settings\index.ts
+export { Settings } from './Settings';
+### D:\Project\NamThuEdu\frontend\src\app\features\student\settings\Settings.tsx
+import { useState, type ComponentType, type CSSProperties } from 'react'; import { Settings2, User, ShieldCheck } from 'lucide-react'; import { AccountInfoCard } from '../account/AccountInfoCard'; import { PasswordChangeCard } from '../account/PasswordChangeCard';
+### D:\Project\NamThuEdu\frontend\src\app\features\student\settings\ThemeSwitcher.tsx
+import { useState } from 'react'; import { useTranslation } from 'react-i18next'; import { Palette, Check } from 'lucide-react'; import { useThemeContext } from '../../../../contexts/ThemeContext'; import { ThemePreference } from '../../../../themes/types';
+### D:\Project\NamThuEdu\frontend\src\app\features\student\teens\components\ExamNewsFeed.tsx
+import { useQuery } from '@tanstack/react-query'; import { useState, useEffect, useCallback } from 'react'; import { Newspaper, ChevronLeft, ChevronRight, Clock, ExternalLink } from 'lucide-react'; import { getApiUrl } from '../../../../../utils/apiConfig';
+### D:\Project\NamThuEdu\frontend\src\app\features\student\teens\TeensDashboard.tsx
+import { useState, useEffect } from 'react'; import { Link } from 'react-router'; import {   BarChart3, BookOpenCheck, Target, TrendingUp,   Flame, ArrowRight, Play, CheckCircle2, ChevronRight, Sparkles,
+### D:\Project\NamThuEdu\frontend\src\app\features\student\teens\TeensHistory.tsx
+/**  * TeensHistory — Trang "Lịch sử thi" cho học viên Teens (13–17).  *  * Tông teal/cyan đồng bộ TeensLayout (khác bản Adults tông tím).  * Hiển thị toàn bộ bài đã làm: lọc theo kết quả + tìm kiếm + sắp xếp,
+### D:\Project\NamThuEdu\frontend\src\app\features\student\teens\TeensTests.tsx
+/**  * TeensTests — Trang "Bài tập" cho học viên Teens (13–17)  *  * 2 chế độ xem (tab):  *  1. "Tất cả bài tập"  → browseTeensExams: LẤY HẾT đề teens đã publish.
+### D:\Project\NamThuEdu\frontend\src\app\features\student\teens\TeensTestTaking.tsx
+/**  * TeensTestTaking — Engine làm bài cho học viên Teens (13–17)  *  * Khác bản VSTEP (TestTaking — 4 kỹ năng cứng) và bản Kids (1 câu vui nhộn):  * - Tông teal/cyan chuyên nghiệp, đồng bộ TeensLayout.
+### D:\Project\NamThuEdu\frontend\src\app\features\student\test-taking\AnswerReview.tsx
+import { useState, useEffect } from "react"; import { useParams, useNavigate } from "react-router"; import { useQuery } from "@tanstack/react-query"; import {   CheckCircle,
+### D:\Project\NamThuEdu\frontend\src\app\features\student\test-taking\components\ExamBottomNav.tsx
+import React from "react";  interface ExamBottomNavProps {   questions: any[];   currentQuestionIndex: number;
+### D:\Project\NamThuEdu\frontend\src\app\features\student\test-taking\components\IntroScreen.tsx
+import { useState, useRef } from "react"; import { Mic, Volume2, Play, CheckCircle2, AlertCircle } from "lucide-react";  interface IntroScreenProps {   examData: any;
+### D:\Project\NamThuEdu\frontend\src\app\features\student\test-taking\components\TestNavigator.tsx
+import { CheckCircle2, Flag, MapPin } from "lucide-react";  interface TestNavigatorProps {   questions: any[];   currentQuestionIndex: number;
+### D:\Project\NamThuEdu\frontend\src\app\features\student\test-taking\ExamLobby.tsx
+import { useEffect, useRef, useState } from "react"; import { useNavigate, useParams } from "react-router"; import { Camera, Mic, Volume2, CheckCircle2, AlertCircle, Loader2, ArrowLeft } from "lucide-react"; import { useTranslation } from "react-i18next"; import { studentApi } from "@/services/studentApi";
+### D:\Project\NamThuEdu\frontend\src\app\features\student\test-taking\layouts\ListeningLayout.tsx
+import { useState, useRef, useEffect } from "react"; import { Play, Pause, Volume2, RotateCcw } from "lucide-react";  interface ListeningLayoutProps {   question: any;
+### D:\Project\NamThuEdu\frontend\src\app\features\student\test-taking\layouts\ReadingLayout.tsx
+import { useState } from "react";  interface ReadingLayoutProps {   question: any;   answer: string;
+### D:\Project\NamThuEdu\frontend\src\app\features\student\test-taking\layouts\SpeakingLayout.tsx
+import { useState, useEffect } from "react"; import { Mic, Square, Play, RotateCcw } from "lucide-react";  interface SpeakingLayoutProps {   question: any;
+### D:\Project\NamThuEdu\frontend\src\app\features\student\test-taking\layouts\WritingLayout.tsx
+import { useState, useEffect } from "react"; import { Edit3, CheckCircle2, AlertTriangle } from "lucide-react";  interface WritingLayoutProps {   question: any;
+### D:\Project\NamThuEdu\frontend\src\app\features\student\test-taking\ResultDetail.tsx
+import { useParams, useNavigate, Link } from "react-router"; import { useQuery } from "@tanstack/react-query"; import {   Eye,   TrendingUp,
+### D:\Project\NamThuEdu\frontend\src\app\features\student\test-taking\TestTaking.tsx
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"; import { useMutation } from "@tanstack/react-query"; import {    AlertTriangle, BookOpen, CheckCircle, Mic, Pause, Play, Square,    RotateCcw, ChevronRight, Volume2, FileText, Bookmark, BookmarkCheck
+### D:\Project\NamThuEdu\frontend\src\app\features\student\test-taking\TestTakingVSTEP.tsx
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"; import { useMutation } from "@tanstack/react-query"; import {    AlertTriangle, BookOpen, CheckCircle, Mic, Pause, Play, Square,    RotateCcw, ChevronRight, Volume2, FileText, Bookmark, BookmarkCheck
+### D:\Project\NamThuEdu\frontend\src\app\features\student\tests\index.ts
+export { TestList } from './TestList';
+### D:\Project\NamThuEdu\frontend\src\app\features\student\tests\TestHistory.tsx
+import { useState, useMemo } from "react"; import { Link, useNavigate } from "react-router"; import { useQuery } from "@tanstack/react-query"; import {   Trophy,
+### D:\Project\NamThuEdu\frontend\src\app\features\student\tests\TestList.tsx
+import { useEffect, useState } from "react"; import { Link } from "react-router"; import { useQuery } from "@tanstack/react-query"; import { useTranslation } from "react-i18next"; import { usePageTitle, PAGE_TITLES } from "../../../../hooks";
+### D:\Project\NamThuEdu\frontend\src\app\features\student\WaitingForClass.tsx
+import React from 'react'; import { Clock, GraduationCap, Mail, Phone } from 'lucide-react';  export function WaitingForClass() {   const userStr = localStorage.getItem('user');
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\assignments\AssignmentProgress.tsx
+import { useState } from "react"; import { useTranslation } from "react-i18next"; import { Link, useParams } from "react-router"; import {   ArrowLeft,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\assignments\AssignModal.tsx
+import { useEffect, useMemo, useRef, useState } from "react"; import {   X, Search, CalendarClock, CalendarCheck, Bell, Send, Loader2,   Check, Users, FileText, MessageSquare, RotateCcw, ChevronRight,   MapPin, Mail, Phone, CalendarDays, GraduationCap, UserRound, Globe,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\assignments\CreateAssignment.tsx
+import { useState, useEffect } from "react"; import { useNavigate, useSearchParams } from "react-router"; import {   ArrowLeft, Search, Calendar, Clock, Users, School,   CheckCircle2, AlertCircle, Send, BookOpen, ChevronRight,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\assignments\index.ts
+export { AssignmentProgress } from "./AssignmentProgress"; export { CreateAssignment } from "./CreateAssignment"; export { AssignModal } from "./AssignModal"; export { ReminderModal } from "./ReminderModal";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\assignments\ReminderModal.tsx
+import { X, AlertTriangle, Send, Users, Clock, FileText } from "lucide-react"; import { useTranslation } from "react-i18next";  interface ReminderModalProps {   isOpen: boolean;
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\blog\BlogList.tsx
+import { useState, useEffect, useCallback } from "react"; import { Link, useNavigate } from "react-router"; import { useTranslation } from "react-i18next"; import {   Plus, Search, Eye, Edit3, Trash2, Send, FileText, Clock,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\blog\Categories.tsx
+import { useState } from "react"; import { Link } from "react-router"; import {   ChevronRight,   Plus,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\blog\ContentStats.tsx
+import { useState, useEffect } from "react"; import { Link } from "react-router"; import {   ChevronLeft, FileText, Eye, Heart, MessageCircle,   TrendingUp, TrendingDown, Activity, CheckCircle,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\blog\CreateBlog.tsx
+import { useState, useEffect } from 'react'; import { useNavigate } from 'react-router-dom'; import ReactQuill from 'react-quill-new'; import 'react-quill-new/dist/quill.snow.css'; import { useBlog } from '../../../../hooks/useBlog';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\blog\CreatePost.tsx
+import { useState, useEffect } from "react"; import { Link, useNavigate, useParams } from "react-router"; import { useTranslation } from "react-i18next"; import ReactQuill from "react-quill-new"; import "react-quill-new/dist/quill.snow.css";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\blog\index.ts
+export { CreateBlog } from './CreateBlog'; export { CreatePost } from './CreatePost'; export { BlogList } from './BlogList'; export { PostDetail } from './PostDetail'; export { ContentStats } from './ContentStats';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\blog\PostDetail.tsx
+import { useState, useEffect } from "react"; import { Link, useNavigate, useParams } from "react-router"; import { useTranslation } from "react-i18next"; import {   ArrowLeft,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\classes\ClassDetail.tsx
+import { useEffect, useState, useCallback } from "react"; import { useParams, useNavigate } from "react-router"; import {   ArrowLeft, Users, FileText, Megaphone, Target, ArrowRightLeft,   Loader2, AlertCircle, Trash2, Plus, UserPlus, Search, Calendar, CheckCircle2, Info,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\classes\ClassList.tsx
+import { useState, useEffect } from "react"; import { getAuthToken } from '../../../../utils/authStorage'; import { useTranslation } from "react-i18next"; import { Link } from "react-router"; import { usePageTitle, PAGE_TITLES } from "../../../../hooks/usePageTitle";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\classes\ClassManage.tsx
+import { useEffect, useState } from "react"; import { useNavigate } from "react-router"; import {   Plus, Users, School, AlertCircle, Trash2, Pencil, ArrowRightLeft,   Loader2, GraduationCap, Layers, UserCog, Check, X,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\classes\classMgmtUi.tsx
+import { ReactNode, useEffect, useState } from "react"; import { createPortal } from "react-dom"; import { X } from "lucide-react"; import { getFullMediaUrl } from "../../../../utils/mediaUtils";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\classes\ClassStats.tsx
+import { useState } from "react"; import { useTranslation } from "react-i18next"; import { Link } from "react-router"; import {   ArrowLeft,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\classes\CreateClass.tsx
+import { useState } from "react"; import { useTranslation } from "react-i18next"; import { Link } from "react-router"; import {   ArrowLeft,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\classes\index.ts
+export { ClassList } from './ClassList'; export { CreateClass } from './CreateClass'; export { TransferClass } from './TransferClass'; export { ClassStats } from './ClassStats';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\classes\StudentGoalModal.tsx
+import { useEffect, useState } from "react"; import {   Loader2, Sparkles, Target, TrendingUp, AlertTriangle, CheckCircle2,   ListChecks, Trash2, Clock, History, } from "lucide-react";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\classes\TransferClass.tsx
+import { useState } from "react"; import { useTranslation } from "react-i18next"; import { Link } from "react-router"; import {   ArrowLeft,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\courses\components\CourseAIInsights.tsx
+import { motion } from "framer-motion"; import { Sparkles, TrendingUp, AlertTriangle, Lightbulb, Target, BrainCircuit, Users } from "lucide-react";  export function CourseAIInsights() {   return (
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\courses\components\CourseDetailedStats.tsx
+import { motion } from "framer-motion"; import {    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,   BarChart, Bar, Legend, Cell
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\courses\components\CourseScheduleBuilder.tsx
+import { useState } from "react"; import { motion } from "framer-motion"; import { Plus, Clock, Users, MapPin, MoreVertical } from "lucide-react";  const daysOfWeek = [
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\courses\CourseDetail.tsx
+import { useState, useEffect } from "react"; import { useTranslation } from "react-i18next"; import { useParams, useNavigate, useSearchParams } from "react-router"; import { usePageHeader } from "../../../../contexts/TeacherHeaderContext"; import {
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\courses\CourseList.tsx
+import { useState, useEffect } from "react"; import { Link } from "react-router"; import { useTranslation } from "react-i18next"; import { usePageTitle, PAGE_TITLES } from "../../../../hooks/usePageTitle"; import { usePageHeader } from "../../../../contexts/TeacherHeaderContext";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\courses\CourseStats.tsx
+import { useState } from "react"; import { Link } from "react-router"; import { useTranslation } from "react-i18next"; import {   ArrowLeft,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\courses\CreateCourse.tsx
+import { useState } from "react"; import { Link, useNavigate } from "react-router"; import { useTranslation } from "react-i18next"; import {   ArrowLeft,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\courses\EditCourse.tsx
+import { useState, useEffect } from "react"; import { Link, useNavigate, useParams } from "react-router"; import { useTranslation } from "react-i18next"; import {   ArrowLeft, BookOpen, Save, Upload, Target, Globe, GraduationCap, Users, Clock, Calendar, DollarSign, Settings as SettingsIcon
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\courses\ManageStudents.tsx
+import { useState } from "react"; import { Link } from "react-router"; import { useTranslation } from "react-i18next"; import { formatVNDate } from "@/utils/dateUtils"; import {
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\dashboard\Dashboard.tsx
+import { useState, useEffect } from "react"; import { useTranslation } from "react-i18next"; import { useNavigate } from "react-router"; import { usePageTitle, PAGE_TITLES } from "../../../../hooks/usePageTitle"; import { api } from "../../../../services/api";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\dashboard\index.ts
+export { Dashboard } from './Dashboard';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\AllExams.tsx
+import { useState, useEffect } from "react"; import { Link } from "react-router"; import { usePageTitle, PAGE_TITLES } from "../../../../hooks/usePageTitle"; import {   FileText,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\CreateExam.tsx
+import { useEffect, useState } from "react"; import { getAuthToken } from '../../../../utils/authStorage'; import { Link, useNavigate, useParams, useSearchParams } from "react-router"; import { TemplateGuide } from "./TemplateGuide"; import { useSidebar } from "../../../../contexts/SidebarContext";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\CreateExamManual.tsx
+import React, { useState } from 'react'; import { useNavigate } from 'react-router-dom'; import { teacherApi } from '@/services/teacherApi';  interface Answer {
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\CreateVSTEPExam.tsx
+import { useState, useEffect } from "react"; import { Link, useNavigate } from "react-router"; import {   ArrowLeft,   Save,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\EditExam.tsx
+import { Link, useParams } from "react-router"; import { ArrowLeft, Save, Eye } from "lucide-react";  export function EditExam() {   const { examId } = useParams();
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ExamDetail.tsx
+import { Link, useParams, useNavigate } from "react-router"; import { ArrowLeft, Edit, Copy, Send, Download, Archive, Trash2, Clock, Target, FileText, BarChart3 } from "lucide-react"; import { useState, useEffect } from "react"; import { getKidsExam } from "../../../../services/kidsExamApi"; import { api } from "../../../../services/api";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ExamPreview.tsx
+import { useParams, useNavigate } from "react-router"; import { ArrowLeft, Clock, Volume2, Undo2 } from "lucide-react"; import { useState, useEffect, useCallback } from "react"; import { getKidsExam } from "../../../../services/kidsExamApi"; import { useToast } from "../../../../hooks/useToast";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ExamPreviewNew.tsx
+import { useParams, useNavigate } from 'react-router'; import { ArrowLeft } from 'lucide-react'; import { ExamPlayer } from '../../../../components/exam';  /**
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ExamTemplates.tsx
+import { useState } from "react"; import { Link } from "react-router"; import {   ArrowLeft,   Info,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\GeneralExamPreview.tsx
+/**  * GeneralExamPreview — Xem chi tiết đề GENERAL/objective (trắc nghiệm, đúng/sai,  * điền từ, trả lời ngắn). Dùng cho đề teens/luyện tập không thuộc VSTEP/IELTS/Kids/THPT.  *  * Route: /giao-vien/de-thi/:examId/xem-de
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ielts\components\FormPasteModal.tsx
+import { useState, useEffect } from 'react'; import { X, FileText, Sparkles, AlertCircle, Check } from 'lucide-react'; import {   parseFormText,   generatePreviewText,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ielts\components\IeltsImportModal.tsx
+/**  * IeltsImportModal — Smart hybrid PDF importer.  *  * Flow:  *   1. Upload PDF → extract text bằng pdfjs.
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ielts\components\IeltsPlayModeConfig.tsx
+/**  * IeltsPlayModeConfig — Cho phép teacher cấu hình 2 chế độ chơi:  *   • Practice: học viên chọn từng phần, có thể giới hạn thời gian  *   • Full test: học viên làm liên tục cả đề, ra điểm band  *
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ielts\components\PdfPageSelector.tsx
+import { useState, useEffect, useCallback, useRef } from 'react'; import { CheckSquare, Square, Loader2, Scissors, ArrowRight, ZoomIn, X } from 'lucide-react';  /**  * PdfPageSelector — chọn / cắt trang PDF trước khi import.
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ielts\CreateIeltsExam.tsx
+/**  * CreateIeltsExam — Trang tạo đề thi IELTS theo concept đúng:  *   ┌─ 1 đề = 1 SKILL duy nhất (Listening / Reading / Writing / Speaking)  *   ├─ Có 2 chế độ chơi cho học viên: Practice (chọn sections) + Full test  *   └─ Không có "Full 4 skills" trong 1 đề
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ielts\CreateIeltsFullExam.tsx
+/**  * CreateIeltsFullExam — Tạo đề thi IELTS Full Test (cả 4 kỹ năng).  *  * Pattern tham khảo: CreateVstepFull.tsx (Step 0 → Step 1 với 4 tab).  *
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ielts\editors\IeltsListeningEditor.tsx
+import { useState, useEffect, useRef, memo, useCallback } from "react"; import {   Headphones,   Upload,   Trash2,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ielts\editors\IeltsReadingEditor.tsx
+import { useState, useEffect, useMemo, type ReactElement } from "react"; import {   BookOpen,   Save,   CheckCircle2,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ielts\editors\IeltsSpeakingEditor.tsx
+import { useState, useEffect } from "react"; import { Mic, Save, Plus, Trash2, Sparkles, MessageCircle } from "lucide-react"; import {   IELTS_STRUCTURE,   SPEAKING_CUE_CARD_TEMPLATE,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ielts\editors\IeltsWritingEditor.tsx
+import { useState, useEffect } from "react"; import { PenLine, Save, Image as ImageIcon, Upload, Sparkles, AlertCircle } from "lucide-react"; import { IELTS_STRUCTURE, type IeltsTestType } from "../structure";  interface WritingTask {
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ielts\IeltsExamStudentPreview.tsx
+/**  * IeltsExamStudentPreview — Preview UI giống trang đề thi study4.com  *  * Layout:  *   ┌─ Hero card ─────────────────────────────┐
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ielts\ieltsParser.ts
+/**  * IELTS Exam Smart Parser  * ───────────────────────  * Parse text trích xuất từ PDF đề thi IELTS (Academic / General Training)  * thành payload đúng shape cho 4 editor: Listening / Reading / Writing / Speaking.
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ielts\IeltsPreviewPage.tsx
+/**  * IeltsPreviewPage — Trang xem trước đề IELTS (standalone, không cần editor).  * Route: /giao-vien/de-thi/ielts/:skill/xem/:examId  *  * Fetch draft data từ GET /teacher/exams/:examId/ielts/draft
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ielts\IeltsTestPreviewPage.tsx
+/**  * IeltsTestPreviewPage — Demo UI làm bài cho teacher.  *  * Mục đích: cho giáo viên xem trước layout học viên sẽ thấy khi làm bài  * IELTS. Trang này KHÔNG tạo session, KHÔNG lưu đáp án, KHÔNG có timer
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ielts\structure.ts
+// IELTS official exam structure (idp.com / britishcouncil) // Used by IELTS editors to scaffold sections, durations, question counts, // and band-score conversion logic.  export type IeltsSkill = "listening" | "reading" | "writing" | "speaking";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ielts\utils\formParser.test.ts
+import { describe, it, expect } from 'vitest'; import { parseFormText, PARSER_EXAMPLES } from './formParser';  describe('formParser', () => {   it('should parse form with parentheses numbering', () => {
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ielts\utils\formParser.ts
+/**  * Auto-parser for IELTS form-completion questions.  * Allows teachers to paste entire forms from PDFs and auto-detect blank spaces.  *   * Patterns detected:
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\IeltsExamPreview.tsx
+/**  * IELTS Exam Preview (teacher view).  *  * Loads the same exam data the student sees, but renders a read-only preview  * with all 4 skills (Listening / Reading / Writing / Speaking) and shows
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\ImportExam.tsx
+import React, { useState, useCallback } from 'react'; import { useNavigate } from 'react-router'; import {   ArrowLeft, Upload, FileText, Sparkles, CheckCircle2,   AlertCircle, X, ChevronDown, ChevronUp, BookOpen, RotateCcw,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\index.ts
+export { AllExams } from "./AllExams"; export { CreateExam } from "./CreateExam"; export { CreateVSTEPExam } from "./CreateVSTEPExam"; export { ExamTemplates } from "./ExamTemplates"; export { MyExams } from "./MyExams";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\components\CambridgePartCard.tsx
+import React, { useState } from 'react'; import { ChevronDown, ChevronUp } from 'lucide-react';  interface SubPart {   partNumber: number;
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\components\editorPrimitives.tsx
+import React, { useState } from 'react'; import { Upload, Trash2, Loader2, Plus } from 'lucide-react'; import { uploadKidsMedia } from '../../../../../../services/kidsExamApi';  /* ──────────────────────────────────────────────────────────────────────────
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\components\EditorShell.tsx
+import React from 'react'; import { X } from 'lucide-react';  /**  * EditorShell — khung chuẩn dùng chung cho mọi editor dạng bài Kids.
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\components\StepIndicator.tsx
+import React from 'react'; import { Check } from 'lucide-react';  interface StepIndicatorProps {   currentStep: number;
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\components\TaskTypeSelectorModal.tsx
+import React, { useState, useEffect } from 'react'; import { ArrowLeft, Headphones, BookOpen, Mic } from 'lucide-react'; import { getKidsTaskTypes, KidsTaskType } from '../../../../../../services/kidsExamApi';  interface TaskTypeSelectorModalProps {
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\constants\cambridgeStructure.ts
+// Cambridge YLE Parts Structure — Blueprint chuẩn 2018 (nguồn: cambridgeenglish.org) // Mỗi part được GÁN SẴN dạng bài đúng chuẩn (taskType). Giáo viên không cần chọn lại, // chỉ click vào part để vào thẳng editor. Vẫn có thể "Đổi dạng bài" nếu muốn tùy biến. // // description = nhãn tiếng Việt của dạng bài (hiển thị ở sidebar Step 2)
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\CreateKidsExam.tsx
+import React, { useState, useEffect } from 'react'; import { ArrowLeft, Save } from 'lucide-react'; import { useNavigate, useParams } from 'react-router'; import StepIndicator from './components/StepIndicator'; import Step1ExamType from './steps/Step1ExamType';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\ClozeTestEditor.tsx
+import React, { useState } from 'react'; import { Save, X, Plus, Trash2 } from 'lucide-react';  interface ClozeTestEditorProps {   onSave: (data: any) => void;
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\DialogueMatchingEditor.tsx
+import React, { useState } from 'react'; import { Trash2, X } from 'lucide-react'; import EditorShell from '../components/EditorShell'; import { FieldLabel, TextField, AddItemButton } from '../components/editorPrimitives';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\FindDifferencesEditor.tsx
+import React, { useState } from 'react'; import { Trash2, AlertCircle } from 'lucide-react'; import EditorShell from '../components/EditorShell'; import { FieldLabel, TextField, ImageUpload, AddItemButton } from '../components/editorPrimitives';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\InformationExchangeEditor.tsx
+import React, { useState } from 'react'; import { Trash2 } from 'lucide-react'; import EditorShell from '../components/EditorShell'; import { FieldLabel, TextField, ImageUpload, AddItemButton } from '../components/editorPrimitives';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\ListenColourEditor.tsx
+import React, { useState, useEffect } from 'react'; import { Upload, Trash2, Save, X, Volume2, Image as ImageIcon } from 'lucide-react'; import { uploadKidsMedia } from '../../../../../../services/kidsExamApi'; import { useToastContext } from '../../../../../../contexts/ToastContext';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\ListenDrawLinesEditor.tsx
+import React, { useState, useEffect } from 'react'; import { Upload, Image as ImageIcon, Plus, Trash2, Volume2, X } from 'lucide-react'; import { uploadKidsMedia, getExamMedia } from '../../../../../../services/kidsExamApi'; import { getFullMediaUrl } from '../../../../../../utils/mediaUtils'; import { useToastContext } from '../../../../../../contexts/ToastContext';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\ListeningLetterMatchEditor.tsx
+import React, { useState } from 'react'; import { Save, X, Plus, Trash2, Upload, Volume2 } from 'lucide-react'; import { uploadKidsMedia } from '../../../../../../services/kidsExamApi'; import { useToastContext } from '../../../../../../contexts/ToastContext';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\ListenTickEditor.tsx
+import React, { useState, useEffect } from 'react'; import { X, Upload, Play, Pause, Plus, Trash2, Volume2, Image as ImageIcon } from 'lucide-react'; import { uploadKidsMedia } from '../../../../../../services/kidsExamApi'; import { useToastContext } from '../../../../../../contexts/ToastContext';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\ListenWriteEditor.tsx
+import React, { useState, useEffect } from 'react'; import { X, Upload, Play, Pause, Plus, Trash2, Volume2 } from 'lucide-react'; import { uploadKidsMedia } from '../../../../../../services/kidsExamApi'; import { useToastContext } from '../../../../../../contexts/ToastContext';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\LookReadEditor.tsx
+import React, { useState, useEffect } from 'react'; import { Trash2, Save, X, Image as ImageIcon, Plus } from 'lucide-react'; import { uploadKidsMedia } from '../../../../../../services/kidsExamApi'; import { useToastContext } from '../../../../../../contexts/ToastContext'; import { calculateQuestionPoints, getScorableItemsCount, getExampleItemsCount } from '../../../../../../utils/examUtils';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\LookReadWriteEditor.tsx
+import React, { useState, useEffect } from 'react'; import { Trash2, Save, X, Image as ImageIcon, Plus } from 'lucide-react'; import { uploadKidsMedia } from '../../../../../../services/kidsExamApi'; import { useToastContext } from '../../../../../../contexts/ToastContext'; import { calculateQuestionPoints, getScorableItemsCount, getExampleItemsCount } from '../../../../../../utils/examUtils';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\ObjectPlacementEditor.tsx
+import React, { useState } from 'react'; import EditorShell from '../components/EditorShell'; import {   FieldLabel,   TextField,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\OddOneOutEditor.tsx
+import React, { useState } from 'react'; import { AlertCircle } from 'lucide-react'; import EditorShell from '../components/EditorShell'; import { FieldLabel, TextField, ImageUpload } from '../components/editorPrimitives';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\OpenClozeEditor.tsx
+import React, { useState } from 'react'; import { Trash2, X, Plus } from 'lucide-react'; import EditorShell from '../components/EditorShell'; import { FieldLabel, TextField, TextArea, AddItemButton } from '../components/editorPrimitives';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\PictureCardQuestionsEditor.tsx
+import React, { useState } from 'react'; import EditorShell from '../components/EditorShell'; import {   FieldLabel,   TextField,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\PictureQuestionsEditor.tsx
+import React, { useState } from 'react'; import EditorShell from '../components/EditorShell'; import {   FieldLabel,   TextField,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\PictureSentenceWritingEditor.tsx
+import React, { useState } from 'react'; import { Trash2, X, Plus } from 'lucide-react'; import EditorShell from '../components/EditorShell'; import { FieldLabel, TextField, ImageUpload, AddItemButton } from '../components/editorPrimitives';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\PictureStoryNarrationEditor.tsx
+import React, { useState } from 'react'; import { Trash2, AlertCircle } from 'lucide-react'; import EditorShell from '../components/EditorShell'; import { FieldLabel, TextField, ImageUpload, AddItemButton } from '../components/editorPrimitives';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\PictureStoryWritingEditor.tsx
+import React, { useState } from 'react'; import { Trash2 } from 'lucide-react'; import EditorShell from '../components/EditorShell'; import { FieldLabel, TextField, ImageUpload, AddItemButton } from '../components/editorPrimitives';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\ReadingComprehensionEditor.tsx
+import React, { useState } from 'react'; import { Trash2 } from 'lucide-react'; import EditorShell from '../components/EditorShell'; import { FieldLabel, TextField, TextArea, AddItemButton } from '../components/editorPrimitives';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\StoryCompletionEditor.tsx
+import React, { useState } from 'react'; import { Trash2 } from 'lucide-react'; import EditorShell from '../components/EditorShell'; import { FieldLabel, TextField, TextArea, AddItemButton } from '../components/editorPrimitives';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\UnscrambleWordsEditor.tsx
+import React, { useState } from 'react'; import { Trash2 } from 'lucide-react'; import EditorShell from '../components/EditorShell'; import { FieldLabel, TextField, ImageUpload, AddItemButton } from '../components/editorPrimitives'; import {
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\WordBankFillEditor.tsx
+import React, { useState, useEffect } from 'react'; import { Save, Plus, Trash2, Image as ImageIcon, X } from 'lucide-react'; import { uploadKidsMedia } from '../../../../../../services/kidsExamApi'; import { useToastContext } from '../../../../../../contexts/ToastContext'; import { calculateQuestionPoints, getScorableItemsCount, getExampleItemsCount } from '../../../../../../utils/examUtils';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\editors\WordDefinitionMatchingEditor.tsx
+import React, { useState } from 'react'; import { Trash2 } from 'lucide-react'; import EditorShell from '../components/EditorShell'; import { FieldLabel, TextField, AddItemButton } from '../components/editorPrimitives';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\steps\Step1ExamType.tsx
+import React, { useRef, useState } from 'react'; import {   Rocket,   Target,   Plane,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\steps\Step2AddQuestions.tsx
+import React, { useState } from 'react'; import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronRight, MousePointerClick } from 'lucide-react'; import { CAMBRIDGE_PARTS_STRUCTURE, getTaskTypeLabel } from '../constants/cambridgeStructure'; import ListenDrawLinesEditor from '../editors/ListenDrawLinesEditor'; import ListenWriteEditor from '../editors/ListenWriteEditor';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\kids\steps\Step3Preview.tsx
+import React from 'react'; import { ArrowLeft, CheckCircle, Clock, FileText, Award } from 'lucide-react';  interface Step3PreviewProps {   examData: any;
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\MyExams.tsx
+import { useState, useEffect } from "react"; import { Link } from "react-router"; import { teacherApi } from "../../../../services/teacherApi"; import { usePageTitle, PAGE_TITLES } from "../../../../hooks/usePageTitle"; import { formatVNDate } from "@/utils/dateUtils";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\setup\CreateExamSetup.tsx
+import { useState } from 'react'; import { useNavigate } from 'react-router'; import * as Icons from 'lucide-react'; import {   ArrowLeft,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\setup\examCatalog.ts
+/**  * Catalog of exam types organized by age group.  *  * Mỗi entry chứa thông tin đủ để render card + redirect đến creator chuyên dụng.  *
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\teens\CreateTeensExam.tsx
+/**  * CreateTeensExam — Tạo đề Listening / Speaking cho học viên Teens.  *  * Route: /giao-vien/de-thi/teens/:skill/tao-moi  (skill = listening | speaking)  *
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\TemplateGuide.tsx
+import { Download, FileJson, BookOpen, Info } from 'lucide-react';  export function TemplateGuide() {   const templates = [     {
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\thpt\AddSectionModal.tsx
+import { X } from 'lucide-react'; import * as Icons from 'lucide-react'; import type { SectionType } from '../../../../../types/thpt'; import { SECTION_TYPES, THPT_THEME } from './sections';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\thpt\CreateThptExam.tsx
+import { useEffect, useMemo, useRef, useState } from 'react'; import { useNavigate, useParams } from 'react-router'; import * as Icons from 'lucide-react'; import {   ArrowLeft,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\thpt\editors\SectionEditor.tsx
+import type { ThptSection } from '../../../../../../types/thpt'; import { useState } from 'react'; import { Upload, Loader2, Volume2, Trash2 } from 'lucide-react'; import { api } from '../../../../../../services/api'; import {
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\thpt\editors\shared.tsx
+/**  * Shared sub-components dùng chung cho các section editor.  */ import { Trash2 } from 'lucide-react'; import { THPT_THEME } from '../sections';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\thpt\sections.ts
+/**  * Section registry — metadata + factory cho từng dạng câu hỏi THPT/THCS.  */ import type {   SectionType,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\vstep\components\MindMapEditor.tsx
+import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, X, Sparkles } from "lucide-react";  interface MindMapEditorProps {   mainTopic: string;   ideas: [string, string, string, string]; // [top, right, bottom, left]
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\vstep\CreateVstepFull.tsx
+import { useState, useEffect } from "react"; import { useNavigate, useSearchParams, useLocation, useParams } from "react-router"; import { ArrowLeft, BookOpen, Headphones, PenTool, Mic, CheckCircle2, Save, FileText, Clock, ChevronRight, Loader2, Upload } from "lucide-react"; import { useToastContext } from "../../../../../contexts/ToastContext"; import { useTranslation } from "react-i18next";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\vstep\CreateVstepListening.tsx
+import { useState, useEffect, useRef } from "react"; import { useNavigate, useSearchParams, useParams } from "react-router"; import {   ArrowLeft,   Save,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\vstep\CreateVstepReading.tsx
+import { useState, useRef, useEffect } from "react"; import { useNavigate, useSearchParams, useParams } from "react-router"; import { ArrowLeft, Save, BookOpen, FileText, CheckCircle2 } from "lucide-react"; import { useToast } from "../../../../../hooks/useToast"; import { useTranslation } from "react-i18next";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\vstep\CreateVstepSpeaking.tsx
+import { useState, useEffect } from "react"; import { useNavigate, useSearchParams, useParams } from "react-router"; import { ArrowLeft, Save, Plus, Trash2, MessageSquare, Lightbulb, Users, Sparkles, X, Eraser } from "lucide-react"; import { useToast } from "../../../../../hooks/useToast"; import { useTranslation } from "react-i18next";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\vstep\CreateVstepWriting.tsx
+import { useState, useEffect } from "react"; import { useNavigate, useSearchParams, useParams } from "react-router"; import { ArrowLeft, Save, PenTool, FileText, CheckCircle2 } from "lucide-react"; import { useToast } from "../../../../../hooks/useToast"; import { useTranslation } from "react-i18next";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\vstep\VstepImportModal.tsx
+import { useRef, useState } from 'react'; import { X, Upload, Download, FileJson, FileText, CheckCircle2, Loader2, AlertCircle, Headphones, BookOpen, PenTool, Sparkles, Code2, Copy, Check, Bot } from 'lucide-react'; import {   saveVstepListeningSection,   saveVstepPart,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\vstep\vstepParser.ts
+/**  * VSTEP Exam Smart Parser  * ─────────────────────────  * Parse text trích xuất từ PDF đề thi VSTEP thành ImportPayload  * KHÔNG dùng AI — chỉ regex + heuristic dựa trên cấu trúc cố định của VSTEP.
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\exams\VstepExamPreview.tsx
+import { useState, useEffect, useMemo, useRef } from "react"; import { useParams, useNavigate, Link } from "react-router"; import {   ArrowLeft,   Headphones,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\grading\__tests__\ThptGradingDetail.test.tsx
+/**  * Tests for ThptGradingDetail (Teens / THPT teacher grading screen).  *  * Covers tasks 9.2–9.7:  *  - Two-track render + AI-default score (9.2)
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\grading\ClassReport.tsx
+import { useState } from "react"; import { useTranslation } from "react-i18next"; import { useParams } from "react-router"; import {   Users,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\grading\GradingDetail.tsx
+import { Fragment, useState, useMemo, useEffect, useRef, useLayoutEffect, lazy, Suspense } from "react"; import { api } from "../../../../services/api"; import { gradingApi } from "../../../../services/gradingApi"; import { KidsAnswerReview } from "./KidsAnswerReview"; import { useTranslation } from "react-i18next";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\grading\GradingQueue.tsx
+import { useState, useEffect, useMemo, useRef, useCallback } from "react"; import { Link } from "react-router"; import { useTranslation } from "react-i18next"; import { usePageTitle, PAGE_TITLES } from "../../../../hooks/usePageTitle"; import {
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\grading\GradingStats.tsx
+import {   FileText,   CheckCircle2,   Clock,   TrendingUp,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\grading\IeltsGradingDetail.tsx
+/**  * IELTS Grading Detail page.  *  * Mirrors VSTEP grading workflow but adapted for IELTS:  *  • Score scale: 0–9 band (steps of 0.5)
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\grading\index.ts
+export { GradingQueue } from "./GradingQueue"; export { GradingDetail } from "./GradingDetail"; export { ClassReport } from "./ClassReport"; export { GradingStats } from "./GradingStats";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\grading\KidsAnswerReview.tsx
+/**  * KidsAnswerReview — hiển thị bài làm của học viên cho 1 câu hỏi dạng Kids task  * trên TRANG CHẤM ĐIỂM của giáo viên (teacher-facing, thiết kế gọn, chuyên nghiệp).  *  * Thay vì hiện JSON thô ({"0":"a","1":"a"...}) -> render bảng rõ ràng:
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\grading\KidsGradingDetail.tsx
+/**  * KidsGradingDetail — trang chấm điểm dành riêng cho đề Kids  * (Cambridge Young Learners: STARTERS / MOVERS / FLYERS).  *  * Khác với khung VSTEP fallback cũ:
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\grading\TeacherReviewModal.tsx
+import { useState, useEffect, useRef } from "react"; import { useTranslation } from "react-i18next"; import { createPortal } from "react-dom"; import { AnimatePresence, motion } from "framer-motion"; import {
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\grading\ThptGradingDetail.tsx
+import { useEffect, useMemo, useState, useRef } from 'react'; import { useNavigate } from 'react-router'; import {   Loader2,   AlertCircle,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\monitoring\ConnectionHistory.tsx
+import React, { useState } from "react"; import { Link } from "react-router"; import {   ChevronRight,   Wifi,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\monitoring\index.ts
+export { LiveMonitoring } from "./LiveMonitoring"; export { StudentDetail } from "./StudentDetail"; export { RealtimeStats } from "./RealtimeStats";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\monitoring\LiveMonitoring.tsx
+import { useState, useEffect, useRef } from "react"; import { Link } from "react-router"; import { useTranslation } from "react-i18next"; import { api } from "../../../../services/api"; import {
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\monitoring\RealtimeStats.tsx
+import { useState, useEffect, useRef } from "react"; import { Link } from "react-router"; import {   Users, CheckCircle, BookOpen, Zap, TrendingUp, Activity,   ChevronRight, RefreshCw,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\monitoring\StudentDetail.tsx
+import { useState, useEffect } from "react"; import { useParams, Link } from "react-router"; import {   X,   User,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\practice\PracticeSessionDetail.tsx
+import { useState, useEffect } from "react"; import { useParams, useNavigate, Link } from "react-router"; import {   ArrowLeft, Clock, FileText, BookOpen, Headphones, Book, PenTool, Mic,   BarChart3, Shuffle, Edit, Target, Calendar, CheckCircle, XCircle,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\practice\PracticeSessionEdit.tsx
+import { useState, useEffect } from "react"; import { useParams, useNavigate } from "react-router"; import { ArrowLeft, Save, Loader2, AlertCircle, CheckCircle, FileText, ExternalLink } from "lucide-react"; import { api } from "@/services/api";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\practice\PracticeSessionList.tsx
+import { useState, useMemo } from "react"; import { Link, useNavigate } from "react-router"; import { usePageTitle, PAGE_TITLES } from "../../../../hooks/usePageTitle"; import {   Plus,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\reports\ExportReports.tsx
+import { useState } from "react"; import { Link } from "react-router"; import {   ChevronRight,   Download,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\reports\index.ts
+export { ReportsOverview } from "./ReportsOverview"; export { StudentProgress } from "./StudentProgress"; export { ExportReports } from "./ExportReports";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\reports\ReportsOverview.tsx
+import { useState } from "react"; import { Link } from "react-router"; import { usePageTitle, PAGE_TITLES } from "@/hooks/usePageTitle"; import { usePageHeader } from "@/contexts/TeacherHeaderContext"; import { useTeacherReports } from "@/hooks/useTeacherReports";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\reports\ResultsAnalysis.tsx
+import { useState } from "react"; import { Link } from "react-router"; import {   ChevronRight,   FileText,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\reports\StudentProgress.tsx
+import { useState, useEffect } from "react"; import { Link } from "react-router"; import {   ChevronRight,   Search,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\settings\index.ts
+export { Settings } from './Settings';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\settings\LegalContentTab.tsx
+import { useState, useEffect, useCallback } from "react"; import { useTranslation } from "react-i18next"; import { Save, RotateCcw, FileText, Shield, ChevronDown, Loader2, Database, Globe, Check, AlertCircle } from "lucide-react"; import { adminApi } from "../../../../services/adminApi"; import legalDefaults from "./legal-defaults.json";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\settings\PdfCutterTab.tsx
+import { useState, useCallback } from 'react'; import {   Upload, FileText, Download, X, CheckSquare, Square, Scissors, } from 'lucide-react';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\settings\Settings.tsx
+import { useState, useEffect, useRef, useCallback } from "react"; import { createPortal } from "react-dom"; import { useTranslation } from "react-i18next"; import { useSearchParams } from "react-router"; import { usePageHeader } from "../../../../contexts/TeacherHeaderContext";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\students\AddStudent.tsx
+import { useState, useEffect, useRef } from "react"; import { getAuthToken } from '../../../../utils/authStorage'; import { useTranslation } from "react-i18next"; import { Link, useNavigate } from "react-router"; import {
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\students\CreateStudent.tsx
+import React, { useState } from 'react'; import { getAuthToken } from '../../../../utils/authStorage'; import { UserPlus, Baby, Users, GraduationCap, X } from 'lucide-react';  interface CreateStudentProps {
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\students\EditStudentModal.tsx
+import { useState, useEffect, useRef } from "react"; import { getAuthToken } from '../../../../utils/authStorage'; import { motion, AnimatePresence } from "framer-motion"; import { useTranslation } from "react-i18next"; import {
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\students\ExamScheduleModal.tsx
+import { useState, useEffect, useCallback } from "react"; import { motion, AnimatePresence } from "framer-motion"; import {   X,   Loader2,
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\students\index.ts
+export { StudentManagement } from './StudentManagement'; export { AddStudent } from './AddStudent';
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\students\StudentCredentialsModal.tsx
+import { useState, useEffect } from "react"; import { motion, AnimatePresence } from "framer-motion"; import { X, Copy, Eye, EyeOff, CheckCircle2, Clock, RotateCcw } from "lucide-react"; import { getApiUrl } from "../../../../utils/apiConfig"; import { getAuthToken } from "../../../../utils/authStorage";
+### D:\Project\NamThuEdu\frontend\src\app\features\teacher\students\StudentManagement.tsx
+import { useState, useEffect, useMemo } from "react"; import { getAuthToken } from "../../../../utils/authStorage"; import { useTranslation } from "react-i18next"; import { usePageTitle, PAGE_TITLES } from "../../../../hooks/usePageTitle"; import Swal from 'sweetalert2';
+### D:\Project\NamThuEdu\frontend\src\app\features\test\index.ts
+export { TestExamPlayer } from './TestExamPlayer';
+### D:\Project\NamThuEdu\frontend\src\app\features\test\MockTestPage.tsx
+import { useState, useMemo } from "react"; import {    BookOpen, Bookmark, BookmarkCheck, Mic  } from "lucide-react";
+### D:\Project\NamThuEdu\frontend\src\app\features\test\TestExamPlayer.tsx
+import { useState } from 'react'; import { useParams } from 'react-router'; import { ExamPlayer } from '../../../components/exam';  /**
+### D:\Project\NamThuEdu\frontend\src\app\layouts\AdminLayout.tsx
+import { useState, useEffect, useCallback, Suspense } from "react"; import { Link, useLocation, Outlet, useNavigate } from "react-router"; import {   LayoutDashboard,   Users,
+### D:\Project\NamThuEdu\frontend\src\app\layouts\AdultsLayout.tsx
+/**  * Adults Layout — Sidebar dành cho người đi làm (18+)  *  * Nguyên tắc UI/UX:  *  - Restrained accent: cam chỉ dùng cho active indicator (thanh trái + soft bg + text)
+### D:\Project\NamThuEdu\frontend\src\app\layouts\index.ts
+export { TeacherLayout } from './TeacherLayout'; export { StudentLayout } from './StudentLayout'; export { AdminLayout } from './AdminLayout';
+### D:\Project\NamThuEdu\frontend\src\app\layouts\KidsLayout.tsx
+/**  * Kids Layout - Giao diện dành cho trẻ em (6-12 tuổi)  *  * Đặc điểm:  * - Thanh điều hướng NGANG ở trên cùng (sticky), dùng chung desktop + mobile
+### D:\Project\NamThuEdu\frontend\src\app\layouts\StudentLayout.tsx
+import { useState, useEffect } from "react"; import { Outlet, useLocation } from "react-router"; import { StudentNavbar } from "../components/student/StudentNavbar"; import { usePushNotification } from "../../hooks/usePushNotification"; import { usePwaInstall } from "../../hooks/usePwaInstall";
+### D:\Project\NamThuEdu\frontend\src\app\layouts\TeacherLayout.tsx
+import { Outlet, useLocation } from "react-router"; import { Sidebar } from "../components/shared/Sidebar"; import { Header } from "../components/shared/Header"; import { SidebarProvider, useSidebar } from "../../contexts/SidebarContext"; import {
+### D:\Project\NamThuEdu\frontend\src\app\layouts\TeensLayout.tsx
+import { useState, useEffect, useRef } from 'react'; import { Outlet, useNavigate, useLocation } from 'react-router'; import { useQuery } from '@tanstack/react-query'; import { usePushNotification } from '../../hooks/usePushNotification'; import { usePwaInstall } from '../../hooks/usePwaInstall';
+### D:\Project\NamThuEdu\frontend\src\app\routes.tsx
+/**  * routes.tsx — Entry point tổng hợp tất cả route của ứng dụng.  *  * Cấu trúc 3 role:  *  - Teacher  → base path "/giao-vien" → TeacherLayout (sidebar #2563EB)
+### D:\Project\NamThuEdu\frontend\src\app\routes\adminPreviewRoutes.tsx
+/**  * adminPreviewRoutes — Route "Xem trước đề" cho admin.  *  * Khác các route admin thường: KHÔNG bọc trong AdminLayout (sidebar) mà render  * full-screen đúng UI học viên sẽ thấy khi thi. Vẫn bảo vệ bằng
+### D:\Project\NamThuEdu\frontend\src\app\routes\adminRoutes.tsx
+/**  * adminRoutes — Tất cả route dành cho admin.  * Base path: "/admin" — Layout: AdminLayout (sidebar dark slate).  * Tất cả page đều lazy-loaded để Suspense fallback (AdminPageSkeleton)  * trong AdminLayout hiển thị khung skeleton khi chuyển trang.
+### D:\Project\NamThuEdu\frontend\src\app\routes\authRoutes.tsx
+/**  * Authentication Routes  *   * Organized by role:  * - Student: /dang-nhap, /dang-ky
+### D:\Project\NamThuEdu\frontend\src\app\routes\StudentProtectedRoute.tsx
+import React from 'react'; import { Navigate } from 'react-router-dom'; import { getAuthToken, getAuthUser, clearAuthData } from '../../utils/authStorage';  interface StudentProtectedRouteProps {
+### D:\Project\NamThuEdu\frontend\src\app\routes\studentRoutes.tsx
+import { lazy, Suspense, useEffect, useState } from 'react'; import { Navigate, RouteObject, useLocation, useParams, useRouteError } from 'react-router'; import { ProtectedRoute } from '../../components/auth'; import { StudentLayout } from '../layouts/StudentLayout'; import { KidsLayout } from '../layouts/KidsLayout';
+### D:\Project\NamThuEdu\frontend\src\app\routes\teacherRoutes.tsx
+/**  * teacherRoutes — Tất cả route dành cho giáo viên.  * Base path: "/giao-vien" — Layout: TeacherLayout (sidebar xanh dương).  *   * ✅ Protected by authentication - requires teacher role
+### D:\Project\NamThuEdu\frontend\src\components\adaptive\AdaptiveButton.tsx
+/**  * Adaptive Button Component  *   * Button that adapts its size, style, and behavior based on age group  */
+### D:\Project\NamThuEdu\frontend\src\components\adaptive\AdaptiveCard.tsx
+/**  * Adaptive Card Component  *   * Card that adapts its padding, border radius, and shadow based on age group  */
+### D:\Project\NamThuEdu\frontend\src\components\adaptive\AdaptiveComponentsDemo.tsx
+/**  * Adaptive Components Demo  *   * Demonstrates all adaptive components with different age group themes  */
+### D:\Project\NamThuEdu\frontend\src\components\adaptive\AdaptiveIcon.tsx
+/**  * Adaptive Icon Component  *   * Icon wrapper that adapts size based on age group  */
+### D:\Project\NamThuEdu\frontend\src\components\adaptive\AdaptiveLayout.tsx
+/**  * Adaptive Layout Components  *   * Layout components that adapt grid columns and spacing based on age group  */
+### D:\Project\NamThuEdu\frontend\src\components\adaptive\AdaptiveTypography.tsx
+/**  * Adaptive Typography Components  *   * Typography components that adapt font size, weight, and family based on age group  */
+### D:\Project\NamThuEdu\frontend\src\components\adaptive\index.ts
+/**  * Adaptive Components Index  *   * Export all adaptive components  */
+### D:\Project\NamThuEdu\frontend\src\components\auth\AuthGuard.tsx
+/**  * AuthGuard — Bảo vệ trang login/register.  *  * Nếu user đã đăng nhập (với đúng role), tự redirect về dashboard tương ứng.  * Dùng để bọc các trang: /dang-nhap, /giao-vien/dang-nhap, /admin/login.
+### D:\Project\NamThuEdu\frontend\src\components\auth\index.ts
+export { ProtectedRoute } from './ProtectedRoute'; export { AuthGuard } from './AuthGuard';
+### D:\Project\NamThuEdu\frontend\src\components\auth\ProtectedRoute.tsx
+/**  * ProtectedRoute - Auth Guard Component  *  * Synchronous check (no flash) — reads localStorage immediately.  * - Not authenticated → redirect to role-specific login page.
+### D:\Project\NamThuEdu\frontend\src\components\debug\AuthDebug.tsx
+import { useState } from 'react'; import { teacherApi } from '../../services/teacherApi';  export function AuthDebug() {   const [debugInfo, setDebugInfo] = useState<any>(null);
+### D:\Project\NamThuEdu\frontend\src\components\exam\examComponents.test.tsx
+import { describe, it, expect, vi } from 'vitest'; import { render, screen, fireEvent } from '@testing-library/react'; import { SaveStatusIndicator } from './SaveStatusIndicator'; import { OfflineBanner } from './OfflineBanner'; import { ResumeExamModal } from './ResumeExamModal';
+### D:\Project\NamThuEdu\frontend\src\components\exam\ExamPlayer.tsx
+import { useState } from 'react'; import { ArrowLeft, Clock, Undo2 } from 'lucide-react'; import { ExamPlayerProps } from '../../types/exam'; import { useExamData, useAnswerTracking, useLineDrawing, useMediaUpload } from '../../hooks/exam'; import { groupQuestionsByPart, getPartInfo, getActualTaskType, getTaskTypeName } from '../../utils/examDataExtractor';
+### D:\Project\NamThuEdu\frontend\src\components\exam\index.ts
+export { ExamPlayer } from './ExamPlayer'; export { QuestionRenderer } from './QuestionRenderer'; export * from './questions'; export {   SaveStatusIndicator,
+### D:\Project\NamThuEdu\frontend\src\components\exam\MultiTabWarning.tsx
+/**  * MultiTabWarning  * ---------------  * Hiển thị cảnh báo khi BroadcastChannel phát hiện một tab khác cũng đang  * mở cùng `submissionId`. Đa tab nguy hiểm vì:
+### D:\Project\NamThuEdu\frontend\src\components\exam\OfflineBanner.tsx
+/**  * OfflineBanner  * -------------  * Banner đỏ gắn trên đầu trang khi mất kết nối Internet.  *
+### D:\Project\NamThuEdu\frontend\src\components\exam\QuestionRenderer.tsx
+import React from 'react'; import { QuestionRendererProps } from '../../types/exam'; import { getActualTaskType, extractTaskData } from '../../utils/examDataExtractor'; import {   ListenAndDrawLines,
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\ClozeTest.tsx
+import { getFullMediaUrl } from '../../../utils/mediaUtils';  interface ClozeTestProps {   question: any;   taskData: any;
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\DefaultQuestion.tsx
+import { Volume2 } from 'lucide-react'; import { QuestionRendererProps } from '../../../types/exam'; import { extractTaskData } from '../../../utils/examDataExtractor'; import { getFullMediaUrl } from '../../../utils/mediaUtils';
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\DialogueMatching.tsx
+interface DialogueMatchingProps {   question: any;   taskData: any;   interactiveMode: boolean;   userAnswer?: any;
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\FindDifferences.tsx
+import { getFullMediaUrl } from '../../../utils/mediaUtils'; import { Plus, Trash2 } from 'lucide-react';  /**  * FindDifferences — "Tìm điểm khác nhau giữa 2 bức tranh".
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\index.ts
+/**  * Question renderer components  * Each component handles a specific task type  */
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\InformationExchange.tsx
+import { getFullMediaUrl } from '../../../utils/mediaUtils';  interface InformationExchangeProps {   question: any;   taskData: any;
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\ListenAndDrawLines.tsx
+import { useState } from 'react'; import { Volume2 } from 'lucide-react'; import { QuestionRendererProps } from '../../../types/exam'; import { extractTaskData } from '../../../utils/examDataExtractor'; import { getFullMediaUrl } from '../../../utils/mediaUtils';
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\ListenAndTick.tsx
+import { Volume2 } from 'lucide-react'; import { QuestionRendererProps } from '../../../types/exam'; import { extractTaskData } from '../../../utils/examDataExtractor'; import { getFullMediaUrl } from '../../../utils/mediaUtils';
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\ListenAndWrite.tsx
+import { Volume2 } from 'lucide-react'; import { QuestionRendererProps } from '../../../types/exam'; import { extractTaskData } from '../../../utils/examDataExtractor'; import { getFullMediaUrl } from '../../../utils/mediaUtils';
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\ListenColourWrite.tsx
+import { Volume2 } from 'lucide-react'; import { getFullMediaUrl } from '../../../utils/mediaUtils';  interface ListenColourWriteProps {   question: any;
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\ListeningLetterMatch.tsx
+import { Volume2 } from 'lucide-react'; import { getFullMediaUrl } from '../../../utils/mediaUtils';  interface ListeningLetterMatchProps {   question: any;
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\LookAndRead.tsx
+import { QuestionRendererProps } from '../../../types/exam'; import { extractTaskData } from '../../../utils/examDataExtractor'; import { getFullMediaUrl } from '../../../utils/mediaUtils';  export function LookAndRead({
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\LookReadWrite.tsx
+import { QuestionRendererProps } from '../../../types/exam'; import { extractTaskData } from '../../../utils/examDataExtractor'; import { getFullMediaUrl } from '../../../utils/mediaUtils';  export function LookReadWrite({
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\ObjectPlacement.tsx
+import { getFullMediaUrl } from '../../../utils/mediaUtils';  /**  * ObjectPlacement — "Đặt đồ vật vào đúng vị trí".  * Player học viên không có hạ tầng kéo–thả → cho mỗi vật chọn vị trí (nếu có
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\OddOneOut.tsx
+import { getFullMediaUrl } from '../../../utils/mediaUtils'; import { CheckCircle2 } from 'lucide-react';  /**  * OddOneOut — "Tìm đồ vật khác nhóm".
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\OpenCloze.tsx
+import { getFullMediaUrl } from '../../../utils/mediaUtils';  interface OpenClozeProps {   question: any;   taskData: any;
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\PictureCardQuestions.tsx
+import { getFullMediaUrl } from '../../../utils/mediaUtils';  /**  * PictureCardQuestions — "Nhìn thẻ hình và trả lời".  * Mỗi thẻ có 1 ô nhập câu trả lời → lưu { [cardIdx]: string }.
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\PictureQuestions.tsx
+import { getFullMediaUrl } from '../../../utils/mediaUtils';  interface PictureQuestionsProps {   question: any;   taskData: any;
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\PictureSentenceWriting.tsx
+import { getFullMediaUrl } from '../../../utils/mediaUtils';  interface PictureSentenceWritingProps {   question: any;   taskData: any;
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\PictureStoryNarration.tsx
+import { getFullMediaUrl } from '../../../utils/mediaUtils';  /**  * PictureStoryNarration — "Nhìn tranh và kể chuyện".  * Học viên gõ câu chuyện của mình → lưu { story: string }.
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\PictureStoryWriting.tsx
+import { getFullMediaUrl } from '../../../utils/mediaUtils';  interface PictureStoryWritingProps {   question: any;   taskData: any;
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\ReadingComprehension.tsx
+interface ReadingComprehensionProps {   question: any;   taskData: any;   interactiveMode: boolean;   userAnswer?: any;
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\StoryCompletion.tsx
+interface StoryCompletionProps {   question: any;   taskData: any;   interactiveMode: boolean;   userAnswer?: any;
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\UnscrambleWords.tsx
+import { getFullMediaUrl } from '../../../utils/mediaUtils';  interface UnscrambleWordsProps {   question: any;   taskData: any;
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\WordBankFill.tsx
+import { QuestionRendererProps } from '../../../types/exam'; import { extractTaskData } from '../../../utils/examDataExtractor'; import { getFullMediaUrl } from '../../../utils/mediaUtils';  export function WordBankFill({
+### D:\Project\NamThuEdu\frontend\src\components\exam\questions\WordDefinitionMatching.tsx
+interface WordDefinitionMatchingProps {   question: any;   taskData: any;   interactiveMode: boolean;   userAnswer?: any;
+### D:\Project\NamThuEdu\frontend\src\components\exam\ResumeExamModal.tsx
+/**  * ResumeExamModal  * ---------------  * Modal hiển thị khi user truy cập trang TestTaking với một submission đã có  * draft localStorage. Hỏi: "Bạn có bài thi đang dở, tiếp tục từ chỗ cũ?".
+### D:\Project\NamThuEdu\frontend\src\components\exam\SaveStatusIndicator.tsx
+/**  * SaveStatusIndicator  * -------------------  * Pill nhỏ hiển thị trạng thái auto-save kế bên timer.  *
+### D:\Project\NamThuEdu\frontend\src\components\exam\TimeWarningBanner.tsx
+import React from 'react'; import { Timer, AlertTriangle, Zap } from 'lucide-react';  export type TimeWarningLevel = null | '5min' | '1min' | '10sec';
+### D:\Project\NamThuEdu\frontend\src\components\gamification\BadgeDisplay.tsx
+/**  * Badge Display Component  *   * Displays badges/achievements with age-appropriate styling  */
+### D:\Project\NamThuEdu\frontend\src\components\gamification\index.ts
+/**  * Gamification Components  *   * Age-appropriate gamification elements  */
+### D:\Project\NamThuEdu\frontend\src\components\gamification\ProgressTracker.tsx
+/**  * Progress Tracker Component  *   * Displays learning progress with age-appropriate visualization  */
+### D:\Project\NamThuEdu\frontend\src\components\gamification\StreakDisplay.tsx
+/**  * Streak Display Component  *   * Shows learning streak with age-appropriate styling  */
+### D:\Project\NamThuEdu\frontend\src\components\NotificationPermissionBanner.tsx
+import { Bell, X } from 'lucide-react'; import { useState } from 'react'; import { UsePushNotificationReturn } from '../hooks/usePushNotification';  interface Props {
+### D:\Project\NamThuEdu\frontend\src\components\PwaInstallBanner.tsx
+import { useState } from 'react'; import { Smartphone, X } from 'lucide-react'; import { UsePwaInstallReturn } from '../hooks/usePwaInstall';  interface Props {
+### D:\Project\NamThuEdu\frontend\src\components\shared\BlogSEO.tsx
+import { Helmet } from "react-helmet-async";  const SITE_NAME = "NamThuEdu"; const SITE_URL = "https://namthuedu.vn"; const DEFAULT_IMAGE = "/images/banner.png";
+### D:\Project\NamThuEdu\frontend\src\components\shared\ErrorHandler.tsx
+import { AxiosError } from 'axios'; import { toast } from '../../lib/toast'; import { ValidationError } from '../../types/teacher';  /**
+### D:\Project\NamThuEdu\frontend\src\components\shared\LogoutOverlay.tsx
+/**  * LogoutOverlay — Hiệu ứng chuyển trang khi đăng xuất.  *  * Tái sử dụng animation của màn hình đăng nhập thành công (loginAnimations.css):  * vòng tròn vẽ dần + dấu check, chỉ thay đổi text cho phù hợp ngữ cảnh đăng xuất.
+### D:\Project\NamThuEdu\frontend\src\components\student\DailyMotivationPopup.tsx
+/**  * DailyMotivationPopup — popup "buff tinh thần" + nhắc nhở, hiện 1 LẦN/NGÀY  * vào lần đầu học viên mở app trong ngày.  *  * - Chỉ hiện 1 lần mỗi ngày (lưu cờ theo userId + ngày vào localStorage).
+### D:\Project\NamThuEdu\frontend\src\components\student\ExamReminderPopup.tsx
+import { useEffect, useState } from "react"; import { motion, AnimatePresence } from "framer-motion"; import { CalendarClock, Clock, MapPin, Sparkles, X, Flame, BookOpen } from "lucide-react"; import { studentApi, type ExamSchedule } from "../../services/studentApi"; import { getAuthUser } from "../../utils/authStorage";
+### D:\Project\NamThuEdu\frontend\src\components\theme\index.ts
+/**  * Theme Components Index  *   * Export all theme-related components  */
+### D:\Project\NamThuEdu\frontend\src\components\theme\ThemeDemo.tsx
+/**  * Theme Demo Component  *   * Demonstrates theme-aware components and styling  */
+### D:\Project\NamThuEdu\frontend\src\components\theme\ThemeSwitcher.tsx
+/**  * Theme Switcher Component  *   * UI component to switch between themes and age groups  */
+### D:\Project\NamThuEdu\frontend\src\components\ui\index.ts
+export { Toast } from "./Toast"; export { ToastContainer } from "./ToastContainer"; export type { ToastType, ToastProps } from "./Toast";
+### D:\Project\NamThuEdu\frontend\src\components\ui\QuillEditor.tsx
+import { forwardRef, useRef } from 'react'; import ReactQuill from 'react-quill-new'; import 'react-quill-new/dist/quill.snow.css';  interface QuillEditorProps {
+### D:\Project\NamThuEdu\frontend\src\components\ui\Skeleton.tsx
+/**  * Skeleton Component  *   * Reusable skeleton loading component for better UX  * Shows placeholder while content is loading
+### D:\Project\NamThuEdu\frontend\src\components\ui\Toast.tsx
+import { useEffect, useState } from "react"; import { CheckCircle2, XCircle, AlertCircle, Info, X } from "lucide-react";  export type ToastType = "success" | "error" | "warning" | "info";
+### D:\Project\NamThuEdu\frontend\src\components\ui\ToastContainer.tsx
+import { Toast, ToastProps } from "./Toast";  interface ToastContainerProps {   toasts: Omit<ToastProps, "onClose">[];   onClose: (id: string) => void;
+### D:\Project\NamThuEdu\frontend\src\contexts\SidebarContext.tsx
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';  interface SidebarContextType {   isCollapsed: boolean;   toggle: () => void;
+### D:\Project\NamThuEdu\frontend\src\contexts\TeacherHeaderContext.tsx
+import {   createContext,   useContext,   useEffect,   useMemo,
+### D:\Project\NamThuEdu\frontend\src\contexts\ThemeContext.tsx
+/**  * Theme Context  *   * Provides theme state and management to the entire application  */
+### D:\Project\NamThuEdu\frontend\src\contexts\ToastContext.tsx
+import React, { createContext, useContext } from 'react'; import { useToast } from '../hooks/useToast'; import { ToastContainer } from '../components/ui/ToastContainer';  interface ToastContextType {
+### D:\Project\NamThuEdu\frontend\src\hooks\exam\index.ts
+export { useExamData } from './useExamData'; export { useAnswerTracking } from './useAnswerTracking'; export { useLineDrawing } from './useLineDrawing'; export { useMediaUpload } from './useMediaUpload'; export {
+### D:\Project\NamThuEdu\frontend\src\hooks\exam\useAnswerTracking.ts
+import { useState, useCallback } from 'react';  export function useAnswerTracking() {   const [answers, setAnswers] = useState<{ [questionId: number]: any }>({});
+### D:\Project\NamThuEdu\frontend\src\hooks\exam\useExamData.ts
+import { useState, useEffect } from 'react'; import { getKidsExam } from '../../services/kidsExamApi'; import { ExamData } from '../../types/exam';  export function useExamData(examId: number) {
+### D:\Project\NamThuEdu\frontend\src\hooks\exam\useExamSession.test.ts
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'; import { renderHook, act, waitFor } from '@testing-library/react'; import { useExamSession } from './useExamSession'; import { studentApi } from '../../services/studentApi'; import { examDraftStorage } from '../../lib/exam/examDraftStorage';
+### D:\Project\NamThuEdu\frontend\src\hooks\exam\useExamSession.ts
+/**  * useExamSession  * --------------  * Hook tổng cho mọi trang test taking — gói gọn auto-save, auto-submit,  * heartbeat, đếm ngược server-truth, đa tab và unload handling.
+### D:\Project\NamThuEdu\frontend\src\hooks\exam\useLineDrawing.ts
+import { useState, useCallback } from 'react';  export function useLineDrawing() {   const [imageRefs, setImageRefs] = useState<{ [questionId: number]: HTMLImageElement | null }>({});   const [labelRefs, setLabelRefs] = useState<{ [key: string]: HTMLDivElement | null }>({});
+### D:\Project\NamThuEdu\frontend\src\hooks\exam\useMediaUpload.ts
+import { useState, useCallback } from 'react';  export function useMediaUpload() {   const [uploadedImages, setUploadedImages] = useState<{ [key: string]: File }>({});
+### D:\Project\NamThuEdu\frontend\src\hooks\exam\useTextHighlight.ts
+/**  * Hook quản lý text highlighting cho bài đọc IELTS  * Lưu highlights vào localStorage để persist qua F5  */ import { useState, useEffect, useCallback } from 'react';
+### D:\Project\NamThuEdu\frontend\src\hooks\index.ts
+export { useToast } from "./useToast"; export { useAgeGroup } from "./useAgeGroup"; export { useAgeGroupSync } from "./useAgeGroupSync"; export { useDebounce } from "./useDebounce"; export { useLocalStorage } from "./useLocalStorage";
+### D:\Project\NamThuEdu\frontend\src\hooks\useAgeGroup.ts
+/**  * useAgeGroup Hook  *   * Hook to manage age group and theme preferences  */
+### D:\Project\NamThuEdu\frontend\src\hooks\useAgeGroupSync.ts
+/**  * useAgeGroupSync Hook  *   * Hook to sync age group and theme preference with backend  */
+### D:\Project\NamThuEdu\frontend\src\hooks\useAssignmentProgress.ts
+import { useState, useEffect, useCallback } from 'react'; import { api } from '@/services/api';  export interface Assignment {   taId: number;
+### D:\Project\NamThuEdu\frontend\src\hooks\useBlog.ts
+import { useState, useCallback } from "react"; import { teacherBlogApi, Blog, CreateBlogDto, BlogFilters } from "../services/blogApi";  interface UseBlogReturn {   blogs: Blog[];
+### D:\Project\NamThuEdu\frontend\src\hooks\useClassReport.ts
+import { useState, useEffect, useCallback } from 'react'; import { api } from '@/services/api';  export interface ClassInfo {   cId: number;
+### D:\Project\NamThuEdu\frontend\src\hooks\useDebounce.ts
+import { useEffect, useState } from 'react';  /**  * Debounce hook  * Delays updating the value until after the specified delay
+### D:\Project\NamThuEdu\frontend\src\hooks\useGradingStats.ts
+import { useState, useEffect, useCallback } from 'react'; import { api } from '@/services/api';  export interface TrendPoint { date: string; graded: number; } export interface TopStudent  { name: string; avatar_url?: string | null; user_id?: number; count: number; avg: number; }
+### D:\Project\NamThuEdu\frontend\src\hooks\useLocalStorage.ts
+import { useState, useEffect } from 'react';  /**  * Local storage hook with type safety  */
+### D:\Project\NamThuEdu\frontend\src\hooks\useNotificationSound.ts
+import { useCallback, useRef } from "react";  const LS_KEY = "notification_sound_enabled"; const DEBOUNCE_MS = 2000; // Minimum gap between two sounds
+### D:\Project\NamThuEdu\frontend\src\hooks\usePageTitle.ts
+/**  * usePageTitle — Hook để set document.title động cho từng trang.  *  * Quy tắc:  * - Trang public (landing, login): "Tên trang | NamThu Edu"
+### D:\Project\NamThuEdu\frontend\src\hooks\usePracticeSessions.ts
+import { useState, useEffect, useCallback } from 'react'; import { api } from '@/services/api';  export interface PracticeSession {   ps_id: number;
+### D:\Project\NamThuEdu\frontend\src\hooks\usePushNotification.ts
+import { useEffect, useState } from 'react'; import { getApiUrl } from '../utils/apiConfig'; import { getAuthToken } from '../utils/authStorage';  function urlBase64ToUint8Array(base64String: string): Uint8Array {
+### D:\Project\NamThuEdu\frontend\src\hooks\usePwaInstall.ts
+import { useEffect, useState } from 'react';  interface BeforeInstallPromptEvent extends Event {   prompt: () => Promise<void>;   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+### D:\Project\NamThuEdu\frontend\src\hooks\useStudentDashboardData.ts
+/**  * useStudentDashboardData  *  * Hook dùng chung cho TeensDashboard và AdultsDashboard.  *
+### D:\Project\NamThuEdu\frontend\src\hooks\useTeacherApi.ts
+import { useState, useEffect, useCallback, useRef } from 'react'; import { AxiosError } from 'axios'; import { ApiResponse } from '../types/teacher'; import { handleApiError, logError } from '../components/shared/ErrorHandler';
+### D:\Project\NamThuEdu\frontend\src\hooks\useTeacherReports.ts
+import { useState, useEffect, useCallback } from 'react'; import { api } from '@/services/api';  // Types export interface TrendPoint {
+### D:\Project\NamThuEdu\frontend\src\hooks\useTheme.ts
+/**  * useTheme Hook  *   * Convenient hook to access theme values and utilities  */
+### D:\Project\NamThuEdu\frontend\src\hooks\useToast.ts
+import { useState, useCallback } from "react"; import { ToastType } from "../components/ui/Toast";  interface Toast {   id: string;
+### D:\Project\NamThuEdu\frontend\src\i18n.ts
+import i18n from "i18next"; import { initReactI18next } from "react-i18next";  // ── Vietnamese ───────────────────────────────────────────────────────────── import viCommon from "./locales/vi/common.json";
+### D:\Project\NamThuEdu\frontend\src\lib\api.ts
+http://localhost:5173/hoc-vienimport { env } from '@/utils/env';  /**  * API client configuration  */
+### D:\Project\NamThuEdu\frontend\src\lib\exam\examDraftStorage.test.ts
+import { describe, it, expect, beforeEach, vi } from 'vitest'; import {   load,   save,   patchAnswers,
+### D:\Project\NamThuEdu\frontend\src\lib\exam\examDraftStorage.ts
+/**  * examDraftStorage  * ----------------  * Lớp lưu trữ phía client cho trạng thái bài thi đang làm dở.  *
+### D:\Project\NamThuEdu\frontend\src\lib\toast.ts
+import type { CSSProperties } from 'react';  export type ToastId = string | number;  type ToastAction = {
+### D:\Project\NamThuEdu\frontend\src\main.tsx
+import { createRoot } from "react-dom/client"; import { HelmetProvider } from "react-helmet-async"; import App from "./app/App.tsx"; import "./styles/index.css"; import "./i18n"; // Import i18n config
+### D:\Project\NamThuEdu\frontend\src\services\adminApi.ts
+import { api } from "./api"; import type { ApiResponse } from "../types/index";  export interface AdminUser {   uId?: number;
+### D:\Project\NamThuEdu\frontend\src\services\ageGroupApi.ts
+/**  * Age Group API Service  *   * API calls for age group and theme preference management  */
+### D:\Project\NamThuEdu\frontend\src\services\api.ts
+import axios, { AxiosError, InternalAxiosRequestConfig, AxiosResponse } from 'axios'; import { getAuthToken, clearAuthData } from '../utils/authStorage';  const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL; const API_TIMEOUT = Number(import.meta.env.VITE_API_TIMEOUT) || 30000;
+### D:\Project\NamThuEdu\frontend\src\services\authApi.ts
+/**  * Authentication API Service  *   * Handles user authentication operations including login, register, and profile  */
+### D:\Project\NamThuEdu\frontend\src\services\blogApi.ts
+import { api } from './api'; import type { ApiResponse } from '../types/index';  // Types export interface CreateBlogDto {
+### D:\Project\NamThuEdu\frontend\src\services\classMgmtApi.test.ts
+/**  * Unit tests cho classMgmtApi / adminHandoverApi / studentGoalApi.  * Mock module './api' (axios instance) và xác nhận mỗi method gọi đúng  * endpoint + HTTP method, đồng thời unwrap `.data` từ response.  */
+### D:\Project\NamThuEdu\frontend\src\services\classMgmtApi.ts
+import { api } from './api';  /**  * Service cho tính năng Teacher Class Management.  * Gọi trực tiếp api (axios) — trả về body { status, data, message }.
+### D:\Project\NamThuEdu\frontend\src\services\examGroupsApi.ts
+import { api } from './api';  export interface ExamSummary {   eId: number;   eTitle: string;
+### D:\Project\NamThuEdu\frontend\src\services\gradingApi.ts
+import { api } from "./api";  /**  * AI-Assisted Grading Review API client.  *
+### D:\Project\NamThuEdu\frontend\src\services\groqApi.ts
+/**  * Groq AI API Service  * Sử dụng Groq API để generate gợi ý cho VSTEP Speaking và parse PDF đề thi  */
+### D:\Project\NamThuEdu\frontend\src\services\kidsExamApi.ts
+import { api } from './api';  export interface KidsExamType {   id: number;   code: string;
+### D:\Project\NamThuEdu\frontend\src\services\mockData.ts
+// Mock data for testing UI without backend  export const mockTestAssignments = {   status: "success",   data: {
+### D:\Project\NamThuEdu\frontend\src\services\publicApi.ts
+import { api } from "./api"; import type { ApiResponse } from "../types/index";  export interface PublicTest {   id: number;
+### D:\Project\NamThuEdu\frontend\src\services\speakerDiarization.ts
+/**  * Speaker diarization 2-speaker (heuristic, browser-only, free).  *  * Cách làm:  *  1. Đầu vào: AudioBuffer (đã decode 16kHz mono) + chunks có timestamps từ Whisper
+### D:\Project\NamThuEdu\frontend\src\services\studentApi.ts
+import { api } from './api'; import { getAuthToken } from '../utils/authStorage';  export interface TestAssignment {   assignment_id: number;
+### D:\Project\NamThuEdu\frontend\src\services\teacherActivityLog.ts
+/**  * Teacher activity log helper — gọi mỗi khi giáo viên hoàn tất một action  * (tạo đề, sửa, giao bài, chấm điểm, thêm học viên, đăng bài...).  *  * Cách dùng:
+### D:\Project\NamThuEdu\frontend\src\services\teacherApi.test.ts
+/**  * Teacher API Service Tests  *   * Tests for the teacherApi service layer to verify:  * - Axios instance configuration
+### D:\Project\NamThuEdu\frontend\src\services\teacherApi.ts
+import { api } from './api'; import {   ApiResponse,   PaginatedResponse,   TestStatistics,
+### D:\Project\NamThuEdu\frontend\src\services\thptGradingApi.ts
+import { api } from './api';  /**  * THPT (Teens) teacher grading API client.  *
+### D:\Project\NamThuEdu\frontend\src\services\vstepApi.ts
+import { api } from './api';  export interface VstepPartData {   partNumber: number;   partName: string;
+### D:\Project\NamThuEdu\frontend\src\services\whisperLocal.ts
+/**  * Whisper Local STT — chạy hoàn toàn trong browser, không cần API key.  * Dùng @huggingface/transformers (transformers.js v3) + ONNX runtime web.  *  * Model mặc định: Xenova/whisper-tiny.en (~40MB, tiếng Anh)
+### D:\Project\NamThuEdu\frontend\src\services\whisperWorker.ts
+/// <reference lib="webworker" /> /**  * Whisper Web Worker — chạy inference ONNX ở luồng nền để KHÔNG treo UI.  *  * Toàn bộ phần nặng (load model + transcribe) chạy trong worker này.
+### D:\Project\NamThuEdu\frontend\src\test\setup.ts
+import { expect, afterEach, vi } from 'vitest'; import { cleanup } from '@testing-library/react'; import '@testing-library/jest-dom';  // Cleanup after each test
+### D:\Project\NamThuEdu\frontend\src\themes\adults.theme.ts
+/**  * Adults Theme (18-45 tuổi)  *   * Style: Trust & Authority - Professional, minimalist  * Colors: Professional, muted, clean
+### D:\Project\NamThuEdu\frontend\src\themes\index.ts
+/**  * Theme System Index  *   * Central export point for all theme configurations  */
+### D:\Project\NamThuEdu\frontend\src\themes\kids.theme.ts
+/**  * Kids Theme (6-12 tuổi)  *   * Style: Claymorphism - Soft 3D, playful, toy-like  * Colors: Bright, saturated, energetic
+### D:\Project\NamThuEdu\frontend\src\themes\teens.theme.ts
+/**  * Teens Theme (13-17 tuổi)  *   * Style: Glassmorphism - Modern, frosted glass, layered  * Colors: Modern, trendy, not too childish
+### D:\Project\NamThuEdu\frontend\src\themes\themeUtils.ts
+/**  * Theme Utilities  *   * Helper functions for theme management and CSS variable injection  */
+### D:\Project\NamThuEdu\frontend\src\themes\types.ts
+/**  * Theme Type Definitions  *   * TypeScript interfaces for theme configuration  */
+### D:\Project\NamThuEdu\frontend\src\types\env.d.ts
+/// <reference types="vite/client" />  interface ImportMetaEnv {   // API Configuration   readonly VITE_API_URL: string;
+### D:\Project\NamThuEdu\frontend\src\types\exam.ts
+/**  * Shared types for Exam Player  * Used by both teacher preview and student exam pages  */
+### D:\Project\NamThuEdu\frontend\src\types\index.ts
+// Common types used across the application  export interface User {   id: string;   name: string;
+### D:\Project\NamThuEdu\frontend\src\types\teacher.ts
+/**  * TypeScript Type Definitions for Teacher API  * Comprehensive interfaces for all teacher-related data structures  */
+### D:\Project\NamThuEdu\frontend\src\types\thpt.ts
+/**  * THPT / THCS — Đề thi Tiếng Anh phổ thông Việt Nam (linh hoạt theo section).  *  * Một đề = nhiều "section" động (không cố định 4 part).  * Mỗi section có `type` quyết định dạng câu hỏi + payload riêng.
+### D:\Project\NamThuEdu\frontend\src\utils\ageDetection.ts
+/**  * Age Detection Utilities  *   * Utilities for calculating age and determining age groups  * for UI/UX adaptation system
+### D:\Project\NamThuEdu\frontend\src\utils\apiConfig.ts
+/**  * API Configuration  * Centralized API URL management from environment variables  */
+### D:\Project\NamThuEdu\frontend\src\utils\authStorage.ts
+/**  * authStorage — Centralized auth token storage.  *  * remember = true  → localStorage  (persists across browser sessions)  * remember = false → sessionStorage (cleared when tab/browser closes)
+### D:\Project\NamThuEdu\frontend\src\utils\cacheManager.ts
+/**  * Cache Manager  * In-memory cache with TTL (Time To Live) for API responses  * Supports pattern-based invalidation for efficient cache management  */
+### D:\Project\NamThuEdu\frontend\src\utils\cn.ts
+import { type ClassValue, clsx } from 'clsx'; import { twMerge } from 'tailwind-merge';  /**  * Utility function to merge Tailwind CSS classes
+### D:\Project\NamThuEdu\frontend\src\utils\dateUtils.ts
+/**  * Format a MySQL datetime string ("2026-06-20 18:57:13") to vi-VN locale date.  * Appends +07:00 (Asia/Ho_Chi_Minh) to ensure correct date regardless of browser timezone.  */ export function formatVNDate(dateStr: string | null | undefined): string {
+### D:\Project\NamThuEdu\frontend\src\utils\env.ts
+/**  * Environment configuration utilities  */  export const env = {
+### D:\Project\NamThuEdu\frontend\src\utils\examDataExtractor.ts
+/**  * Utility functions to extract data from kids_task_config  * Handles multiple possible field names and nested structures  */
+### D:\Project\NamThuEdu\frontend\src\utils\examUtils.ts
+/**  * Utility functions for exam calculations  */  /**
+### D:\Project\NamThuEdu\frontend\src\utils\format.ts
+/**  * Formatting utilities  */  /**
+### D:\Project\NamThuEdu\frontend\src\utils\formatters.test.ts
+import { describe, it, expect } from 'vitest'; import {   formatDuration,   formatScore,   formatPercentage,
+### D:\Project\NamThuEdu\frontend\src\utils\formatters.ts
+import { format, formatDistanceToNow, parseISO } from 'date-fns'; import { vi, enUS } from 'date-fns/locale';  export function formatDate(date: string | Date, locale: string = 'vi'): string {   const dateObj = typeof date === 'string' ? parseISO(date) : date;
+### D:\Project\NamThuEdu\frontend\src\utils\gradeHelpers.ts
+export function getGradeBadge(score: number): string {   if (score >= 95) return 'A+';   if (score >= 90) return 'A';   if (score >= 85) return 'B+';   if (score >= 80) return 'B';
+### D:\Project\NamThuEdu\frontend\src\utils\mediaUtils.ts
+/**  * Media URL utilities  * Handles conversion between relative and absolute URLs for media files  */
+### D:\Project\NamThuEdu\frontend\src\utils\skillHelpers.ts
+import { Headphones, Eye, PenTool, Mic } from 'lucide-react';  export const SKILL_COLORS = {   listening: '#8B5CF6',   reading: '#10B981',
+### D:\Project\NamThuEdu\frontend\src\utils\slugUtils.ts
+/**  * Generate URL-friendly slug from Vietnamese text  */ export function generateSlug(text: string): string {   return text
+### D:\Project\NamThuEdu\frontend\src\utils\studentRoleTheme.ts
+/**  * studentRoleTheme — màu đặc trưng theo lứa học viên.  *  * Mỗi role 1 màu riêng để nhận diện:  *  - kids   → cam (orange)
+### D:\Project\NamThuEdu\frontend\src\utils\textFormatUtils.tsx
+import React from 'react';  /**  * Text Formatting Utilities  *
+### D:\Project\NamThuEdu\frontend\src\utils\validation.ts
+/**  * Validation utilities  */  /**

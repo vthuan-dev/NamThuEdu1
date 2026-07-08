@@ -1,0 +1,344 @@
+### D:\Project\NamThuEdu\backend\app\Console\Commands\CleanupDeletedStudents.php
+<?php  namespace App\Console\Commands;  use Illuminate\Console\Command;
+### D:\Project\NamThuEdu\backend\app\Console\Commands\HealSubjectiveScores.php
+<?php  namespace App\Console\Commands;  use Illuminate\Console\Command;
+### D:\Project\NamThuEdu\backend\app\Console\Commands\ProcessExpiredTests.php
+<?php  namespace App\Console\Commands;  use Illuminate\Console\Command;
+### D:\Project\NamThuEdu\backend\app\Console\Commands\SendDailyGoalReminders.php
+<?php  namespace App\Console\Commands;  use Illuminate\Console\Command;
+### D:\Project\NamThuEdu\backend\app\Console\Commands\SendScheduledAssignmentReminders.php
+<?php  namespace App\Console\Commands;  use Illuminate\Console\Command;
+### D:\Project\NamThuEdu\backend\app\Console\Commands\StartWebSocketServer.php
+<?php  namespace App\Console\Commands;  use Illuminate\Console\Command;
+### D:\Project\NamThuEdu\backend\app\Console\Commands\SwitchEnvironment.php
+<?php  namespace App\Console\Commands;  use Illuminate\Console\Command;
+### D:\Project\NamThuEdu\backend\app\Console\Kernel.php
+<?php  namespace App\Console;  use Illuminate\Console\Scheduling\Schedule;
+### D:\Project\NamThuEdu\backend\app\Events\TeacherMonitorEvent.php
+<?php  namespace App\Events;  use Illuminate\Broadcasting\Channel;
+### D:\Project\NamThuEdu\backend\app\Events\TestSessionEvent.php
+<?php  namespace App\Events;  use Illuminate\Broadcasting\Channel;
+### D:\Project\NamThuEdu\backend\app\Exceptions\Handler.php
+<?php  namespace App\Exceptions;  use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+### D:\Project\NamThuEdu\backend\app\Helpers\EnvironmentHelper.php
+<?php  namespace App\Helpers;  class EnvironmentHelper
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\AddressProxyController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\AdminActivityLogController.php
+<?php  namespace App\Http\Controllers;  use App\Models\AdminActivityLog;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\AdminHandoverController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\AdminSystemController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\AgeGroupContentController.php
+<?php  namespace App\Http\Controllers;  use App\Models\Exam;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\AgeGroupController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\ApiDocController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\AuthController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\BlogController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\CategoryController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\ClassAnnouncementController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\ClassController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\ClassGoalController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\ContributorAssetController.php
+<?php  namespace App\Http\Controllers;  use App\Models\ContributorAsset;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\Controller.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\CourseController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\DocsController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\ExamCommentController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\ExamController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\ExamHighlightController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\ExamImportController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\ExamTemplateController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\FileServeController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\FileUploadController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\GamificationTestController.php
+<?php  namespace App\Http\Controllers;  use App\Services\GamificationService;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\GeminiPdfController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\GradingController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\GradingReviewController.php
+<?php  namespace App\Http\Controllers;  use App\Jobs\GradeVstepSubjectiveJob;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\IeltsExamController.php
+<?php  namespace App\Http\Controllers;  use App\Models\Exam;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\KidsExamController.php
+<?php  namespace App\Http\Controllers;  use App\Models\Exam;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\MonitoringController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\NewsController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\PracticeController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\PushController.php
+<?php  namespace App\Http\Controllers;  use App\Models\PushSubscription;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\StaticFileController.php
+
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\StudentAnalyticsController.php
+<?php  namespace App\Http\Controllers;  use App\Models\Submission;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\StudentCourseController.php
+<?php  namespace App\Http\Controllers;  use App\Models\Classes;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\StudentExamController.php
+<?php  namespace App\Http\Controllers;  use App\Services\GamificationService;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\StudentExamScheduleController.php
+<?php  namespace App\Http\Controllers;  use App\Models\StudentExamSchedule;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\StudentExamSessionController.php
+<?php  namespace App\Http\Controllers;  use App\Models\Submission;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\StudentGamificationController.php
+<?php  namespace App\Http\Controllers;  use App\Models\StudentCoin;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\StudentGoalController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\StudentLessonController.php
+<?php  namespace App\Http\Controllers;  use App\Services\GamificationService;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\StudentPracticeController.php
+<?php  namespace App\Http\Controllers;  use App\Models\PracticeSession;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\StudentProfileController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\StudentTestController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\SwaggerController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\SystemReportController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\TeacherActivityLogController.php
+<?php  namespace App\Http\Controllers;  use App\Models\TeacherActivityLog;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\TeacherDashboardController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\TeacherReportController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\TeensExamController.php
+<?php  namespace App\Http\Controllers;  use App\Models\Answer;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\TestAssignmentController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\TestController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\TestExamController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\TestGamificationController.php
+<?php  namespace App\Http\Controllers;  use App\Services\GamificationService;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\TestWebSocketController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\ThptExamController.php
+<?php  namespace App\Http\Controllers;  use App\Models\Exam;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\ThptGradingController.php
+<?php  namespace App\Http\Controllers;  use App\Models\Submission;
+### D:\Project\NamThuEdu\backend\app\Http\Controllers\UserController.php
+<?php  namespace App\Http\Controllers;  use Illuminate\Http\Request;
+### D:\Project\NamThuEdu\backend\app\Http\Kernel.php
+<?php  namespace App\Http;  use Illuminate\Foundation\Http\Kernel as HttpKernel;
+### D:\Project\NamThuEdu\backend\app\Http\Middleware\Authenticate.php
+<?php  namespace App\Http\Middleware;  use Illuminate\Auth\Middleware\Authenticate as Middleware;
+### D:\Project\NamThuEdu\backend\app\Http\Middleware\CheckAdmin.php
+<?php  namespace App\Http\Middleware;  use Closure;
+### D:\Project\NamThuEdu\backend\app\Http\Middleware\CheckFeatureFlag.php
+<?php  namespace App\Http\Middleware;  use Closure;
+### D:\Project\NamThuEdu\backend\app\Http\Middleware\CheckMaintenanceMode.php
+<?php  namespace App\Http\Middleware;  use Closure;
+### D:\Project\NamThuEdu\backend\app\Http\Middleware\CheckRole.php
+<?php  namespace App\Http\Middleware;  use Closure;
+### D:\Project\NamThuEdu\backend\app\Http\Middleware\CorsMiddleware.php
+<?php  namespace App\Http\Middleware;  use Closure;
+### D:\Project\NamThuEdu\backend\app\Http\Middleware\EncryptCookies.php
+<?php  namespace App\Http\Middleware;  use Illuminate\Cookie\Middleware\EncryptCookies as Middleware;
+### D:\Project\NamThuEdu\backend\app\Http\Middleware\LogAdminActivity.php
+<?php  namespace App\Http\Middleware;  use Closure;
+### D:\Project\NamThuEdu\backend\app\Http\Middleware\PreventRequestsDuringMaintenance.php
+<?php  namespace App\Http\Middleware;  use Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance as Middleware;
+### D:\Project\NamThuEdu\backend\app\Http\Middleware\RedirectIfAuthenticated.php
+<?php  namespace App\Http\Middleware;  use App\Providers\RouteServiceProvider;
+### D:\Project\NamThuEdu\backend\app\Http\Middleware\TrimStrings.php
+<?php  namespace App\Http\Middleware;  use Illuminate\Foundation\Http\Middleware\TrimStrings as Middleware;
+### D:\Project\NamThuEdu\backend\app\Http\Middleware\TrustHosts.php
+<?php  namespace App\Http\Middleware;  use Illuminate\Http\Middleware\TrustHosts as Middleware;
+### D:\Project\NamThuEdu\backend\app\Http\Middleware\TrustProxies.php
+<?php  namespace App\Http\Middleware;  use Illuminate\Http\Middleware\TrustProxies as Middleware;
+### D:\Project\NamThuEdu\backend\app\Http\Middleware\VerifyCsrfToken.php
+<?php  namespace App\Http\Middleware;  use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as Middleware;
+### D:\Project\NamThuEdu\backend\app\Http\Requests\Admin\AdminCreateUserRequest.php
+<?php  namespace App\Http\Requests\Admin;  /**
+### D:\Project\NamThuEdu\backend\app\Http\Requests\Admin\AdminFormRequest.php
+<?php  namespace App\Http\Requests\Admin;  use Illuminate\Contracts\Validation\Validator;
+### D:\Project\NamThuEdu\backend\app\Http\Requests\Admin\AdminUpdateUserRequest.php
+<?php  namespace App\Http\Requests\Admin;  /**
+### D:\Project\NamThuEdu\backend\app\Http\Requests\Admin\BulkUserActionRequest.php
+<?php  namespace App\Http\Requests\Admin;  /**
+### D:\Project\NamThuEdu\backend\app\Http\Requests\Admin\ChangeUserRoleRequest.php
+<?php  namespace App\Http\Requests\Admin;  /**
+### D:\Project\NamThuEdu\backend\app\Jobs\GradeThptSpeakingJob.php
+<?php  namespace App\Jobs;  use App\Models\Submission;
+### D:\Project\NamThuEdu\backend\app\Jobs\GradeVstepSubjectiveJob.php
+<?php  namespace App\Jobs;  use App\Models\Submission;
+### D:\Project\NamThuEdu\backend\app\Models\Achievement.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Model;
+### D:\Project\NamThuEdu\backend\app\Models\AdminActivityLog.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Model;
+### D:\Project\NamThuEdu\backend\app\Models\AdminNotification.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\AdminSetting.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\Answer.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\AssetKeyword.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Model;
+### D:\Project\NamThuEdu\backend\app\Models\AssetMetadataHistory.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Model;
+### D:\Project\NamThuEdu\backend\app\Models\AssignmentReminder.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\Badge.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Model;
+### D:\Project\NamThuEdu\backend\app\Models\BlogType.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\Category.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\ClassAnnouncement.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\ClassCoTeacher.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\ClassEnrollment.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\Classes.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\ClassGoal.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\ClassGoalReminderLog.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\ClassHandoverRequest.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\ClassModel.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\ClassTransfer.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\CoinTransaction.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Model;
+### D:\Project\NamThuEdu\backend\app\Models\ContentAnalytics.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\ContentBlock.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Model;
+### D:\Project\NamThuEdu\backend\app\Models\ContentTemplate.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\ContributorAsset.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Model;
+### D:\Project\NamThuEdu\backend\app\Models\Course.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\CourseEnrollment.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\Exam.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\ExamComment.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Model;
+### D:\Project\NamThuEdu\backend\app\Models\ExamHighlight.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Model;
+### D:\Project\NamThuEdu\backend\app\Models\ExamTemplate.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\ExamType.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\ExamVocabNote.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Model;
+### D:\Project\NamThuEdu\backend\app\Models\GradingHistory.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\OtpLog.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\Post.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\PracticeSession.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\PushSubscription.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Model;
+### D:\Project\NamThuEdu\backend\app\Models\Question.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\QuestionBank.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\StudentAchievement.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Model;
+### D:\Project\NamThuEdu\backend\app\Models\StudentCoin.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Model;
+### D:\Project\NamThuEdu\backend\app\Models\StudentExamSchedule.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\StudentGoal.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\StudentGoalAnalysis.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\StudentPoint.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\StudentStats.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Model;
+### D:\Project\NamThuEdu\backend\app\Models\StudentStreak.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Model;
+### D:\Project\NamThuEdu\backend\app\Models\Submission.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\SubmissionAnswer.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\TeacherActivityLog.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Model;
+### D:\Project\NamThuEdu\backend\app\Models\TemplateSection.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\TestAssignment.php
+<?php  namespace App\Models;  use Illuminate\Database\Eloquent\Factories\HasFactory;
+### D:\Project\NamThuEdu\backend\app\Models\User.php
+<?php  namespace App\Models;  use Illuminate\Contracts\Auth\MustVerifyEmail;
+### D:\Project\NamThuEdu\backend\app\Providers\AppServiceProvider.php
+<?php  namespace App\Providers;  use Illuminate\Support\ServiceProvider;
+### D:\Project\NamThuEdu\backend\app\Providers\AuthServiceProvider.php
+<?php  namespace App\Providers;  use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
+### D:\Project\NamThuEdu\backend\app\Providers\BroadcastServiceProvider.php
+<?php  namespace App\Providers;  use Illuminate\Support\Facades\Broadcast;
+### D:\Project\NamThuEdu\backend\app\Providers\EnvironmentServiceProvider.php
+<?php  namespace App\Providers;  use Illuminate\Support\ServiceProvider;
+### D:\Project\NamThuEdu\backend\app\Providers\EventServiceProvider.php
+<?php  namespace App\Providers;  use Illuminate\Auth\Events\Registered;
+### D:\Project\NamThuEdu\backend\app\Providers\RouteServiceProvider.php
+<?php  namespace App\Providers;  use Illuminate\Cache\RateLimiting\Limit;
+### D:\Project\NamThuEdu\backend\app\Services\ClassManagementService.php
+<?php  namespace App\Services;  use App\Models\Classes;
+### D:\Project\NamThuEdu\backend\app\Services\CourseManagementService.php
+<?php  namespace App\Services;  use App\Models\Course;
+### D:\Project\NamThuEdu\backend\app\Services\ExamAutoSubmitService.php
+<?php  namespace App\Services;  use App\Http\Controllers\StudentTestController;
+### D:\Project\NamThuEdu\backend\app\Services\FeatureFlagService.php
+<?php  namespace App\Services;  class FeatureFlagService
+### D:\Project\NamThuEdu\backend\app\Services\GamificationService.php
+<?php  namespace App\Services;  use App\Models\StudentCoin;
+### D:\Project\NamThuEdu\backend\app\Services\GradingReviewService.php
+<?php  namespace App\Services;  use App\Models\GradingHistory;
+### D:\Project\NamThuEdu\backend\app\Services\IELTSGradingService.php
+<?php  namespace App\Services;  use App\Models\Submission;
+### D:\Project\NamThuEdu\backend\app\Services\IELTSService.php
+<?php  namespace App\Services;  use App\Models\Exam;
+### D:\Project\NamThuEdu\backend\app\Services\PracticeService.php
+<?php  namespace App\Services;  use App\Models\Exam;
+### D:\Project\NamThuEdu\backend\app\Services\PushNotificationService.php
+<?php  namespace App\Services;  use App\Models\PushSubscription;
+### D:\Project\NamThuEdu\backend\app\Services\SMS\MockSMSService.php
+<?php  namespace App\Services\SMS;  use Illuminate\Support\Facades\Log;
+### D:\Project\NamThuEdu\backend\app\Services\SMS\SMSServiceInterface.php
+<?php  namespace App\Services\SMS;  interface SMSServiceInterface
+### D:\Project\NamThuEdu\backend\app\Services\StudentGoalAnalysisService.php
+<?php  namespace App\Services;  use App\Models\Submission;
+### D:\Project\NamThuEdu\backend\app\Services\StudentProgressService.php
+<?php  namespace App\Services;  use App\Models\Submission;
+### D:\Project\NamThuEdu\backend\app\Services\TestRecoveryService.php
+<?php  namespace App\Services;  use App\Models\Submission;
+### D:\Project\NamThuEdu\backend\app\Services\TestWebSocketService.php
+<?php  namespace App\Services;  use App\Events\TestSessionEvent;
+### D:\Project\NamThuEdu\backend\app\Services\VstepGradingService.php
+<?php  namespace App\Services;  use App\Models\Submission;
+### D:\Project\NamThuEdu\backend\app\Services\VSTEPService.php
+<?php  namespace App\Services;  use App\Models\Exam;
