@@ -546,7 +546,7 @@ export const CreateVstepListening = ({
     });
     if (serverUrl && examId && !examId.startsWith("vstep-")) {
       try {
-        const latestPart = parts.find((p) => p.partNumber === partNumber);
+        const latestPart = partsRef.current.find((p) => p.partNumber === partNumber);
         const latestSection = latestPart?.sections.find(
           (s) => s.sectionNumber === sectionNumber
         );
@@ -576,6 +576,16 @@ export const CreateVstepListening = ({
         console.log("✅ Auto-save audio response:", resp);
         const layout = VSTEP_LISTENING_LAYOUT[partNumber as 1 | 2 | 3];
         success(`✅ Đã lưu audio ${layout.label} ${sectionNumber} vào DB`);
+
+        // Cập nhật savedSections nếu section này đã có câu hỏi
+        const hasQuestions = latestSection?.questions.some((q) => q.questionText.trim());
+        if (hasQuestions) {
+          setSavedSections((prev) => {
+            const next = new Set(prev);
+            next.add(key);
+            return next;
+          });
+        }
       } catch (err: any) {
         console.error("❌ Auto-save audio metadata failed:", err);
         console.error("Response:", err.response?.data);

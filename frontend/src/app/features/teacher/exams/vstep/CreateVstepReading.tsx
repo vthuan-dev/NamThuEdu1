@@ -346,7 +346,13 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
   };
 
   const countWords = (text: string) => {
-    const plainText = text.replace(/<[^>]*>/g, " ").trim();
+    if (!text) return 0;
+    const plainText = text
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&#160;|&#xA0;/gi, " ")
+      .replace(/[\u00A0\u202F\u2007\u00AD\u200B\u200C\u200D\u2060\uFEFF]/g, " ")
+      .trim();
     return plainText.split(/\s+/).filter((word) => word.length > 0).length;
   };
 

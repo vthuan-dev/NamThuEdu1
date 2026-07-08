@@ -113,7 +113,14 @@ function labelForType(value: string): string {
 }
 
 function countWords(text: string): number {
-  return text.trim().split(/\s+/).filter(Boolean).length;
+  if (!text) return 0;
+  const plainText = text
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&#160;|&#xA0;/gi, " ")
+    .replace(/[\u00A0\u202F\u2007\u00AD\u200B\u200C\u200D\u2060\uFEFF]/g, " ")
+    .trim();
+  return plainText.split(/\s+/).filter(Boolean).length;
 }
 
 let uidCounter = 0;
