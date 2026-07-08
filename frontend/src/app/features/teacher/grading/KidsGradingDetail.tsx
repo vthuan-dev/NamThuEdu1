@@ -353,7 +353,13 @@ export function KidsGradingDetail() {
           <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
-              onClick={() => navigate(-1)}
+              onClick={() => {
+                if (window.history.state && window.history.state.idx > 0) {
+                  navigate(-1);
+                } else {
+                  navigate('/giao-vien/cham-diem');
+                }
+              }}
               className="p-2 rounded-lg hover:bg-slate-100 cursor-pointer transition-colors flex-shrink-0"
               aria-label="Back"
             >

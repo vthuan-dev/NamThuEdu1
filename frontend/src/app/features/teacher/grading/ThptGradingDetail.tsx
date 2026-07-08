@@ -496,7 +496,13 @@ export function ThptGradingDetail({ submissionId }: Props) {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/giao-vien/cham-diem')}
+              onClick={() => {
+                if (window.history.state && window.history.state.idx > 0) {
+                  navigate(-1);
+                } else {
+                  navigate('/giao-vien/cham-diem');
+                }
+              }}
               className="px-4 py-2 rounded-lg bg-slate-100 text-slate-600 font-semibold text-sm hover:bg-slate-200 transition-colors cursor-pointer"
             >
               Quay lại
@@ -520,7 +526,13 @@ export function ThptGradingDetail({ submissionId }: Props) {
         <div className="px-6 py-3 flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate('/giao-vien/cham-diem')}
+            onClick={() => {
+              if (window.history.state && window.history.state.idx > 0) {
+                navigate(-1);
+              } else {
+                navigate('/giao-vien/cham-diem');
+              }
+            }}
             className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer flex-shrink-0"
           >
             <ArrowLeft className="w-4 h-4 text-slate-600" />

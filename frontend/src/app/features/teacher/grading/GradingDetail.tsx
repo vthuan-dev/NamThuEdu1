@@ -1651,9 +1651,18 @@ function VstepGradingDetailInternal() {
           <span className="text-slate-400 truncate max-w-[240px]">{exam.title}</span>
         </div>
         <div className="flex items-center gap-2">
-          <Link to="/giao-vien/cham-diem" className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors">
+          <button
+            onClick={() => {
+              if (window.history.state && window.history.state.idx > 0) {
+                navigate(-1);
+              } else {
+                navigate('/giao-vien/cham-diem');
+              }
+            }}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
+          >
             <ArrowLeft className="w-4 h-4" />{t("teacher.grading.detail.back")}
-          </Link>
+          </button>
           <button
             onClick={handleSave}
             disabled={saveLoading || pageLoading}

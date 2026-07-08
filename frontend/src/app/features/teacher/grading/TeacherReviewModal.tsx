@@ -323,17 +323,24 @@ export function TeacherReviewModal({ submission, open, onClose, onReviewed }: Pr
                     </div>
 
                     {!skillMode ? (
-                      <div className="rounded-2xl bg-white border border-slate-100 p-5 flex items-center gap-4 shadow-sm">
-                        <div className="w-16 h-16 rounded-2xl bg-violet-50 border border-violet-100 flex flex-col items-center justify-center flex-shrink-0">
-                          <span className="text-xl font-black text-violet-700 leading-none">{displayScore}</span>
-                          <span className="text-[9px] font-bold text-violet-400 mt-1">/ {displayMaxScore}</span>
+                      <div
+                        role="button"
+                        onClick={goToDetail}
+                        className="rounded-2xl bg-white border border-slate-100 p-5 flex items-center justify-between gap-4 shadow-sm hover:bg-slate-50/80 hover:border-violet-200 transition-all cursor-pointer group w-full text-left"
+                      >
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className="w-16 h-16 rounded-2xl bg-violet-50 border border-violet-100 flex flex-col items-center justify-center flex-shrink-0 group-hover:bg-violet-100/50 transition-colors">
+                            <span className="text-xl font-black text-violet-700 leading-none">{displayScore}</span>
+                            <span className="text-[9px] font-bold text-violet-400 mt-1">/ {displayMaxScore}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-slate-700 group-hover:text-violet-700 transition-colors">Điểm hệ thống chấm</p>
+                            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                              Đề dạng chấm theo từng câu/từng phần. Nhấp để mở trang chấm chi tiết xem đáp án và chỉnh điểm từng câu.
+                            </p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-slate-700">Điểm hệ thống chấm</p>
-                          <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                            Đề dạng chấm theo từng câu/từng phần. Mở trang chấm chi tiết để xem đáp án và chỉnh điểm từng câu.
-                          </p>
-                        </div>
+                        <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-violet-600 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
                       </div>
                     ) : hasAiScores ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -403,7 +410,7 @@ export function TeacherReviewModal({ submission, open, onClose, onReviewed }: Pr
                             <div className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center flex-shrink-0 text-slate-400">
                               <Icon className="w-4 h-4" />
                             </div>
-                            <span className="text-sm font-bold text-slate-650 w-14 flex-shrink-0">{t(labelKey)}</span>
+                            <span className="text-sm font-bold text-slate-600 w-14 flex-shrink-0">{t(labelKey)}</span>
                             <div className="flex-1 relative">
                               <input
                                 type="number"
@@ -423,38 +430,19 @@ export function TeacherReviewModal({ submission, open, onClose, onReviewed }: Pr
                     </div>
                     ) : (
                     <div className="space-y-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center flex-shrink-0 text-violet-600">
-                          <Award className="w-4 h-4" />
-                        </div>
-                        <span className="text-sm font-bold text-slate-650 flex-shrink-0">Tổng điểm</span>
-                        <div className="flex-1 relative">
-                          <input
-                            type="number"
-                            min={0}
-                            max={displayMaxScore}
-                            step={0.5}
-                            value={totalInput}
-                            onChange={(e) => setTotalInput(e.target.value)}
-                            placeholder={`0 - ${displayMaxScore}`}
-                            className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all font-semibold text-slate-800 placeholder:text-slate-400"
-                          />
-                        </div>
-                        <span className="text-xs text-slate-400 w-12 text-right flex-shrink-0">/ {displayMaxScore}</span>
-                      </div>
                       <button
                         type="button"
                         onClick={goToDetail}
-                        className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 hover:border-violet-200 transition-colors group"
+                        className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white transition-colors group cursor-pointer shadow-sm shadow-violet-200 active:scale-[0.99]"
                       >
-                        <span className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                          <ListChecks className="w-4 h-4 text-violet-600" />
+                        <span className="flex items-center gap-2 text-sm font-semibold">
+                          <ListChecks className="w-4 h-4 text-white" />
                           Chấm chi tiết từng câu
                         </span>
-                        <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 group-hover:text-violet-600 transition-all" />
+                        <ArrowRight className="w-4 h-4 text-white group-hover:translate-x-0.5 transition-all" />
                       </button>
-                      <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Đề này chấm theo từng câu. Bạn có thể nhập nhanh tổng điểm ở trên, hoặc mở trang chấm chi tiết để chỉnh từng câu rồi quay lại xác nhận.
+                      <p className="text-[11.5px] text-slate-500 leading-relaxed bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+                        Đề thi này được chấm điểm theo từng câu/từng phần để đảm bảo tính nhất quán với đáp án của học viên. Vui lòng mở trang chấm chi tiết để xem bài làm và điều chỉnh điểm.
                       </p>
                     </div>
                     )}
