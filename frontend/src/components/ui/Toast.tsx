@@ -70,8 +70,8 @@ export function Toast({ id, type, message, duration = 3500, onClose }: ToastProp
         transition-all duration-300 ease-out
         min-w-[340px] max-w-[420px]
         ${isExiting
-          ? "animate-[slideOutRight_300ms_ease-in_forwards] opacity-0 translate-x-12"
-          : "animate-[slideInRight_400ms_cubic-bezier(0.16,1,0.3,1)]"
+          ? "animate-[slideOutLeft_300ms_ease-in_forwards] opacity-0 -translate-x-12"
+          : "animate-[slideInLeft_400ms_cubic-bezier(0.16,1,0.3,1)]"
         }
       `}
     >

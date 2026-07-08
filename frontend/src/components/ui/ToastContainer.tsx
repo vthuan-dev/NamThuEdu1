@@ -8,7 +8,7 @@ interface ToastContainerProps {
 export function ToastContainer({ toasts, onClose }: ToastContainerProps) {
   return (
     <div
-      className="fixed top-5 right-5 z-[9999] flex flex-col items-end gap-3 pointer-events-none"
+      className="fixed top-5 left-5 z-[9999] flex flex-col items-start gap-3 pointer-events-none"
       role="region"
       aria-label="Thông báo"
     >
