@@ -23,6 +23,12 @@ import {
   Type as TypeIcon,
   GraduationCap,
   BookOpen,
+  User,
+  Calendar,
+  MapPin,
+  Phone,
+  Mail,
+  Clock,
 } from 'lucide-react';
 import { useToastContext } from '../../../../contexts/ToastContext';
 import { RichText } from '../../../../components/ui/RichText';
@@ -308,10 +314,12 @@ export function ThptGradingDetail({ submissionId }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recompute?.weightedTotal, autoWeighted]);
 
-  // Vùng cuộn là div nội bộ của page (scrollBodyRef). Header nằm ngoài nên không trôi.
+  // Vùng cuộn: tự động tìm container cuộn gần nhất (scrollBodyRef hoặc layout cha)
   useEffect(() => {
     if (page !== 'ready') return;
-    scrollParentRef.current = scrollBodyRef.current;
+    if (scrollBodyRef.current) {
+      scrollParentRef.current = scrollBodyRef.current.closest('.overflow-y-auto') || scrollBodyRef.current;
+    }
   }, [page]);
 
   // Scroll-spy: sáng đèn tab của phần đang ở đỉnh viewport (lắng nghe scroll trực tiếp).
@@ -506,9 +514,9 @@ export function ThptGradingDetail({ submissionId }: Props) {
     : recompute?.weightedTotal ?? 0;
 
   return (
-    <div ref={rootRef} className="flex-1 min-h-0 flex flex-col bg-slate-50">
-      {/* ─── Header (NẰM NGOÀI vùng cuộn → luôn cố định) ──────────────────── */}
-      <header ref={headerRef} className="flex-shrink-0 bg-white border-b border-slate-200 z-30">
+    <div ref={rootRef} className="flex-1 flex flex-col bg-slate-50">
+      {/* ─── Header (Sticky top) ──────────────────── */}
+      <header ref={headerRef} className="sticky top-0 z-30 bg-white border-b border-slate-200">
         <div className="px-6 py-3 flex items-center gap-3">
           <button
             type="button"
@@ -602,7 +610,7 @@ export function ThptGradingDetail({ submissionId }: Props) {
       </header>
 
       {/* ─── Vùng cuộn nội bộ (header ở trên không nằm trong đây) ─────────── */}
-      <div ref={scrollBodyRef} className="flex-1 min-h-0 overflow-y-auto">
+      <div ref={scrollBodyRef} className="w-full">
         {/* ─── Body: 2-column layout ───────────────────────────────────────── */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-16">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
@@ -668,7 +676,7 @@ export function ThptGradingDetail({ submissionId }: Props) {
           </div>
 
           {/* RIGHT: sticky score dashboard */}
-          <aside className="lg:sticky lg:top-4 space-y-4">
+          <aside className="lg:sticky lg:top-20 max-h-[calc(100vh-140px)] overflow-y-auto pr-1 space-y-4 scrollbar-thin">
             <ScoreDashboard
               recompute={recompute}
               scaleMax={scaleMax}
@@ -689,6 +697,118 @@ export function ThptGradingDetail({ submissionId }: Props) {
               objRawMax={obj.raw_score_max}
               onScrollToSection={scrollToSection}
             />
+
+            {/* Student Info Card */}
+            <div className="rounded-2xl bg-white border border-slate-200 p-5 space-y-4">
+              <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+                <User className="w-4 h-4 text-teal-600" />
+                <h2 className="text-sm font-bold text-slate-800">Thông tin học viên</h2>
+              </div>
+              <div className="space-y-3 text-sm text-slate-600">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-slate-400">Họ tên:</span>
+                  <span className="font-bold text-slate-800">{data.student.name}</span>
+                </div>
+                {data.student.class_name && (
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-slate-400">Lớp:</span>
+                    <span className="font-semibold text-slate-700 flex items-center gap-1">
+                      <GraduationCap className="w-3.5 h-3.5 text-teal-500" />
+                      {data.student.class_name}
+                    </span>
+                  </div>
+                )}
+                {data.student.age_group && (
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-slate-400">Loại học viên:</span>
+                    <span className="font-semibold text-slate-700">
+                      {data.student.age_group === 'kids'
+                        ? 'Thiếu nhi (Kids)'
+                        : data.student.age_group === 'teens'
+                          ? 'Thiếu niên (Teens)'
+                          : data.student.age_group === 'adults'
+                            ? 'Người lớn (Adults)'
+                            : data.student.age_group}
+                    </span>
+                  </div>
+                )}
+                {data.student.gender !== undefined && data.student.gender !== null && (
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-slate-400">Giới tính:</span>
+                    <span className="text-slate-700">
+                      {data.student.gender ? 'Nam' : 'Nữ'}
+                    </span>
+                  </div>
+                )}
+                {data.student.dob && (
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-slate-400">Ngày sinh:</span>
+                    <span className="text-slate-700 flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                      {(() => {
+                        const parts = data.student.dob.split('-');
+                        return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : data.student.dob;
+                      })()}
+                      {data.student.dob && (() => {
+                        const birthYear = new Date(data.student.dob).getFullYear();
+                        const currentYear = new Date().getFullYear();
+                        const age = currentYear - birthYear;
+                        return age > 0 ? ` (${age} tuổi)` : '';
+                      })()}
+                    </span>
+                  </div>
+                )}
+                {data.student.phone && (
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-slate-400">Số điện thoại:</span>
+                    <span className="text-slate-700 flex items-center gap-1">
+                      <Phone className="w-3.5 h-3.5 text-slate-400" />
+                      {data.student.phone}
+                    </span>
+                  </div>
+                )}
+                {data.student.email && (
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-slate-400">Email:</span>
+                    <span className="text-slate-700 flex items-center gap-1 max-w-[180px] truncate" title={data.student.email}>
+                      <Mail className="w-3.5 h-3.5 text-slate-400" />
+                      {data.student.email}
+                    </span>
+                  </div>
+                )}
+                {data.student.address && (
+                  <div className="flex flex-col gap-1 pt-1 border-t border-slate-50">
+                    <span className="font-medium text-slate-400">Địa chỉ / Quê quán:</span>
+                    <span className="text-slate-700 text-xs flex items-start gap-1 leading-relaxed">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 mt-0.5 flex-shrink-0" />
+                      {data.student.address}
+                    </span>
+                  </div>
+                )}
+                {data.submitted_at && (
+                  <div className="flex flex-col gap-1 pt-1 border-t border-slate-50">
+                    <span className="font-medium text-slate-400">Thời gian nộp bài:</span>
+                    <span className="text-slate-700 text-xs flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      {(() => {
+                        try {
+                          const d = new Date(data.submitted_at);
+                          return d.toLocaleString('vi-VN', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                          });
+                        } catch {
+                          return data.submitted_at;
+                        }
+                      })()}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
           </aside>
         </div>
         </main>

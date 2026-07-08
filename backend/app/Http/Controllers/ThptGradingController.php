@@ -233,7 +233,7 @@ class ThptGradingController extends Controller
         if (!$user || $user->uRole !== 'teacher') {
             return $this->error('Bạn không có quyền truy cập.', 401);          // Req 7.2
         }
-        $sub = Submission::with('exam')->find($id);
+        $sub = Submission::with(['exam', 'user.class'])->find($id);
         if (!$sub) {
             return $this->error('Không tìm thấy bài làm.', 404);
         }
@@ -357,6 +357,13 @@ class ThptGradingController extends Controller
             'student' => [
                 'id'   => optional($sub->user)->uId,
                 'name' => optional($sub->user)->uName,
+                'phone' => optional($sub->user)->uPhone,
+                'email' => optional($sub->user)->uEmail,
+                'gender' => optional($sub->user)->uGender,
+                'address' => optional($sub->user)->uAddress,
+                'dob' => optional($sub->user)->uDoB ? optional($sub->user)->uDoB->toDateString() : null,
+                'class_name' => optional(optional($sub->user)->class)->cName,
+                'age_group' => optional($sub->user)->age_group,
             ],
             'submitted_at'             => optional($sub->sSubmit_time)->toIso8601String(),
             'status'                   => $sub->sStatus,

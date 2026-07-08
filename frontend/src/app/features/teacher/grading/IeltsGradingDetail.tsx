@@ -499,7 +499,7 @@ export function IeltsGradingDetail() {
   }
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-slate-50">
+    <div className="h-screen max-h-screen overflow-hidden flex flex-col bg-slate-50">
       {/* Header - compact (NẰM NGOÀI vùng cuộn → luôn cố định) */}
       <div className="flex-shrink-0 bg-white border-b border-slate-200 z-30">
         <div className="px-6 py-2.5 flex items-center justify-between gap-4">

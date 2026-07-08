@@ -165,7 +165,17 @@ export interface ObjectiveSummary {
 export interface GradingData {
   submission_id: number;
   exam: { id: number | null; title: string | null; type: string | null };
-  student: { id: number | null; name: string | null };
+  student: {
+    id: number | null;
+    name: string | null;
+    phone?: string | null;
+    email?: string | null;
+    gender?: boolean | null;
+    address?: string | null;
+    dob?: string | null;
+    class_name?: string | null;
+    age_group?: string | null;
+  };
   submitted_at: string | null;
   status: string | null;
   ai_speaking_pending: boolean;
