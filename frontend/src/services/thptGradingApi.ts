@@ -186,6 +186,8 @@ export interface GradingData {
   teacher_override_score?: number | null;
   answers: Record<string, unknown>;
   correct_answers: Record<string, unknown>;
+  answer_overrides?: Record<string, boolean>;
+  correct_overrides?: Record<string, string>;
   subjective_questions: SubjectiveQuestion[];
   sections: GradingSection[];
   // Present only on save() response:
@@ -207,6 +209,11 @@ export interface SaveGradingBody {
   /** Điểm tổng ghi đè (0–10). null/undefined = không ghi đè (dùng điểm tự động). */
   teacher_override_score?: number | null;
   publish: boolean;
+  answer_overrides?: Record<string, boolean>;
+  correct_overrides?: Record<string, string>;
+  objective_raw_score?: number | null;
+  objective_raw_max?: number | null;
+  objective_scaled_score?: number | null;
 }
 
 export const thptGradingApi = {

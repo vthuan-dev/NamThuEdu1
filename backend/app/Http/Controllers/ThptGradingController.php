@@ -86,6 +86,11 @@ class ThptGradingController extends Controller
             // kể cả đề toàn trắc nghiệm khách quan (không có phần Nói/Viết).
             'teacher_override_score'          => 'nullable|numeric|min:0|max:10',
             'publish'                         => 'nullable|boolean',
+            'answer_overrides'                => 'nullable|array',
+            'correct_overrides'               => 'nullable|array',
+            'objective_raw_score'             => 'nullable|numeric',
+            'objective_raw_max'               => 'nullable|numeric',
+            'objective_scaled_score'          => 'nullable|numeric',
         ]);
 
         $user      = $request->user();
@@ -96,9 +101,33 @@ class ThptGradingController extends Controller
             ? $validated['teacher_override_score']
             : null;
 
-        DB::transaction(function () use ($sub, $user, $publish, $questions, $overall, $overrideScore) {
+        $answerOverrides = $validated['answer_overrides'] ?? null;
+        $correctOverrides = $validated['correct_overrides'] ?? null;
+        $objRawScore = isset($validated['objective_raw_score']) ? (float)$validated['objective_raw_score'] : null;
+        $objRawMax = isset($validated['objective_raw_max']) ? (float)$validated['objective_raw_max'] : null;
+        $objScaledScore = isset($validated['objective_scaled_score']) ? (float)$validated['objective_scaled_score'] : null;
+
+        DB::transaction(function () use (
+            $sub, $user, $publish, $questions, $overall, $overrideScore,
+            $answerOverrides, $correctOverrides, $objRawScore, $objRawMax, $objScaledScore
+        ) {
             $payload = $sub->submission_payload ?? [];
             $result  = $payload['result'] ?? [];
+
+            if ($answerOverrides !== null) {
+                $payload['answer_overrides'] = $answerOverrides;
+            }
+            if ($correctOverrides !== null) {
+                $payload['correct_overrides'] = $correctOverrides;
+            }
+
+            if ($objRawScore !== null) {
+                $result['raw_score'] = $objRawScore;
+            }
+            if ($objRawMax !== null) {
+                $result['raw_score_max'] = $objRawMax;
+            }
+
             $speaking = is_array($result['speaking'] ?? null) ? $result['speaking'] : [];
             $parts    = is_array($speaking['parts'] ?? null) ? $speaking['parts'] : [];
 
@@ -147,9 +176,15 @@ class ThptGradingController extends Controller
             }
 
             // Blend với điểm khách quan thuần — mirror GradeThptSpeakingJob (D4).
-            $objectiveScaled = isset($result['scaled_score_objective'])
-                ? (float) $result['scaled_score_objective']
-                : $this->recomputeObjectiveScaled($result);
+            $objectiveScaled = $objScaledScore !== null
+                ? $objScaledScore
+                : (isset($result['scaled_score_objective'])
+                    ? (float) $result['scaled_score_objective']
+                    : $this->recomputeObjectiveScaled($result));
+
+            if ($objScaledScore !== null) {
+                $result['scaled_score_objective'] = $objScaledScore;
+            }
 
             if ($objectiveScaled !== null && $speakingAvg !== null) {
                 $combined = round(($objectiveScaled + $speakingAvg) / 2, 2);
@@ -382,6 +417,8 @@ class ThptGradingController extends Controller
             // Raw maps — cho phép frontend tái dùng SectionView (review mode) y hệt trang học viên.
             'answers'                  => (object) $answers,
             'correct_answers'          => (object) $correctAnswers,
+            'answer_overrides'         => $payload['answer_overrides'] ?? (object) [],
+            'correct_overrides'        => $payload['correct_overrides'] ?? (object) [],
             // Câu chủ quan (Nói/Viết) — giữ nguyên cho UI override hiện có.
             'subjective_questions'     => $subjective,
             // Toàn bộ cấu trúc đề học viên đã làm, từng phần một (ADDED SCOPE).

@@ -146,6 +146,8 @@ export function ThptGradingDetail({ submissionId }: Props) {
         setAutoWeighted(!hasOverride);
         setDraft(buildInitialDraft(d));
         setWeights(buildInitialWeights(d));
+        setAnswerOverride(d.answer_overrides ?? {});
+        setCorrectOverride(d.correct_overrides ?? {});
         setPage('ready');
       })
       .catch(() => setPage('error'));
@@ -306,6 +308,22 @@ export function ThptGradingDetail({ submissionId }: Props) {
     return { liveSections, totalWeight, weightedTotal };
   }, [data, answerOverride, correctOverride, weights, draft]);
 
+  const liveObjRawScore = useMemo(() => {
+    if (!data) return null;
+    if (!recompute) return data.objective.raw_score;
+    return recompute.liveSections
+      .filter(s => s.kind === 'objective')
+      .reduce((sum, s) => sum + s.correct, 0);
+  }, [recompute, data]);
+
+  const liveObjRawMax = useMemo(() => {
+    if (!data) return null;
+    if (!recompute) return data.objective.raw_score_max;
+    return recompute.liveSections
+      .filter(s => s.kind === 'objective')
+      .reduce((sum, s) => sum + s.total, 0);
+  }, [recompute, data]);
+
   // Khi ở chế độ auto → đồng bộ điểm tổng hệ số vào ô override.
   useEffect(() => {
     if (autoWeighted && recompute) {
@@ -459,6 +477,13 @@ export function ThptGradingDetail({ submissionId }: Props) {
         overall_teacher_feedback: overallFeedback,
         teacher_override_score: overrideScore.trim() !== '' ? Number(overrideScore) : null,
         publish: true,
+        answer_overrides: answerOverride,
+        correct_overrides: correctOverride,
+        objective_raw_score: liveObjRawScore,
+        objective_raw_max: liveObjRawMax,
+        objective_scaled_score: (liveObjRawScore !== null && liveObjRawMax !== null && liveObjRawMax > 0)
+          ? round2((liveObjRawScore / liveObjRawMax) * scaleMax)
+          : null,
       });
       if (res) {
         setData((prev) => (prev ? { ...prev, ...res } : res));
@@ -515,6 +540,7 @@ export function ThptGradingDetail({ submissionId }: Props) {
 
   const obj = data.objective;
   const scaleMax = obj.scale_max ?? 10;
+
   const finalScore = overrideScore.trim() !== '' && inRange0to10(overrideScore)
     ? Number(overrideScore)
     : recompute?.weightedTotal ?? 0;
@@ -705,8 +731,8 @@ export function ThptGradingDetail({ submissionId }: Props) {
               onWeightChange={updateWeight}
               onResetWeights={resetWeights}
               aiPending={data.ai_speaking_pending}
-              objRawScore={obj.raw_score}
-              objRawMax={obj.raw_score_max}
+              objRawScore={liveObjRawScore}
+              objRawMax={liveObjRawMax}
               onScrollToSection={scrollToSection}
             />
 
@@ -782,10 +808,16 @@ export function ThptGradingDetail({ submissionId }: Props) {
                 {data.student.email && (
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-slate-400">Email:</span>
-                    <span className="text-slate-700 flex items-center gap-1 max-w-[180px] truncate" title={data.student.email}>
+                    <a
+                      href={`https://mail.google.com/mail/?view=cm&fs=1&to=${data.student.email}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-slate-700 hover:text-violet-600 flex items-center gap-1 max-w-[180px] truncate hover:underline cursor-pointer transition-colors"
+                      title={`Gửi email qua Gmail: ${data.student.email}`}
+                    >
                       <Mail className="w-3.5 h-3.5 text-slate-400" />
                       {data.student.email}
-                    </span>
+                    </a>
                   </div>
                 )}
                 {data.student.address && (
