@@ -25,6 +25,7 @@ import {
   BookOpen,
 } from 'lucide-react';
 import { useToastContext } from '../../../../contexts/ToastContext';
+import { RichText } from '../../../../components/ui/RichText';
 import { getFullMediaUrl } from '../../../../utils/mediaUtils';
 import {
   thptGradingApi,
@@ -1138,7 +1139,7 @@ function ObjectiveSectionBody({
               <span className="text-[11px] font-bold uppercase tracking-wider text-teal-700">Đoạn văn</span>
             </div>
             <div className="p-5 max-h-[70vh] overflow-y-auto">
-              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{section.passage}</p>
+              <RichText as="div" className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap" text={section.passage} />
             </div>
           </div>
           {/* Right: questions */}
@@ -1156,7 +1157,7 @@ function ObjectiveSectionBody({
 function PassageBox({ text }: { text: string }) {
   return (
     <div className="rounded-2xl bg-white border border-slate-200 p-5">
-      <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{text}</p>
+      <RichText as="div" className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap" text={text} />
     </div>
   );
 }
@@ -1314,7 +1315,7 @@ function McqReview({
   return (
     <QCardShell n={q.question_number} effective={effective} changed={changed}>
       {q.prompt && (
-        <p className="text-sm text-slate-800 leading-relaxed font-medium mb-3">{q.prompt}</p>
+        <RichText as="p" className="text-sm text-slate-800 leading-relaxed font-medium mb-3" text={q.prompt} />
       )}
 
       <div className="space-y-2">
@@ -1351,7 +1352,7 @@ function McqReview({
                   // Trọng âm: KHÔNG tự dò đuôi ed/s/es — chỉ nhấn khi giáo viên đã đánh dấu.
                   const isStress = q.variant === 'stress';
                   const parts = splitPhoneticWord(opt.text, opt.underline, !isStress, opt.underlineStart);
-                  if (!parts.mark) return <>{opt.text}</>;
+                  if (!parts.mark) return <RichText text={opt.text} />;
                   return (
                     <>
                       {parts.before}
@@ -1423,7 +1424,7 @@ function TextReview({
       .join(' ');
   return (
     <QCardShell n={q.question_number} effective={effective} changed={key in answerOverride}>
-      {prompt && <p className="text-sm text-slate-800 leading-relaxed font-medium mb-3">{prompt}</p>}
+      {prompt && <RichText as="p" className="text-sm text-slate-800 leading-relaxed font-medium mb-3" text={prompt} />}
       <div className="space-y-2">
         <div>
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
@@ -1615,7 +1616,7 @@ function SentenceInsertionReview({
   const effective = key in answerOverride ? answerOverride[key] : q.is_correct;
   return (
     <QCardShell n={q.question_number} effective={effective} changed={key in answerOverride}>
-      {q.prompt && <p className="text-sm text-slate-800 font-medium mb-2">{q.prompt}</p>}
+      {q.prompt && <RichText as="p" className="text-sm text-slate-800 font-medium mb-2" text={q.prompt} />}
       <blockquote className="border-l-4 border-teal-300 pl-3 py-1 italic text-sm text-slate-700 bg-teal-50/40 rounded-r mb-3">
         {q.sentence_to_insert}
       </blockquote>
@@ -1708,7 +1709,7 @@ function SubjectiveQuestionCard({
           <Mic className="w-[18px] h-[18px]" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[15px] font-medium text-slate-800 leading-relaxed">{q.prompt}</p>
+          <RichText as="p" className="text-[15px] font-medium text-slate-800 leading-relaxed" text={q.prompt} />
           <div className="mt-2.5">
             <AudioPlayer url={q.audio_url} />
           </div>
