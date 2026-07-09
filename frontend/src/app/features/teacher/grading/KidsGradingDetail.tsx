@@ -36,6 +36,8 @@ import {
   type ReviewRow,
 } from "../../student/kids/player/kidsAnswerKey";
 import { KidsTaskRenderer } from "../../student/kids/player/KidsTaskRenderer";
+import { ListenColourWrite } from "../../../../components/exam/questions/ListenColourWrite";
+import { extractTaskData } from "../../../../utils/examDataExtractor";
 
 // Các dạng có ảnh / nối ảnh / audio → mặc định MỞ panel "Bài làm của học viên".
 // Dạng thuần chữ (cloze, open_cloze...) mặc định THU cho gọn.
@@ -64,6 +66,7 @@ interface KidsTask {
   feedback: string;
   isManual: boolean;
   skill: string;           // listening | reading | writing | speaking | ""
+  rawConfig?: any;         // toàn bộ kids_task_config (để render dạng nghe & tô màu)
 }
 
 interface ExamMeta {
@@ -189,6 +192,7 @@ export function KidsGradingDetail() {
             feedback: sa.saTeacher_feedback ?? "",
             isManual: MANUAL_REVIEW_TYPES.has(taskType),
             skill: normalizeSkill(cfg.skill),
+            rawConfig: cfg,
           } satisfies KidsTask;
         });
         setTasks(mapped);
@@ -572,6 +576,18 @@ function KidsTaskCard({
     [task.studentAnswerRaw]
   );
 
+  // Dạng "Nghe & tô màu": dùng component chuyên dụng để hiện tranh + nhãn vật thể
+  // + đối chiếu đúng/sai chồng lên ảnh (giống trang kết quả học sinh), thay vì text thô.
+  const isListenColour =
+    task.taskType === "listen_colour_write" || task.taskType === "listen_colour";
+  const listenColourData = useMemo(
+    () =>
+      isListenColour
+        ? extractTaskData({ kids_task_config: task.rawConfig } as any)
+        : null,
+    [isListenColour, task.rawConfig]
+  );
+
   // Map khóa đáp án → đúng/sai (theo nguồn sự thật rowsCorrect mà giáo viên chỉnh).
   // Renderer dùng để tô màu nhãn trên ảnh khớp với bảng Đúng/Sai bên dưới.
   const gradeOverrides = useMemo(() => {
@@ -637,14 +653,23 @@ function KidsTaskCard({
           </button>
           {showWork && (
             <div className="p-4 bg-white">
-              <KidsTaskRenderer
-                taskType={task.taskType}
-                taskData={task.taskData}
-                answer={studentAnswerMap}
-                onChange={() => {}}
-                readOnly
-                gradeOverrides={gradeOverrides}
-              />
+              {isListenColour && listenColourData ? (
+                <ListenColourWrite
+                  question={{ title: task.taskName }}
+                  taskData={listenColourData}
+                  interactiveMode={false}
+                  userAnswer={studentAnswerMap}
+                />
+              ) : (
+                <KidsTaskRenderer
+                  taskType={task.taskType}
+                  taskData={task.taskData}
+                  answer={studentAnswerMap}
+                  onChange={() => {}}
+                  readOnly
+                  gradeOverrides={gradeOverrides}
+                />
+              )}
             </div>
           )}
         </div>
@@ -709,7 +734,9 @@ function KidsTaskCard({
         )}
 
         {/* ── Dạng chấm tay: bài làm + điểm + nhận xét ── */}
-        {task.isManual && (
+        {/* Với dạng nghe & tô màu, panel ListenColourWrite bên trên đã hiển thị bài làm
+            đầy đủ (tranh + nhãn + đối chiếu) nên bỏ qua khối text thô này. */}
+        {task.isManual && !isListenColour && (
           <div>
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
               <FileText className="w-3.5 h-3.5" /> Bài làm của học viên
