@@ -1533,6 +1533,32 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
             </div>
           ) : isMcq && question.options ? (
             isMultiMcq ? (
+              isGrouped && !isGroupStart ? (
+                // Câu sau trong nhóm multi-select: chỉ hiện hàng nút chữ cái gọn
+                // để tick chọn nhiều đáp án đúng (tối đa selectCount). Text đáp án
+                // A/B/C/D đã nhập 1 lần ở câu đầu nhóm nên KHÔNG lặp lại ở đây.
+                <div className="flex items-center gap-2 p-2 rounded-lg border border-gray-200 bg-gray-50/50">
+                  <span className="text-xs font-semibold text-gray-600 mr-2">
+                    Đáp án đúng cho câu {question.questionNumber} (chọn {selectCount}):
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {optionKeys.map((k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => toggleMulti(k)}
+                        className={`w-8 h-8 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center justify-center border ${
+                          selectedSet.has(k)
+                            ? "bg-emerald-500 border-emerald-600 text-white shadow-sm font-extrabold"
+                            : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        {k}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
               <div className="space-y-1.5">
                 <p className="text-[11px] text-gray-500">
                   Chọn đúng {selectCount} đáp án (Choose {selectCount === 2 ? "TWO" : "THREE"}):
@@ -1591,6 +1617,7 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
                   </button>
                 )}
               </div>
+              )
             ) : (
               <div className="space-y-2">
                 {isGrouped && !isGroupStart ? (
