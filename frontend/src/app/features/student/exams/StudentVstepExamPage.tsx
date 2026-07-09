@@ -1776,8 +1776,17 @@ function HighlightablePassage({
   /* Stable plain text derived once from original html — normalizes soft line breaks */
   const plainText = useMemo(() => {
     const stripped = html.replace(/<[^>]*>/g, "");
+    /* Decode HTML entities (&nbsp;, &amp;, &#39;, …) that may come from pasted/imported content.
+       Without this, entities like &nbsp; would render as literal text on screen. */
+    let decoded = stripped;
+    if (typeof document !== "undefined") {
+      const ta = document.createElement("textarea");
+      ta.innerHTML = stripped;
+      decoded = ta.value;
+    }
     /* Replace double newlines (paragraph breaks) with a placeholder, collapse single \n into space */
-    return stripped
+    return decoded
+      .replace(/\u00a0/g, " ")              // non-breaking space → normal space
       .replace(/\r\n/g, "\n")
       .replace(/\n{2,}/g, "\x00PARA\x00")   // paragraph break → placeholder
       .replace(/\n/g, " ")                  // mid-sentence \n → space
