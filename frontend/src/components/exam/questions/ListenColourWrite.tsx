@@ -8,6 +8,11 @@ interface ListenColourWriteProps {
   interactiveMode: boolean;
   userAnswer?: any;
   onAnswerChange?: (answer: any) => void;
+  /**
+   * Chế độ giáo viên: thay giao diện "khen thưởng" trẻ em bằng bảng đối chiếu
+   * gọn gàng, trung tính để giáo viên chấm & rà soát nhanh.
+   */
+  teacherMode?: boolean;
 }
 
 export function ListenColourWrite({
@@ -15,7 +20,8 @@ export function ListenColourWrite({
   taskData,
   interactiveMode,
   userAnswer,
-  onAnswerChange
+  onAnswerChange,
+  teacherMode = false
 }: ListenColourWriteProps) {
   // Lấy danh sách câu hỏi: đảm bảo phải là Array (tránh trùng tên với instructions text dạng string)
   const items = (Array.isArray(taskData.task_data?.instructions) ? taskData.task_data.instructions : null) ||
@@ -353,8 +359,8 @@ export function ListenColourWrite({
         </div>
       )}
       
-      {/* Review mode: Hiển thị đáp án chi tiết - KIDS FRIENDLY 🎨 */}
-      {!interactiveMode && itemsWithHotspot.length > 0 && (
+      {/* Review mode: Hiển thị đáp án chi tiết - KIDS FRIENDLY 🎨 (chỉ cho học viên xem lại) */}
+      {!interactiveMode && !teacherMode && itemsWithHotspot.length > 0 && (
         <div className="p-6 bg-gradient-to-br from-yellow-50 via-orange-50 to-pink-50 rounded-3xl border-4 border-yellow-400 space-y-4 shadow-lg">
           <div className="flex items-center gap-3 text-2xl font-black text-orange-600">
             <span className="text-4xl">📊</span>
@@ -486,6 +492,89 @@ export function ListenColourWrite({
           </div>
         </div>
       )}
+
+      {/* Teacher mode: bảng đối chiếu gọn gàng, trung tính để chấm điểm */}
+      {!interactiveMode && teacherMode && itemsWithHotspot.length > 0 && (() => {
+        const gradedItems = itemsWithHotspot.filter((item: any) => {
+          const isExample = item.isExample || item.is_example;
+          if (isExample) return false;
+          const correctAnswer = item.colour || item.writeText || item.write_text || '';
+          return !!correctAnswer;
+        });
+        const correctCount = gradedItems.reduce((acc: number, item: any) => {
+          const originalIndex = items.findIndex((x: any) => x.id === item.id);
+          const correctAnswer = item.colour || item.writeText || item.write_text || '';
+          const studentAnswer = userAnswer?.[originalIndex] || '';
+          return acc + (correctAnswer === studentAnswer ? 1 : 0);
+        }, 0);
+
+        return (
+          <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+            <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+              <span className="flex items-center gap-1.5 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Đối chiếu đáp án
+              </span>
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                Đúng {correctCount}/{gradedItems.length}
+              </span>
+            </div>
+            <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-2 px-4 py-2 bg-white text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+              <span>#</span>
+              <span>Chủ thể</span>
+              <span className="text-right">Học viên</span>
+              <span className="text-right">Đáp án</span>
+              <span className="text-center">KQ</span>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {gradedItems.map((item: any) => {
+                const originalIndex = items.findIndex((x: any) => x.id === item.id);
+                const correctAnswer = item.colour || item.writeText || item.write_text || '';
+                const studentAnswer = userAnswer?.[originalIndex] || '';
+                const isCorrect = correctAnswer === studentAnswer;
+                const correctColorMeta = colours.find(c => c.value === correctAnswer);
+                const studentColorMeta = colours.find(c => c.value === studentAnswer);
+                const objectName = item.objectName || item.object || item.name || '(chưa đặt tên)';
+
+                const renderVal = (val: string, meta: any) => {
+                  if (!val) return <span className="text-slate-400 italic">Chưa trả lời</span>;
+                  if (meta) {
+                    return (
+                      <span className="inline-flex items-center gap-1.5 justify-end">
+                        <span
+                          className="w-4 h-4 rounded-full border border-black/10 inline-block shadow-sm"
+                          style={{ backgroundColor: meta.hex }}
+                        />
+                        <span className="font-semibold">{meta.label}</span>
+                      </span>
+                    );
+                  }
+                  return <span className="font-mono font-semibold">{val}</span>;
+                };
+
+                return (
+                  <div key={item.id} className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-2 items-center px-4 py-2.5 text-sm">
+                    <span className="text-slate-400 font-bold tabular-nums">{originalIndex + 1}</span>
+                    <span className="text-slate-700 truncate" title={objectName}>{objectName}</span>
+                    <span className={`text-right ${isCorrect ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {renderVal(studentAnswer, studentColorMeta)}
+                    </span>
+                    <span className="text-right text-slate-500">
+                      {renderVal(correctAnswer, correctColorMeta)}
+                    </span>
+                    <span className="flex justify-center">
+                      {isCorrect ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      ) : (
+                        <XCircle className="w-4 h-4 text-rose-500" />
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Hiển thị danh sách câu hỏi cũ làm phương án dự phòng (Fallback) nếu không có hotspot */}
       {itemsWithoutHotspot.length > 0 && (

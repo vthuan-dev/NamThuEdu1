@@ -659,6 +659,7 @@ function KidsTaskCard({
                   taskData={listenColourData}
                   interactiveMode={false}
                   userAnswer={studentAnswerMap}
+                  teacherMode
                 />
               ) : (
                 <KidsTaskRenderer
