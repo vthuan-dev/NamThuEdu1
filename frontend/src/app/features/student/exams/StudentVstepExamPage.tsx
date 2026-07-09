@@ -1505,7 +1505,7 @@ export function StudentVstepExamPage() {
         answeredWriting={stats.answeredWriting}
         totalWriting={stats.wq}
         answeredSpeaking={stats.answeredSpeaking}
-        totalSpeaking={speakingParts.length}
+        totalSpeaking={stats.sq > 0 ? speakingParts.length : 0}
         onConfirm={handleSubmit}
         onCancel={() => setShowSubmit(false)}
         loading={submitting}
