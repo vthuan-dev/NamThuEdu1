@@ -1775,7 +1775,18 @@ function HighlightablePassage({
 
   /* Stable plain text derived once from original html — normalizes soft line breaks */
   const plainText = useMemo(() => {
-    const stripped = html.replace(/<[^>]*>/g, "");
+    // Step 1: Convert block-level tags to newlines BEFORE stripping.
+    // This preserves paragraph structure from the original HTML.
+    const withBreaks = html
+      .replace(/<\/p\s*>/gi, "\n\n")       // </p> → paragraph break
+      .replace(/<br\s*\/?>/gi, "\n")        // <br> → line break
+      .replace(/<\/div\s*>/gi, "\n\n")      // </div> → paragraph break
+      .replace(/<\/li\s*>/gi, "\n")         // </li> → line break
+      .replace(/<\/h[1-6]\s*>/gi, "\n\n");  // </h1-6> → paragraph break
+
+    // Step 2: Strip remaining HTML tags
+    const stripped = withBreaks.replace(/<[^>]*>/g, "");
+
     /* Decode HTML entities (&nbsp;, &amp;, &#39;, …) that may come from pasted/imported content.
        Without this, entities like &nbsp; would render as literal text on screen. */
     let decoded = stripped;
