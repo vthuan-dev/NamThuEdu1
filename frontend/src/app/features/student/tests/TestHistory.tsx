@@ -80,10 +80,59 @@ const SKILL_META: Record<string, { label: string; icon: any; color: string; bg: 
 };
 
 function getSkillMeta(skill?: string, type?: string) {
-  if (type?.toUpperCase() === "VSTEP") return SKILL_META.vstep;
-  const s = skill?.toLowerCase();
-  if (!s || s === "mixed" || s === "all") return SKILL_META.vstep;
-  return SKILL_META[s] ?? { label: skill ?? "Bài thi", icon: FileText, color: "#6B7280", bg: "#F3F4F6" };
+  const t = type?.toUpperCase() ?? "GENERAL";
+  const s = skill?.toLowerCase() ?? "mixed";
+
+  let label = t;
+  let color = "#7C3AED";
+  let bg = "#EDE9FE";
+  let icon = FileText;
+
+  // Determine skill label suffix
+  let skillLabel = "";
+  if (s === "listening") {
+    skillLabel = "Listening";
+    icon = Headphones;
+    color = "#0284C7";
+    bg = "#E0F2FE";
+  } else if (s === "reading") {
+    skillLabel = "Reading";
+    icon = BookOpen;
+    color = "#059669";
+    bg = "#D1FAE5";
+  } else if (s === "writing") {
+    skillLabel = "Writing";
+    icon = PenLine;
+    color = "#D97706";
+    bg = "#FEF3C7";
+  } else if (s === "speaking") {
+    skillLabel = "Speaking";
+    icon = Mic;
+    color = "#DB2777";
+    bg = "#FCE7F3";
+  } else {
+    skillLabel = "Full Test";
+    icon = FileText;
+    if (t === "VSTEP") {
+      color = "#7C3AED";
+      bg = "#EDE9FE";
+    } else if (t === "IELTS") {
+      color = "#8B5CF6";
+      bg = "#F3E8FF";
+    } else {
+      color = "#6B7280";
+      bg = "#F3F4F6";
+    }
+  }
+
+  // Combine Type + Skill
+  if (t === "VSTEP" || t === "IELTS") {
+    label = `${t} ${skillLabel}`;
+  } else {
+    label = t === "GENERAL" ? skillLabel : `${t} ${skillLabel}`;
+  }
+
+  return { label, icon, color, bg };
 }
 
 function getTimeDiff(start?: string, end?: string): string | null {
