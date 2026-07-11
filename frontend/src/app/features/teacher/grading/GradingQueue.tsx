@@ -18,7 +18,6 @@ import {
   ClipboardCheck,
   BookOpenCheck,
   CheckSquare,
-  Square,
   Loader2,
 } from "lucide-react";
 import { Header } from "../../../components/shared/Header";
@@ -286,44 +285,95 @@ export function GradingQueue() {
     return list;
   }, [filtered, sortField, sortDirection]);
 
-  // Bài có thể phê duyệt hàng loạt: tab giao bài + chưa được teacher review
-  const selectableSubs = useMemo(
-    () => sortedAndFiltered.filter((s) => sourceTab === "assigned" && !s.teacher_reviewed_at),
-    [sortedAndFiltered, sourceTab]
-  );
-  const allSelectableSelected =
-    selectableSubs.length > 0 && selectableSubs.every((s) => selectedIds.has(s.id));
-  const selectedCount = selectedIds.size;
+  // Multi-select: chọn NHIỀU bài cùng lúc trên tab giao bài.
+  // Ưu tiên bài chờ duyệt; vẫn cho chọn bài đã duyệt nếu giáo viên muốn phê duyệt lại.
+  const selectableSubs = useMemo(() => {
+    if (sourceTab !== "assigned") return [] as Submission[];
+    return sortedAndFiltered;
+  }, [sortedAndFiltered, sourceTab]);
 
-  const toggleSelect = (id: string) => {
+  const pendingSelectableSubs = useMemo(
+    () => selectableSubs.filter((s) => !s.teacher_reviewed_at),
+    [selectableSubs]
+  );
+
+  // Chỉ đếm các id đang còn trong danh sách hiện tại (tránh count ảo khi filter)
+  const selectedVisibleIds = useMemo(
+    () => selectableSubs.map((s) => s.id).filter((id) => selectedIds.has(id)),
+    [selectableSubs, selectedIds]
+  );
+  const selectedCount = selectedVisibleIds.length;
+
+  const allVisibleSelected =
+    selectableSubs.length > 0 && selectableSubs.every((s) => selectedIds.has(s.id));
+  const someVisibleSelected =
+    !allVisibleSelected && selectableSubs.some((s) => selectedIds.has(s.id));
+
+  const toggleSelect = (id: string, checked?: boolean) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      const shouldSelect = checked ?? !next.has(id);
+      if (shouldSelect) next.add(id);
+      else next.delete(id);
       return next;
     });
+    setBulkMessage(null);
   };
 
-  const toggleSelectAll = () => {
-    if (allSelectableSelected) {
-      setSelectedIds(new Set());
-      return;
-    }
-    setSelectedIds(new Set(selectableSubs.map((s) => s.id)));
+  const toggleSelectAll = (checked?: boolean) => {
+    const shouldSelect = checked ?? !allVisibleSelected;
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (shouldSelect) {
+        // Thêm toàn bộ dòng đang hiển thị (giữ các lựa chọn ngoài filter nếu còn)
+        selectableSubs.forEach((s) => next.add(s.id));
+      } else {
+        // Bỏ chọn toàn bộ dòng đang hiển thị
+        selectableSubs.forEach((s) => next.delete(s.id));
+      }
+      return next;
+    });
+    setBulkMessage(null);
   };
 
-  // Đổi tab / filter → bỏ chọn để tránh phê duyệt nhầm
+  // Chỉ clear khi đổi tab nguồn / tab duyệt — KHÔNG clear khi gõ search
   useEffect(() => {
     setSelectedIds(new Set());
     setBulkMessage(null);
-  }, [sourceTab, reviewTab, filterExam, filterClass, filterRole, searchQuery]);
+  }, [sourceTab, reviewTab]);
+
+  // Dọn id không còn tồn tại sau khi data reload
+  useEffect(() => {
+    if (selectedIds.size === 0) return;
+    const valid = new Set(submissions.map((s) => s.id));
+    setSelectedIds((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (valid.has(id)) next.add(id);
+        else changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, [submissions]);
 
   const handleBulkApprove = async () => {
     if (selectedCount === 0 || bulkApproving) return;
-    const ids = Array.from(selectedIds);
-    if (!window.confirm(`Phê duyệt ${ids.length} bài làm đã chọn? Điểm hiện tại / điểm AI sẽ được giữ nguyên.`)) {
-      return;
-    }
+
+    // Chỉ gửi các id đang visible + thuộc tab hiện tại
+    const ids = selectedVisibleIds;
+    const pendingCount = ids.filter((id) => {
+      const s = submissions.find((x) => x.id === id);
+      return s && !s.teacher_reviewed_at;
+    }).length;
+
+    const msg =
+      pendingCount === ids.length
+        ? `Phê duyệt ${ids.length} bài đã chọn? Điểm hiện tại / điểm AI sẽ được giữ nguyên.`
+        : `Phê duyệt ${ids.length} bài đã chọn (${pendingCount} chờ duyệt, ${ids.length - pendingCount} đã duyệt trước đó)? Điểm hiện tại / điểm AI sẽ được giữ nguyên.`;
+
+    if (!window.confirm(msg)) return;
+
     setBulkApproving(true);
     setBulkMessage(null);
     try {
@@ -332,7 +382,8 @@ export function GradingQueue() {
       });
       if (result.status === "success") {
         const approvedIds: number[] = result.data?.approved_ids ?? [];
-        const reviewedAt: string = result.data?.teacher_reviewed_at ?? new Date().toISOString();
+        const reviewedAt: string =
+          result.data?.teacher_reviewed_at ?? new Date().toISOString();
         const approvedSet = new Set(approvedIds.map(String));
         setSubmissions((prev) =>
           prev.map((s) =>
@@ -346,7 +397,12 @@ export function GradingQueue() {
               : s
           )
         );
-        setSelectedIds(new Set());
+        // Bỏ chọn các bài vừa duyệt; giữ lại bài bị skip (nếu có)
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          approvedSet.forEach((id) => next.delete(id));
+          return next;
+        });
         const skipped = result.data?.skipped?.length ?? 0;
         setBulkMessage(
           skipped > 0
@@ -638,40 +694,71 @@ export function GradingQueue() {
 
           {/* ── Loading / Error ── */}
           {/* Bulk approve bar — only for assigned submissions */}
-          {sourceTab === "assigned" && selectedCount > 0 && (
-            <div className="flex flex-wrap items-center gap-3 px-4 py-3 rounded-2xl border border-violet-200 bg-violet-50/80 shadow-sm">
-              <div className="flex items-center gap-2 text-sm font-semibold text-violet-800">
-                <CheckSquare className="w-4 h-4" />
-                Đã chọn {selectedCount} bài
-              </div>
-              <button
-                type="button"
-                onClick={handleBulkApprove}
-                disabled={bulkApproving}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 disabled:opacity-60 shadow-sm shadow-violet-200 transition-colors"
-              >
-                {bulkApproving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Đang phê duyệt...
-                  </>
-                ) : (
-                  <>
-                    <UserCheck className="w-4 h-4" />
-                    Phê duyệt hàng loạt
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedIds(new Set())}
-                disabled={bulkApproving}
-                className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-white/80 transition-colors"
-              >
-                Bỏ chọn
-              </button>
-              {bulkMessage && (
-                <span className="text-xs font-medium text-emerald-700 ml-auto">{bulkMessage}</span>
+          {sourceTab === "assigned" && (
+            <div className="flex flex-wrap items-center gap-2 px-1">
+              {pendingSelectableSubs.length > 0 && selectedCount === 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedIds(new Set(pendingSelectableSubs.map((s) => s.id)));
+                    setBulkMessage(null);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 hover:bg-violet-100 transition-colors"
+                >
+                  <CheckSquare className="w-3.5 h-3.5" />
+                  Chọn tất cả chờ duyệt ({pendingSelectableSubs.length})
+                </button>
+              )}
+              {selectedCount > 0 && (
+                <div className="flex flex-wrap items-center gap-3 w-full px-4 py-3 rounded-2xl border border-violet-200 bg-violet-50/80 shadow-sm">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-violet-800">
+                    <CheckSquare className="w-4 h-4" />
+                    Đã chọn {selectedCount}/{selectableSubs.length} bài
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleBulkApprove}
+                    disabled={bulkApproving}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 disabled:opacity-60 shadow-sm shadow-violet-200 transition-colors"
+                  >
+                    {bulkApproving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Đang phê duyệt...
+                      </>
+                    ) : (
+                      <>
+                        <UserCheck className="w-4 h-4" />
+                        Phê duyệt {selectedCount} bài
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Bỏ chọn chỉ các dòng đang hiển thị
+                      toggleSelectAll(false);
+                    }}
+                    disabled={bulkApproving}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-white/80 transition-colors"
+                  >
+                    Bỏ chọn
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedIds(new Set());
+                      setBulkMessage(null);
+                    }}
+                    disabled={bulkApproving}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-white/80 transition-colors"
+                  >
+                    Xóa hết lựa chọn
+                  </button>
+                  {bulkMessage && (
+                    <span className="text-xs font-medium text-emerald-700 ml-auto">{bulkMessage}</span>
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -701,19 +788,22 @@ export function GradingQueue() {
                   <tr className="bg-slate-50 border-b border-slate-100 select-none">
                     {sourceTab === "assigned" && (
                       <th className="px-4 py-3.5 w-12 rounded-tl-2xl">
-                        <button
-                          type="button"
-                          onClick={toggleSelectAll}
-                          disabled={selectableSubs.length === 0}
-                          className="p-1 rounded-md text-violet-600 hover:bg-violet-100 disabled:opacity-30 disabled:cursor-not-allowed"
-                          title={allSelectableSelected ? "Bỏ chọn tất cả" : "Chọn tất cả bài chờ duyệt"}
-                        >
-                          {allSelectableSelected ? (
-                            <CheckSquare className="w-4 h-4" />
-                          ) : (
-                            <Square className="w-4 h-4" />
-                          )}
-                        </button>
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed accent-violet-600"
+                          checked={allVisibleSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = someVisibleSelected;
+                          }}
+                          disabled={selectableSubs.length === 0 || bulkApproving}
+                          onChange={(e) => toggleSelectAll(e.target.checked)}
+                          title={
+                            allVisibleSelected
+                              ? "Bỏ chọn tất cả trên trang này"
+                              : `Chọn tất cả ${selectableSubs.length} bài đang hiển thị`
+                          }
+                          aria-label="Chọn nhiều bài"
+                        />
                       </th>
                     )}
                     <th className={`px-5 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider ${sourceTab !== "assigned" ? "rounded-tl-2xl" : ""}`}>
@@ -780,7 +870,6 @@ export function GradingQueue() {
                     const isReviewed = !!sub.teacher_reviewed_at;
                     const isChanged = changedIds.has(sub.id);
                     const isSelected = selectedIds.has(sub.id);
-                    const canSelect = sourceTab === "assigned" && !isReviewed;
                     return (
                       <tr
                         key={sub.id}
@@ -794,26 +883,25 @@ export function GradingQueue() {
                       >
                         {sourceTab === "assigned" && (
                           <td className="px-4 py-4">
-                            {canSelect ? (
-                              <button
-                                type="button"
-                                onClick={() => toggleSelect(sub.id)}
-                                className={`p-1 rounded-md transition-colors ${
-                                  isSelected
-                                    ? "text-violet-600 bg-violet-100"
-                                    : "text-slate-400 hover:text-violet-600 hover:bg-violet-50"
-                                }`}
-                                title={isSelected ? "Bỏ chọn" : "Chọn để phê duyệt"}
-                              >
-                                {isSelected ? (
-                                  <CheckSquare className="w-4 h-4" />
-                                ) : (
-                                  <Square className="w-4 h-4" />
-                                )}
-                              </button>
-                            ) : (
-                              <span className="block w-6" />
-                            )}
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500 cursor-pointer disabled:opacity-40 accent-violet-600"
+                              checked={isSelected}
+                              disabled={bulkApproving}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                toggleSelect(sub.id, e.target.checked);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              title={
+                                isSelected
+                                  ? "Bỏ chọn bài này"
+                                  : isReviewed
+                                    ? "Chọn để phê duyệt lại"
+                                    : "Chọn để phê duyệt"
+                              }
+                              aria-label={`Chọn bài của ${sub.studentName}`}
+                            />
                           </td>
                         )}
                         {/* Student */}
