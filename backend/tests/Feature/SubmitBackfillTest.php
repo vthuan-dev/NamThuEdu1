@@ -237,14 +237,15 @@ class SubmitBackfillTest extends TestCase
             ->postJson("/api/student/tests/{$submissionId}/submit", [])
             ->assertStatus(200);
 
-        // Bulk save sau khi đã submit → fail
+        // Bulk save sau khi đã submit → returns 200 but saves 0 (idempotent)
         $res = $this->actingAs($this->student, 'sanctum')
             ->postJson("/api/student/tests/{$submissionId}/answers/bulk", [
                 'answers' => [
                     ['question_id' => $this->questions[0]['qId'], 'saAnswer_text' => 'B'],
                 ],
             ]);
-        $res->assertStatus(400);
+        $res->assertStatus(200);
+        $res->assertJsonPath('data.saved', 0);
     }
 
     /** @test */

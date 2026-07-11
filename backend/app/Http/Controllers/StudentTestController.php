@@ -670,6 +670,19 @@ class StudentTestController extends Controller
                 }
 
                 if ($submission->sStatus !== 'in_progress') {
+                    $completedStatuses = ['graded', 'auto_submitted', 'submitted', 'grading_subjective', 'partially_graded'];
+                    if (in_array($submission->sStatus, $completedStatuses, true)) {
+                        return ['status' => 200, 'data' => [
+                            'status' => 'success',
+                            'data' => [
+                                'saved' => 0,
+                                'skipped' => count($request->answers),
+                                'errors' => [['reason' => 'Bài làm đã được nộp trước đó.']],
+                                'message' => 'Bài làm đã được nộp trước đó.'
+                            ]
+                        ]];
+                    }
+
                     return ['status' => 400, 'data' => [
                         'status' => 'error',
                         'message' => 'Bài làm đã được nộp hoặc không thể chỉnh sửa.'
@@ -806,7 +819,8 @@ class StudentTestController extends Controller
             ], 404);
         }
 
-        if ($submission->sStatus === 'graded' || $submission->sStatus === 'auto_submitted') {
+        $completedStatuses = ['graded', 'auto_submitted', 'submitted', 'grading_subjective', 'partially_graded'];
+        if (in_array($submission->sStatus, $completedStatuses, true)) {
             return response()->json([
                 'status' => 'success',
                 'data' => [
@@ -922,7 +936,8 @@ class StudentTestController extends Controller
                 ], 404);
             }
 
-            if ($submission->sStatus === 'graded' || $submission->sStatus === 'auto_submitted') {
+            $completedStatuses = ['graded', 'auto_submitted', 'submitted', 'grading_subjective', 'partially_graded'];
+            if (in_array($submission->sStatus, $completedStatuses, true)) {
                 DB::rollBack();
                 return response()->json([
                     'status' => 'success',
