@@ -1617,4 +1617,112 @@ class GradingController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * POST /api/teacher/submissions/bulk-approve
+     * Phê duyệt hàng loạt bài làm (giữ nguyên điểm hiện có / điểm AI).
+     * Body: { submission_ids: number[], feedback?: string }
+     */
+    public function bulkApprove(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Bạn không có quyền truy cập.'
+            ], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'submission_ids'   => 'required|array|min:1|max:100',
+            'submission_ids.*' => 'required|integer',
+            'feedback'         => 'nullable|string|max:2000',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Dữ liệu không hợp lệ.',
+                'errors'  => $validator->errors(),
+            ], 400);
+        }
+
+        $ids = array_values(array_unique(array_map('intval', $request->submission_ids)));
+        $feedback = $request->input('feedback');
+
+        try {
+            $submissions = Submission::whereIn('sId', $ids)
+                ->whereHas('exam', function ($q) use ($user) {
+                    $q->where('eTeacher_id', $user->uId);
+                })
+                ->get();
+
+            if ($submissions->isEmpty()) {
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Không tìm thấy bài làm hợp lệ để phê duyệt.',
+                ], 404);
+            }
+
+            $now = now();
+            $approved = [];
+            $skipped = [];
+
+            DB::beginTransaction();
+
+            foreach ($submissions as $submission) {
+                // Chỉ phê duyệt bài đã nộp / đã chấm (AI hoặc thủ công)
+                if (!in_array($submission->sStatus, ['submitted', 'graded', 'partially_graded', 'ai_graded'], true)) {
+                    $skipped[] = [
+                        'id'     => $submission->sId,
+                        'reason' => 'Bài làm chưa được nộp hoặc không thể phê duyệt.',
+                    ];
+                    continue;
+                }
+
+                $payload = [
+                    'sStatus'             => 'graded',
+                    'sGraded_time'        => $submission->sGraded_time ?? $now,
+                    'teacher_reviewed_at' => $now,
+                ];
+
+                // Chỉ ghi feedback nếu teacher gửi kèm (không xoá feedback cũ)
+                if (!is_null($feedback) && $feedback !== '') {
+                    $payload['sTeacher_feedback'] = $feedback;
+                }
+
+                $submission->update($payload);
+                $approved[] = $submission->sId;
+            }
+
+            DB::commit();
+
+            $notFound = array_values(array_diff($ids, $submissions->pluck('sId')->all()));
+            foreach ($notFound as $missingId) {
+                $skipped[] = [
+                    'id'     => $missingId,
+                    'reason' => 'Không tìm thấy hoặc không thuộc quyền của bạn.',
+                ];
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'data'   => [
+                    'approved_ids'   => $approved,
+                    'approved_count' => count($approved),
+                    'skipped'        => $skipped,
+                    'teacher_reviewed_at' => $now->toISOString(),
+                    'message'        => 'Đã phê duyệt ' . count($approved) . ' bài làm.',
+                ],
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Lỗi hệ thống khi phê duyệt hàng loạt.',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
 }

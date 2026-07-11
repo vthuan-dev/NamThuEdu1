@@ -17,6 +17,9 @@ import {
   HelpCircle,
   ClipboardCheck,
   BookOpenCheck,
+  CheckSquare,
+  Square,
+  Loader2,
 } from "lucide-react";
 import { Header } from "../../../components/shared/Header";
 import { useHideTeacherHeader } from "../../../../contexts/TeacherHeaderContext";
@@ -115,6 +118,9 @@ export function GradingQueue() {
   const [isPolling, setIsPolling]       = useState(false);
   // Sau 3s hiện note nhỏ nhắc giáo viên rê chuột vào icon để xem hướng dẫn.
   const [showHint, setShowHint]         = useState(false);
+  const [selectedIds, setSelectedIds]   = useState<Set<string>>(new Set());
+  const [bulkApproving, setBulkApproving] = useState(false);
+  const [bulkMessage, setBulkMessage]   = useState<string | null>(null);
   const pollingRef     = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevDataRef    = useRef<Submission[]>([]);
 
@@ -279,6 +285,84 @@ export function GradingQueue() {
     }
     return list;
   }, [filtered, sortField, sortDirection]);
+
+  // Bài có thể phê duyệt hàng loạt: tab giao bài + chưa được teacher review
+  const selectableSubs = useMemo(
+    () => sortedAndFiltered.filter((s) => sourceTab === "assigned" && !s.teacher_reviewed_at),
+    [sortedAndFiltered, sourceTab]
+  );
+  const allSelectableSelected =
+    selectableSubs.length > 0 && selectableSubs.every((s) => selectedIds.has(s.id));
+  const selectedCount = selectedIds.size;
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allSelectableSelected) {
+      setSelectedIds(new Set());
+      return;
+    }
+    setSelectedIds(new Set(selectableSubs.map((s) => s.id)));
+  };
+
+  // Đổi tab / filter → bỏ chọn để tránh phê duyệt nhầm
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setBulkMessage(null);
+  }, [sourceTab, reviewTab, filterExam, filterClass, filterRole, searchQuery]);
+
+  const handleBulkApprove = async () => {
+    if (selectedCount === 0 || bulkApproving) return;
+    const ids = Array.from(selectedIds);
+    if (!window.confirm(`Phê duyệt ${ids.length} bài làm đã chọn? Điểm hiện tại / điểm AI sẽ được giữ nguyên.`)) {
+      return;
+    }
+    setBulkApproving(true);
+    setBulkMessage(null);
+    try {
+      const { data: result } = await api.post("/teacher/submissions/bulk-approve", {
+        submission_ids: ids.map((id) => Number(id)),
+      });
+      if (result.status === "success") {
+        const approvedIds: number[] = result.data?.approved_ids ?? [];
+        const reviewedAt: string = result.data?.teacher_reviewed_at ?? new Date().toISOString();
+        const approvedSet = new Set(approvedIds.map(String));
+        setSubmissions((prev) =>
+          prev.map((s) =>
+            approvedSet.has(s.id)
+              ? {
+                  ...s,
+                  status: "graded" as const,
+                  teacher_reviewed_at: reviewedAt,
+                  gradedTime: s.gradedTime ?? new Date(reviewedAt),
+                }
+              : s
+          )
+        );
+        setSelectedIds(new Set());
+        const skipped = result.data?.skipped?.length ?? 0;
+        setBulkMessage(
+          skipped > 0
+            ? `Đã phê duyệt ${approvedIds.length} bài. Bỏ qua ${skipped} bài không hợp lệ.`
+            : `Đã phê duyệt ${approvedIds.length} bài làm.`
+        );
+        setTimeout(() => setBulkMessage(null), 4000);
+      } else {
+        setBulkMessage(result.message || "Không thể phê duyệt hàng loạt.");
+      }
+    } catch (err: any) {
+      setBulkMessage(err?.response?.data?.message || "Lỗi khi phê duyệt hàng loạt.");
+    } finally {
+      setBulkApproving(false);
+    }
+  };
 
   const TABS: { key: ReviewTab; label: string; count: number; icon: typeof Clock }[] = [
     { key: "all",      label: t("teacher.grading.queuePage.tabs.all"),      count: submissions.length, icon: Inbox },
@@ -553,6 +637,50 @@ export function GradingQueue() {
           </div>
 
           {/* ── Loading / Error ── */}
+          {/* Bulk approve bar — only for assigned submissions */}
+          {sourceTab === "assigned" && selectedCount > 0 && (
+            <div className="flex flex-wrap items-center gap-3 px-4 py-3 rounded-2xl border border-violet-200 bg-violet-50/80 shadow-sm">
+              <div className="flex items-center gap-2 text-sm font-semibold text-violet-800">
+                <CheckSquare className="w-4 h-4" />
+                Đã chọn {selectedCount} bài
+              </div>
+              <button
+                type="button"
+                onClick={handleBulkApprove}
+                disabled={bulkApproving}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 disabled:opacity-60 shadow-sm shadow-violet-200 transition-colors"
+              >
+                {bulkApproving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Đang phê duyệt...
+                  </>
+                ) : (
+                  <>
+                    <UserCheck className="w-4 h-4" />
+                    Phê duyệt hàng loạt
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                disabled={bulkApproving}
+                className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-white/80 transition-colors"
+              >
+                Bỏ chọn
+              </button>
+              {bulkMessage && (
+                <span className="text-xs font-medium text-emerald-700 ml-auto">{bulkMessage}</span>
+              )}
+            </div>
+          )}
+          {sourceTab === "assigned" && bulkMessage && selectedCount === 0 && (
+            <div className="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-700 font-medium">
+              {bulkMessage}
+            </div>
+          )}
+
           {loading && (
             <div className="flex items-center justify-center py-20">
               <div className="w-10 h-10 rounded-full border-3 border-violet-200 border-t-violet-600 animate-spin" />
@@ -571,7 +699,24 @@ export function GradingQueue() {
               <table className="w-full">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100 select-none">
-                    <th className="px-5 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider rounded-tl-2xl">
+                    {sourceTab === "assigned" && (
+                      <th className="px-4 py-3.5 w-12 rounded-tl-2xl">
+                        <button
+                          type="button"
+                          onClick={toggleSelectAll}
+                          disabled={selectableSubs.length === 0}
+                          className="p-1 rounded-md text-violet-600 hover:bg-violet-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                          title={allSelectableSelected ? "Bỏ chọn tất cả" : "Chọn tất cả bài chờ duyệt"}
+                        >
+                          {allSelectableSelected ? (
+                            <CheckSquare className="w-4 h-4" />
+                          ) : (
+                            <Square className="w-4 h-4" />
+                          )}
+                        </button>
+                      </th>
+                    )}
+                    <th className={`px-5 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider ${sourceTab !== "assigned" ? "rounded-tl-2xl" : ""}`}>
                       {t("teacher.grading.table.student")}
                     </th>
                     <th className="px-5 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
@@ -634,15 +779,43 @@ export function GradingQueue() {
                     const cfg = STATUS_CONFIG[sub.status] ?? STATUS_CONFIG.submitted;
                     const isReviewed = !!sub.teacher_reviewed_at;
                     const isChanged = changedIds.has(sub.id);
+                    const isSelected = selectedIds.has(sub.id);
+                    const canSelect = sourceTab === "assigned" && !isReviewed;
                     return (
                       <tr
                         key={sub.id}
                         className={`transition-all duration-700 group ${
-                          isChanged
+                          isSelected
+                            ? "bg-violet-50/70"
+                            : isChanged
                             ? "bg-amber-50 ring-1 ring-inset ring-amber-200"
                             : "hover:bg-slate-50/70"
                         }`}
                       >
+                        {sourceTab === "assigned" && (
+                          <td className="px-4 py-4">
+                            {canSelect ? (
+                              <button
+                                type="button"
+                                onClick={() => toggleSelect(sub.id)}
+                                className={`p-1 rounded-md transition-colors ${
+                                  isSelected
+                                    ? "text-violet-600 bg-violet-100"
+                                    : "text-slate-400 hover:text-violet-600 hover:bg-violet-50"
+                                }`}
+                                title={isSelected ? "Bỏ chọn" : "Chọn để phê duyệt"}
+                              >
+                                {isSelected ? (
+                                  <CheckSquare className="w-4 h-4" />
+                                ) : (
+                                  <Square className="w-4 h-4" />
+                                )}
+                              </button>
+                            ) : (
+                              <span className="block w-6" />
+                            )}
+                          </td>
+                        )}
                         {/* Student */}
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-3">
