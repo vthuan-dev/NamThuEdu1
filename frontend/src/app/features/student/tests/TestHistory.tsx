@@ -172,6 +172,11 @@ export function TestHistory() {
   /* ── Per-type records (VSTEP 0-10, IELTS band 0-9) ── */
   const vstepSubs = submitted.filter(s => s.exam?.eType?.toUpperCase() === "VSTEP");
   const ieltsSubs = submitted.filter(s => s.exam?.eType?.toUpperCase() === "IELTS");
+  const otherSubs = submitted.filter(s => {
+    const t = s.exam?.eType?.toUpperCase();
+    return t !== "VSTEP" && t !== "IELTS";
+  });
+
   // sScore for VSTEP = overallAvg * 10  →  display as sScore / 10 (0-10 scale)
   // sScore for IELTS = band * 10        →  display as sScore / 10 (0-9 band)
   const bestVstepRaw  = vstepSubs.reduce((b, s) => Math.max(b, toNum(s.sScore)), 0);
@@ -180,6 +185,21 @@ export function TestHistory() {
   const bestIeltsDisp = ieltsSubs.length > 0 && bestIeltsRaw > 0 ? bestIeltsRaw / 10 : null;
   const avgVstepDisp  = vstepSubs.length > 0 ? vstepSubs.reduce((s, x) => s + toNum(x.sScore), 0) / vstepSubs.length / 10 : null;
   const avgIeltsDisp  = ieltsSubs.length > 0 ? ieltsSubs.reduce((s, x) => s + toNum(x.sScore), 0) / ieltsSubs.length / 10 : null;
+
+  const avgOtherDisp  = otherSubs.length > 0
+    ? otherSubs.reduce((sum, s) => {
+        const max = toNum(s.exam?.eMax_score ?? 100);
+        return sum + (max > 0 ? (toNum(s.sScore) / max * 100) : 0);
+      }, 0) / otherSubs.length
+    : null;
+
+  const bestOtherDisp = otherSubs.length > 0
+    ? otherSubs.reduce((best, s) => {
+        const max = toNum(s.exam?.eMax_score ?? 100);
+        const pct = max > 0 ? (toNum(s.sScore) / max * 100) : 0;
+        return Math.max(best, pct);
+      }, 0)
+    : null;
 
   /* CEFR distribution */
   const cefrDist = useMemo(() => {
@@ -275,8 +295,18 @@ export function TestHistory() {
             {[
               { label: "Tổng bài", value: totalTests, color: "#DDD6FE" },
               { label: "Đã nộp", value: submitted.length, color: "#FCD34D" },
-              { label: "Điểm TB", value: avgScore.toFixed(1), color: "#86EFAC" },
-              { label: "Cao nhất", value: bestScore > 0 ? bestScore.toFixed(1) : "—", color: "#FDBA74" },
+              ...(vstepSubs.length > 0 ? [
+                { label: "TB VSTEP", value: `${avgVstepDisp !== null ? avgVstepDisp.toFixed(1) : "—"}/10`, color: "#86EFAC" },
+                { label: "VSTEP Cao nhất", value: `${bestVstepDisp !== null ? bestVstepDisp.toFixed(1) : "—"}/10`, color: "#FDBA74" }
+              ] : []),
+              ...(ieltsSubs.length > 0 ? [
+                { label: "TB IELTS", value: `${avgIeltsDisp !== null ? avgIeltsDisp.toFixed(1) : "—"}/9`, color: "#93C5FD" },
+                { label: "IELTS Cao nhất", value: `${bestIeltsDisp !== null ? bestIeltsDisp.toFixed(1) : "—"}/9`, color: "#FCA5A5" }
+              ] : []),
+              ...(otherSubs.length > 0 ? [
+                { label: "TB Khác", value: `${avgOtherDisp !== null ? avgOtherDisp.toFixed(1) : "—"}%`, color: "#C6F6D5" },
+                { label: "Cao nhất Khác", value: `${bestOtherDisp !== null ? bestOtherDisp.toFixed(1) : "—"}%`, color: "#FEE2E2" }
+              ] : [])
             ].map((s) => (
               <div key={s.label} className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl"
                 style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.18)" }}>
@@ -800,8 +830,24 @@ export function TestHistory() {
                 <div className="flex divide-x divide-[#F0F0F8]" style={{ borderBottom: "1.5px solid #F0F0F8" }}>
                   {[
                     { label: "Bài đã thi", value: submitted.length },
-                    { label: "TB điểm", value: avgScore.toFixed(1) },
-                    { label: "Cao nhất", value: bestScore > 0 ? bestScore.toFixed(1) : "—" },
+                    { 
+                      label: "TB điểm", 
+                      value: vstepSubs.length > 0 && ieltsSubs.length === 0 && otherSubs.length === 0
+                        ? `${(avgScore / 10).toFixed(1)}/10`
+                        : ieltsSubs.length > 0 && vstepSubs.length === 0 && otherSubs.length === 0
+                        ? `${(avgScore / 10).toFixed(1)}/9`
+                        : `${avgScore.toFixed(1)}%` 
+                    },
+                    { 
+                      label: "Cao nhất", 
+                      value: bestEntry
+                        ? (bestEntry.exam?.eType?.toUpperCase() === "VSTEP"
+                          ? `${(bestScore / 10).toFixed(1)}/10`
+                          : bestEntry.exam?.eType?.toUpperCase() === "IELTS"
+                          ? `${(bestScore / 10).toFixed(1)}/9`
+                          : `${bestScore.toFixed(1)}/${bestMax}`)
+                        : "—" 
+                    },
                   ].map(st => (
                     <div key={st.label} className="flex-1 py-2.5 text-center">
                       <p style={{ fontSize: 15, fontWeight: 900, color: "#1F1344", lineHeight: 1 }}>{st.value}</p>
