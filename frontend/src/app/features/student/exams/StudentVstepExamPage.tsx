@@ -1818,6 +1818,17 @@ function HighlightablePassage({
     return /^(passage|text|reading|đoạn|bài đọc)\s*\d+/i.test(t);
   };
 
+  /* Bold paragraph identifiers like A, B, C, D... at the start of a paragraph */
+  const boldSectionPrefix = (htmlStr: string): string => {
+    return htmlStr.replace(
+      /^(<mark[^>]*>)?([A-Z])(<\/mark>)?(\s|\.|\)|:\s|&nbsp;)/,
+      (match, openMark, letter, closeMark, suffix) => {
+        const boldLetter = `<strong style="font-weight:800;font-size:1.15em;color:#0f172a;margin-right:2px">${letter}</strong>`;
+        return `${openMark || ''}${boldLetter}${closeMark || ''}${suffix}`;
+      }
+    );
+  };
+
   /* Render one paragraph — divider lines become a visual <hr> separator */
   const renderPara = (para: string): string => {
     const t = para.trim();
@@ -1827,7 +1838,9 @@ function HighlightablePassage({
         + `<div style="flex:1;border-top:2px dashed #cbd5e1"></div>`
         + `</div>`;
     }
-    return `<p style="font-size:17px;line-height:1.8;margin-bottom:1em">${escHtml(t)}</p>`;
+    const escaped = escHtml(t);
+    const formatted = boldSectionPrefix(escaped);
+    return `<p style="font-size:17px;line-height:1.8;margin-bottom:1em">${formatted}</p>`;
   };
 
   /* Build rendered HTML with <mark> tags and paragraph support */
@@ -1858,7 +1871,8 @@ function HighlightablePassage({
           + `<div style="flex:1;border-top:2px dashed #cbd5e1"></div>`
           + `</div>`;
       }
-      return `<p style="font-size:17px;line-height:1.8;margin-bottom:1em">${para.trim()}</p>`;
+      const formatted = boldSectionPrefix(para.trim());
+      return `<p style="font-size:17px;line-height:1.8;margin-bottom:1em">${formatted}</p>`;
     }).join("");
   }, [plainText, highlights]);
 
