@@ -21,7 +21,7 @@ const PRIMARY = "#0ea5e9"; // Sky Blue
 const STUDENT_BASE_PATH = "/hoc-vien";
 
 // ─── Score Circle ─────────────────────────────────────────────────────────────
-function ScoreCircle({ score: rawScore, maxScore: rawMaxScore = 100 }: { score: number | string; maxScore?: number | string }) {
+function ScoreCircle({ score: rawScore, maxScore: rawMaxScore = 100, isVstep }: { score: number | string; maxScore?: number | string; isVstep?: boolean }) {
   const score = typeof rawScore === "number" ? rawScore : parseFloat(rawScore) || 0;
   const maxScore = typeof rawMaxScore === "number" ? rawMaxScore : parseFloat(rawMaxScore) || 100;
   const circumference = 2 * Math.PI * 54;
@@ -49,7 +49,7 @@ function ScoreCircle({ score: rawScore, maxScore: rawMaxScore = 100 }: { score: 
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span style={{ fontSize: 32, fontWeight: 900, color: "#0F172A", lineHeight: 1 }}>
-          {displayScore.toFixed(2)}
+          {isVstep ? displayScore.toFixed(1) : displayScore.toFixed(2)}
         </span>
         <span style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>
           / 10
@@ -218,7 +218,7 @@ export function ResultDetail({ modalSubmissionId }: { modalSubmissionId?: number
               </div>
             </div>
           ) : (
-            <ScoreCircle score={score} maxScore={maxScore} />
+            <ScoreCircle score={score} maxScore={maxScore} isVstep={isVstep} />
           )}
           
           <div className="text-center">
