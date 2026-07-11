@@ -1840,7 +1840,7 @@ function HighlightablePassage({
     }
     const escaped = escHtml(t);
     const formatted = boldSectionPrefix(escaped);
-    return `<p style="font-size:17px;line-height:1.8;margin-bottom:1em">${formatted}</p>`;
+    return `<p style="font-size:17px;line-height:1.8;margin-bottom:1em;color:#0f172a">${formatted}</p>`;
   };
 
   /* Build rendered HTML with <mark> tags and paragraph support */
@@ -1872,7 +1872,7 @@ function HighlightablePassage({
           + `</div>`;
       }
       const formatted = boldSectionPrefix(para.trim());
-      return `<p style="font-size:17px;line-height:1.8;margin-bottom:1em">${formatted}</p>`;
+      return `<p style="font-size:17px;line-height:1.8;margin-bottom:1em;color:#0f172a">${formatted}</p>`;
     }).join("");
   }, [plainText, highlights]);
 
