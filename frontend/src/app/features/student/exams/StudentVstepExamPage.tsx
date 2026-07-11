@@ -1797,10 +1797,32 @@ function HighlightablePassage({
   /* Escape HTML special chars in plain text segments */
   const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+  /* Detect if a paragraph is a passage boundary label:
+   * e.g. "PASSAGE 1", "Passage 2", "Text 1", "Reading 1", "Đoạn 1"
+   * Returns true for short (≤60 chars) lines matching these patterns.
+   */
+  const isPassageDivider = (para: string): boolean => {
+    const t = para.trim();
+    if (!t || t.length > 60) return false;
+    return /^(passage|text|reading|đoạn|bài đọc)\s*\d+/i.test(t);
+  };
+
+  /* Render one paragraph — divider lines become a visual <hr> separator */
+  const renderPara = (para: string): string => {
+    const t = para.trim();
+    if (!t) return "";
+    if (isPassageDivider(t)) {
+      return `<div style="margin:2em 0 1.5em;display:flex;align-items:center;gap:12px">`
+        + `<div style="flex:1;border-top:2px dashed #cbd5e1"></div>`
+        + `</div>`;
+    }
+    return `<p style="font-size:17px;line-height:1.8;margin-bottom:1em">${escHtml(t)}</p>`;
+  };
+
   /* Build rendered HTML with <mark> tags and paragraph support */
   const renderedHtml = useMemo(() => {
     const toHtml = (s: string) =>
-      s.split("\n\n").map((para) => `<p style="font-size:17px;line-height:1.8;margin-bottom:1em">${escHtml(para.trim())}</p>`).join("");
+      s.split("\n\n").map((para) => renderPara(para)).join("");
 
     if (!highlights.length) return toHtml(plainText);
 
@@ -1817,7 +1839,16 @@ function HighlightablePassage({
       cursor = h.end_offset;
     }
     flat += escHtml(plainText.slice(cursor));
-    return flat.split("\n\n").map((para) => `<p style="font-size:17px;line-height:1.8;margin-bottom:1em">${para.trim()}</p>`).join("");
+    return flat.split("\n\n").map((para) => {
+      /* Divider lines don't contain highlights — safe to render as divider */
+      const plain = para.replace(/<[^>]*>/g, "").trim();
+      if (isPassageDivider(plain)) {
+        return `<div style="margin:2em 0 1.5em;display:flex;align-items:center;gap:12px">`
+          + `<div style="flex:1;border-top:2px dashed #cbd5e1"></div>`
+          + `</div>`;
+      }
+      return `<p style="font-size:17px;line-height:1.8;margin-bottom:1em">${para.trim()}</p>`;
+    }).join("");
   }, [plainText, highlights]);
 
   /* Click on existing mark to delete */
