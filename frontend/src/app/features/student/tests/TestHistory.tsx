@@ -514,17 +514,22 @@ export function TestHistory() {
 
                   <div className="space-y-2">
                     {items.map((s: any) => {
-                      const score     = toNum(s.sScore);
-                      const examMax   = toNum(s.exam?.eMax_score ?? 100);
+                      const examType  = s.exam?.eType?.toUpperCase();
+                      const isVstep   = examType === "VSTEP";
+                      const isIelts   = examType === "IELTS";
+                      const isThpt    = examType === "THPT";
+
+                      const rawScore  = toNum(s.sScore);
+                      const rawMax    = toNum(s.exam?.eMax_score ?? 100);
+
+                      const score     = isVstep || isIelts ? rawScore / 10 : rawScore;
+                      const examMax   = isVstep ? 10 : isIelts ? 9 : rawMax;
+
                       const scorePct  = examMax > 0 ? (score / examMax) * 100 : 0;
                       const cefr      = getCEFR(score, examMax);
                       const status    = getStatusChip(s.sStatus);
                       const skillMeta = getSkillMeta(s.exam?.eSkill, s.exam?.eType);
                       const SkillIcon = skillMeta.icon;
-                      const examType  = s.exam?.eType?.toUpperCase();
-                      const isVstep   = examType === "VSTEP";
-                      const isIelts   = examType === "IELTS";
-                      const isThpt    = examType === "THPT";
                       const isPending = s.sStatus === "grading_subjective";
                       const isInProg  = s.sStatus === "in_progress";
                       const timeDiff  = getTimeDiff(s.sStart_time, s.sSubmit_time);
