@@ -251,6 +251,13 @@ export interface ListeningSection extends BaseSection {
   type: 'listening';
   audio_url: string;
   transcript?: string;
+  /**
+   * Ảnh đề nguyên khối (form/note) — nếu có thì HS xem layout 2 cột:
+   * trái = ảnh đề, phải = câu trả lời (giống IELTS).
+   */
+  task_image?: string;
+  /** 'image_block' khi GV chọn dạng nghe + ảnh đề */
+  layout?: 'default' | 'image_block';
   items: ListeningItem[];
 }
 

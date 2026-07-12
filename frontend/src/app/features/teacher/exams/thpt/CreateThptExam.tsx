@@ -259,8 +259,12 @@ export function CreateThptExam() {
   };
 
   // ── Section ops ────────────────────────────────────────────────────────
-  const addSection = (type: SectionType, initItemKind?: 'mc' | 'fill_blank') => {
-    const newSec = createSection(type, nextQuestionNumber(config.sections), initItemKind);
+  const addSection = (
+    type: SectionType,
+    initItemKind?: 'mc' | 'fill_blank',
+    initLayout?: 'image_block',
+  ) => {
+    const newSec = createSection(type, nextQuestionNumber(config.sections), initItemKind, initLayout);
     setConfig((prev) => ({ ...prev, sections: [...prev.sections, newSec] }));
     setActiveIdx(config.sections.length);
     setHasUnsaved(true);

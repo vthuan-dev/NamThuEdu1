@@ -1,13 +1,8 @@
 /**
  * TeensTests — Trang "Bài tập" cho học viên Teens (13–17)
  *
- * 2 chế độ xem (tab):
- *  1. "Tất cả bài tập"  → browseTeensExams: LẤY HẾT đề teens đã publish.
- *                         Đề được giáo viên giao riêng có gắn nhãn "Cô giao".
- *                         Đề tự do thì làm trực tiếp (direct=1, không cần assignment).
- *  2. "Giáo viên giao"  → getTests: chỉ các đề thầy cô giao (assignment) + trạng thái.
- *
- * Style: teal/slate chuyên nghiệp — đồng bộ TeensLayout/TeensDashboard.
+ * CHỈ hiển thị đề đã được giáo viên giao (assignment qua getTests).
+ * Không browse full bank teens/THPT.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
@@ -25,7 +20,6 @@ const BASE = '/hoc-vien';
 const TEAL = '#0D9488';
 const TEAL_MID = '#14B8A6';
 
-type Tab = 'all' | 'assigned';
 type Status = 'pending' | 'in_progress' | 'completed';
 
 const SKILL_LABELS: Record<string, string> = {
@@ -97,18 +91,24 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
   // thpt_config; các đề thường (questions[]) dùng engine teens cũ.
   const isThpt = String(item.type ?? '').toUpperCase() === 'THPT';
 
+  // Assigned-only: luôn đi qua assignment khi có assignmentId.
+  // Không fallback free direct (backend đã chặn start-teens nếu chưa được giao).
   const startTo = isThpt
-    ? (effectiveAssigned && item.assignmentId
+    ? (item.assignmentId
       ? `${BASE}/lam-bai-thpt/${item.examId}?assignmentId=${item.assignmentId}`
-      : `${BASE}/lam-bai-thpt/${item.examId}`)
-    : (effectiveAssigned && item.assignmentId
+      : `${BASE}/bai-tap`)
+    : (item.assignmentId
       ? `${BASE}/phong-cho/${item.assignmentId}`
-      : `${BASE}/lam-bai/${item.examId}?autostart=1&direct=1`);
+      : `${BASE}/bai-tap`);
 
-  // Làm lại luôn đi đường direct (không vướng giới hạn assignment)
+  // Làm lại vẫn qua assignment để tôn trọng số lần / phòng chờ
   const redoTo = isThpt
-    ? `${BASE}/lam-bai-thpt/${item.examId}`
-    : `${BASE}/lam-bai/${item.examId}?autostart=1&direct=1`;
+    ? (item.assignmentId
+      ? `${BASE}/lam-bai-thpt/${item.examId}?assignmentId=${item.assignmentId}`
+      : `${BASE}/bai-tap`)
+    : (item.assignmentId
+      ? `${BASE}/phong-cho/${item.assignmentId}`
+      : `${BASE}/bai-tap`);
 
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-xl bg-white ring-1 ring-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all duration-300 hover:-translate-y-0.5 hover:ring-teal-300/70 hover:shadow-[0_12px_26px_-14px_rgba(13,148,136,0.3)]">
@@ -212,45 +212,17 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
 
 export function TeensTests() {
   usePageTitle(PAGE_TITLES.STUDENT_TESTS);
-  const [tab, setTab] = useState<Tab>('all');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'duration' | 'questions'>('newest');
 
-  // Tab "Tất cả" — luôn lấy hết đề teens đã publish
-  const { data: browseData, isLoading: browseLoading } = useQuery({
-    queryKey: ['student', 'tests', 'teens-browse'],
-    queryFn: () => studentApi.browseTeensExams(),
-  });
-
-  // Tab "Giáo viên giao" — chỉ đề được gán
+  // Chỉ đề giáo viên giao
   const { data: assignedData, isLoading: assignedLoading } = useQuery({
     queryKey: ['student', 'tests', 'teens-assigned'],
     queryFn: () => studentApi.getTests({}),
   });
 
-  const allExams: TeensExamItem[] = useMemo(() => {
-    const list = (browseData as any)?.data?.data ?? [];
-    return list.map((e: any) => ({
-      key: `exam-${e.id}`,
-      examId: e.id,
-      title: e.title,
-      type: e.type,
-      skill: e.skill,
-      scope: e.scope,
-      partNumber: e.part_number ?? null,
-      duration: e.duration,
-      questions: e.questions_count,
-      status: (e.submission_status ?? 'pending') as Status,
-      submissionId: e.submission_id ?? null,
-      assignmentId: e.assignment_id ?? null,
-      isAssigned: !!e.is_assigned,
-      deadline: e.deadline ?? null,
-      createdAt: e.created_at ?? null,
-    }));
-  }, [browseData]);
-
-  const assignedExams: TeensExamItem[] = useMemo(() => {
+    const assignedExams: TeensExamItem[] = useMemo(() => {
     const groups = (assignedData as any)?.data?.data;
     if (!groups) return [];
     const map = (arr: any[], s: Status) => (arr || []).map((t: any) => ({
@@ -278,8 +250,8 @@ export function TeensTests() {
     ].filter((t) => !isPastDeadline(t.deadline));
   }, [assignedData]);
 
-  const source = tab === 'all' ? allExams : assignedExams;
-  const isLoading = tab === 'all' ? browseLoading : assignedLoading;
+  const source = assignedExams;
+  const isLoading = assignedLoading;
 
   const visible = useMemo(() => {
     let result = source;
@@ -311,7 +283,7 @@ export function TeensTests() {
   // ─── Phân trang: 12 bài / trang ───────────────────────────────────────────
   const PAGE_SIZE = 12;
   const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [tab, search, statusFilter, sortBy]);
+  useEffect(() => { setPage(1); }, [search, statusFilter, sortBy]);
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
   const paged = useMemo(
@@ -323,10 +295,10 @@ export function TeensTests() {
   // (assignedExams đã loại các bài quá hạn deadline). Nếu đếm từ allExams sẽ lệch.
   const assignedCount = assignedExams.length;
   const stats = {
-    total: allExams.length,
-    pending: allExams.filter((e) => e.status === 'pending').length,
-    inProgress: allExams.filter((e) => e.status === 'in_progress').length,
-    completed: allExams.filter((e) => e.status === 'completed').length,
+    total: assignedExams.length,
+    pending: assignedExams.filter((e) => e.status === 'pending').length,
+    inProgress: assignedExams.filter((e) => e.status === 'in_progress').length,
+    completed: assignedExams.filter((e) => e.status === 'completed').length,
   };
 
   return (
@@ -347,9 +319,9 @@ export function TeensTests() {
               <ClipboardList className="w-6 h-6 text-white" />
             </div>
             <div>
-              <p className="text-teal-200 text-xs font-bold tracking-widest uppercase mb-1">Đề luyện</p>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight">Đề luyện của tôi</h1>
-              <p className="text-teal-100 text-sm mt-1">Đề thầy cô đăng để bạn luyện tập — chọn một đề để bắt đầu nhé!</p>
+              <p className="text-teal-200 text-xs font-bold tracking-widest uppercase mb-1">Bài được giao</p>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight">Bài giáo viên giao</h1>
+              <p className="text-teal-100 text-sm mt-1">Chỉ hiện bài giáo viên đã giao cho bạn — chọn một bài để bắt đầu nhé!</p>
             </div>
           </div>
 
@@ -364,7 +336,7 @@ export function TeensTests() {
               <div key={s.label} className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl"
                 style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)' }}>
                 <span className="text-xl font-extrabold tabular-nums" style={{ color: s.color }}>
-                  {browseLoading ? '—' : s.value}
+                  {assignedLoading ? '—' : s.value}
                 </span>
                 <span className="text-xs font-semibold text-teal-100">{s.label}</span>
               </div>
@@ -376,28 +348,16 @@ export function TeensTests() {
       {/* ══ Toolbar ════════════════════════════════════════════════════════════ */}
       <div className="px-6 sm:px-8 lg:px-10 py-5 max-w-[1600px] mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
-          {/* Tabs */}
-          <div className="flex items-center gap-1 p-1 rounded-2xl bg-white border border-slate-200">
-            <button onClick={() => setTab('all')}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all"
-              style={tab === 'all'
-                ? { background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})`, color: '#fff', boxShadow: `0 4px 14px ${TEAL}40` }
-                : { background: 'transparent', color: '#64748B' }}>
-              <Sparkles className="w-4 h-4" /> Tất cả đề luyện
-            </button>
-            <button onClick={() => setTab('assigned')}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all"
-              style={tab === 'assigned'
-                ? { background: 'linear-gradient(135deg, #4F46E5, #6366F1)', color: '#fff', boxShadow: '0 4px 14px rgba(79,70,229,0.3)' }
-                : { background: 'transparent', color: '#64748B' }}>
-              <Gift className="w-4 h-4" /> Giáo viên giao
-              {assignedCount > 0 && (
-                <span className="text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5 font-bold"
-                  style={tab === 'assigned' ? { background: 'rgba(255,255,255,0.25)' } : { background: '#EEF2FF', color: '#4F46E5' }}>
-                  {assignedCount}
-                </span>
-              )}
-            </button>
+          {/* Assigned-only badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white"
+            style={{ background: 'linear-gradient(135deg, #4F46E5, #6366F1)', boxShadow: '0 4px 14px rgba(79,70,229,0.3)' }}>
+            <Gift className="w-4 h-4" /> Giáo viên giao
+            {assignedCount > 0 && (
+              <span className="text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5 font-bold"
+                style={{ background: 'rgba(255,255,255,0.25)' }}>
+                {assignedCount}
+              </span>
+            )}
           </div>
 
           {/* Bộ lọc trạng thái */}
@@ -452,23 +412,19 @@ export function TeensTests() {
           <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">
             <div className="w-20 h-20 rounded-2xl mx-auto flex items-center justify-center mb-5"
               style={{ background: '#CCFBF1' }}>
-              {tab === 'assigned'
-                ? <Gift className="w-10 h-10" style={{ color: TEAL }} />
-                : <AlertTriangle className="w-10 h-10" style={{ color: TEAL }} />}
+              <Gift className="w-10 h-10" style={{ color: TEAL }} />
             </div>
             <h3 className="text-lg font-extrabold text-slate-800">
-              {search ? 'Không tìm thấy bài nào' : tab === 'assigned' ? 'Chưa có bài giáo viên giao riêng' : 'Chưa có bài tập nào'}
+              {search ? 'Không tìm thấy bài nào' : 'Chưa có bài giáo viên giao'}
             </h3>
             <p className="text-sm text-slate-500 mt-1">
-              {search ? 'Thử từ khóa khác nhé!' : tab === 'assigned'
-                ? 'Khi thầy cô giao bài riêng, bài sẽ hiện ở đây.'
-                : 'Thầy cô chưa đăng bài tập nào. Hãy quay lại sau nhé!'}
+              {search ? 'Thử từ khóa khác nhé!' : 'Khi thầy cô giao bài, bài sẽ hiện ở đây.'}
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {paged.map((t) => (
-              <ExamCard key={t.key} item={t} showAssignedBadge={tab === 'all'} />
+              <ExamCard key={t.key} item={t} showAssignedBadge={false} />
             ))}
           </div>
         )}

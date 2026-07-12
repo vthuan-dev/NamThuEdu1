@@ -167,17 +167,18 @@ const SECTION_GUIDE: Record<string, GuideContent> = {
       'Gốc: "He is too young to drive."\nĐầu câu: "He isn\'t…"\n→ He isn\'t old enough to drive.',
   },
   listening: {
-    short: 'Tải audio + câu trắc nghiệm và/hoặc điền chỗ trống.',
+    short: 'Tải audio (+ ảnh đề nếu cần) + câu trắc nghiệm và/hoặc điền chỗ trống.',
     grading: 'auto',
     steps: [
       'Tải file audio (mp3 / m4a / wav…).',
+      'Tuỳ chọn: tải 1 ảnh đề nguyên khối (form/note) — HS thấy trái ảnh, phải câu (kiểu IELTS).',
       'Thêm transcript nếu muốn (ẩn với học viên).',
       'Mỗi câu: chọn dạng Trắc nghiệm hoặc Điền chỗ trống.',
       'Trắc nghiệm: 4 phương án + chọn đáp án đúng.',
       'Điền chỗ trống: prompt (có ____) + đáp án chấp nhận (cách bằng dấu phẩy).',
     ],
     example:
-      '[Audio] → What time is the meeting?\nA. 9AM   B. 10AM ✓\n\n[Audio] → The train leaves at ____.\n→ Đáp án: 8.30 / 8:30',
+      '[Audio + Ảnh form] → What time is the meeting?\nA. 9AM   B. 10AM ✓\n\n[Audio] → The train leaves at ____.\n→ Đáp án: 8.30 / 8:30',
   },
   speaking: {
     short: 'Đề nói — học viên ghi âm, AI chấm.',
@@ -720,8 +721,11 @@ function McQuestionsEditor({ section, all, onChange }: { section: Extract<ThptSe
 // ════════════════════════════════════════════════════════════════════════════
 function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSection, { type: 'listening' }>; all: ThptSection[]; onChange: (s: ThptSection) => void }) {
   const [uploading, setUploading] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
   const [err, setErr] = useState('');
   const update = (items: typeof section.items) => onChange({ ...section, items });
+  const isImageBlock =
+    (section.layout ?? (section.task_image ? 'image_block' : 'default')) === 'image_block';
 
   const uploadAudio = async (file: File) => {
     setUploading(true); setErr('');
@@ -744,6 +748,32 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
     }
   };
 
+  const uploadTaskImage = async (file: File) => {
+    setImageUploading(true); setErr('');
+    try {
+      const fd = new FormData();
+      fd.append('image', file, file.name);
+      fd.append('questionId', `thpt-listening-img-${section.id}`);
+      const token = localStorage.getItem('auth_token');
+      const endpoint = token ? '/teacher/upload/image' : '/test/upload/image';
+      const { data: result } = await api.post(endpoint, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const url = result?.data?.imageUrl || result?.data?.url || result?.data?.path;
+      if (result.success && url) {
+        onChange({
+          ...section,
+          task_image: String(url),
+          layout: 'image_block',
+        });
+      } else {
+        throw new Error(result.message || 'Upload ảnh thất bại');
+      }
+    } catch (e: any) {
+      setErr(e?.response?.data?.message || e?.message || 'Lỗi tải ảnh đề');
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
   const setKind = (idx: number, kind: 'mc' | 'fill_blank') => {
     const item = section.items[idx] as any;
     const qn = item.question_number;
@@ -760,6 +790,37 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
   return (
     <div className="space-y-4">
       <InlineGuide type="listening" />
+
+      {/* Layout mode */}
+      <div className="rounded-xl bg-white border border-slate-200 p-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-bold text-slate-500">Layout HS:</span>
+        <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-slate-100">
+          <button
+            type="button"
+            onClick={() => onChange({ ...section, layout: 'default' })}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+              !isImageBlock ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+            }`}
+          >
+            Câu hỏi dọc
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange({ ...section, layout: 'image_block' })}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+              isImageBlock ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+            }`}
+          >
+            Ảnh đề + câu (2 cột)
+          </button>
+        </div>
+        {isImageBlock && (
+          <span className="text-[11px] text-sky-700 font-medium">
+            Học viên: trái = ảnh đề · phải = câu trả lời
+          </span>
+        )}
+      </div>
+
       {/* Audio uploader */}
       <div className="rounded-xl bg-white border border-slate-200 p-4">
         <p className="text-xs font-bold text-slate-500 mb-2">Audio cho phần Nghe</p>
@@ -787,6 +848,70 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
           placeholder="Transcript (tuỳ chọn — không hiển thị cho học viên khi thi)"
           className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 mt-3 focus:outline-none focus:ring-2 focus:ring-blue-200"
         />
+      </div>
+
+      {/* Task image uploader */}
+      <div className="rounded-xl bg-white border border-slate-200 p-4">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <p className="text-xs font-bold text-slate-500">Ảnh đề nguyên khối (form / note)</p>
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-sky-600">Tuỳ chọn · IELTS-style</span>
+        </div>
+        <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
+          Upload 1 ảnh chứa/note cho cả phần. Học viên sẽ thấy ảnh bên trái, câu hỏi/đáp án bên phải.
+          Không upload thì vẫn dùng layout câu hỏi dọc như cũ.
+        </p>
+        {section.task_image ? (
+          <div className="space-y-2">
+            <div className="relative rounded-xl border border-emerald-200 bg-emerald-50/40 overflow-hidden">
+              <img
+                src={section.task_image}
+                alt="Ảnh đề"
+                className="w-full max-h-64 object-contain bg-white"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:border-blue-300 cursor-pointer">
+                {imageUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                Đổi ảnh
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={imageUploading}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) uploadTaskImage(f);
+                    e.currentTarget.value = '';
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => onChange({ ...section, task_image: '', layout: 'default' })}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-200 text-xs font-semibold text-rose-600 hover:bg-rose-50 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Xoá ảnh
+              </button>
+            </div>
+          </div>
+        ) : (
+          <label className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-sky-200 bg-sky-50/40 px-4 py-4 cursor-pointer hover:border-sky-400 transition-colors text-sm font-medium text-sky-700">
+            {imageUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            {imageUploading ? 'Đang tải ảnh…' : 'Chọn ảnh đề (jpg, png, webp…)'}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={imageUploading}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) uploadTaskImage(f);
+                e.currentTarget.value = '';
+              }}
+            />
+          </label>
+        )}
       </div>
 
       {section.items.map((item: any, idx) => {
@@ -822,7 +947,13 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
                 update(items);
               }}
               rows={2}
-              placeholder={kind === 'fill_blank' ? 'Câu hỏi / prompt (dùng ____ cho chỗ trống)' : 'Nội dung câu hỏi nghe'}
+              placeholder={
+                isImageBlock
+                  ? (kind === 'fill_blank'
+                    ? 'Câu hỏi ngắn (ảnh đề đã hiện bên trái) — dùng ____ nếu cần'
+                    : 'Câu hỏi ngắn (ảnh đề đã hiện bên trái HS)')
+                  : (kind === 'fill_blank' ? 'Câu hỏi / prompt (dùng ____ cho chỗ trống)' : 'Nội dung câu hỏi nghe')
+              }
               className="mb-3"
             />
 

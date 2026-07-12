@@ -393,7 +393,8 @@ export const studentRoutes: RouteObject = {
     // Exam routes
     {
       path: 'de-thi',
-      element: <Suspense fallback={<LoadingFallback />}><StudentExamBrowser /></Suspense>,
+      // Policy assigned-only: không browse full bank VSTEP/IELTS
+      element: <Navigate to="/hoc-vien/bai-tap" replace />,
     },
     // Legacy routes (shared functionality)
     {
@@ -564,7 +565,8 @@ export const adultsRoutes: RouteObject = {
     },
     {
       path: 'de-thi',
-      element: <Suspense fallback={<LoadingFallback />}><StudentExamBrowser /></Suspense>,
+      // Policy assigned-only: không browse full bank VSTEP/IELTS
+      element: <Navigate to="/hoc-vien/bai-tap" replace />,
     },
     {
       path: 'analytics',

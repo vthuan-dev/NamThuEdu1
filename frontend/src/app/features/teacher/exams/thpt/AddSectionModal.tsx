@@ -6,7 +6,11 @@ import { THPT_THEME } from './sections';
 interface Props {
   open: boolean;
   onClose: () => void;
-  onPick: (type: SectionType, initItemKind?: 'mc' | 'fill_blank') => void;
+  onPick: (
+    type: SectionType,
+    initItemKind?: 'mc' | 'fill_blank',
+    initLayout?: 'image_block',
+  ) => void;
 }
 
 const GROUP_LABELS: Record<string, string> = {
@@ -24,6 +28,8 @@ interface OptionMeta {
   icon: string;
   group: 'language' | 'reading' | 'writing' | 'listening' | 'speaking';
   initItemKind?: 'mc' | 'fill_blank';
+  initLayout?: 'image_block';
+  badge?: string;
 }
 
 const MODAL_OPTIONS: OptionMeta[] = [
@@ -128,6 +134,16 @@ const MODAL_OPTIONS: OptionMeta[] = [
     initItemKind: 'fill_blank',
   },
   {
+    type: 'listening',
+    label: 'Nghe + ảnh đề (form/note)',
+    description: 'Audio + 1 ảnh đề nguyên khối — HS: trái ảnh, phải câu (kiểu IELTS)',
+    icon: 'Image',
+    group: 'listening',
+    initItemKind: 'mc',
+    initLayout: 'image_block',
+    badge: 'Ảnh đề',
+  },
+  {
     type: 'speaking',
     label: 'Nói (Speaking)',
     description: 'Đề nói — học viên ghi âm, AI chấm điểm',
@@ -178,10 +194,10 @@ export function AddSectionModal({ open, onClose, onPick }: Props) {
                     const Icon = (Icons as any)[meta.icon] ?? Icons.Square;
                     return (
                       <button
-                        key={meta.label + meta.type}
+                        key={meta.label + meta.type + (meta.initLayout ?? meta.initItemKind ?? '')}
                         type="button"
                         onClick={() => {
-                          onPick(meta.type, meta.initItemKind);
+                          onPick(meta.type, meta.initItemKind, meta.initLayout);
                           onClose();
                         }}
                         className="text-left rounded-xl border border-slate-200 p-4 hover:border-blue-400 hover:shadow-sm transition-all cursor-pointer group"
@@ -194,9 +210,16 @@ export function AddSectionModal({ open, onClose, onPick }: Props) {
                             <Icon className="w-5 h-5" style={{ color: THPT_THEME.primary }} />
                           </div>
                           <div className="min-w-0">
-                            <p className="text-sm font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
-                              {meta.label}
-                            </p>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <p className="text-sm font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
+                                {meta.label}
+                              </p>
+                              {meta.badge && (
+                                <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-700">
+                                  {meta.badge}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs text-slate-500 mt-0.5 leading-snug">
                               {meta.description}
                             </p>

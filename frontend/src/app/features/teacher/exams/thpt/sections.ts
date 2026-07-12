@@ -219,8 +219,14 @@ const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 /**
  * Tạo section trống theo type.
+ * @param initLayout 'image_block' = Nghe + ảnh đề nguyên khối (IELTS-style)
  */
-export function createSection(type: SectionType, startNum: number, initItemKind?: 'mc' | 'fill_blank'): ThptSection {
+export function createSection(
+  type: SectionType,
+  startNum: number,
+  initItemKind?: 'mc' | 'fill_blank',
+  initLayout?: 'image_block',
+): ThptSection {
   const base = { id: sid(), points_per_question: 1 };
   switch (type) {
     case 'phonetics':
@@ -319,17 +325,31 @@ export function createSection(type: SectionType, startNum: number, initItemKind?
         instructions: 'Viết lại câu sao cho nghĩa không đổi.',
         items: [makeTransformItem(startNum)],
       };
-    case 'listening':
+    case 'listening': {
+      const isImageBlock = initLayout === 'image_block';
       return {
         ...base,
         type: 'listening',
-        title: initItemKind === 'fill_blank' ? 'Nghe điền chỗ trống' : 'Nghe trắc nghiệm',
-        instructions: initItemKind === 'fill_blank' 
-          ? 'Nghe đoạn ghi âm và điền từ thích hợp vào chỗ trống.' 
-          : 'Nghe đoạn ghi âm rồi chọn đáp án đúng.',
+        title: isImageBlock
+          ? 'Nghe + ảnh đề'
+          : initItemKind === 'fill_blank'
+            ? 'Nghe điền chỗ trống'
+            : 'Nghe trắc nghiệm',
+        instructions: isImageBlock
+          ? 'Nghe đoạn ghi âm, xem ảnh đề và trả lời các câu hỏi (trắc nghiệm / điền từ).'
+          : initItemKind === 'fill_blank'
+            ? 'Nghe đoạn ghi âm và điền từ thích hợp vào chỗ trống.'
+            : 'Nghe đoạn ghi âm rồi chọn đáp án đúng.',
         audio_url: '',
-        items: [initItemKind === 'fill_blank' ? makeListeningFillItem(startNum) : makeListeningMcItem(startNum)],
+        task_image: '',
+        layout: isImageBlock ? 'image_block' : 'default',
+        items: [
+          initItemKind === 'fill_blank'
+            ? makeListeningFillItem(startNum)
+            : makeListeningMcItem(startNum),
+        ],
       };
+    }
     case 'speaking':
       return {
         ...base,

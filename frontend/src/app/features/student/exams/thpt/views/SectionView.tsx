@@ -57,6 +57,13 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
     (section.type === 'mc_cloze' || section.type === 'reading_mixed') &&
     !!passageText && passageText.trim().length > 0;
 
+  // Listening image-block (IELTS-style): trái = ảnh đề, phải = câu hỏi
+  // layout === 'default' => không chia 2 cột dù vẫn còn task_image (GV tắt layout)
+  const taskImage = String((section as any).task_image || '').trim();
+  const layoutMode = String((section as any).layout || (taskImage ? 'image_block' : 'default'));
+  const isListeningImageBlock =
+    section.type === 'listening' && taskImage.length > 0 && layoutMode === 'image_block';
+
   const headerEl = !hideHeader ? (
     // Ghim header khi cuộn để học viên luôn thấy dạng đề đang làm.
     // top-[68px] để nằm ngay dưới ThptTopBar (sticky top-0).
@@ -84,6 +91,55 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
           {/* Cột câu hỏi — cuộn riêng */}
           <div className="lg:overflow-y-auto lg:pr-1 space-y-5">
             <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} writingParts={writingParts} correctQuestions={correctQuestions} hidePassage />
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (isListeningImageBlock) {
+    return (
+      <section className="space-y-5">
+        {headerEl}
+        {/* Audio sticky full-width trên ảnh + câu */}
+        {(section as any).audio_url && (
+          <div className="rounded-xl border border-slate-200 bg-white p-3 flex items-center gap-3 sticky top-[68px] z-10">
+            <Headphones className="w-4 h-4 text-teal-600 flex-shrink-0" />
+            <audio controls src={(section as any).audio_url} className="w-full h-10" />
+          </div>
+        )}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:h-[calc(100vh-18rem)]">
+          <div className="lg:overflow-y-auto lg:pr-1">
+            <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-teal-700">Ảnh đề</span>
+              </div>
+              <a href={taskImage} target="_blank" rel="noreferrer" className="block group relative">
+                <img
+                  src={taskImage}
+                  alt="Ảnh đề"
+                  className="w-full object-contain rounded-xl border border-slate-100 bg-slate-50 max-h-[calc(100vh-22rem)]"
+                />
+                <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-black/50 text-white text-[11px] font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                  Phóng to
+                </span>
+              </a>
+            </div>
+          </div>
+          <div className="lg:overflow-y-auto lg:pr-1 space-y-5">
+            <Body
+              section={section}
+              answers={answers}
+              correctAnswers={correctAnswers}
+              onAnswerChange={onAnswerChange}
+              mode={mode}
+              submissionId={submissionId}
+              speakingParts={speakingParts}
+              speakingAudio={speakingAudio}
+              writingParts={writingParts}
+              correctQuestions={correctQuestions}
+              hidePassage
+            />
           </div>
         </div>
       </section>
@@ -218,9 +274,11 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
       );
 
     case 'listening': {
+      const hideAudio = !!hidePassage; // image-block parent đã render audio sticky
+      const isReviewMode = mode === 'review';
       return (
         <div className="space-y-4">
-          {section.audio_url && (
+          {!hideAudio && section.audio_url && (
             <div className="rounded-xl border border-slate-200 bg-white p-3 flex items-center gap-3">
               <audio controls src={section.audio_url} className="w-full h-10" />
             </div>
@@ -237,7 +295,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                   <TextAnswer
                     value={String(answers[key] ?? '')}
                     onChange={(v) => onAnswerChange?.(key, v)}
-                    isReview={mode === 'review'}
+                    isReview={isReviewMode}
                     correct={correctAnswers ? String(correctAnswers[key] ?? '') : undefined}
                     isCorrectMap={correctQuestions?.[key]}
                   />
@@ -245,6 +303,8 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
               );
             }
             const options = item.options ?? [];
+            const userVal = String(answers[key] ?? '');
+            const correctVal = String(correctAnswers?.[key] ?? '');
             return (
               <QCard key={key} n={item.question_number}>
                 {item.prompt && (
@@ -255,15 +315,13 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                     <ChoiceButton
                       key={opt.id}
                       letter={opt.id}
-                      text={opt.text}
-                      selected={answers[key] === opt.id}
-                      correct={
-                        mode === 'review' && correctAnswers
-                          ? String(correctAnswers[key]) === String(opt.id)
-                          : undefined
-                      }
+                      label={opt.text}
+                      picked={userVal === opt.id}
+                      correct={isReviewMode && correctVal === opt.id}
+                      wrong={isReviewMode && userVal === opt.id && correctVal !== opt.id}
                       onClick={() => onAnswerChange?.(key, opt.id)}
-                      disabled={mode === 'review'}
+                      disabled={isReviewMode}
+                      block
                     />
                   ))}
                 </div>

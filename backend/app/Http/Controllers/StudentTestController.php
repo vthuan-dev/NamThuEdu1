@@ -1913,6 +1913,54 @@ class StudentTestController extends Controller
     /**
      * Check if student is eligible for assignment
      */
+
+    /**
+     * Policy: học viên chỉ được xem/làm đề khi đã được giao (assignment).
+     * Dùng cho browse + start-direct để chặn full bank / URL guess.
+     */
+    private function studentHasActiveAssignmentForExam($user, int $examId): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        $classIds = $user->class_id ? [$user->class_id] : [];
+
+        return TestAssignment::where('exam_id', $examId)
+            ->where(function ($q) use ($user, $classIds) {
+                $q->where(function ($qq) use ($user) {
+                    $qq->where('taTarget_type', 'student')
+                        ->where('taTarget_id', $user->uId);
+                })->orWhere(function ($qq) use ($classIds) {
+                    if (empty($classIds)) {
+                        $qq->whereRaw('1 = 0');
+                        return;
+                    }
+                    $qq->where('taTarget_type', 'class')
+                        ->whereIn('taTarget_id', $classIds);
+                });
+            })
+            ->where(function ($q) {
+                // Còn hạn hoặc không có deadline
+                $q->whereNull('taDeadline')->orWhere('taDeadline', '>=', now());
+            })
+            ->exists();
+    }
+
+    /**
+     * Response chuẩn khi học viên cố browse full bank đề.
+     * FE nên dùng GET /student/tests (assignment) thay thế.
+     */
+    private function assignedOnlyBrowseEmptyResponse()
+    {
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Chỉ hiển thị đề đã được giao. Dùng GET /student/tests.',
+            'data'    => [],
+            'policy'  => 'assigned_only',
+        ]);
+    }
+
     private function isStudentEligible($studentId, $assignment)
     {
         if ($assignment->taTarget_type === 'student') {
@@ -3428,6 +3476,16 @@ class StudentTestController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
         }
 
+        // Policy: chỉ cho start-direct khi exam đã được giao cho học viên này.
+        if (!$this->studentHasActiveAssignmentForExam($user, (int) $examId)) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Bạn chỉ có thể làm đề đã được giáo viên giao.',
+                'policy'  => 'assigned_only',
+            ], 403);
+        }
+
+
         $exam = Exam::where('eId', $examId)
             ->whereIn('eType', ['VSTEP', 'IELTS'])
             ->where(function ($q) {
@@ -4428,6 +4486,10 @@ class StudentTestController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
         }
 
+        // Policy: học viên chỉ thấy đề đã giao — không trả full bank publish.
+        return $this->assignedOnlyBrowseEmptyResponse();
+
+
         $type = $request->query('type');
         $skill = $request->query('skill');     // listening|reading|writing|speaking
         $testType = $request->query('test_type'); // Academic | "General Training"
@@ -4496,6 +4558,10 @@ class StudentTestController extends Controller
         if (!$user || $user->uRole !== 'student') {
             return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
         }
+
+        // Policy: học viên chỉ thấy đề đã giao — không trả full bank publish.
+        return $this->assignedOnlyBrowseEmptyResponse();
+
 
         $exams = Exam::withCount('questions')
             ->where('age_group', 'kids')
@@ -4589,6 +4655,16 @@ class StudentTestController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
         }
 
+        // Policy: chỉ cho start-direct khi exam đã được giao cho học viên này.
+        if (!$this->studentHasActiveAssignmentForExam($user, (int) $examId)) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Bạn chỉ có thể làm đề đã được giáo viên giao.',
+                'policy'  => 'assigned_only',
+            ], 403);
+        }
+
+
         $exam = Exam::with(['questions.answers', 'contentBlocks'])
             ->where('eId', $examId)
             ->where('age_group', 'kids')
@@ -4673,6 +4749,10 @@ class StudentTestController extends Controller
         if (!$user || $user->uRole !== 'student') {
             return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
         }
+
+        // Policy: học viên chỉ thấy đề đã giao — không trả full bank publish.
+        return $this->assignedOnlyBrowseEmptyResponse();
+
 
         $exams = Exam::withCount('questions')
             ->where('age_group', 'teens')
@@ -4761,6 +4841,16 @@ class StudentTestController extends Controller
         if (!$user || $user->uRole !== 'student') {
             return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
         }
+
+        // Policy: chỉ cho start-direct khi exam đã được giao cho học viên này.
+        if (!$this->studentHasActiveAssignmentForExam($user, (int) $examId)) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Bạn chỉ có thể làm đề đã được giáo viên giao.',
+                'policy'  => 'assigned_only',
+            ], 403);
+        }
+
 
         $exam = Exam::with(['questions.answers', 'contentBlocks'])
             ->where('eId', $examId)

@@ -177,18 +177,6 @@ export function TestList() {
     return `${BASE}/ket-qua/${submissionId}`;
   };
 
-  // Đề giáo viên giao đã quá hạn → "hạ cấp" về luyện tập tự do: bắt đầu một lượt
-  // làm mới theo examId (direct), không vướng ràng buộc assignment. Route phụ thuộc
-  // loại đề (THPT/VSTEP/IELTS dùng player riêng; còn lại dùng engine chung).
-  const directStartUrlFor = (test: any) => {
-    const examType = String(test?.exam_type ?? "").toUpperCase();
-    const examId = test?.exam_id;
-    if (examType === "THPT") return `${BASE}/lam-bai-thpt/${examId}`;
-    if (examType === "VSTEP") return `${BASE}/lam-bai-vstep/${examId}`;
-    if (examType === "IELTS") return `${BASE}/de-thi/ielts/${examId}`;
-    return `${BASE}/lam-bai/${examId}?autostart=1&direct=1`;
-  };
-
   const isAdultLevelExam = (t: any) => {
     const s = String(t.exam_type || '').toLowerCase() + ' ' + String(t.exam_title || '').toLowerCase();
     return s.includes('vstep') || s.includes('ielts') || s.includes('toeic');
@@ -546,15 +534,13 @@ export function TestList() {
                       <div className="h-1 w-full rounded-full" style={{ background: '#FEE2E2' }} />
                     </div>
 
-                    {/* ── CTA: quá hạn → làm bài tự do (direct) ── */}
+                    {/* ── CTA: quá hạn — không cho làm free ── */}
                     <div className="px-5 pb-5">
-                      <Link to={directStartUrlFor(test)}
-                        className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl font-bold text-sm text-white transition-all duration-200 group-hover:gap-3"
-                        style={{ background: `linear-gradient(135deg, ${PURPLE} 0%, ${PURPLE_MID} 100%)`, boxShadow: `0 4px 14px ${PURPLE}45` }}>
-                        <Play className="w-4 h-4 fill-white" />
-                        Làm bài
-                        <ChevronRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-                      </Link>
+                      <div className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl font-bold text-sm cursor-not-allowed"
+                        style={{ background: '#FEE2E2', color: '#B91C1C', border: '1px solid #FECACA' }}>
+                        <CalendarX className="w-4 h-4" />
+                        Đã quá hạn — không thể làm
+                      </div>
                     </div>
                   </div>
                 );
@@ -822,12 +808,11 @@ export function TestList() {
                            Xem kết quả
                         </Link>
                       ) : testIsOverdue ? (
-                        <Link to={directStartUrlFor(test)}
-                              className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all hover:scale-105"
-                              style={{ background: color, color: "#fff" }}>
-                          <Play className="w-5 h-5 fill-current" />
-                          Làm bài
-                        </Link>
+                        <div className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold cursor-not-allowed"
+                              style={{ background: "#FEE2E2", color: "#B91C1C", border: "1px solid #FECACA" }}>
+                          <CalendarX className="w-5 h-5" />
+                          Đã quá hạn
+                        </div>
                       ) : (
                         <Link to={`${BASE}/phong-cho/${test.assignment_id}`}
                               className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all ${canStart ? 'hover:scale-105' : 'opacity-50 cursor-not-allowed'}`}

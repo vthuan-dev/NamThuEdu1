@@ -661,7 +661,7 @@ export function AdultsDashboard() {
           {isNewUser ? (
             <div className="flex items-center gap-3 flex-wrap">
               <Link
-                to="/hoc-vien/de-thi"
+                to="/hoc-vien/bai-tap"
                 className="inline-flex items-center gap-2.5 px-5 py-3 rounded-2xl text-sm font-bold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
                 style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.3)' }}
               >
@@ -722,7 +722,7 @@ export function AdultsDashboard() {
         {/* ─── Quick Actions ───────────────────────────────────── */}
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {([
-            { icon: BookOpenCheck, label: 'Đề thi',    sub: 'Thi thử & đánh giá',      href: '/hoc-vien/de-thi',    color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
+            { icon: BookOpenCheck, label: 'Đề thi',    sub: 'Thi thử & đánh giá',      href: '/hoc-vien/bai-tap',    color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
             { icon: History,       label: 'Lịch sử',   sub: 'Kết quả bài đã làm',      href: '/hoc-vien/lich-su',   color: '#0284C7', bg: '#F0F9FF', border: '#BAE6FD' },
             { icon: ClipboardList, label: 'Bài tập',   sub: pendingAssignments.length > 0 ? `${pendingAssignments.length} đang chờ` : 'Bài được giao', href: '/hoc-vien/bai-tap', color: '#EA580C', bg: '#FFF7ED', border: '#FED7AA' },
             { icon: TrendingUp,    label: 'Tiến độ',   sub: 'Xem lịch sử học',         href: '/hoc-vien/tien-do',   color: PURPLE,    bg: PURPLE_LIGHT, border: '#C4B5FD' },
@@ -1135,7 +1135,7 @@ export function AdultsDashboard() {
                     <p className="text-sm text-slate-500 mt-1">Khám phá đề thi VSTEP, IELTS, TOEIC và nhiều hơn nữa.</p>
                     <div className="flex items-center justify-center gap-3 mt-5">
                       <Link
-                        to="/hoc-vien/de-thi"
+                        to="/hoc-vien/bai-tap"
                         className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-bold text-white transition-all"
                         style={{ background: 'linear-gradient(135deg, #3B82F6, #2563EB)', boxShadow: '0 4px 14px rgba(59,130,246,0.35)' }}
                       >

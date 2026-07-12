@@ -1,12 +1,9 @@
 /**
- * KidsTests — Trang "Bài thi của em" cho trẻ 6-12 (Cambridge YL)
+ * KidsTests — Trang "Bài thi" cho học viên Kids
  *
- * 2 chế độ xem (tab):
- *  1. "Tất cả bài thi"  → browseKidsExams: LUÔN lấy hết đề Cambridge YL đã publish.
- *                         Đề được giao có gắn nhãn "Cô giao"; đề tự do thì làm trực tiếp.
- *  2. "Cô giao cho em"  → getTests: chỉ các đề thầy cô giao (assignment) + trạng thái.
- *
- * Style: tươi sáng, bo tròn lớn, emoji, 1 điểm nhấn rose/cam — đúng tinh thần kids.
+ * CHỈ hiển thị đề đã được giáo viên giao (assignment qua getTests).
+ * Không browse full bank Cambridge YL.
+ * Vẫn giữ khối "Luyện tập tự do" (kỹ năng) ở cuối trang.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
@@ -20,7 +17,6 @@ import { usePageTitle, PAGE_TITLES } from '../../../../hooks/usePageTitle';
 
 const BASE = '/hoc-vien';
 
-type Tab = 'all' | 'assigned';
 type Status = 'pending' | 'in_progress' | 'completed';
 
 const STATUS_META: Record<Status, { label: string; c: string; soft: string }> = {
@@ -157,19 +153,16 @@ function ExamCard({
   const allowed = attemptsAllowed ?? 0;
   const hasAttemptsLeft = allowed <= 0 || used < allowed;
 
-  // Link "Bắt đầu / Tiếp tục":
-  //  - được giao & còn hạn → vào phòng chờ qua assignmentId (tôn trọng giới hạn lượt)
-  //  - tự do / hết hạn      → làm trực tiếp bằng examId (direct=1)
-  const startTo = effectiveAssigned && assignmentId
+  // Assigned-only: chỉ vào phòng chờ khi có assignmentId.
+  // Không mở free direct (backend chặn start-kids nếu chưa được giao).
+  const startTo = assignmentId
     ? `${BASE}/phong-cho/${assignmentId}`
-    : `${BASE}/lam-bai/${examId}?autostart=1&direct=1`;
+    : `${BASE}/bai-tap`;
 
-  // "Làm lại":
-  //  - đề được giao & còn hạn → đi qua phòng chờ (đếm vào số lần làm của bài giao)
-  //  - đề tự do                → direct, làm mới thoải mái
-  const redoTo = effectiveAssigned && assignmentId
+  // "Làm lại" cũng qua assignment để đếm lượt đúng
+  const redoTo = assignmentId
     ? `${BASE}/phong-cho/${assignmentId}`
-    : `${BASE}/lam-bai/${examId}?autostart=1&direct=1`;
+    : `${BASE}/bai-tap`;
 
   return (
     <div className="flex flex-col bg-white rounded-3xl border-2 border-rose-100 p-5 transition-all hover:shadow-lg hover:-translate-y-0.5 hover:border-rose-200">
@@ -273,20 +266,12 @@ function ExamCard({
 
 export function KidsTests() {
   usePageTitle(PAGE_TITLES.STUDENT_TESTS);
-  const [tab, setTab] = useState<Tab>('all');
   const [search, setSearch] = useState('');
 
-  // Tab "Tất cả" — luôn lấy hết đề kids
-  const { data: browseData, isLoading: browseLoading } = useQuery({
-    queryKey: ['student', 'tests', 'kids-browse'],
-    queryFn: () => studentApi.browseKidsExams(),
-  });
-
-  // Tab "Cô giao" — chỉ đề được gán
+  // Chỉ đề giáo viên giao
   const { data: assignedData, isLoading: assignedLoading } = useQuery({
     queryKey: ['student', 'tests', 'kids-assigned'],
     queryFn: () => studentApi.getTests({}),
-    enabled: tab === 'assigned',
   });
 
   const isPastDeadline = useCallback((d: string | null | undefined) => {
@@ -294,41 +279,7 @@ export function KidsTests() {
     return new Date(d) < new Date();
   }, []);
 
-  const allExams = useMemo(() => {
-    const list = (browseData as any)?.data?.data ?? [];
-    const mapped = list.map((e: any) => ({
-      key: `exam-${e.id}`,
-      examId: e.id,
-      title: e.title,
-      skill: e.skill,
-      scope: e.scope,
-      partNumber: e.part_number ?? null,
-      duration: e.duration,
-      questions: e.questions_count,
-      status: (e.submission_status ?? 'pending') as Status,
-      submissionId: e.submission_id ?? null,
-      assignmentId: e.assignment_id ?? null,
-      isAssigned: !!e.is_assigned,
-      deadline: e.deadline ?? null,
-      attemptsUsed: e.attempts_used ?? null,
-      attemptsAllowed: e.attempts_allowed ?? null,
-      submittedAt: e.submitted_at ?? null,
-    }));
-
-    // Bài giáo viên giao ĐÃ làm xong (còn hạn) → quản lý ở tab "Giáo viên giao",
-    // không hiện lại ở tab "Tất cả" nữa. Bài giao quá hạn coi như đề tự do (giữ lại).
-    const filtered = mapped.filter((e: any) => {
-      const expired = isPastDeadline(e.deadline);
-      const assignedActive = e.isAssigned && !expired;
-      return !(assignedActive && e.status === 'completed');
-    });
-
-    // Đẩy bài giáo viên giao (còn hạn, chưa xong) lên ĐẦU để học viên dễ thấy.
-    const priority = (e: any) => (e.isAssigned && !isPastDeadline(e.deadline) ? 0 : 1);
-    return filtered.sort((a: any, b: any) => priority(a) - priority(b));
-  }, [browseData, isPastDeadline]);
-
-  const assignedExams = useMemo(() => {
+    const assignedExams = useMemo(() => {
     const groups = (assignedData as any)?.data?.data;
     if (!groups) return [];
     const isAdult = (title: string) => {
@@ -360,8 +311,8 @@ export function KidsTests() {
     ].filter((t: any) => !isAdult(t.title) && !isPastDeadline(t.deadline));
   }, [assignedData, isPastDeadline]);
 
-  const source = tab === 'all' ? allExams : assignedExams;
-  const isLoading = tab === 'all' ? browseLoading : assignedLoading;
+  const source = assignedExams;
+  const isLoading = assignedLoading;
 
   const visible = useMemo(() => {
     if (!search.trim()) return source;
@@ -372,7 +323,7 @@ export function KidsTests() {
   // ─── Phân trang: 12 bài / trang ───────────────────────────────────────────
   const PAGE_SIZE = 12;
   const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [tab, search]);
+  useEffect(() => { setPage(1); }, [search]);
   const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
   const paged = useMemo(
@@ -402,8 +353,8 @@ export function KidsTests() {
               <BookOpenCheck className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight">Bài thi của bạn 🎒</h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Chọn một bài thi và bắt đầu khám phá nhé!</p>
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 leading-tight">Bài giáo viên giao 🎒</h1>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Chỉ hiện bài cô giáo đã giao cho bạn nhé!</p>
             </div>
           </div>
 
@@ -452,33 +403,17 @@ export function KidsTests() {
           </div>
         </header>
 
-        {/* ─── Tabs ────────────────────────────────────────────── */}
+        {/* ─── Badge: chỉ bài giáo viên giao ─────────────────── */}
         <div className="flex items-center">
-          <div className="flex items-center gap-2 p-1 rounded-2xl bg-white/70 border-2 border-rose-100">
-            <button
-              onClick={() => setTab('all')}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-extrabold transition-all"
-              style={tab === 'all'
-                ? { background: 'linear-gradient(135deg, #FB7185, #F97316)', color: '#fff', boxShadow: '0 6px 16px rgba(251,113,133,0.35)' }
-                : { background: 'transparent', color: '#64748B' }}
-            >
-              <Sparkles className="w-4 h-4" /> Tất cả bài thi
-            </button>
-            <button
-              onClick={() => setTab('assigned')}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-extrabold transition-all"
-              style={tab === 'assigned'
-                ? { background: 'linear-gradient(135deg, #8B5CF6, #6366F1)', color: '#fff', boxShadow: '0 6px 16px rgba(139,92,246,0.35)' }
-                : { background: 'transparent', color: '#64748B' }}
-            >
-              <Gift className="w-4 h-4" /> Giáo viên giao
-              {assignedCount > 0 && (
-                <span className="text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5 font-bold"
-                  style={tab === 'assigned' ? { background: 'rgba(255,255,255,0.25)' } : { background: '#EDE9FE', color: '#7C3AED' }}>
-                  {assignedCount}
-                </span>
-              )}
-            </button>
+          <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-extrabold text-white"
+            style={{ background: 'linear-gradient(135deg, #8B5CF6, #6366F1)', boxShadow: '0 6px 16px rgba(139,92,246,0.35)' }}>
+            <Gift className="w-4 h-4" /> Bài giáo viên giao
+            {assignedCount > 0 && (
+              <span className="text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5 font-bold"
+                style={{ background: 'rgba(255,255,255,0.25)' }}>
+                {assignedCount}
+              </span>
+            )}
           </div>
         </div>
 
@@ -530,12 +465,10 @@ export function KidsTests() {
               </svg>
             </div>
             <h3 className="text-lg font-extrabold text-slate-800">
-              {search ? 'Không tìm thấy bài nào' : tab === 'assigned' ? 'Chưa có bài cô giao' : 'Chưa có bài thi nào'}
+              {search ? 'Không tìm thấy bài nào' : 'Chưa có bài cô giao'}
             </h3>
             <p className="text-sm text-slate-500 mt-1">
-              {search ? 'Thử từ khóa khác nhé!' : tab === 'assigned'
-                ? 'Khi thầy cô giao bài, bài sẽ hiện ở đây nhé!'
-                : 'Hãy quay lại sau nhé!'}
+              {search ? 'Thử từ khóa khác nhé!' : 'Khi thầy cô giao bài, bài sẽ hiện ở đây nhé!'}
             </p>
           </div>
         ) : (
@@ -554,7 +487,7 @@ export function KidsTests() {
                 assignmentId={t.assignmentId}
                 examId={t.examId}
                 isAssigned={t.isAssigned}
-                showAssignedBadge={tab === 'all'}
+                showAssignedBadge={false}
                 deadline={t.deadline}
                 attemptsUsed={t.attemptsUsed}
                 attemptsAllowed={t.attemptsAllowed}
@@ -594,7 +527,7 @@ export function KidsTests() {
         )}
 
         {/* ─── Khu luyện tập tự do (chỉ ở tab "Tất cả") ─────────── */}
-        {tab === 'all' && !isLoading && <KidsPracticeBlock />}
+        {!isLoading && <KidsPracticeBlock />}
       </div>
     </div>
   );
