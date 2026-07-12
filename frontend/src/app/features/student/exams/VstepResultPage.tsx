@@ -105,7 +105,13 @@ interface StatItem {
 function StatsOverview({ items }: { items: StatItem[] }) {
   if (items.length === 0) return null;
   const cols =
-    items.length >= 4 ? "sm:grid-cols-4" : items.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2";
+    items.length >= 5
+      ? "sm:grid-cols-5"
+      : items.length >= 4
+        ? "sm:grid-cols-4"
+        : items.length === 3
+          ? "sm:grid-cols-3"
+          : "sm:grid-cols-2";
   return (
     <div className={`grid grid-cols-2 ${cols} divide-x divide-y sm:divide-y-0 divide-slate-100`}>
       {items.map((it) => (
@@ -324,13 +330,37 @@ export function VstepResultPage() {
   const showScorePending = displayOverall === null && (hasPendingSubjective || pendingSkills.length > 0);
   const blankSubmission = hasSubmitted && answeredCount === 0;
 
+  // Stats rõ ràng: tổng câu đề / đã làm / đúng / điểm tổng
   const statsItems: StatItem[] = [];
   if (totalMcq > 0) {
-    statsItems.push({ label: "Câu đúng", value: `${correctMcq}/${totalMcq}` });
-    if (accuracy !== null) statsItems.push({ label: "Độ chính xác", value: `${accuracy}%` });
+    statsItems.push({
+      label: "Tổng câu đề",
+      value: String(totalMcq),
+      sub: "Listening + Reading",
+    });
+    statsItems.push({
+      label: "Đã làm",
+      value: `${answeredMcq}/${totalMcq}`,
+      sub: answeredMcq < totalMcq ? `Bỏ trống ${totalMcq - answeredMcq}` : "Hoàn thành",
+    });
+    statsItems.push({
+      label: "Câu đúng",
+      value: `${correctMcq}/${totalMcq}`,
+      sub: accuracy !== null ? `${accuracy}%` : undefined,
+    });
   }
   if (displayOverall !== null && !showScorePending) {
-    statsItems.push({ label: "Điểm số", value: displayOverall.toFixed(1), sub: scaleSuffix });
+    statsItems.push({
+      label: "Điểm tổng",
+      value: displayOverall.toFixed(1),
+      sub: `${scaleSuffix}${isSingleSkill ? ` · ${visibleSkills[0].label}` : " · Trung bình"}`,
+    });
+  } else if (showScorePending) {
+    statsItems.push({
+      label: "Điểm tổng",
+      value: "…",
+      sub: "Đang chấm",
+    });
   }
   if (durationText) {
     statsItems.push({ label: "Thời gian", value: durationText });
@@ -628,7 +658,11 @@ export function VstepResultPage() {
                 <div>
                   <p className="font-semibold text-sm text-slate-800">{label}</p>
                   {!isSubjective && adjustedStats && (
-                    <p className="text-xs text-slate-400">{adjustedStats.correct}/{adjustedStats.total} câu đúng</p>
+                    <p className="text-xs text-slate-400">
+                      {adjustedStats.correct}/{adjustedStats.total} đúng
+                      {" · "}
+                      Đã làm {skillAnswered[key]?.answered ?? 0}/{adjustedStats.total}
+                    </p>
                   )}
                   {isSubjective && isPending && (
                     <p className="text-xs text-slate-400">
