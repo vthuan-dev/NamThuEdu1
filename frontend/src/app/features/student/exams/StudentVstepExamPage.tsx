@@ -137,7 +137,9 @@ function SubmitDialog({
               ))}
             </div>
             {!allDone && (
-              <p className="mt-3 text-xs text-slate-500">Một số phần chưa hoàn thành. Bạn có chắc muốn nộp bài?</p>
+              <p className="mt-3 text-xs text-amber-700 font-medium">
+                Bạn còn phần chưa làm xong. Hãy hoàn thành 100% câu hỏi trong đề rồi mới nộp.
+              </p>
             )}
           </div>
           <div className="flex gap-3 w-full">
@@ -145,9 +147,9 @@ function SubmitDialog({
               className="flex-1 py-3 rounded-xl font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition text-sm">
               Tiếp tục làm
             </button>
-            <button onClick={onConfirm} disabled={loading}
-              className="flex-1 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition text-sm disabled:opacity-60">
-              {loading ? "Đang nộp..." : "Nộp bài"}
+            <button onClick={onConfirm} disabled={loading || !allDone}
+              className="flex-1 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition text-sm disabled:opacity-60 disabled:cursor-not-allowed">
+              {loading ? "Đang nộp..." : allDone ? "Nộp bài" : "Chưa hoàn thành"}
             </button>
           </div>
         </div>
@@ -1031,10 +1033,9 @@ export function StudentVstepExamPage() {
    * - Speaking: đã thu âm xong tất cả parts
    * Nếu chưa đủ → nút Nộp bài DISABLED + tooltip giải thích lý do.
    */
-  // Soft-lock: LUÔN cho phép bấm Nộp bài (giống phòng thi thật + Kids/Teens).
-  // Còn thiếu câu/phần → chỉ cảnh báo trong dialog xác nhận, KHÔNG khoá nút.
-  // Lý do: khoá cứng khiến học viên kẹt hẳn nếu thu âm/upload Speaking lỗi
-  // (đặc biệt trên iOS) hoặc viết ngắn — không bao giờ nộp được bài.
+    // Hard-lock: chỉ cho nộp khi đã hoàn thành 100% các skill có trong đề.
+  // Reading / Full test: thiếu câu trắc nghiệm / writing / speaking → disable nút Nộp.
+  // Auto-submit khi hết giờ vẫn chạy bình thường (không qua submitGate).
   const submitGate = useMemo(() => {
     const reasons: string[] = [];
     const lrRemain = Math.max(0, stats.totalMCQ - stats.answeredMCQ);
@@ -1043,12 +1044,13 @@ export function StudentVstepExamPage() {
     if (lrRemain > 0) reasons.push(`còn ${lrRemain} câu trắc nghiệm`);
     if (wRemain > 0) reasons.push(`còn ${wRemain} bài viết`);
     if (sRemain > 0) reasons.push(`còn ${sRemain} phần nói`);
+    const canSubmit = reasons.length === 0;
     return {
-      canSubmit: true,
+      canSubmit,
       reasons,
-      tooltip: reasons.length === 0
+      tooltip: canSubmit
         ? "Sẵn sàng nộp bài"
-        : `Bạn ${reasons.join(", ")} — vẫn có thể nộp bài`,
+        : `Chưa thể nộp — bạn ${reasons.join(", ")}. Hãy hoàn thành hết rồi nộp.`,
     };
   }, [stats, speakingParts.length]);
 

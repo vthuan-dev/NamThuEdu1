@@ -19,7 +19,6 @@ import {
   Loader2,
   Bot,
   RefreshCw,
-  Info,
 } from "lucide-react";
 import { studentApi } from "../../../../services/studentApi";
 
@@ -254,55 +253,32 @@ export function VstepResultPage() {
   const correctMcq =
     (skillStats.listening?.correct ?? 0) + (skillStats.reading?.correct ?? 0);
   const answeredMcq = skillAnswered.listening.answered + skillAnswered.reading.answered;
-  // Practice mode = không phải tất cả câu MCQ đều có answer
-  const isPracticeMode = totalMcqExam > 0 && answeredMcq > 0 && answeredMcq < totalMcqExam;
-  // Stats hiển thị: practice mode dùng ANSWERED, full test dùng TOTAL
-  const totalMcq = isPracticeMode ? answeredMcq : totalMcqExam;
+  // Không còn "practice mode" chia mẫu số theo số câu đã làm.
+  // Reading / Full test luôn hiển thị: số câu đúng / TỔNG câu trong đề.
+  // Câu bỏ trống tính là sai (không làm giảm mẫu số).
+  const isPracticeMode = false;
+  const totalMcq = totalMcqExam > 0 ? totalMcqExam : Math.max(answeredMcq, 0);
   const accuracy = totalMcq > 0 ? Math.round((correctMcq / totalMcq) * 100) : null;
 
-  // ── Recompute scores cho IELTS / practice mode ────────────────────────────
-  // Backend vstep_scores tính trên /10 (correct/totalExam × 10, AI W/S /10). Với:
-  //  - IELTS: cần /9 scale cho cả 4 kỹ năng
-  //  - Practice mode (làm 1 section): score nên dựa vào attempted, không phải total
-  // → Override scores tại FE.
+  // ── Recompute scores cho IELTS scale (/9) ─────────────────────────────────
+  // Backend vstep_scores tính trên /10. IELTS cần convert sang /9.
+  // VSTEP luôn dùng điểm backend trên tổng câu của đề (không scale theo attempted).
   const adjustedScores = useMemo<Record<string, number | null | undefined>>(() => {
     const out: Record<string, number | null | undefined> = { ...scores };
-    if (!isIelts && !isPracticeMode) return out;
+    if (!isIelts) return out;
 
-    const round = (n: number) => (isIelts ? Math.round(n * 2) / 2 : Math.round(n * 10) / 10);
-
-    const computeBand = (correct: number, attempted: number): number | null => {
-      if (attempted <= 0) return null;
-      const pct = correct / attempted;
-      return round(pct * maxScore);
-    };
-
-    // L+R: dùng số đã trả lời thực tế (practice mode) hoặc convert tỉ lệ sang /9 (IELTS)
-    for (const sk of ["listening", "reading"] as const) {
-      const a = skillAnswered[sk];
-      if (a && a.answered > 0) {
-        out[sk] = computeBand(a.correct, a.answered);
-      } else if (isIelts && typeof scores[sk] === "number") {
-        // Convert backend /10 → /9
+    const round = (n: number) => Math.round(n * 2) / 2;
+    for (const sk of ["listening", "reading", "writing", "speaking"] as const) {
+      if (typeof scores[sk] === "number") {
         out[sk] = round((scores[sk] as number) / 10 * maxScore);
       }
     }
-
-    // W+S: backend trả /10 → convert sang /9 cho IELTS
-    if (isIelts) {
-      for (const sk of ["writing", "speaking"] as const) {
-        if (typeof scores[sk] === "number") {
-          out[sk] = round((scores[sk] as number) / 10 * maxScore);
-        }
-      }
-    }
-
     return out;
-  }, [scores, isIelts, isPracticeMode, skillAnswered, maxScore]);
+  }, [scores, isIelts, maxScore]);
 
   // Use adjusted scores instead of raw backend scores
   const finalScores: Record<string, number | null | undefined> =
-    (isIelts || isPracticeMode) ? adjustedScores : scores;
+    isIelts ? adjustedScores : scores;
 
   // Overall average: chỉ tính khi MỌI skill được render đã có điểm hợp lệ.
   // Nếu còn bất kỳ skill pending → overallAvg = null (hide until graded).
@@ -458,22 +434,6 @@ export function VstepResultPage() {
         Về trang đề thi
       </button>
 
-      {/* ── Practice mode info banner ────────────────────────────────────────── */}
-      {isPracticeMode && answeredMcq > 0 && (
-        <div className="rounded-xl border border-cyan-200 bg-cyan-50/60 px-4 py-3 flex items-start gap-3">
-          <Info className="w-5 h-5 text-cyan-600 flex-shrink-0 mt-0.5" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-cyan-800">
-              Chế độ luyện tập (Practice Mode)
-            </p>
-            <p className="text-xs text-cyan-700/80 mt-0.5">
-              Đây là kết quả luyện tập {answeredMcq} câu - không phải bài thi đầy đủ ({totalMcqExam} câu). 
-              Điểm số được tính dựa trên phần bạn đã làm.
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* ── Hero card: tiêu đề + điểm + stats — gộp 1 khối, tối giản ──────── */}
       <div className="rounded-2xl border border-slate-200 bg-white">
         {/* Header */}
@@ -574,13 +534,8 @@ export function VstepResultPage() {
           ]
             .filter((g) => g.rows.length > 0)
             .map((g) => {
-              // Practice mode: chỉ hiển thị câu đã trả lời thực tế
-              const displayRows = isPracticeMode
-                ? g.rows.filter((r) => {
-                    const text = r.saAnswer_text;
-                    return text != null && String(text).trim() !== "";
-                  })
-                : g.rows;
+              // Luôn hiển thị đủ câu trong đề (bỏ trống vẫn hiện)
+              const displayRows = g.rows;
               
               const answeredCount = displayRows.filter(
                 (r) => r.saAnswer_text != null && String(r.saAnswer_text).trim() !== ""
@@ -661,12 +616,8 @@ export function VstepResultPage() {
           const isPending = score === null && skillPending;
           const hasDisplayScore = score !== null;
 
-          // ── Practice mode: dùng answered count thay vì backend total ──
-          // Nếu practice mode (làm 1 section ~13 câu thay vì full 40), backend vẫn trả
-          // total=40 → hiển thị sai "1/40 câu đúng". Fix: đếm số câu đã answered thực tế.
-          const adjustedStats = stats && !isSubjective && isPracticeMode && skillAnswered[key]
-            ? { ...stats, total: skillAnswered[key].answered }
-            : stats;
+          // Luôn dùng total từ đề (skill_stats.total). Câu bỏ trống = sai.
+          const adjustedStats = stats;
 
           return (
             <div key={key} className="flex items-center justify-between px-5 py-4">
@@ -779,12 +730,8 @@ export function VstepResultPage() {
         if (rows.length === 0) return null;
         const isOpen = expandedSkill === key;
         const correct = rows.filter((r) => r.saIs_correct).length;
-        // Practice mode: chỉ đếm câu đã trả lời thực tế thay vì tất cả câu trong đề
-        const answeredRows = rows.filter((r) => {
-          const text = r.saAnswer_text;
-          return text != null && String(text).trim() !== "";
-        });
-        const total = isPracticeMode ? answeredRows.length : rows.length;
+        // Mẫu số = tổng câu trong đề, không phải số câu đã làm
+        const total = rows.length;
 
         return (
           <div key={key} className="rounded-xl overflow-hidden border border-slate-200 bg-white">
@@ -808,8 +755,7 @@ export function VstepResultPage() {
 
             {isOpen && (
               <div className="divide-y divide-slate-100 border-t border-slate-100">
-                {/* Practice mode: chỉ hiển thị câu đã trả lời thực tế */}
-                {(isPracticeMode ? answeredRows : rows).map((ans, idx) => {
+                {rows.map((ans, idx) => {
                   const qText = ans.question?.qContent?.replace(/<[^>]*>/g, "").slice(0, 80) ?? `Câu ${idx + 1}`;
                   const correctAns = examQMap[ans.question?.qId] ?? "—";
                   const userAns = ans.saAnswer_text ?? "—";
