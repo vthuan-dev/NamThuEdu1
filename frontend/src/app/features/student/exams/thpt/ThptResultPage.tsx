@@ -107,13 +107,29 @@ export function ThptResultPage() {
         setGradingStuck(false);
         setLoading(false);
 
-        // Nếu đề có Speaking và AI chưa chấm → poll mỗi 8s đến khi xong
+        // Nếu đề có Speaking/Writing và AI chưa chấm → poll mỗi 8s đến khi xong
         const sections = data?.result?.sections ?? [];
         const hasSpeakingSection = sections.some((s: any) => s.type === 'speaking');
         const speakingScored = !!data?.result?.speaking
           && typeof data.result.speaking.score === 'number';
-        if (hasSpeakingSection && !speakingScored) {
+        const hasWritingSection = sections.some((s: any) => s.type === 'writing');
+        const writingScored = !!data?.result?.writing
+          && typeof data.result.writing.score === 'number';
+
+        const isStillGrading = (hasSpeakingSection && !speakingScored) || (hasWritingSection && !writingScored);
+        if (isStillGrading) {
+          pollCountRef.current += 1;
+          if (pollCountRef.current > 20) {
+            setGradingStuck(true);
+            setGradingPending(false);
+            setLoading(false);
+            return;
+          }
+          setGradingPending(true);
           pollTimer = window.setTimeout(fetchResult, 8000);
+        } else {
+          setGradingPending(false);
+          setGradingStuck(false);
         }
       } catch (err: any) {
         const status: number | undefined = err?.response?.status;
@@ -221,7 +237,9 @@ export function ThptResultPage() {
   const activeSection  = config.sections[activeIdx];
   const hasSpeakingSection = result.sections.some((s) => s.type === 'speaking');
   const speakingScored     = !!result.speaking && typeof result.speaking.score === 'number';
-  const overallPending     = hasSpeakingSection && !speakingScored;
+  const hasWritingSection  = result.sections.some((s) => s.type === 'writing');
+  const writingScored      = !!result.writing && typeof result.writing.score === 'number';
+  const overallPending     = (hasSpeakingSection && !speakingScored) || (hasWritingSection && !writingScored);
 
   const scaledPct = result.scale_max > 0 ? (result.scaled_score / result.scale_max) * 100 : 0;
   const scoreTone = scaledPct >= 70 ? { text: '#059669', label: 'Tốt lắm!' }
