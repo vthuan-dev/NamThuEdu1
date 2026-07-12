@@ -1,12 +1,12 @@
 import { X } from 'lucide-react';
 import * as Icons from 'lucide-react';
 import type { SectionType } from '../../../../../types/thpt';
-import { SECTION_TYPES, THPT_THEME } from './sections';
+import { THPT_THEME } from './sections';
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  onPick: (type: SectionType) => void;
+  onPick: (type: SectionType, initItemKind?: 'mc' | 'fill_blank') => void;
 }
 
 const GROUP_LABELS: Record<string, string> = {
@@ -16,6 +16,125 @@ const GROUP_LABELS: Record<string, string> = {
   listening: 'Nghe (Listening)',
   speaking: 'Nói (Speaking)',
 };
+
+interface OptionMeta {
+  type: SectionType;
+  label: string;
+  description: string;
+  icon: string;
+  group: 'language' | 'reading' | 'writing' | 'listening' | 'speaking';
+  initItemKind?: 'mc' | 'fill_blank';
+}
+
+const MODAL_OPTIONS: OptionMeta[] = [
+  {
+    type: 'phonetics',
+    label: 'Ngữ âm',
+    description: 'Phát âm / trọng âm — chọn từ khác biệt',
+    icon: 'Volume2',
+    group: 'language',
+  },
+  {
+    type: 'mc_questions',
+    label: 'Trắc nghiệm',
+    description: 'Ngữ pháp / từ vựng / đồng-trái nghĩa / giao tiếp',
+    icon: 'ListChecks',
+    group: 'language',
+  },
+  {
+    type: 'word_form',
+    label: 'Chia dạng từ',
+    description: 'Cho từ gốc → điền dạng đúng vào câu',
+    icon: 'Type',
+    group: 'language',
+  },
+  {
+    type: 'error_identification',
+    label: 'Tìm lỗi sai',
+    description: '4 phần gạch chân, chọn phần sai',
+    icon: 'AlertTriangle',
+    group: 'language',
+  },
+  {
+    type: 'mc_cloze',
+    label: 'Đọc điền trắc nghiệm',
+    description: 'Đoạn văn, mỗi chỗ trống chọn A/B/C/D',
+    icon: 'FileText',
+    group: 'reading',
+  },
+  {
+    type: 'word_bank_cloze',
+    label: 'Điền từ cho sẵn',
+    description: 'Đoạn văn + ngân hàng từ để điền',
+    icon: 'Boxes',
+    group: 'reading',
+  },
+  {
+    type: 'open_cloze',
+    label: 'Điền 1 từ tự do',
+    description: 'Đoạn văn, tự điền 1 từ mỗi chỗ trống',
+    icon: 'PenLine',
+    group: 'reading',
+  },
+  {
+    type: 'tf_group',
+    label: 'Đúng / Sai',
+    description: 'Context (notice, ad, email) + statements T/F',
+    icon: 'CheckSquare',
+    group: 'reading',
+  },
+  {
+    type: 'reading_mixed',
+    label: 'Đọc hiểu hỗn hợp',
+    description: 'Passage + TF + MC + Sentence Insertion',
+    icon: 'BookOpen',
+    group: 'reading',
+  },
+  {
+    type: 'matching',
+    label: 'Nối câu',
+    description: 'Nối (1-4) → (A-F)',
+    icon: 'ArrowLeftRight',
+    group: 'reading',
+  },
+  {
+    type: 'sentence_transformation',
+    label: 'Viết lại câu',
+    description: 'Giữ nguyên nghĩa, chấm theo đáp án chấp nhận',
+    icon: 'Repeat',
+    group: 'writing',
+  },
+  {
+    type: 'writing',
+    label: 'Viết đoạn / bài văn',
+    description: 'Đề viết đoạn/bài văn — giáo viên chấm tay',
+    icon: 'PenLine',
+    group: 'writing',
+  },
+  {
+    type: 'listening',
+    label: 'Nghe trắc nghiệm',
+    description: 'Tải audio + câu hỏi chọn đáp án A/B/C/D',
+    icon: 'Headphones',
+    group: 'listening',
+    initItemKind: 'mc',
+  },
+  {
+    type: 'listening',
+    label: 'Nghe điền chỗ trống',
+    description: 'Tải audio + câu hỏi tự nhập từ điền vào chỗ trống',
+    icon: 'PenLine',
+    group: 'listening',
+    initItemKind: 'fill_blank',
+  },
+  {
+    type: 'speaking',
+    label: 'Nói (Speaking)',
+    description: 'Đề nói — học viên ghi âm, AI chấm điểm',
+    icon: 'Mic',
+    group: 'speaking',
+  },
+];
 
 export function AddSectionModal({ open, onClose, onPick }: Props) {
   if (!open) return null;
@@ -47,7 +166,7 @@ export function AddSectionModal({ open, onClose, onPick }: Props) {
 
         <div className="p-6 space-y-6">
           {groups.map((g) => {
-            const types = SECTION_TYPES.filter((s) => s.group === g);
+            const types = MODAL_OPTIONS.filter((s) => s.group === g);
             if (!types.length) return null;
             return (
               <div key={g}>
@@ -59,10 +178,10 @@ export function AddSectionModal({ open, onClose, onPick }: Props) {
                     const Icon = (Icons as any)[meta.icon] ?? Icons.Square;
                     return (
                       <button
-                        key={meta.type}
+                        key={meta.label + meta.type}
                         type="button"
                         onClick={() => {
-                          onPick(meta.type);
+                          onPick(meta.type, meta.initItemKind);
                           onClose();
                         }}
                         className="text-left rounded-xl border border-slate-200 p-4 hover:border-blue-400 hover:shadow-sm transition-all cursor-pointer group"

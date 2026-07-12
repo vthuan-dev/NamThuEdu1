@@ -220,7 +220,7 @@ const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 /**
  * Tạo section trống theo type.
  */
-export function createSection(type: SectionType, startNum: number): ThptSection {
+export function createSection(type: SectionType, startNum: number, initItemKind?: 'mc' | 'fill_blank'): ThptSection {
   const base = { id: sid(), points_per_question: 1 };
   switch (type) {
     case 'phonetics':
@@ -323,10 +323,12 @@ export function createSection(type: SectionType, startNum: number): ThptSection 
       return {
         ...base,
         type: 'listening',
-        title: 'Nghe',
-        instructions: 'Nghe đoạn ghi âm rồi trả lời các câu hỏi (trắc nghiệm hoặc điền chỗ trống).',
+        title: initItemKind === 'fill_blank' ? 'Nghe điền chỗ trống' : 'Nghe trắc nghiệm',
+        instructions: initItemKind === 'fill_blank' 
+          ? 'Nghe đoạn ghi âm và điền từ thích hợp vào chỗ trống.' 
+          : 'Nghe đoạn ghi âm rồi chọn đáp án đúng.',
         audio_url: '',
-        items: [makeListeningMcItem(startNum)],
+        items: [initItemKind === 'fill_blank' ? makeListeningFillItem(startNum) : makeListeningMcItem(startNum)],
       };
     case 'speaking':
       return {
