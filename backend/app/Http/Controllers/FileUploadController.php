@@ -94,7 +94,7 @@ class FileUploadController extends Controller
                     'size' => $audioFile->getSize(),
                     'mimeType' => $audioFile->getMimeType()
                 ]
-            ])->header('Access-Control-Allow-Origin', '*');
+            ]);
 
         } catch (\Exception $e) {
             \Log::error('Audio upload error', [

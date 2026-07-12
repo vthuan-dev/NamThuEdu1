@@ -104,12 +104,30 @@ return [
     |
     */
     'security' => [
-        'cors_allowed_origins' => env('APP_ENV') === 'production' 
-            ? ['https://namthuedu.com', 'https://www.namthuedu.com']
-            : (env('APP_ENV') === 'staging' 
-                ? ['https://staging.namthuedu.com']
-                : ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5173']
-            ),
+        // Single source of truth consumed by EnvironmentServiceProvider → cors.allowed_origins.
+        // Keep production on namthuedu.vn (not .com). Local must include both localhost and 127.0.0.1.
+        'cors_allowed_origins' => array_values(array_unique(array_filter(array_merge(
+            // Always allow production frontends (safe even in local when testing against prod FE)
+            [
+                'https://namthuedu.vn',
+                'https://www.namthuedu.vn',
+            ],
+            // Staging
+            env('APP_ENV') === 'staging' ? [
+                'https://staging.namthuedu.vn',
+            ] : [],
+            // Local / development frontends
+            in_array(env('APP_ENV'), ['local', 'development', null, ''], true) || env('APP_ENV') !== 'production' ? [
+                'http://localhost:5173',
+                'http://127.0.0.1:5173',
+                'http://localhost:3000',
+                'http://127.0.0.1:3000',
+                'http://localhost:8000',
+                'http://127.0.0.1:8000',
+            ] : [],
+            // Optional comma-separated override from .env: CORS_ALLOWED_ORIGINS=https://a.com,https://b.com
+            array_filter(array_map('trim', explode(',', (string) env('CORS_ALLOWED_ORIGINS', ''))))
+        )))),
         'jwt_secret' => null,
         'session_secure' => in_array(env('APP_ENV'), ['staging', 'production']),
         'force_https' => env('APP_ENV') === 'production',

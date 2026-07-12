@@ -4,46 +4,16 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use App\Models\User;
 use App\Models\OtpLog;
-use Laravel\Sanctum\PersonalAccessToken;
 use App\Services\GamificationService;
 
 class AuthController extends Controller
 {
-    /**
-     * @OA\Post(
-     *     path="/register",
-     *     tags={"Authentication"},
-     *     summary="User registration",
-     *     description="Register new student user with age-based theme",
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"name","phone","password","password_confirmation"},
-     *             @OA\Property(property="name", type="string", example="Nguyễn Văn A"),
-     *             @OA\Property(property="phone", type="string", example="0336695863"),
-     *             @OA\Property(property="email", type="string", example="example@gmail.com"),
-     *             @OA\Property(property="password", type="string", example="password123"),
-     *             @OA\Property(property="password_confirmation", type="string", example="password123")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Registration successful"
-     *     ),
-     *     @OA\Response(
-     *         response=400,
-     *         description="Validation error"
-     *     )
-     * )
-     * 
-     * POST /api/register
-     * Đăng ký tài khoản học sinh mới
-     */
     /**
      * @OA\Post(
      *     path="/register",
@@ -55,7 +25,7 @@ class AuthController extends Controller
      *         description="Registration disabled"
      *     )
      * )
-     * 
+     *
      * POST /api/register
      * DISABLED: Học viên không thể tự đăng ký
      * Chỉ Admin/Teacher mới có thể tạo tài khoản học viên
@@ -86,7 +56,7 @@ class AuthController extends Controller
      *         description="Unauthorized"
      *     )
      * )
-     * 
+     *
      * GET /api/user/profile
      * Lấy thông tin profile đầy đủ
      */
@@ -126,6 +96,7 @@ class AuthController extends Controller
         }
         return 'adults';
     }
+
     /**
      * @OA\Post(
      *     path="/login",
@@ -149,7 +120,7 @@ class AuthController extends Controller
      *         description="Invalid credentials"
      *     )
      * )
-     * 
+     *
      * POST /api/login
      * Đăng nhập bằng SĐT + mật khẩu
      */
@@ -248,16 +219,12 @@ class AuthController extends Controller
             try {
                 (new GamificationService())->updateStreak($user->uId);
             } catch (\Exception $e) {
-                \Log::warning('Streak update failed on login: ' . $e->getMessage());
+                Log::warning('Streak update failed on login: ' . $e->getMessage());
             }
         }
 
         // Tạo refresh token (sống 30 ngày)
-        $refreshToken = Str::random(64);
-        $user->update([
-            'refresh_token'            => hash('sha256', $refreshToken),
-            'refresh_token_expires_at' => now()->addDays(30),
-        ]);
+        $refreshToken = $this->issueRefreshToken($user);
 
         // Prepare user data
         $userData = [
@@ -273,9 +240,6 @@ class AuthController extends Controller
             'avatar' => $user->avatar_url,
         ];
 
-        // (Class system deprecated — học viên giờ chỉ thuộc age_group, không
-        // còn thuộc lớp cố định. Khối expose class info đã được gỡ khỏi đây.)
-
         return response()->json([
             'status' => 'success',
             'data' => [
@@ -290,10 +254,94 @@ class AuthController extends Controller
 
     /**
      * @OA\Post(
+     *     path="/refresh",
+     *     tags={"Authentication"},
+     *     summary="Refresh access token",
+     *     description="Exchange a valid refresh token for a new access token and rotated refresh token",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"refresh_token"},
+     *             @OA\Property(property="refresh_token", type="string")
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Token refreshed"),
+     *     @OA\Response(response=401, description="Invalid refresh token")
+     * )
+     *
+     * POST /api/refresh
+     */
+    public function refresh(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'refresh_token' => 'required|string|min:32',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Refresh token không hợp lệ',
+                'errors' => $validator->errors(),
+            ], 400);
+        }
+
+        $hashed = hash('sha256', $request->refresh_token);
+
+        $user = User::where('refresh_token', $hashed)
+            ->whereNull('uDeleted_at')
+            ->first();
+
+        if (
+            !$user
+            || !$user->refresh_token_expires_at
+            || $user->refresh_token_expires_at->isPast()
+            || $user->uStatus !== 'active'
+        ) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Refresh token không hợp lệ hoặc đã hết hạn',
+            ], 401);
+        }
+
+        // Rotate refresh token (single-use)
+        $newRefreshToken = $this->issueRefreshToken($user);
+
+        $ua = $request->userAgent() ?? 'refresh';
+        $newToken = $user->createToken('refresh:' . substr($ua, 0, 80));
+        $accessToken = $newToken->plainTextToken;
+        $newToken->accessToken->forceFill(['last_used_ip' => $request->ip()])->save();
+
+        $age = $user->uDoB ? now()->diffInYears($user->uDoB) : null;
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'access_token'  => $accessToken,
+                'token_type'    => 'Bearer',
+                'expires_in'    => 86400,
+                'refresh_token' => $newRefreshToken,
+                'user' => [
+                    'id' => $user->uId,
+                    'name' => $user->uName,
+                    'phone' => $user->uPhone,
+                    'age' => $age,
+                    'role' => $user->uRole,
+                    'age_group' => $user->age_group ?? 'teens',
+                    'class_id' => $user->class_id,
+                    'theme_preference' => $user->theme_preference ?? 'auto',
+                    'avatar_url' => $user->avatar_url,
+                    'avatar' => $user->avatar_url,
+                ],
+            ],
+        ]);
+    }
+
+    /**
+     * @OA\Post(
      *     path="/users/accept",
      *     tags={"Authentication"},
      *     summary="Request OTP for password reset",
-     *     description="Request OTP code to reset password",
+     *     description="Request OTP code to reset password. Always returns a generic success message to prevent phone enumeration.",
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
@@ -303,47 +351,54 @@ class AuthController extends Controller
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="OTP sent successfully"
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="Phone number not found"
-     *     ),
-     *     @OA\Response(
-     *         response=401,
-     *         description="Invalid phone number"
+     *         description="Generic acknowledgement (does not confirm phone existence)"
      *     )
      * )
-     * 
+     *
      * POST /api/users/accept
      * Yêu cầu OTP để reset mật khẩu
      */
     public function accept(Request $request)
     {
+        // Generic message — never reveal whether the phone exists or the OTP value.
+        $genericResponse = [
+            'status' => 'success',
+            'data' => [
+                'message' => 'Nếu số điện thoại tồn tại trong hệ thống, mã OTP đã được gửi.',
+            ],
+        ];
+
         $validator = Validator::make($request->all(), [
             'phone' => 'required|string',
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Số điện thoại không đúng'
-            ], 401);
+            // Still avoid leaking validation differences for phone format abuse paths.
+            return response()->json($genericResponse);
         }
 
-        // Kiểm tra user tồn tại
+        $ipKey = 'otp-accept-ip:' . $request->ip();
+        $phoneKey = 'otp-accept-phone:' . $request->phone;
+
+        if (RateLimiter::tooManyAttempts($ipKey, 10) || RateLimiter::tooManyAttempts($phoneKey, 5)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Quá nhiều lần yêu cầu. Vui lòng thử lại sau.',
+            ], 429);
+        }
+
+        RateLimiter::hit($ipKey, 60);
+        RateLimiter::hit($phoneKey, 300);
+
         $user = User::where('uPhone', $request->phone)
                    ->whereNull('uDeleted_at')
                    ->first();
 
+        // Do not create OTP / send SMS for unknown phones (still return generic 200).
         if (!$user) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Không tìm thấy số điện thoại trên cơ sở dữ liệu'
-            ], 404);
+            return response()->json($genericResponse);
         }
 
-        // Tạo OTP
         $otp = $this->generateOTP(6);
         $expiredAt = now()->addMinutes(5);
 
@@ -355,22 +410,26 @@ class AuthController extends Controller
         ]);
 
         if (!$otpLog) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Tạo mã OTP thất bại'
-            ], 500);
+            // Keep response generic; log server-side.
+            Log::error('Failed to create OTP log', ['user_id' => $user->uId]);
+            return response()->json($genericResponse);
         }
 
-        // TODO: Gửi SMS thực tế ở đây
-        // $this->sendOTP($request->phone, $otp);
+        // Send OTP via SMS provider only — never include OTP in HTTP response.
+        $this->sendOTP($request->phone, $otp);
 
-        return response()->json([
-            'status' => 'success',
-            'data' => [
-                'message' => 'Mã OTP đã được gửi đến số điện thoại của bạn (Mock: ' . $otp . ')',
-                'debug_otp' => $otp // For testing purpose
-            ]
-        ]);
+        // Local-only diagnostic log (not returned to client).
+        if (config('app.env') === 'local') {
+            Log::debug('OTP generated for password reset', [
+                'user_id' => $user->uId,
+                'phone' => $request->phone,
+                // intentionally omit otp value from structured logs in shared envs;
+                // keep only in local if you need manual testing via log tail.
+                'otp' => $otp,
+            ]);
+        }
+
+        return response()->json($genericResponse);
     }
 
     /**
@@ -395,18 +454,22 @@ class AuthController extends Controller
      *     @OA\Response(
      *         response=400,
      *         description="Invalid OTP or validation error"
-     *     ),
-     *     @OA\Response(
-     *         response=404,
-     *         description="User not found"
      *     )
      * )
-     * 
+     *
      * POST /api/users/reset-password
      * Đặt lại mật khẩu bằng OTP
      */
     public function resetPassword(Request $request)
     {
+        $ipKey = 'otp-reset-ip:' . $request->ip();
+        if (RateLimiter::tooManyAttempts($ipKey, 10)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Quá nhiều lần thử. Vui lòng thử lại sau.',
+            ], 429);
+        }
+
         $validator = Validator::make($request->all(), [
             'phone' => 'required|string',
             'otp' => 'required|string|size:6',
@@ -421,16 +484,21 @@ class AuthController extends Controller
             ], 400);
         }
 
+        RateLimiter::hit($ipKey, 60);
+
         // Tìm user
         $user = User::where('uPhone', $request->phone)
                    ->whereNull('uDeleted_at')
                    ->first();
 
+        // Uniform error — avoid user-existence oracle via different messages.
+        $invalidOtpResponse = response()->json([
+            'status' => 'error',
+            'message' => 'Mã OTP không chính xác hoặc đã hết hạn',
+        ], 400);
+
         if (!$user) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Người dùng không tồn tại'
-            ], 404);
+            return $invalidOtpResponse;
         }
 
         // Verify OTP
@@ -442,19 +510,26 @@ class AuthController extends Controller
                           ->first();
 
         if (!$otpRecord) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Mã OTP không chính xác hoặc đã hết hạn'
-            ], 400);
+            return $invalidOtpResponse;
         }
 
-        // Update password
+        // Update password + invalidate refresh token
         $user->update([
-            'uPassword' => Hash::make($request->password)
+            'uPassword' => Hash::make($request->password),
+            'refresh_token' => null,
+            'refresh_token_expires_at' => null,
         ]);
+
+        // Revoke all Sanctum access tokens after password reset
+        $user->tokens()->delete();
 
         // Mark OTP as verified
         $otpRecord->update(['oVerified' => true]);
+
+        // Invalidate any other outstanding OTPs for this user
+        OtpLog::where('userId', $user->uId)
+            ->where('oVerified', false)
+            ->update(['oVerified' => true]);
 
         return response()->json([
             'status' => 'success',
@@ -480,7 +555,7 @@ class AuthController extends Controller
      *         description="Unauthorized"
      *     )
      * )
-     * 
+     *
      * POST /api/logout
      * Đăng xuất
      */
@@ -502,20 +577,40 @@ class AuthController extends Controller
     }
 
     /**
-     * Generate OTP
+     * Persist a hashed refresh token and return the plaintext value once.
      */
-    private function generateOTP(int $length = 6): string
+    private function issueRefreshToken(User $user): string
     {
-        return (string) rand(pow(10, $length - 1), pow(10, $length) - 1);
+        $refreshToken = Str::random(64);
+        $user->update([
+            'refresh_token'            => hash('sha256', $refreshToken),
+            'refresh_token_expires_at' => now()->addDays(30),
+        ]);
+
+        return $refreshToken;
     }
 
     /**
-     * Send OTP via SMS (Mock implementation)
+     * Generate cryptographically secure numeric OTP
+     */
+    private function generateOTP(int $length = 6): string
+    {
+        $max = (10 ** $length) - 1;
+        $min = 10 ** ($length - 1);
+        return (string) random_int($min, $max);
+    }
+
+    /**
+     * Send OTP via SMS (stub — wire real provider in production)
      */
     private function sendOTP(string $phone, string $otp): bool
     {
-        // TODO: Implement actual SMS sending
-        // Example: Twilio, AWS SNS, etc.
+        // TODO: Implement actual SMS sending (Twilio, AWS SNS, etc.)
+        // Never return OTP in HTTP responses.
+        Log::info('Password-reset OTP dispatch requested', [
+            'phone' => $phone,
+            // do not log otp outside local/debug channels
+        ]);
         return true;
     }
 }

@@ -48,7 +48,7 @@ class TestController extends Controller
      *         description="Unauthorized - teacher role required"
      *     )
      * )
-     * 
+     *
      * POST /api/tests/upload
      * Upload file test (Excel/CSV)
      */
@@ -128,7 +128,7 @@ class TestController extends Controller
      *     path="/tests",
      *     tags={"Tests"},
      *     summary="Get public tests",
-     *     description="Get list of public tests available to all users",
+     *     description="Get list of public published tests available to all users",
      *     @OA\Response(
      *         response=200,
      *         description="Tests retrieved successfully"
@@ -138,18 +138,25 @@ class TestController extends Controller
      *         description="Server error"
      *     )
      * )
-     * 
+     *
      * GET /api/tests
-     * Danh sách test (tương thích với backend cũ)
+     * Danh sách test public (chỉ published + public)
      */
     public function index(Request $request)
     {
         try {
-            // Get all exams from database
-            $exams = Exam::orderBy('eCreated_at', 'desc')->get();
+            // Public catalog only: never leak private/draft exams unauthenticated
+            $exams = Exam::query()
+                ->where('eStatus', 'published')
+                ->where(function ($query) {
+                    $query->where('eVisibility', 'public')
+                          ->orWhereNull('eVisibility');
+                })
+                ->orderBy('eCreated_at', 'desc')
+                ->get();
 
             // Format response to match old backend
-            $tests = $exams->map(function($exam) {
+            $tests = $exams->map(function ($exam) {
                 return [
                     'id' => $exam->eId,
                     'title' => $exam->eTitle,
@@ -173,7 +180,7 @@ class TestController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to fetch tests: ' . $e->getMessage()
+                'message' => 'Failed to fetch tests'
             ], 500);
         }
     }
