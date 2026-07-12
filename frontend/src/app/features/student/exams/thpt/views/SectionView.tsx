@@ -1044,8 +1044,6 @@ function WritingResultCard({
     ? Object.entries(result.criteria_detail as Record<string, unknown>)
     : [];
   const gradedBy = result?.graded_by === 'teacher' ? 'Giáo viên' : result?.graded_by === 'ai' ? 'AI' : result?.graded_by;
-  const [showPrompt, setShowPrompt] = useState(false);
-  const [showEssay, setShowEssay] = useState(true);
 
   const criteriaLabel = (raw: string) => {
     const key = raw.toLowerCase();
@@ -1085,67 +1083,95 @@ function WritingResultCard({
         )}
       </div>
 
-      <div className="p-4 sm:p-5 space-y-4">
-        {/* Score panel first — student cares most about this */}
-        {!graded ? (
-          essay.trim() ? (
-            <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-              <Loader2 className="w-4 h-4 animate-spin text-amber-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold text-amber-900">AI đang chấm bài viết</p>
-                <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
-                  Điểm và nhận xét sẽ hiện ngay tại đây khi xong — trang tự cập nhật, không cần nộp lại.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <XCircle className="w-4 h-4 text-slate-400 flex-shrink-0" />
-              <p className="text-sm font-medium text-slate-500">Bạn chưa viết bài cho câu này.</p>
-            </div>
-          )
-        ) : (
-          <div className="rounded-xl border border-slate-200 overflow-hidden">
-            <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-emerald-50/70 to-white border-b border-slate-100">
-              <div
-                className="w-16 h-16 rounded-2xl flex flex-col items-center justify-center flex-shrink-0 text-white shadow-sm"
-                style={{ background: scoreColor }}
-              >
-                <span className="text-xl font-extrabold leading-none tabular-nums">{score.toFixed(1)}</span>
-                <span className="text-[9px] font-bold opacity-85 mt-0.5">/ 10</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-700 mb-1">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  {gradedBy === 'Giáo viên' ? 'Giáo viên chấm' : 'AI chấm điểm'}
-                </div>
-                <p className="text-sm font-bold text-slate-800">{scoreLabel}</p>
-                {criteria.length > 0 && (
-                  <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                    {criteria.slice(0, 4).map(([k, v]) => (
-                      <span
-                        key={k}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-white border border-slate-200 text-slate-600"
-                      >
-                        {criteriaLabel(k)}
-                        <b className="text-slate-800 tabular-nums">{String(v)}</b>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+      {/* 2 columns: left essay content · right AI review */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 lg:min-h-[360px]">
+        {/* LEFT — đề + bài viết */}
+        <div className="p-4 sm:p-5 border-b lg:border-b-0 lg:border-r border-slate-100 flex flex-col gap-3 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Nội dung bài viết</p>
+            <span className="text-[11px] font-semibold text-slate-400 tabular-nums">{wordCount} từ</span>
+          </div>
 
-            <div className="p-4 space-y-3.5">
-              {result?.feedback && (
+          {prompt && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Đề bài</p>
+              <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{prompt}</p>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3 flex-1 min-h-0">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Bài làm của bạn</p>
+            <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed lg:max-h-[420px] lg:overflow-y-auto pr-1">
+              {essay || <span className="text-slate-400 italic">Không có bài viết.</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT — đánh giá AI */}
+        <div className="p-4 sm:p-5 bg-gradient-to-b from-emerald-50/40 to-white flex flex-col gap-3.5 min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5" />
+            Đánh giá từ AI
+          </p>
+
+          {!graded ? (
+            essay.trim() ? (
+              <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <Loader2 className="w-4 h-4 animate-spin text-amber-600 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Nhận xét</p>
+                  <p className="text-sm font-semibold text-amber-900">AI đang chấm bài viết</p>
+                  <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+                    Điểm và nhận xét sẽ hiện ở cột này khi xong — trang tự cập nhật.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <XCircle className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                <p className="text-sm font-medium text-slate-500">Bạn chưa viết bài cho câu này.</p>
+              </div>
+            )
+          ) : (
+            <>
+              {/* Score hero */}
+              <div className="rounded-xl border border-emerald-100 bg-white p-4 flex items-center gap-4">
+                <div
+                  className="w-16 h-16 rounded-2xl flex flex-col items-center justify-center flex-shrink-0 text-white shadow-sm"
+                  style={{ background: scoreColor }}
+                >
+                  <span className="text-xl font-extrabold leading-none tabular-nums">{score.toFixed(1)}</span>
+                  <span className="text-[9px] font-bold opacity-85 mt-0.5">/ 10</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 mb-0.5">
+                    {gradedBy === 'Giáo viên' ? 'Giáo viên chấm' : 'AI chấm điểm'}
+                  </p>
+                  <p className="text-sm font-bold text-slate-800">{scoreLabel}</p>
+                  {criteria.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                      {criteria.map(([k, v]) => (
+                        <span
+                          key={k}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-slate-50 border border-slate-200 text-slate-600"
+                        >
+                          {criteriaLabel(k)}
+                          <b className="text-slate-800 tabular-nums">{String(v)}</b>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {result?.feedback && (
+                <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Nhận xét</p>
                   <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{result.feedback}</p>
                 </div>
               )}
 
               {suggestions.length > 0 && (
-                <div>
+                <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Gợi ý cải thiện</p>
                   <ul className="space-y-1.5">
                     {suggestions.map((s, i) => (
@@ -1157,60 +1183,7 @@ function WritingResultCard({
                   </ul>
                 </div>
               )}
-
-              {criteria.length > 4 && (
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  {criteria.map(([k, v]) => (
-                    <div key={k} className="rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">
-                        {criteriaLabel(k)}
-                      </p>
-                      <p className="text-sm font-black text-slate-800 mt-0.5 tabular-nums">{String(v)}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Prompt — collapsible to reduce noise */}
-        {prompt && (
-          <div className="rounded-xl border border-slate-200 bg-slate-50/60 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setShowPrompt((v) => !v)}
-              className="w-full px-3.5 py-2.5 flex items-center justify-between gap-2 text-left hover:bg-slate-50 transition-colors cursor-pointer"
-            >
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Đề bài</span>
-              <span className="text-xs font-semibold text-teal-700">{showPrompt ? 'Thu gọn' : 'Xem đề'}</span>
-            </button>
-            {showPrompt && (
-              <div className="px-3.5 pb-3 text-sm text-slate-700 whitespace-pre-wrap leading-relaxed border-t border-slate-100 pt-2.5">
-                {prompt}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Essay — collapsible, open by default */}
-        <div className="rounded-xl border border-slate-200 overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setShowEssay((v) => !v)}
-            className="w-full px-3.5 py-2.5 flex items-center justify-between gap-2 text-left bg-white hover:bg-slate-50 transition-colors cursor-pointer"
-          >
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Bài làm · {wordCount} từ
-            </span>
-            <span className="text-xs font-semibold text-teal-700">{showEssay ? 'Thu gọn' : 'Xem bài'}</span>
-          </button>
-          {showEssay && (
-            <div className="px-3.5 pb-3.5 border-t border-slate-100 pt-2.5">
-              <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto pr-1">
-                {essay || <span className="text-slate-400 italic">Không có bài viết.</span>}
-              </div>
-            </div>
+            </>
           )}
         </div>
       </div>
