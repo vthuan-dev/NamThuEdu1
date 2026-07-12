@@ -790,36 +790,62 @@ export function TeensTestTaking() {
         </div>
       )}
 
-      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_240px]">
+      <div className={`mt-5 grid grid-cols-1 gap-4 ${
+        isImageBlock
+          ? 'lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_220px]'
+          : 'lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_240px]'
+      }`}>
         {/* Cột content block: đoạn đọc HOẶC ảnh đề listening (luôn render để tránh hook order violation) */}
-        <section className={`hidden lg:flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden h-[calc(100vh-12rem)] ${!isBlockMode ? 'invisible' : ''}`}>
-          <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-teal-50 to-white flex-shrink-0">
-            <div className="flex items-center gap-2">
-              {isImageBlock ? <ImageIcon className="w-4 h-4 text-teal-600" /> : <BookOpen className="w-4 h-4 text-teal-600" />}
-              <h2 className="text-sm font-bold text-slate-900">{isImageBlock ? 'Ảnh đề' : 'Đọc hiểu'}</h2>
+        <section className={`hidden lg:flex flex-col bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden h-[calc(100vh-12rem)] ${!isBlockMode ? 'invisible' : ''}`}>
+          <div className="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-teal-50 to-white flex-shrink-0">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                {isImageBlock ? <ImageIcon className="w-4 h-4 text-teal-600 flex-shrink-0" /> : <BookOpen className="w-4 h-4 text-teal-600 flex-shrink-0" />}
+                <h2 className="text-sm font-bold text-slate-900 truncate">
+                  {isImageBlock ? 'Ảnh đề' : 'Đọc hiểu'}
+                </h2>
+                {isImageBlock && groupIndices.length > 0 && (
+                  <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
+                    Câu {groupIndices[0] + 1}–{groupIndices[groupIndices.length - 1] + 1}
+                  </span>
+                )}
+              </div>
+              {isImageBlock && taskImage && (
+                <a
+                  href={taskImage}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 transition-colors"
+                >
+                  <ZoomIn className="w-3.5 h-3.5" /> Phóng to
+                </a>
+              )}
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
+
+          {/* Audio sticky trong panel ảnh — luôn thấy khi nghe */}
+          {isImageBlock && q?.qMedia_url && (
+            <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/80 flex-shrink-0">
+              <button onClick={playAudio}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-white font-semibold text-sm shadow-sm transition-transform hover:scale-[1.01] active:scale-95"
+                style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
+                <Volume2 className="w-4 h-4" /> Nghe đoạn ghi âm
+              </button>
+            </div>
+          )}
+
+          <div className={`flex-1 overflow-y-auto min-h-0 ${isImageBlock ? 'p-3 bg-[#F8FAFC]' : 'px-6 py-4'}`}>
             {isImageBlock ? (
-              <div className="space-y-3">
-                {q?.qMedia_url && (
-                  <button onClick={playAudio}
-                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-white font-semibold text-sm"
-                    style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
-                    <Volume2 className="w-4 h-4" /> Nghe đoạn ghi âm
-                  </button>
-                )}
-                <a href={taskImage} target="_blank" rel="noreferrer" className="block group relative">
-                  <img
-                    src={taskImage}
-                    alt="Ảnh đề"
-                    className="w-full object-contain rounded-xl border border-slate-100 bg-slate-50 max-h-[calc(100vh-18rem)]"
-                  />
-                  <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-black/50 text-white text-[11px] font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
-                    <ZoomIn className="w-3 h-3" /> Phóng to
-                  </span>
-                </a>
-              </div>
+              <a href={taskImage} target="_blank" rel="noreferrer" className="block group relative rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm">
+                <img
+                  src={taskImage}
+                  alt="Ảnh đề"
+                  className="w-full object-contain max-h-[calc(100vh-16rem)]"
+                />
+                <span className="absolute bottom-3 right-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900/55 text-white text-[11px] font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                  <ZoomIn className="w-3 h-3" /> Mở full
+                </span>
+              </a>
             ) : (
               <HighlightablePassage
                 html={passage}
@@ -839,26 +865,35 @@ export function TeensTestTaking() {
         <main className="min-w-0">
           <div className="lg:h-[calc(100vh-12rem)] lg:overflow-y-auto lg:space-y-4 space-y-4">
             {/* Đoạn đọc / ảnh đề cho mobile/tablet — hiển thị dựa trên mobileActiveTab */}
-            <section className={`lg:hidden bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden ${!isBlockMode || mobileActiveTab !== 'passage' ? 'hidden' : 'block'}`}>
-              <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-teal-50 to-white">
-                <div className="flex items-center gap-2">
-                  {isImageBlock ? <ImageIcon className="w-4 h-4 text-teal-600" /> : <BookOpen className="w-4 h-4 text-teal-600" />}
-                  <h2 className="text-sm font-bold text-slate-900">{isImageBlock ? 'Ảnh đề' : 'Đọc hiểu'}</h2>
+            <section className={`lg:hidden bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden ${!isBlockMode || mobileActiveTab !== 'passage' ? 'hidden' : 'block'}`}>
+              <div className="px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-teal-50 to-white">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    {isImageBlock ? <ImageIcon className="w-4 h-4 text-teal-600" /> : <BookOpen className="w-4 h-4 text-teal-600" />}
+                    <h2 className="text-sm font-bold text-slate-900">{isImageBlock ? 'Ảnh đề' : 'Đọc hiểu'}</h2>
+                  </div>
+                  {isImageBlock && taskImage && (
+                    <a href={taskImage} target="_blank" rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-teal-700 bg-teal-50 px-2 py-1 rounded-lg">
+                      <ZoomIn className="w-3.5 h-3.5" /> Phóng to
+                    </a>
+                  )}
                 </div>
               </div>
-              <div className="overflow-y-auto px-5 py-4 min-h-[50vh]">
+              <div className={`overflow-y-auto min-h-[50vh] ${isImageBlock ? 'p-3 bg-[#F8FAFC]' : 'px-5 py-4'}`}>
                 {isImageBlock ? (
                   <div className="space-y-3">
                     {q?.qMedia_url && (
                       <button onClick={playAudio}
-                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-white font-semibold text-sm"
+                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-white font-semibold text-sm shadow-sm"
                         style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
                         <Volume2 className="w-4 h-4" /> Nghe đoạn ghi âm
                       </button>
                     )}
-                    <a href={taskImage} target="_blank" rel="noreferrer">
-                      <img src={taskImage} alt="Ảnh đề" className="w-full object-contain rounded-xl border border-slate-100 bg-slate-50" />
+                    <a href={taskImage} target="_blank" rel="noreferrer" className="block">
+                      <img src={taskImage} alt="Ảnh đề" className="w-full object-contain rounded-xl border border-slate-200 bg-white shadow-sm" />
                     </a>
+                    <p className="text-center text-[11px] text-slate-400 font-medium">Chạm ảnh để phóng to · chuyển tab Câu hỏi để trả lời</p>
                   </div>
                 ) : (
                   <HighlightablePassage
@@ -877,25 +912,60 @@ export function TeensTestTaking() {
 
             {/* Reading mode questions list */}
             <div className={`${!isBlockMode ? 'hidden' : ''} ${mobileActiveTab === 'question' ? 'block' : 'hidden lg:block'}`}>
+              {/* Header cột câu hỏi khi image-block */}
+              {isImageBlock && (
+                <div className="mb-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-extrabold text-slate-900">Câu hỏi</p>
+                    <p className="text-xs text-slate-500 truncate">
+                      Xem ảnh bên trái · điền / chọn đáp án bên phải
+                    </p>
+                  </div>
+                  <span className="flex-shrink-0 text-xs font-bold tabular-nums px-2.5 py-1 rounded-full bg-teal-50 text-teal-700">
+                    {groupIndices.filter((i) => String(session.answers[getQuestionId(questions[i])] ?? '').trim() !== '').length}/{groupIndices.length} đã làm
+                  </span>
+                </div>
+              )}
+
               {groupIndices.map((idx) => {
                 const gq = questions[idx];
                 const gid = getQuestionId(gq);
                 const gSelected = String(session.answers[gid] ?? '');
                 const gFlagged = !!flagged[gid];
                 const isCur = idx === current;
+                const gType = normType(gq);
+                const isFill = gType === 'fill_blank' || gType === 'short_answer';
+                const plainLabel = String(gq?.qContent ?? '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+                const hideLabel = isImageBlock && (!plainLabel || /^(c\u00e2u|cau|q)\s*\d+$/i.test(plainLabel));
                 return (
                   <section
                     key={gid || idx}
                     ref={(el) => { cardRefs.current[idx] = el; }}
                     onMouseDown={() => setCurrent(idx)}
-                    className={`rounded-2xl bg-white border p-5 sm:p-6 transition-shadow scroll-mt-36 ${!isCur ? 'hidden lg:block' : 'block'}`}
-                    style={{ borderColor: isCur ? TEAL : '#E2E8F0', boxShadow: isCur ? '0 0 0 3px #CCFBF1' : undefined }}
+                    className={`rounded-2xl bg-white border transition-all scroll-mt-36 ${
+                      isImageBlock ? 'p-3.5 sm:p-4 mb-2.5' : 'p-5 sm:p-6'
+                    } ${!isCur ? 'hidden lg:block' : 'block'}`}
+                    style={{
+                      borderColor: isCur ? TEAL : '#E2E8F0',
+                      boxShadow: isCur ? '0 0 0 3px #CCFBF1' : undefined,
+                      background: isCur && isImageBlock ? '#F0FDFA' : '#fff',
+                    }}
                   >
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-lg text-sm font-bold text-white"
-                        style={{ background: TEAL }}>
-                        Câu {idx + 1}
-                      </span>
+                    <div className={`flex items-center justify-between ${hideLabel && isFill ? 'mb-2' : 'mb-3'}`}>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded-lg text-sm font-bold text-white"
+                          style={{ background: isCur ? TEAL : '#0F766E' }}>
+                          {idx + 1}
+                        </span>
+                        {isImageBlock && (
+                          <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                            {isFill ? 'Điền từ' : 'Trắc nghiệm'}
+                          </span>
+                        )}
+                        {!isImageBlock && (
+                          <span className="text-sm font-bold text-slate-700">Câu {idx + 1}</span>
+                        )}
+                      </div>
                       <button onClick={(e) => { e.stopPropagation(); toggleFlagFor(gq); }}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-colors"
                         style={{ background: gFlagged ? '#FEF3C7' : '#F8FAFC', color: gFlagged ? '#B45309' : '#94A3B8' }}>
@@ -917,10 +987,32 @@ export function TeensTestTaking() {
                       <img src={gq.qImage_url} alt="" className="w-full max-h-72 object-contain rounded-xl mb-4 bg-slate-50" />
                     )}
 
-                    <RichText as="h2" className="text-base font-bold leading-snug text-slate-900"
-                      text={gq?.qContent ?? `Câu ${idx + 1}`} />
+                    {!hideLabel && (
+                      <RichText
+                        as="h2"
+                        className={`${isImageBlock ? 'text-sm font-semibold' : 'text-base font-bold'} leading-snug text-slate-900 ${isImageBlock ? 'mb-1' : ''}`}
+                        text={gq?.qContent ?? `Câu ${idx + 1}`}
+                      />
+                    )}
 
-                    <QuestionRenderer q={gq} value={gSelected} onChange={(v) => setAnswerFor(gq, v)} />
+                    {/* Fill compact cho image-block: 1 dòng gọn giống IELTS answer sheet */}
+                    {isImageBlock && isFill ? (
+                      <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-100 transition-all">
+                        <span className="text-xs font-bold text-slate-400 flex-shrink-0">Q{idx + 1}</span>
+                        <input
+                          type="text"
+                          value={gSelected}
+                          onChange={(e) => setAnswerFor(gq, e.target.value)}
+                          placeholder="Nhập đáp án…"
+                          className="flex-1 text-[15px] outline-none bg-transparent text-slate-800 font-medium"
+                        />
+                        {gSelected.trim() !== '' && (
+                          <CheckCircle2 className="w-4 h-4 text-teal-500 flex-shrink-0" />
+                        )}
+                      </div>
+                    ) : (
+                      <QuestionRenderer q={gq} value={gSelected} onChange={(v) => setAnswerFor(gq, v)} />
+                    )}
                   </section>
                 );
               })}
