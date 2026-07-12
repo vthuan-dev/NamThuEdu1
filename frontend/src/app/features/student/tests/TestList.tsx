@@ -378,8 +378,7 @@ export function TestList() {
       </div>
 
       {/* ══ Content ═══════════════════════════════════════════════════════════ */}
-      <div className="px-4 lg:px-8 py-8">
-        <div className="max-w-screen-xl mx-auto">
+      <div className="px-8 lg:px-16 py-8">
         {/* Results count */}
         {!isLoading && (
           <p className="text-sm text-gray-500 mb-6">
@@ -860,7 +859,6 @@ export function TestList() {
           </button>
         </div>
       )}
-        </div>
       </div>
     </div>
   );
