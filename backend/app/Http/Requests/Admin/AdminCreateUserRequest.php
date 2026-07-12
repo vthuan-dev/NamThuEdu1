@@ -21,7 +21,8 @@ class AdminCreateUserRequest extends AdminFormRequest
     {
         return [
             'phone'    => 'required|string|unique:users,uPhone',
-            'password' => 'required|string|min:6',
+            // Optional: if omitted/empty, controller defaults to "user123"
+            'password' => 'nullable|string|min:6',
             'name'     => 'required|string|max:150',
             'role'     => 'required|in:student,teacher,admin',
             'status'   => 'nullable|in:active,inactive',
@@ -29,6 +30,7 @@ class AdminCreateUserRequest extends AdminFormRequest
             'address'  => 'nullable|string',
             'gender'   => 'nullable|boolean',
             'class'    => 'nullable|integer',
+            'age_group'=> 'nullable|in:kids,teens,adults',
         ];
     }
 }

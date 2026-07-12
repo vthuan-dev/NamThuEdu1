@@ -219,12 +219,15 @@ export const adminApi = {
   async createUser(payload: {
     name: string;
     phone: string;
-    password: string;
+    password?: string;
     role: "student" | "teacher" | "admin";
     status?: "active" | "inactive";
     age_group?: "kids" | "teens" | "adults" | string;
   }) {
-    const response = await api.post<ApiResponse<{ id: number; phone: string; name: string; role: string; age_group?: string; status?: string; password: string }>>("/admin/users", payload);
+    const response = await api.post<ApiResponse<{ id: number; phone: string; name: string; role: string; age_group?: string; status?: string; password?: string }>>("/admin/users", {
+      ...payload,
+      password: payload.password?.trim() || "user123",
+    });
     return response.data;
   },
 

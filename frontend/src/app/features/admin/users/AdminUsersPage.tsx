@@ -529,27 +529,17 @@ export function AdminUsersPage() {
   };
 
   // Modal reset & creation logic
-  const generateRandomPassword = () => {
-    // Generate 8-character random password (letters + numbers)
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let password = '';
-    for (let i = 0; i < 8; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return password;
-  };
+  const DEFAULT_CREATE_PASSWORD = 'user123';
 
   const openModal = () => {
-    const randomPassword = generateRandomPassword();
-    
     setCRole(activeTab === "teachers" ? "teacher" : "student");
     setCName("");
     setCPhone("");
-    setCPass(randomPassword); // Auto-generate random password
+    setCPass(DEFAULT_CREATE_PASSWORD); // Default password for new accounts
     setCAgeGroup("kids");
     setCStatus("active");
     setModalDone(false);
-    setShowPass(true); // Show password by default
+    setShowPass(true); // Show password by default so admin can copy/hand over
 
     // Clear validation states
     setDebouncedPhone("");
@@ -590,10 +580,11 @@ export function AdminUsersPage() {
       return;
     }
     if (!cPass.trim()) {
-      showToast("Vui lòng nhập mật khẩu", "err");
-      return;
+      // Fallback to default password instead of blocking
+      setCPass(DEFAULT_CREATE_PASSWORD);
     }
-    if (cPass.trim().length < 6) {
+    const passwordToSend = cPass.trim() || DEFAULT_CREATE_PASSWORD;
+    if (passwordToSend.length < 6) {
       showToast("Mật khẩu phải tối thiểu 6 ký tự", "err");
       return;
     }
@@ -603,7 +594,7 @@ export function AdminUsersPage() {
       const result = await adminApi.createUser({
         name: cName.trim(),
         phone: cPhone.trim(),
-        password: cPass,
+        password: passwordToSend,
         role: cRole,
         status: cStatus,
         age_group: cRole === "student" ? cAgeGroup : undefined,
@@ -618,7 +609,7 @@ export function AdminUsersPage() {
         setCreatedUser({
           name: cName.trim(),
           phone: cPhone.trim(),
-          password: result.data.password || cPass,
+          password: result.data.password || passwordToSend,
           role: cRole,
           id: result.data.id,
         });
@@ -1277,7 +1268,7 @@ export function AdminUsersPage() {
                         type={showPass ? "text" : "password"}
                         value={cPass}
                         onChange={(e) => setCPass(e.target.value)}
-                        placeholder="Tối thiểu 6 ký tự"
+                        placeholder="Mặc định: user123"
                         className="w-full rounded-lg border border-slate-200 pl-9 pr-10 py-2 text-sm outline-none transition-all bg-slate-50 focus:border-slate-800 focus:bg-white focus:ring-4 focus:ring-slate-100"
                       />
                       <button
@@ -1288,6 +1279,9 @@ export function AdminUsersPage() {
                         {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Mặc định: <span className="font-semibold text-slate-700">user123</span> (có thể đổi trước khi tạo)
+                    </p>
                   </div>
 
                   {/* Age group (only for Student role) */}

@@ -21,7 +21,7 @@ export function CreateStudent({ onClose, onSuccess }: CreateStudentProps) {
   const [formData, setFormData] = useState<StudentFormData>({
     studentName: '',
     studentPhone: '',
-    studentPassword: '',
+    studentPassword: 'user123',
     studentDoB: '',
     age_group: 'teens',
   });
@@ -69,13 +69,19 @@ export function CreateStudent({ onClose, onSuccess }: CreateStudentProps) {
 
     try {
       const token = getAuthToken();
+      // Backend falls back to "user123" if password is empty; still send default explicitly.
+      const payload = {
+        ...formData,
+        studentPassword: formData.studentPassword?.trim() || 'user123',
+      };
+
       const response = await fetch(`${import.meta.env.VITE_API_URL}/teacher/student`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
@@ -221,9 +227,11 @@ export function CreateStudent({ onClose, onSuccess }: CreateStudentProps) {
               required
               minLength={6}
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-              placeholder="Nhập mật khẩu (tối thiểu 6 ký tự)"
+              placeholder="Mặc định: user123"
             />
-            <p className="mt-1 text-xs text-slate-500">Mật khẩu mặc định cho học viên</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Mật khẩu mặc định: <span className="font-semibold text-slate-700">user123</span> (có thể đổi trước khi tạo)
+            </p>
           </div>
 
           {/* Date of Birth (Optional) */}

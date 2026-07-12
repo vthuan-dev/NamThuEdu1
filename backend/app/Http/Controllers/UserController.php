@@ -512,7 +512,8 @@ class UserController extends Controller
         // Validation for single student
         $validator = Validator::make($request->all(), [
             'studentPhone' => 'required|string|unique:users,uPhone|regex:/^0[0-9]{9,10}$/',
-            'studentPassword' => 'required|string|min:6',
+            // Optional: empty/missing => default "user123"
+            'studentPassword' => 'nullable|string|min:6',
             'studentName' => 'required|string|max:150',
             'studentEmail' => 'nullable|email|max:255',
             'studentDoB' => 'nullable|date|before:today',
@@ -554,9 +555,14 @@ class UserController extends Controller
                 $avatarPath = 'uploads/avatars/' . $avatarName;
             }
 
+            $plainPassword = trim((string) $request->input('studentPassword', ''));
+            if ($plainPassword === '') {
+                $plainPassword = 'user123';
+            }
+
             $student = User::create([
                 'uPhone' => trim($request->studentPhone),
-                'uPassword' => Hash::make($request->studentPassword),
+                'uPassword' => Hash::make($plainPassword),
                 // SECURITY: Do NOT persist the plaintext password (encrypted or not).
                 // OWASP A02 (Cryptographic Failures): a reversible password store
                 // is equivalent to plaintext for any attacker with DB + APP_KEY.
@@ -584,7 +590,7 @@ class UserController extends Controller
                         'age_group' => $student->age_group,
                         'avatar_url' => $student->avatar_url,
                     ]],
-                    'password' => $request->studentPassword, // Return plain password for teacher to copy
+                    'password' => $plainPassword, // Return plain password for teacher to copy
                 ],
                 'message' => 'Tạo học viên thành công!'
             ]);
@@ -642,7 +648,8 @@ class UserController extends Controller
             // Validation cho từng student
             $validator = Validator::make($data, [
                 'studentPhone' => 'required|string|unique:users,uPhone|regex:/^0[0-9]{9,10}$/',
-                'studentPassword' => 'required|string|min:6',
+                // Optional: empty/missing => default "user123"
+                'studentPassword' => 'nullable|string|min:6',
                 'studentName' => 'required|string|max:150',
                 'studentDoB' => 'nullable|date|before:today',
                 'age_group' => 'required|in:kids,teens,adults',
@@ -675,9 +682,14 @@ class UserController extends Controller
                 // Class system đã deprecated — bỏ logic find/create class.
                 // Học viên chỉ thuộc age_group, không thuộc class cố định.
 
+                $plainPassword = trim((string) ($data['studentPassword'] ?? ''));
+                if ($plainPassword === '') {
+                    $plainPassword = 'user123';
+                }
+
                 $student = User::create([
                     'uPhone' => trim($data['studentPhone']),
-                    'uPassword' => Hash::make($data['studentPassword']),
+                    'uPassword' => Hash::make($plainPassword),
                     // SECURITY: see note in createSingleStudent() — plaintext
                     // password is never persisted. Caller must surface the
                     // generated password to the teacher in-response only.
@@ -697,6 +709,7 @@ class UserController extends Controller
                         'name' => $student->uName,
                         'phone' => $student->uPhone,
                         'age_group' => $student->age_group,
+                        'password' => $plainPassword,
                     ];
                 }
             } catch (\Exception $e) {
@@ -1537,9 +1550,15 @@ class UserController extends Controller
     {
         // Xác thực quyền admin + validate input đã được xử lý bởi AdminCreateUserRequest.
         try {
+            // Default initial password when admin leaves it blank.
+            $plainPassword = trim((string) $request->input('password', ''));
+            if ($plainPassword === '') {
+                $plainPassword = 'user123';
+            }
+
             $newUser = User::create([
                 'uPhone' => trim($request->phone),
-                'uPassword' => Hash::make($request->password),
+                'uPassword' => Hash::make($plainPassword),
                 'uName' => $request->name,
                 'uRole' => $request->role,
                 'uStatus' => $request->status ?? 'active',
@@ -1547,6 +1566,7 @@ class UserController extends Controller
                 'uAddress' => $request->address ?? '',
                 'uGender' => $request->gender ?? 0,
                 'uClass' => $request->class ?? 0,
+                'age_group' => $request->age_group ?? ($request->role === 'student' ? 'teens' : null),
             ]);
 
             return response()->json([
@@ -1558,6 +1578,8 @@ class UserController extends Controller
                     'name' => $newUser->uName,
                     'role' => $newUser->uRole,
                     'status' => $newUser->uStatus,
+                    // Returned once so admin can hand credentials to the user.
+                    'password' => $plainPassword,
                 ]
             ], 201);
 
@@ -2311,7 +2333,8 @@ class UserController extends Controller
         foreach ($request->users as $index => $userData) {
             $rowValidator = Validator::make($userData, [
                 'phone' => 'required|string',
-                'password' => 'required|string|min:6',
+                // Optional: empty/missing => default "user123"
+                'password' => 'nullable|string|min:6',
                 'name' => 'required|string|max:150',
                 'role' => 'nullable|in:student,teacher,admin',
                 'status' => 'nullable|in:active,inactive',
@@ -2342,9 +2365,14 @@ class UserController extends Controller
                 continue;
             }
 
+            $plainPassword = trim((string) ($userData['password'] ?? ''));
+            if ($plainPassword === '') {
+                $plainPassword = 'user123';
+            }
+
             User::create([
                 'uPhone' => $phone,
-                'uPassword' => Hash::make($userData['password']),
+                'uPassword' => Hash::make($plainPassword),
                 'uName' => $userData['name'],
                 'uRole' => $userData['role'] ?? 'student',
                 'uStatus' => $userData['status'] ?? 'active',

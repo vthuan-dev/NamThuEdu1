@@ -177,6 +177,10 @@ export function AddStudent() {
       setError(t('teacher.students.addStudent.validation.passwordRequired'));
       return;
     }
+    if (!autoPassword && formData.studentPassword.trim().length < 6) {
+      setError('Mật khẩu phải tối thiểu 6 ký tự');
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -190,8 +194,10 @@ export function AddStudent() {
       if (formData.address) fd.append('address', formData.address);
       fd.append('age_group', formData.age_group);
 
+      // Default password for new students is always "user123" when auto mode is on.
+      // Backend also falls back to "user123" if studentPassword is empty.
       const passwordToSend = autoPassword
-        ? Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8).toUpperCase()
+        ? 'user123'
         : formData.studentPassword;
       fd.append('studentPassword', passwordToSend);
       fd.append('status', formData.status);
@@ -551,7 +557,8 @@ export function AddStudent() {
                   </span>
                 </div>
                 <p className="text-[12px] text-slate-500 mt-0.5">
-                  {t('teacher.students.addStudent.autoPassword.description')}
+                  Mật khẩu mặc định: <span className="font-semibold text-slate-700">user123</span>
+                  {' '}(bỏ chọn để nhập mật khẩu khác)
                 </p>
               </div>
             </label>
