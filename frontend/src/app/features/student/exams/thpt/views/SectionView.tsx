@@ -40,9 +40,10 @@ interface Props {
   speakingParts?: Record<string, any>;
   /** URL bản ghi âm Nói theo câu (review): { "5": url, "6": url } */
   speakingAudio?: Record<string, string>;
+  correctQuestions?: Record<string, boolean>;
 }
 
-export function SectionView({ section, answers, correctAnswers, onAnswerChange, mode, submissionId, speakingParts, speakingAudio }: Props) {
+export function SectionView({ section, answers, correctAnswers, onAnswerChange, mode, submissionId, speakingParts, speakingAudio, correctQuestions }: Props) {
   const typeLabel = TYPE_LABEL[section.type] ?? 'Phần thi';
   // Chia đôi trái–phải cho dạng có bài đọc DÀI tách biệt khỏi câu hỏi
   // (mc_cloze, reading_mixed). word_bank_cloze/open_cloze KHÔNG chia vì ô
@@ -78,7 +79,7 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
           </div>
           {/* Cột câu hỏi — cuộn riêng */}
           <div className="lg:overflow-y-auto lg:pr-1 space-y-5">
-            <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} hidePassage />
+            <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} correctQuestions={correctQuestions} hidePassage />
           </div>
         </div>
       </section>
@@ -88,12 +89,12 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
   return (
     <section className="space-y-5">
       {headerEl}
-      <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} />
+      <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} correctQuestions={correctQuestions} />
     </section>
   );
 }
 
-function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissionId, speakingParts, speakingAudio, hidePassage }: Props & { hidePassage?: boolean }) {
+function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissionId, speakingParts, speakingAudio, correctQuestions, hidePassage }: Props & { hidePassage?: boolean }) {
   const isReview = mode === 'review';
   // Đề Nói: mỗi lần chỉ cho ghi âm 1 đề. activeSpeakingQ = số câu đang ghi (hoặc null).
   const [activeSpeakingQ, setActiveSpeakingQ] = useState<number | null>(null);
@@ -202,6 +203,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                 <TextAnswer
                   value={String(answers[key] ?? '')}
                   correct={correctAnswers?.[key] as string | undefined}
+                  isCorrectMap={correctQuestions?.[key]}
                   isReview={isReview}
                   onChange={(v) => onAnswerChange(key, v)}
                 />
@@ -233,6 +235,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                     onChange={(v) => onAnswerChange?.(key, v)}
                     isReview={mode === 'review'}
                     correct={correctAnswers ? String(correctAnswers[key] ?? '') : undefined}
+                    isCorrectMap={correctQuestions?.[key]}
                   />
                 </QCard>
               );
@@ -366,6 +369,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                 <TextAnswer
                   value={String(answers[key] ?? '')}
                   correct={correctAnswers?.[key] as string | undefined}
+                  isCorrectMap={correctQuestions?.[key]}
                   isReview={isReview}
                   onChange={(v) => onAnswerChange(key, v)}
                   multiline
@@ -526,6 +530,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
           passage={section.passage}
           answers={answers}
           correctAnswers={correctAnswers}
+          correctQuestions={correctQuestions}
           onAnswerChange={onAnswerChange}
           isReview={isReview}
         />
@@ -845,17 +850,19 @@ function TfStatementRow({
 function TextAnswer({
   value,
   correct,
+  isCorrectMap,
   isReview,
   onChange,
   multiline,
 }: {
   value: string;
   correct?: string;
+  isCorrectMap?: boolean;
   isReview: boolean;
   onChange: (v: string) => void;
   multiline?: boolean;
 }) {
-  const isCorrect = isReview && value && correct && value.trim().toLowerCase() === correct.trim().toLowerCase();
+  const isCorrect = isReview && (isCorrectMap !== undefined ? isCorrectMap : !!(value && correct && value.trim().toLowerCase() === correct.trim().toLowerCase()));
   const cls = `w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-200 ${
     isReview ? (isCorrect ? 'border-emerald-400 bg-emerald-50' : 'border-red-400 bg-red-50') : 'border-slate-300'
   }`;
@@ -919,12 +926,14 @@ function ClozePassage({
   passage,
   answers,
   correctAnswers,
+  correctQuestions,
   onAnswerChange,
   isReview,
 }: {
   passage: string;
   answers: ThptAnswers;
   correctAnswers?: ThptAnswers;
+  correctQuestions?: Record<string, boolean>;
   onAnswerChange: (key: string, v: string) => void;
   isReview: boolean;
 }) {
@@ -956,7 +965,7 @@ function ClozePassage({
                 const key = `q${tok.qn}`;
                 const userVal = String(answers[key] ?? '');
                 const correctVal = String(correctAnswers?.[key] ?? '');
-                const isCorrect = isReview && userVal && correctVal && userVal.trim().toLowerCase() === correctVal.trim().toLowerCase();
+                const isCorrect = isReview && (correctQuestions !== undefined ? !!correctQuestions[key] : !!(userVal && correctVal && userVal.trim().toLowerCase() === correctVal.trim().toLowerCase()));
                 const isWrong = isReview && userVal && !isCorrect;
                 const isMissing = isReview && !userVal;
                 return (

@@ -1175,6 +1175,7 @@ class ThptExamController extends Controller
         $rawScore = 0;
         $rawMax = 0;
         $correct = [];
+        $correctQuestions = [];
         $sectionStats = [];
 
         foreach ($config['sections'] ?? [] as $s) {
@@ -1186,18 +1187,22 @@ class ThptExamController extends Controller
             $secTotal = 0;
 
             $checkSingle = function (string $key, $expected, $isText = false, array $accepted = [], bool $cs = false)
-                use (&$userAnswers, &$correct, &$secRaw, &$secMax, &$secCorrect, &$secTotal, $pts) {
+                use (&$userAnswers, &$correct, &$correctQuestions, &$secRaw, &$secMax, &$secCorrect, &$secTotal, $pts) {
                 $correct[$key] = $expected;
                 $secMax += $pts;
                 $secTotal++;
                 if ($isText) {
                     $userVal = trim((string) ($userAnswers[$key] ?? ''));
-                    if ($userVal !== '' && $this->matchOpenCloze($userVal, $accepted, $cs)) {
+                    $isCorrect = ($userVal !== '' && $this->matchOpenCloze($userVal, $accepted, $cs));
+                    $correctQuestions[$key] = $isCorrect;
+                    if ($isCorrect) {
                         $secRaw += $pts;
                         $secCorrect++;
                     }
                 } else {
-                    if ($expected !== null && $expected !== '' && ($userAnswers[$key] ?? null) === $expected) {
+                    $isCorrect = ($expected !== null && $expected !== '' && ($userAnswers[$key] ?? null) === $expected);
+                    $correctQuestions[$key] = $isCorrect;
+                    if ($isCorrect) {
                         $secRaw += $pts;
                         $secCorrect++;
                     }
@@ -1256,7 +1261,9 @@ class ThptExamController extends Controller
                             $expected = (bool) ($st['correct'] ?? false);
                             $correct[$key] = $expected;
                             $secMax += $pts; $secTotal++;
-                            if (array_key_exists($key, $userAnswers) && (bool) $userAnswers[$key] === $expected) {
+                            $isCorrect = (array_key_exists($key, $userAnswers) && (bool) $userAnswers[$key] === $expected);
+                            $correctQuestions[$key] = $isCorrect;
+                            if ($isCorrect) {
                                 $secRaw += $pts; $secCorrect++;
                             }
                         }
@@ -1292,7 +1299,9 @@ class ThptExamController extends Controller
                             $key = "q{$qn}.{$idx}";
                             $correct[$key] = $expectedLetter;
                             $secMax += $pts; $secTotal++;
-                            if (($userAnswers[$key] ?? null) === $expectedLetter) {
+                            $isCorrect = (($userAnswers[$key] ?? null) === $expectedLetter);
+                            $correctQuestions[$key] = $isCorrect;
+                            if ($isCorrect) {
                                 $secRaw += $pts; $secCorrect++;
                             }
                         }
@@ -1340,6 +1349,7 @@ class ThptExamController extends Controller
             'scale_max' => $scaleMax,
             'sections' => $sectionStats,
             'correct_answers' => $correct,
+            'correct_questions' => $correctQuestions,
         ];
     }
 

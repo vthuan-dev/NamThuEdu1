@@ -437,6 +437,7 @@ export function ThptResultPage() {
                 section={activeSection}
                 answers={answers}
                 correctAnswers={result.correct_answers}
+                correctQuestions={result.correct_questions}
                 onAnswerChange={() => {}}
                 mode="review"
                 speakingParts={result.speaking?.parts}
