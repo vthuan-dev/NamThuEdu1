@@ -243,7 +243,7 @@ export function ThptResultPage() {
 
       {/* ── Top bar ── */}
       <header className="bg-white border-b border-slate-100 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3.5 flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3.5 flex items-center gap-3">
           <button type="button" onClick={() => navigate('/hoc-vien')}
             className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer flex-shrink-0">
             <ArrowLeft className="w-4 h-4 text-slate-500" />
@@ -255,7 +255,7 @@ export function ThptResultPage() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-5">
 
         {overallPending && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-3">
@@ -459,40 +459,134 @@ export function ThptResultPage() {
         </section>
 
         {/* ── Review section ── */}
-        {activeSection && (
-          <section className="rounded-2xl bg-white overflow-hidden"
-            style={{ border: '1.5px solid #E2E8F0', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between gap-3">
-              {(() => { const m = getSectionMeta(activeSection.type ?? ''); const I = m.Icon; return (
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.bg }}>
-                    <I className="w-3.5 h-3.5" style={{ color: m.color }} />
+        {activeSection && (() => {
+          const m = getSectionMeta(activeSection.type ?? '');
+          const I = m.Icon;
+          const isSpeaking = activeSection.type === 'speaking';
+          const isWriting = activeSection.type === 'writing';
+          const isAiSkill = isSpeaking || isWriting;
+          const aiBlock = isSpeaking ? result.speaking : isWriting ? result.writing : null;
+          const activeStat = result.sections.find((s) => s.section_id === activeSection.id)
+            ?? result.sections[activeIdx];
+          const objCorrect = activeStat?.correct_count ?? 0;
+          const objTotal = activeStat?.total_count ?? 0;
+          const aiReady = !!aiBlock && typeof aiBlock.score === 'number';
+          const aiPending = isAiSkill && !aiReady;
+
+          return (
+            <section
+              className="rounded-2xl overflow-hidden bg-white"
+              style={{
+                border: `1.5px solid ${m.color}33`,
+                boxShadow: `0 8px 28px ${m.color}14, 0 1px 4px rgba(15,23,42,0.04)`,
+              }}
+            >
+              {/* Skill color bar */}
+              <div className="h-1.5" style={{ background: `linear-gradient(90deg, ${m.color}, ${m.color}88)` }} />
+
+              {/* Header — important context only */}
+              <div
+                className="px-4 sm:px-5 py-4 border-b flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
+                style={{ borderColor: `${m.color}18`, background: `linear-gradient(180deg, ${m.bg}AA 0%, #ffffff 100%)` }}
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div
+                    className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm"
+                    style={{ background: m.color, color: '#fff' }}
+                  >
+                    <I className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: m.color }}>{m.label}</p>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: '#1F2937' }} className="truncate">{activeSection.title ?? 'Xem lại'}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider text-white"
+                        style={{ background: m.color }}
+                      >
+                        {m.label}
+                      </span>
+                      <span className="text-[11px] font-semibold text-slate-400">Xem lại bài làm</span>
+                    </div>
+                    <h2 className="text-base sm:text-[17px] font-black text-slate-900 truncate mt-1 leading-snug">
+                      {activeSection.title ?? 'Chi tiết phần thi'}
+                    </h2>
                   </div>
                 </div>
-              ); })()}
-              <span className="text-[11px] font-semibold text-slate-400 shrink-0">Xem lại bài làm</span>
-            </div>
-            <div className="p-3 sm:p-4">
-              <SectionView
-                key={activeSection.id}
-                section={activeSection}
-                answers={answers}
-                correctAnswers={result.correct_answers}
-                correctQuestions={result.correct_questions}
-                onAnswerChange={() => {}}
-                mode="review"
-                speakingParts={result.speaking?.parts}
-                speakingAudio={speakingAudio}
-                writingParts={result.writing?.parts}
-                hideHeader
-              />
-            </div>
-          </section>
-        )}
+
+                {/* Right status — the important numbers */}
+                <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                  {isAiSkill ? (
+                    aiReady ? (
+                      <div
+                        className="rounded-2xl px-3.5 py-2 text-white text-center min-w-[76px]"
+                        style={{ background: m.color }}
+                      >
+                        <p className="text-lg font-black leading-none tabular-nums">
+                          {Number(aiBlock!.score).toFixed(1)}
+                        </p>
+                        <p className="text-[10px] font-bold opacity-90 mt-0.5">
+                          /{aiBlock!.scale_max ?? 10} điểm
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="inline-flex items-center gap-1.5 rounded-2xl px-3 py-2 bg-amber-50 border border-amber-200 text-amber-800">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span className="text-xs font-bold">AI đang chấm</span>
+                      </div>
+                    )
+                  ) : (
+                    <div className="rounded-2xl px-3.5 py-2 bg-white border border-slate-200 text-center min-w-[76px]">
+                      <p className="text-lg font-black leading-none tabular-nums text-slate-900">
+                        {objCorrect}<span className="text-slate-400 font-bold text-sm">/{objTotal}</span>
+                      </p>
+                      <p className="text-[10px] font-bold text-slate-400 mt-0.5">câu đúng</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Tip strip — only when useful */}
+              {(aiPending || (!isAiSkill && objTotal > 0)) && (
+                <div
+                  className="px-4 sm:px-5 py-2.5 text-xs font-medium border-b flex items-center gap-2"
+                  style={{
+                    background: aiPending ? '#FFFBEB' : `${m.bg}`,
+                    borderColor: aiPending ? '#FDE68A' : `${m.color}22`,
+                    color: aiPending ? '#92400E' : m.color,
+                  }}
+                >
+                  {aiPending ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+                      Điểm {m.label.toLowerCase()} sẽ hiện ngay khi AI chấm xong — không cần nộp lại.
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                      Màu xanh = đúng · đỏ = sai. Kéo xuống để xem từng câu.
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Body content */}
+              <div className="p-3 sm:p-5 bg-[#FCFDFE]">
+                <SectionView
+                  key={activeSection.id}
+                  section={activeSection}
+                  answers={answers}
+                  correctAnswers={result.correct_answers}
+                  correctQuestions={result.correct_questions}
+                  onAnswerChange={() => {}}
+                  mode="review"
+                  speakingParts={result.speaking?.parts}
+                  speakingAudio={speakingAudio}
+                  writingParts={result.writing?.parts}
+                  hideHeader
+                />
+              </div>
+            </section>
+          );
+        })()}
       </main>
     </div>
   );
