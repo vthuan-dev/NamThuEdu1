@@ -28,8 +28,7 @@ import {
   MapPin,
   Phone,
   Mail,
-  Clock,
-} from 'lucide-react';
+  Clock, FileText} from 'lucide-react';
 import { useToastContext } from '../../../../contexts/ToastContext';
 import { RichText } from '../../../../components/ui/RichText';
 import { getFullMediaUrl } from '../../../../utils/mediaUtils';
@@ -989,7 +988,7 @@ function ScoreDashboard({
         )}
         {aiPending && (
           <span className="inline-flex items-center gap-1.5 mt-3 px-2.5 py-1 rounded-lg bg-white/20 text-white text-[11px] font-semibold">
-            <Loader2 className="w-3 h-3 animate-spin" /> AI đang chấm phần Nói
+            <Loader2 className="w-3 h-3 animate-spin" /> AI đang chấm phần Nói/Viết
           </span>
         )}
       </div>
@@ -1870,15 +1869,41 @@ function SubjectiveQuestionCard({
 
       <div className="px-5 pt-4 flex items-start gap-3">
         <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-teal-50 text-teal-700 ring-1 ring-teal-100 flex-shrink-0">
-          <Mic className="w-[18px] h-[18px]" />
+          {q.skill === 'writing' ? (
+            <FileText className="w-[18px] h-[18px]" />
+          ) : (
+            <Mic className="w-[18px] h-[18px]" />
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <RichText as="p" className="text-[15px] font-medium text-slate-800 leading-relaxed" text={q.prompt} />
-          <div className="mt-2.5">
-            <AudioPlayer url={q.audio_url} />
-          </div>
+          {q.skill === 'speaking' && (
+            <div className="mt-2.5">
+              <AudioPlayer url={q.audio_url} />
+            </div>
+          )}
         </div>
       </div>
+
+      {q.skill === 'writing' && (
+        <div className="mx-5 mt-3 rounded-xl border border-slate-200 bg-slate-50/80 p-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+            Bài viết của học viên
+          </p>
+          {q.student_answer && String(q.student_answer).trim() ? (
+            <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
+              {q.student_answer}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400 italic">Học viên chưa viết bài.</p>
+          )}
+          {q.student_answer && String(q.student_answer).trim() && (
+            <p className="mt-2 text-xs text-slate-500">
+              {String(q.student_answer).trim().split(/\s+/).length} từ
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-5">
         <AiReviewPanel q={q} />
@@ -1890,6 +1915,11 @@ function SubjectiveQuestionCard({
 
 function AiReviewPanel({ q }: { q: SubjectiveQuestion }) {
   const ai = q.ai;
+  const skillLabel = q.skill === 'writing' ? 'Viết' : 'Nói';
+  const detailEntries = ai?.criteria_detail
+    ? Object.entries(ai.criteria_detail).filter(([, v]) => v != null)
+    : [];
+
   return (
     <div className="rounded-xl border border-slate-200 overflow-hidden">
       <div className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-50 border-b border-slate-100">
@@ -1900,7 +1930,7 @@ function AiReviewPanel({ q }: { q: SubjectiveQuestion }) {
       {q.status === 'ai_pending' ? (
         <div className="flex items-center gap-2.5 px-4 py-6">
           <Loader2 className="w-4 h-4 animate-spin text-amber-600 flex-shrink-0" />
-          <p className="text-sm font-medium text-amber-800">AI đang chấm phần Nói…</p>
+          <p className="text-sm font-medium text-amber-800">AI đang chấm phần {skillLabel}…</p>
         </div>
       ) : !ai ? (
         <div className="flex items-center gap-2.5 px-4 py-6">
@@ -1920,7 +1950,7 @@ function AiReviewPanel({ q }: { q: SubjectiveQuestion }) {
               <span className="text-[9px] font-bold opacity-85 mt-0.5">/ 10</span>
             </div>
             <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
-              {ai.criteria?.pronunciation != null && (
+              {q.skill === 'speaking' && ai.criteria?.pronunciation != null && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600">
                   Phát âm{' '}
                   <b className="text-slate-800 tabular-nums">
@@ -1928,10 +1958,31 @@ function AiReviewPanel({ q }: { q: SubjectiveQuestion }) {
                   </b>
                 </span>
               )}
-              {ai.criteria?.content != null && (
+              {q.skill === 'speaking' && ai.criteria?.content != null && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600">
                   Nội dung{' '}
                   <b className="text-slate-800 tabular-nums">{Number(ai.criteria.content).toFixed(1)}</b>
+                </span>
+              )}
+              {q.skill === 'writing' && detailEntries.map(([name, val]) => (
+                <span
+                  key={name}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600"
+                  title={ai.criterion_comments?.[name] ?? undefined}
+                >
+                  {name}{' '}
+                  <b className="text-slate-800 tabular-nums">{Number(val).toFixed(1)}</b>
+                </span>
+              ))}
+              {q.skill === 'writing' && !detailEntries.length && ai.criteria?.content != null && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600">
+                  Nội dung{' '}
+                  <b className="text-slate-800 tabular-nums">{Number(ai.criteria.content).toFixed(1)}</b>
+                </span>
+              )}
+              {ai.word_count != null && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600">
+                  {ai.word_count} từ
                 </span>
               )}
             </div>
@@ -1943,6 +1994,23 @@ function AiReviewPanel({ q }: { q: SubjectiveQuestion }) {
                   Nhận xét
                 </p>
                 <p className="text-sm text-slate-700 leading-relaxed">{ai.feedback}</p>
+              </div>
+            )}
+            {q.skill === 'writing' && ai.criterion_comments && Object.keys(ai.criterion_comments).length > 0 && (
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                  Nhận xét theo tiêu chí
+                </p>
+                <ul className="space-y-1.5">
+                  {Object.entries(ai.criterion_comments).map(([name, cmt]) =>
+                    cmt ? (
+                      <li key={name} className="text-sm text-slate-700">
+                        <span className="font-semibold text-slate-800">{name}: </span>
+                        <span className="leading-relaxed">{cmt}</span>
+                      </li>
+                    ) : null,
+                  )}
+                </ul>
               </div>
             )}
             {ai.suggestions.length > 0 && (
@@ -2011,7 +2079,7 @@ function TeacherOverridePanel({
       <div className="p-4 space-y-3.5">
         <div>
           <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
-            Điểm cuối {hasAi ? '(mặc định = AI)' : ''}
+            Điểm cuối {hasAi ? '(mặc định = AI)' : '(thang 10)'}
           </label>
           <div className="flex items-center gap-2">
             <input
@@ -2020,7 +2088,7 @@ function TeacherOverridePanel({
               max={10}
               step={0.5}
               value={entry.score}
-              placeholder={hasAi ? undefined : 'Chưa có đề xuất từ AI'}
+              placeholder={hasAi ? undefined : 'Nhập điểm 0–10'}
               onChange={(ev) => onUpdate(qn, { score: ev.target.value })}
               className={`w-24 px-3 py-1.5 rounded-xl border text-sm font-bold tabular-nums focus:outline-none focus:ring-2 ${
                 scoreInvalid
@@ -2035,18 +2103,20 @@ function TeacherOverridePanel({
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <CriteriaInput
-            label="Phát âm"
-            value={entry.pronunciation}
-            onChange={(v) => onUpdate(qn, { pronunciation: v })}
-          />
-          <CriteriaInput
-            label="Nội dung"
-            value={entry.content}
-            onChange={(v) => onUpdate(qn, { content: v })}
-          />
-        </div>
+        {q.skill !== 'writing' && (
+          <div className="grid grid-cols-2 gap-3">
+            <CriteriaInput
+              label="Phát âm"
+              value={entry.pronunciation}
+              onChange={(v) => onUpdate(qn, { pronunciation: v })}
+            />
+            <CriteriaInput
+              label="Nội dung"
+              value={entry.content}
+              onChange={(v) => onUpdate(qn, { content: v })}
+            />
+          </div>
+        )}
 
         <div>
           <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
@@ -2056,7 +2126,7 @@ function TeacherOverridePanel({
             value={entry.feedback}
             onChange={(ev) => onUpdate(qn, { feedback: ev.target.value })}
             rows={3}
-            placeholder="Nhận xét riêng cho câu này…"
+            placeholder="Nhận xét riêng cho câu này… (đè lên nhận xét AI khi phát hành)"
             className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 leading-relaxed focus:outline-none focus:ring-2 focus:ring-teal-200 resize-y"
           />
         </div>

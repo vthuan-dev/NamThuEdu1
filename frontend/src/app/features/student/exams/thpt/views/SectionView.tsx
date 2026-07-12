@@ -15,6 +15,7 @@ const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 const TYPE_LABEL: Record<string, string> = {
   listening: 'Nghe hiểu',
   speaking: 'Nói',
+  writing: 'Viết',
   phonetics: 'Ngữ âm',
   mc_questions: 'Trắc nghiệm',
   word_form: 'Chia dạng từ',
@@ -211,54 +212,61 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
       );
 
     case 'listening': {
-      const sec = section as any;
       return (
-        <>
-          {sec.audio_url && (
-            <div className="rounded-2xl bg-white border border-slate-200 p-4">
-              <div className="flex items-center gap-2.5 mb-3">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-teal-50 text-teal-700 ring-1 ring-teal-100 flex-shrink-0">
-                  <Headphones className="w-[18px] h-[18px]" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-slate-800 leading-tight">Đoạn ghi âm</p>
-                  <p className="text-[11px] text-slate-400">Nghe rồi chọn đáp án đúng cho mỗi câu</p>
-                </div>
-              </div>
-              <audio controls src={sec.audio_url} className="w-full h-10" />
+        <div className="space-y-4">
+          {section.audio_url && (
+            <div className="rounded-xl border border-slate-200 bg-white p-3 flex items-center gap-3">
+              <audio controls src={section.audio_url} className="w-full h-10" />
             </div>
           )}
-          {sec.items.map((item: any) => {
+          {(section.items as any[]).map((item) => {
             const key = `q${item.question_number}`;
-            const userVal = String(answers[key] ?? '');
-            const correctVal = String(correctAnswers?.[key] ?? '');
+            const kind = item.kind === 'fill_blank' ? 'fill_blank' : 'mc';
+            if (kind === 'fill_blank') {
+              return (
+                <QCard key={key} n={item.question_number}>
+                  {item.prompt && (
+                    <p className="text-sm text-slate-800 mb-3 whitespace-pre-wrap">{item.prompt}</p>
+                  )}
+                  <TextAnswer
+                    value={String(answers[key] ?? '')}
+                    onChange={(v) => onAnswerChange?.(key, v)}
+                    isReview={mode === 'review'}
+                    correct={correctAnswers ? String(correctAnswers[key] ?? '') : undefined}
+                  />
+                </QCard>
+              );
+            }
+            const options = item.options ?? [];
             return (
               <QCard key={key} n={item.question_number}>
                 {item.prompt && (
-                  <div className="text-sm text-slate-800 leading-relaxed font-medium mb-3 space-y-1">
-                    {item.prompt.split(/\s+(?=[a-e]\.\s)/i).map((part: string, i: number) => (
-                      <p key={i} className="leading-relaxed" dangerouslySetInnerHTML={{ __html: part.trim() }} />
-                    ))}
-                  </div>
+                  <p className="text-sm text-slate-800 mb-3 whitespace-pre-wrap">{item.prompt}</p>
                 )}
                 <div className="space-y-2">
-                  {item.options.map((opt: any) => (
+                  {options.map((opt: any) => (
                     <ChoiceButton
                       key={opt.id}
                       letter={opt.id}
-                      label={opt.text}
-                      picked={userVal === opt.id}
-                      correct={isReview && correctVal === opt.id}
-                      wrong={isReview && userVal === opt.id && correctVal !== opt.id}
-                      disabled={isReview}
-                      onClick={() => onAnswerChange(key, opt.id)}
-                      block
+                      text={opt.text}
+                      selected={answers[key] === opt.id}
+                      correct={
+                        mode === 'review' && correctAnswers
+                          ? String(correctAnswers[key]) === String(opt.id)
+                          : undefined
+                      }
+                      onClick={() => onAnswerChange?.(key, opt.id)}
+                      disabled={mode === 'review'}
                     />
                   ))}
                 </div>
               </QCard>
             );
           })}
+        </div>
+      );
+    }
+)}
         </>
       );
     }
@@ -299,6 +307,49 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             );
           })}
         </>
+      );
+    }
+
+    case 'writing': {
+      return (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-teal-200 bg-teal-50/70 px-3.5 py-2.5 text-xs text-teal-900">
+            Phần viết được AI chấm sau khi nộp; giáo viên có thể chấm lại. Hãy viết đầy đủ theo yêu cầu đề bài.
+          </div>
+          {(section.items as any[]).map((item) => {
+            const key = `q${item.question_number}`;
+            const val = String(answers[key] ?? '');
+            const words = val.trim() ? val.trim().split(/\s+/).length : 0;
+            const minW = item.min_words as number | undefined;
+            const maxW = item.max_words as number | undefined;
+            return (
+              <QCard key={key} n={item.question_number}>
+                {item.prompt && (
+                  <div className="text-sm text-slate-800 mb-3 whitespace-pre-wrap leading-relaxed">
+                    {item.prompt}
+                  </div>
+                )}
+                {(minW || maxW) && (
+                  <p className="text-xs text-slate-500 mb-2">
+                    Gợi ý số từ:{' '}
+                    {minW ? `tối thiểu ${minW}` : ''}
+                    {minW && maxW ? ' · ' : ''}
+                    {maxW ? `tối đa ${maxW}` : ''}
+                    <span className="ml-2 font-semibold text-slate-700">({words} từ)</span>
+                  </p>
+                )}
+                <textarea
+                  value={val}
+                  onChange={(e) => onAnswerChange?.(key, e.target.value)}
+                  disabled={mode === 'review'}
+                  rows={10}
+                  placeholder="Viết bài của bạn tại đây…"
+                  className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-3 focus:outline-none focus:ring-2 focus:ring-blue-200 resize-y disabled:bg-slate-50 disabled:text-slate-600"
+                />
+              </QCard>
+            );
+          })}
+        </div>
       );
     }
 

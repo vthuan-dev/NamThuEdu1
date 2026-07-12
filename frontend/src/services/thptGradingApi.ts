@@ -24,6 +24,10 @@ export interface AiResult {
   feedback: string | null;
   suggestions: string[];
   transcript?: string | null;
+  /** Writing AI: 4 tiêu chí chi tiết (Task Response, Coherence, Lexical, Grammar) */
+  criteria_detail?: Record<string, number | null> | null;
+  criterion_comments?: Record<string, string | null> | null;
+  word_count?: number | null;
 }
 
 export interface TeacherResult {
@@ -40,6 +44,8 @@ export interface SubjectiveQuestion {
   skill: 'speaking' | 'writing';
   prompt: string;
   audio_url: string | null;
+  /** Bài viết / text học viên (writing); speaking thường null */
+  student_answer?: string | null;
   status: SubjectiveStatus;
   ai: AiResult | null;
   teacher: TeacherResult | null;

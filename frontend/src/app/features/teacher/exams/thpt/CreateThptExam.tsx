@@ -103,9 +103,26 @@ export function CreateThptExam() {
     for (const sec of config.sections) {
       switch (sec.type) {
         case 'mc_questions':
-        case 'listening':
           for (const it of sec.items) {
             if (!String(it.correct_id || '').trim()) missing.push(label(sec, it.question_number));
+          }
+          break;
+        case 'listening':
+          for (const it of sec.items as any[]) {
+            const kind = it.kind === 'fill_blank' ? 'fill_blank' : 'mc';
+            if (kind === 'fill_blank') {
+              const accepted = Array.isArray(it.accepted_answers) ? it.accepted_answers : [];
+              if (!accepted.some((a: string) => String(a || '').trim())) {
+                missing.push(label(sec, it.question_number));
+              }
+            } else if (!String(it.correct_id || '').trim()) {
+              missing.push(label(sec, it.question_number));
+            }
+          }
+          break;
+        case 'writing':
+          for (const it of sec.items) {
+            if (!String(it.prompt || '').trim()) missing.push(label(sec, it.question_number));
           }
           break;
         case 'phonetics':

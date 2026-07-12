@@ -91,21 +91,29 @@ class GradeThptSpeakingJob implements ShouldQueue
             }
         }
 
-        $combined = ($objectiveTotal > 0 && $objectiveScaled !== null)
-            ? round(($objectiveScaled + $speakingAvg) / 2, 2)
-            : $speakingAvg;
-
         $result['speaking'] = [
             'score'     => $speakingAvg,
             'scale_max' => 10,
             'parts'     => $parts,
         ];
-        // Lưu điểm khách quan THUẦN (trước khi blend Nói) để khi giáo viên chốt
-        // điểm sau này có thể blend lại an toàn mà không cần suy ngược. Không
-        // thay đổi công thức blend `scaled_score` hiện có (tương thích ngược).
-        if ($objectiveScaled !== null) {
+        // Lưu điểm khách quan THUẦN (trước khi blend) để teacher/writing job blend lại an toàn.
+        if ($objectiveScaled !== null && !isset($result['scaled_score_objective'])) {
             $result['scaled_score_objective'] = $objectiveScaled;
         }
+
+        // Blend multi-skill: objective + speaking + writing (nếu có).
+        $vals = [];
+        $objPure = isset($result['scaled_score_objective'])
+            ? (float) $result['scaled_score_objective']
+            : $objectiveScaled;
+        if ($objectiveTotal > 0 && $objPure !== null) {
+            $vals[] = (float) $objPure;
+        }
+        $vals[] = $speakingAvg;
+        if (isset($result['writing']['score'])) {
+            $vals[] = (float) $result['writing']['score'];
+        }
+        $combined = round(array_sum($vals) / max(count($vals), 1), 2);
         $result['scaled_score'] = $combined;
         $payload['result'] = $result;
 

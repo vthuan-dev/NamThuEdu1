@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Log;
  *   • Câu trả lời học viên: submission_payload['answers']
  *   • Kết quả khách quan:    submission_payload['result']
  *   • Phần Nói AI:           submission_payload['result']['speaking']['parts']['q{n}']
+ *   • Phần Viết AI:          submission_payload['result']['writing']['parts']['q{n}']
  *   • Bản ghi âm:            sGemini_feedback['speaking_audio'] (key = số câu trần)
  *
  * Endpoints (trong nhóm role:teacher / prefix teacher):
@@ -128,16 +129,35 @@ class ThptGradingController extends Controller
                 $result['raw_score_max'] = $objRawMax;
             }
 
+            // Map question_number → skill từ exam snapshot/config
+            $config = $payload['exam_snapshot']['config']
+                ?? optional($sub->exam)->thpt_config
+                ?? ['sections' => []];
+            $skillByQn = [];
+            foreach (($config['sections'] ?? []) as $s) {
+                $type = $s['type'] ?? '';
+                if (!in_array($type, ['speaking', 'writing'], true)) continue;
+                foreach (($s['items'] ?? []) as $it) {
+                    $qn = $it['question_number'] ?? null;
+                    if ($qn === null) continue;
+                    $skillByQn[(int) $qn] = $type === 'writing' ? 'writing' : 'speaking';
+                }
+            }
+
             $speaking = is_array($result['speaking'] ?? null) ? $result['speaking'] : [];
-            $parts    = is_array($speaking['parts'] ?? null) ? $speaking['parts'] : [];
+            $writing  = is_array($result['writing'] ?? null) ? $result['writing'] : [];
+            $speakingParts = is_array($speaking['parts'] ?? null) ? $speaking['parts'] : [];
+            $writingParts  = is_array($writing['parts'] ?? null) ? $writing['parts'] : [];
 
             $now = now()->toIso8601String();
             foreach ($questions as $q) {
                 $qn  = (int) $q['question_number'];
                 $key = "q{$qn}";
-                $node = is_array($parts[$key] ?? null) ? $parts[$key] : [];
+                $skill = $skillByQn[$qn] ?? 'speaking';
+                $bucket = $skill === 'writing' ? $writingParts : $speakingParts;
+                $node = is_array($bucket[$key] ?? null) ? $bucket[$key] : [];
 
-                // KHÔNG ghi đè field AI — chỉ thêm/cập nhật teacher_* (Req 4.7).
+                // KHÔNG ghi đè field AI — chỉ thêm/cập nhật teacher_*.
                 $node['teacher_score']               = round((float) $q['teacher_score'], 2);
                 $criteria                            = $q['teacher_criteria'] ?? [];
                 $node['teacher_pronunciation_score'] = isset($criteria['pronunciation'])
@@ -148,24 +168,18 @@ class ThptGradingController extends Controller
                 $node['teacher_reviewed_at']         = $now;
                 $node['teacher_reviewed_by']         = (int) $user->uId;
 
-                $parts[$key] = $node;
-            }
-
-            // Điểm Nói hiệu lực = trung bình effective score (teacher_score ?? score).
-            $effScores = [];
-            foreach ($parts as $node) {
-                if (!is_array($node)) continue;
-                $eff = $node['teacher_score'] ?? ($node['score'] ?? null);
-                if ($eff !== null) {
-                    $effScores[] = (float) $eff;
+                if ($skill === 'writing') {
+                    $writingParts[$key] = $node;
+                } else {
+                    $speakingParts[$key] = $node;
                 }
             }
-            $speakingAvg = count($effScores)
-                ? round(array_sum($effScores) / count($effScores), 2)
-                : null;
 
-            if (!empty($parts)) {
-                $speaking['parts'] = $parts;
+            $speakingAvg = $this->avgEffectiveScore($speakingParts);
+            $writingAvg  = $this->avgEffectiveScore($writingParts);
+
+            if (!empty($speakingParts)) {
+                $speaking['parts'] = $speakingParts;
                 if (!isset($speaking['scale_max'])) {
                     $speaking['scale_max'] = self::DEFAULT_SCALE_MAX;
                 }
@@ -174,8 +188,18 @@ class ThptGradingController extends Controller
                 }
                 $result['speaking'] = $speaking;
             }
+            if (!empty($writingParts)) {
+                $writing['parts'] = $writingParts;
+                if (!isset($writing['scale_max'])) {
+                    $writing['scale_max'] = self::DEFAULT_SCALE_MAX;
+                }
+                if ($writingAvg !== null) {
+                    $writing['score'] = $writingAvg;
+                }
+                $result['writing'] = $writing;
+            }
 
-            // Blend với điểm khách quan thuần — mirror GradeThptSpeakingJob (D4).
+            // Blend multi-skill: objective + speaking + writing (nếu có).
             $objectiveScaled = $objScaledScore !== null
                 ? $objScaledScore
                 : (isset($result['scaled_score_objective'])
@@ -186,11 +210,7 @@ class ThptGradingController extends Controller
                 $result['scaled_score_objective'] = $objScaledScore;
             }
 
-            if ($objectiveScaled !== null && $speakingAvg !== null) {
-                $combined = round(($objectiveScaled + $speakingAvg) / 2, 2);
-            } else {
-                $combined = $speakingAvg ?? $objectiveScaled;
-            }
+            $combined = $this->blendSkillScores($objectiveScaled, $speakingAvg, $writingAvg, $result);
             if ($combined !== null) {
                 $result['scaled_score'] = $combined;
             }
@@ -293,15 +313,20 @@ class ThptGradingController extends Controller
             ? (json_decode($sub->sGemini_feedback, true) ?: [])
             : [];
         $audioMap = $rawFeedback['speaking_audio'] ?? [];
-        $parts    = $result['speaking']['parts'] ?? [];
+        $speakingParts = is_array($result['speaking']['parts'] ?? null) ? $result['speaking']['parts'] : [];
+        $writingParts  = is_array($result['writing']['parts'] ?? null) ? $result['writing']['parts'] : [];
 
-        // prompt theo question_number (cho cả speaking lẫn writing nếu sau này có).
+        // prompt theo question_number (speaking + writing).
         $promptByQn = [];
+        $skillByQn  = []; // qn => 'speaking'|'writing'
         foreach (($config['sections'] ?? []) as $s) {
             $type = $s['type'] ?? '';
             if (!in_array($type, ['speaking', 'writing'], true)) continue;
             foreach (($s['items'] ?? []) as $it) {
-                $promptByQn[(string) ($it['question_number'] ?? '')] = $it['prompt'] ?? '';
+                $qn = (string) ($it['question_number'] ?? '');
+                if ($qn === '') continue;
+                $promptByQn[$qn] = $it['prompt'] ?? '';
+                $skillByQn[$qn]  = $type === 'writing' ? 'writing' : 'speaking';
             }
         }
 
@@ -325,8 +350,11 @@ class ThptGradingController extends Controller
                 $qn   = $it['question_number'] ?? null;
                 if ($qn === null) continue;
                 $key  = "q{$qn}";
-                $node = is_array($parts[$key] ?? null) ? $parts[$key] : null;
-                $audio = $audioMap[(string) $qn] ?? null;
+                $skill = $type === 'writing' ? 'writing' : 'speaking';
+                $bucket = $skill === 'writing' ? $writingParts : $speakingParts;
+                $node = is_array($bucket[$key] ?? null) ? $bucket[$key] : null;
+                $audio = $skill === 'speaking' ? ($audioMap[(string) $qn] ?? null) : null;
+                $studentText = isset($answers[$key]) ? (string) $answers[$key] : null;
 
                 $hasAi = is_array($node) && isset($node['score']);
                 $aiBlock = $hasAi ? [
@@ -335,9 +363,13 @@ class ThptGradingController extends Controller
                         'pronunciation' => isset($node['pronunciation_score']) ? (float) $node['pronunciation_score'] : null,
                         'content'       => isset($node['content_score']) ? (float) $node['content_score'] : null,
                     ],
+                    // Writing AI có criteria_detail (4 tiêu chí IELTS-style) — FE dùng nếu có
+                    'criteria_detail' => is_array($node['criteria_detail'] ?? null) ? $node['criteria_detail'] : null,
+                    'criterion_comments' => is_array($node['criterion_comments'] ?? null) ? $node['criterion_comments'] : null,
                     'feedback'    => $node['feedback'] ?? null,
                     'suggestions' => is_array($node['suggestions'] ?? null) ? array_values($node['suggestions']) : [],
                     'transcript'  => $node['transcript'] ?? null,
+                    'word_count'  => isset($node['word_count']) ? (int) $node['word_count'] : null,
                 ] : null;
 
                 $hasTeacher = is_array($node) && isset($node['teacher_score']);
@@ -351,8 +383,17 @@ class ThptGradingController extends Controller
                     'reviewed_at' => $node['teacher_reviewed_at'] ?? null,
                 ] : null;
 
-                if ($hasAi) {
+                if ($hasAi || $hasTeacher) {
                     $status = 'ai_graded';
+                } elseif ($skill === 'writing') {
+                    // Có bài viết → AI đang chấm / chờ queue; trống → no_ai
+                    $hasText = is_string($studentText) && trim($studentText) !== '';
+                    if ($hasText) {
+                        $status = 'ai_pending';
+                        $anyPending = true;
+                    } else {
+                        $status = 'no_ai';
+                    }
                 } elseif ($audio) {
                     $status = 'ai_pending';
                     $anyPending = true;
@@ -362,9 +403,10 @@ class ThptGradingController extends Controller
 
                 $sq = [
                     'question_number' => (int) $qn,
-                    'skill'           => $type === 'writing' ? 'writing' : 'speaking',
+                    'skill'           => $skill,
                     'prompt'          => $promptByQn[(string) $qn] ?? ($it['prompt'] ?? ''),
                     'audio_url'       => $audio,
+                    'student_answer'  => $studentText,
                     'status'          => $status,
                     'ai'              => $aiBlock,
                     'teacher'         => $teacherBlock,
@@ -543,6 +585,7 @@ class ThptGradingController extends Controller
                         'skill'           => $type === 'writing' ? 'writing' : 'speaking',
                         'prompt'          => $it['prompt'] ?? '',
                         'audio_url'       => null,
+                        'student_answer'  => isset($answers["q{$qn}"]) ? (string) $answers["q{$qn}"] : null,
                         'status'          => 'no_ai',
                         'ai'              => null,
                         'teacher'         => null,
@@ -571,14 +614,27 @@ class ThptGradingController extends Controller
                     break;
 
                 case 'mc_questions':
-                case 'listening':
-                    if ($type === 'listening') {
-                        $base['audio_url'] = $s['audio_url'] ?? null;
-                    }
                     foreach (($s['items'] ?? []) as $it) {
                         $questions[] = $mcq($it['question_number'] ?? '?', $it['prompt'] ?? null, $it['options'] ?? [], $it['correct_id'] ?? null);
                     }
                     break;
+                case 'listening':
+                    $base['audio_url'] = $s['audio_url'] ?? null;
+                    foreach (($s['items'] ?? []) as $it) {
+                        $kind = $it['kind'] ?? 'mc';
+                        if ($kind === 'fill_blank') {
+                            $questions[] = $textQ(
+                                $it['question_number'] ?? '?',
+                                $it['prompt'] ?? null,
+                                $it['accepted_answers'] ?? [],
+                                (bool) ($it['case_sensitive'] ?? false)
+                            );
+                        } else {
+                            $questions[] = $mcq($it['question_number'] ?? '?', $it['prompt'] ?? null, $it['options'] ?? [], $it['correct_id'] ?? null);
+                        }
+                    }
+                    break;
+                
 
                 case 'error_identification':
                     foreach (($s['items'] ?? []) as $it) {
@@ -752,4 +808,46 @@ class ThptGradingController extends Controller
         }
         return response()->json($resp, $code);
     }
+    /**
+     * Trung bình điểm hiệu lực (teacher_score ?? score) của 1 bucket parts.
+     */
+    private function avgEffectiveScore(array $parts): ?float
+    {
+        $eff = [];
+        foreach ($parts as $node) {
+            if (!is_array($node)) continue;
+            $e = $node['teacher_score'] ?? ($node['score'] ?? null);
+            if ($e !== null) $eff[] = (float) $e;
+        }
+        if (empty($eff)) return null;
+        return round(array_sum($eff) / count($eff), 2);
+    }
+
+    /**
+     * Blend objective + speaking + writing (chỉ skill có điểm).
+     * Objective chỉ tính nếu đề có câu khách quan (total_count > 0).
+     */
+    private function blendSkillScores(?float $objective, ?float $speaking, ?float $writing, array $result): ?float
+    {
+        $vals = [];
+        $hasObj = false;
+        foreach (($result['sections'] ?? []) as $st) {
+            $t = $st['type'] ?? '';
+            if (!in_array($t, ['speaking', 'writing'], true) && (int) ($st['total_count'] ?? 0) > 0) {
+                $hasObj = true;
+                break;
+            }
+        }
+        // Fallback: nếu không suy ra được từ sections, vẫn dùng objective nếu có
+        if (!$hasObj && $objective !== null && empty($result['sections'])) {
+            $hasObj = true;
+        }
+        if ($hasObj && $objective !== null) $vals[] = $objective;
+        if ($speaking !== null) $vals[] = $speaking;
+        if ($writing !== null) $vals[] = $writing;
+        if (empty($vals)) return $objective ?? $speaking ?? $writing;
+        return round(array_sum($vals) / count($vals), 2);
+    }
+
+
 }

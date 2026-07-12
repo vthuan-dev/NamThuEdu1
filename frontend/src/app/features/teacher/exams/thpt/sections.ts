@@ -119,9 +119,17 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
     autoGrade: true,
   },
   {
+    type: 'writing',
+    label: 'Viết đoạn / bài văn',
+    description: 'Đề viết đoạn/bài văn — giáo viên chấm tay',
+    icon: 'PenLine',
+    group: 'writing',
+    autoGrade: false,
+  },
+  {
     type: 'listening',
     label: 'Nghe (Listening)',
-    description: 'Tải audio + câu hỏi trắc nghiệm — tự chấm',
+    description: 'Audio + trắc nghiệm / điền chỗ trống — tự chấm',
     icon: 'Headphones',
     group: 'audio',
     autoGrade: true,
@@ -170,6 +178,7 @@ export function collectQuestionNumbers(s: ThptSection): number[] {
     case 'reading_mixed':
     case 'listening':
     case 'speaking':
+    case 'writing':
       return (s as any).items.map((i: any) => i.question_number);
     case 'mc_cloze':
     case 'open_cloze':
@@ -315,9 +324,9 @@ export function createSection(type: SectionType, startNum: number): ThptSection 
         ...base,
         type: 'listening',
         title: 'Nghe',
-        instructions: 'Nghe đoạn ghi âm và chọn phương án đúng cho mỗi câu.',
+        instructions: 'Nghe đoạn ghi âm rồi trả lời các câu hỏi (trắc nghiệm hoặc điền chỗ trống).',
         audio_url: '',
-        items: [makeMcItem(startNum)],
+        items: [makeListeningMcItem(startNum)],
       };
     case 'speaking':
       return {
@@ -326,6 +335,14 @@ export function createSection(type: SectionType, startNum: number): ThptSection 
         title: 'Nói',
         instructions: 'Nghe đề, chuẩn bị rồi ghi âm câu trả lời của bạn.',
         items: [makeSpeakingItem(startNum)],
+      };
+    case 'writing':
+      return {
+        ...base,
+        type: 'writing',
+        title: 'Viết đoạn / bài văn',
+        instructions: 'Đọc đề bài và viết đoạn văn / bài văn theo yêu cầu.',
+        items: [makeWritingItem(startNum)],
       };
   }
 }
@@ -405,6 +422,39 @@ export function makeSpeakingItem(qn: number) {
     prompt: '',
     prep_seconds: 5,
     speak_seconds: 120,
+  };
+}
+
+/** Listening trắc nghiệm (kind=mc, default). */
+export function makeListeningMcItem(qn: number) {
+  return {
+    question_number: qn,
+    kind: 'mc' as const,
+    prompt: '',
+    options: ['A', 'B', 'C', 'D'].map((id) => ({ id, text: '' })),
+    correct_id: '',
+  };
+}
+
+/** Listening điền chỗ trống (kind=fill_blank). */
+export function makeListeningFillItem(qn: number) {
+  return {
+    question_number: qn,
+    kind: 'fill_blank' as const,
+    prompt: '',
+    accepted_answers: [''],
+    case_sensitive: false,
+  };
+}
+
+/** Writing — viết đoạn / bài văn (chấm tay). */
+export function makeWritingItem(qn: number) {
+  return {
+    question_number: qn,
+    prompt: '',
+    min_words: undefined as number | undefined,
+    max_words: undefined as number | undefined,
+    guidance: '',
   };
 }
 

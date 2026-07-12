@@ -11,6 +11,9 @@ import {
   makeMatchingItem,
   makeTransformItem,
   makeSpeakingItem,
+  makeListeningMcItem,
+  makeListeningFillItem,
+  makeWritingItem,
   nextQuestionNumber,
   sectionMeta,
 } from '../sections';
@@ -164,15 +167,17 @@ const SECTION_GUIDE: Record<string, GuideContent> = {
       'Gốc: "He is too young to drive."\nĐầu câu: "He isn\'t…"\n→ He isn\'t old enough to drive.',
   },
   listening: {
-    short: 'Tải audio + câu hỏi trắc nghiệm.',
+    short: 'Tải audio + câu trắc nghiệm và/hoặc điền chỗ trống.',
     grading: 'auto',
     steps: [
       'Tải file audio (mp3 / m4a / wav…).',
       'Thêm transcript nếu muốn (ẩn với học viên).',
-      'Mỗi câu: nhập 4 phương án và chọn đáp án đúng.',
+      'Mỗi câu: chọn dạng Trắc nghiệm hoặc Điền chỗ trống.',
+      'Trắc nghiệm: 4 phương án + chọn đáp án đúng.',
+      'Điền chỗ trống: prompt (có ____) + đáp án chấp nhận (cách bằng dấu phẩy).',
     ],
     example:
-      '[Audio] → "What time is the meeting?"\nA. 9AM   B. 10AM ✓   C. 11AM   D. 12PM',
+      '[Audio] → What time is the meeting?\nA. 9AM   B. 10AM ✓\n\n[Audio] → The train leaves at ____.\n→ Đáp án: 8.30 / 8:30',
   },
   speaking: {
     short: 'Đề nói — học viên ghi âm, AI chấm.',
@@ -184,6 +189,18 @@ const SECTION_GUIDE: Record<string, GuideContent> = {
     ],
     example:
       'Describe your favourite hobby.\n• Chuẩn bị: 30s   • Nói: 120s',
+  },
+  writing: {
+    short: 'Đề viết đoạn / bài văn — giáo viên chấm tay.',
+    grading: 'manual',
+    steps: [
+      'Nhập đề bài rõ ràng (yêu cầu, chủ đề, gợi ý).',
+      'Tuỳ chọn: số từ tối thiểu / tối đa (gợi ý cho học viên).',
+      'Tuỳ chọn: ghi chú/rubric cho giáo viên (ẩn với học viên khi thi).',
+      'Học viên viết bài; giáo viên chấm điểm + nhận xét sau khi nộp.',
+    ],
+    example:
+      'Write a paragraph (80–120 words) about your favourite hobby.\n• Min: 80   Max: 120',
   },
 };
 
@@ -337,6 +354,8 @@ export function SectionEditor({ section, allSections, onChange }: Props) {
       return <>{common}<ListeningEditor section={section} all={allSections} onChange={onChange} /></>;
     case 'speaking':
       return <>{common}<SpeakingEditor section={section} all={allSections} onChange={onChange} /></>;
+    case 'writing':
+      return <>{common}<WritingEditor section={section} all={allSections} onChange={onChange} /></>;
     default:
       return common;
   }
@@ -690,7 +709,7 @@ function McQuestionsEditor({ section, all, onChange }: { section: Extract<ThptSe
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// 2b. LISTENING (audio + trắc nghiệm)
+// 2b. LISTENING (audio + trắc nghiệm / điền chỗ trống)
 // ════════════════════════════════════════════════════════════════════════════
 function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSection, { type: 'listening' }>; all: ThptSection[]; onChange: (s: ThptSection) => void }) {
   const [uploading, setUploading] = useState(false);
@@ -716,6 +735,19 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
     } finally {
       setUploading(false);
     }
+  };
+
+  const setKind = (idx: number, kind: 'mc' | 'fill_blank') => {
+    const item = section.items[idx] as any;
+    const qn = item.question_number;
+    const next = kind === 'fill_blank'
+      ? makeListeningFillItem(qn)
+      : makeListeningMcItem(qn);
+    // keep prompt when switching
+    next.prompt = item.prompt || next.prompt;
+    const items = [...section.items];
+    items[idx] = next as any;
+    update(items);
   };
 
   return (
@@ -750,6 +782,119 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
         />
       </div>
 
+      {section.items.map((item: any, idx) => {
+        const kind: 'mc' | 'fill_blank' = item.kind === 'fill_blank' ? 'fill_blank' : 'mc';
+        return (
+          <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs font-bold text-slate-500">Dạng:</span>
+              <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-slate-100">
+                {([
+                  { k: 'mc' as const, l: 'Trắc nghiệm' },
+                  { k: 'fill_blank' as const, l: 'Điền chỗ trống' },
+                ]).map(({ k, l }) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setKind(idx, k)}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                      kind === k ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                    }`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <FormattedTextarea
+              value={item.prompt ?? ''}
+              onChange={(v) => {
+                const items = [...section.items];
+                items[idx] = { ...item, prompt: v };
+                update(items);
+              }}
+              rows={2}
+              placeholder={kind === 'fill_blank' ? 'Câu hỏi / prompt (dùng ____ cho chỗ trống)' : 'Nội dung câu hỏi nghe'}
+              className="mb-3"
+            />
+
+            {kind === 'fill_blank' ? (
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-500">Đáp án chấp nhận (cách bằng dấu phẩy)</label>
+                <AcceptedAnswersInput
+                  value={Array.isArray(item.accepted_answers) ? item.accepted_answers : []}
+                  onChange={(v) => {
+                    const items = [...section.items];
+                    items[idx] = { ...item, kind: 'fill_blank', accepted_answers: v };
+                    update(items);
+                  }}
+                  placeholder="8.30, 8:30, half past eight"
+                />
+                <label className="inline-flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!item.case_sensitive}
+                    onChange={(e) => {
+                      const items = [...section.items];
+                      items[idx] = { ...item, kind: 'fill_blank', case_sensitive: e.target.checked };
+                      update(items);
+                    }}
+                  />
+                  Phân biệt hoa/thường
+                </label>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {(item.options ?? []).map((opt: any, oi: number) => (
+                  <OptionRow
+                    key={opt.id}
+                    letter={opt.id}
+                    text={opt.text}
+                    isCorrect={item.correct_id === opt.id}
+                    onPick={() => {
+                      const items = [...section.items];
+                      items[idx] = { ...item, kind: 'mc', correct_id: opt.id };
+                      update(items);
+                    }}
+                    onTextChange={(v) => {
+                      const items = [...section.items];
+                      const options = [...(item.options ?? [])];
+                      options[oi] = { ...opt, text: v };
+                      items[idx] = { ...item, kind: 'mc', options };
+                      update(items);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </ItemCard>
+        );
+      })}
+      <div className="flex flex-wrap gap-2">
+        <AddButton label="Thêm trắc nghiệm" onClick={() => update([...section.items, makeListeningMcItem(nextQuestionNumber(all))])} />
+        <AddButton label="Thêm điền chỗ trống" onClick={() => update([...section.items, makeListeningFillItem(nextQuestionNumber(all))])} />
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 2c. SPEAKING (đề nói — ghi âm, AI chấm)
+
+// ════════════════════════════════════════════════════════════════════════════
+// 2d. WRITING (đoạn văn / bài văn — giáo viên chấm tay)
+// ════════════════════════════════════════════════════════════════════════════
+function WritingEditor({ section, all, onChange }: { section: Extract<ThptSection, { type: 'writing' }>; all: ThptSection[]; onChange: (s: ThptSection) => void }) {
+  const update = (items: typeof section.items) => onChange({ ...section, items });
+
+  return (
+    <div className="space-y-4">
+      <InlineGuide type="writing" />
+      <div className="rounded-xl border border-teal-200 bg-teal-50/70 px-3.5 py-2.5 text-xs text-teal-900">
+        <b>AI chấm trước</b> — sau khi học viên nộp, AI chấm bài viết (thang 10). Giáo viên có thể chấm tay đè lên điểm/nhận xét AI.
+      </div>
+
       {section.items.map((item, idx) => (
         <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
           <FormattedTextarea
@@ -759,40 +904,65 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
               items[idx] = { ...item, prompt: v };
               update(items);
             }}
-            rows={2}
-            placeholder="Nội dung câu hỏi nghe"
+            rows={4}
+            placeholder="Đề bài viết (yêu cầu, chủ đề, gợi ý cho học viên)…"
             className="mb-3"
           />
-          <div className="space-y-2">
-            {item.options.map((opt, oi) => (
-              <OptionRow
-                key={opt.id}
-                letter={opt.id}
-                text={opt.text}
-                isCorrect={item.correct_id === opt.id}
-                onPick={() => {
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <label className="block">
+              <span className="text-xs font-bold text-slate-500">Số từ tối thiểu (tuỳ chọn)</span>
+              <input
+                type="number"
+                min={0}
+                value={item.min_words ?? ''}
+                onChange={(e) => {
                   const items = [...section.items];
-                  items[idx] = { ...item, correct_id: opt.id };
+                  const n = e.target.value === '' ? undefined : Number(e.target.value);
+                  items[idx] = { ...item, min_words: n };
                   update(items);
                 }}
-                onTextChange={(v) => {
-                  const items = [...section.items];
-                  const options = [...item.options];
-                  options[oi] = { ...opt, text: v };
-                  items[idx] = { ...item, options };
-                  update(items);
-                }}
+                placeholder="vd: 80"
+                className="mt-1 w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
               />
-            ))}
+            </label>
+            <label className="block">
+              <span className="text-xs font-bold text-slate-500">Số từ tối đa (tuỳ chọn)</span>
+              <input
+                type="number"
+                min={0}
+                value={item.max_words ?? ''}
+                onChange={(e) => {
+                  const items = [...section.items];
+                  const n = e.target.value === '' ? undefined : Number(e.target.value);
+                  items[idx] = { ...item, max_words: n };
+                  update(items);
+                }}
+                placeholder="vd: 150"
+                className="mt-1 w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+            </label>
           </div>
+          <label className="block">
+            <span className="text-xs font-bold text-slate-500">Ghi chú / rubric (ẩn học viên khi thi)</span>
+            <textarea
+              value={item.guidance ?? ''}
+              onChange={(e) => {
+                const items = [...section.items];
+                items[idx] = { ...item, guidance: e.target.value };
+                update(items);
+              }}
+              rows={2}
+              placeholder="Tiêu chí chấm, gợi ý cho giáo viên…"
+              className="mt-1 w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200 resize-y"
+            />
+          </label>
         </ItemCard>
       ))}
-      <AddButton label="Thêm câu" onClick={() => update([...section.items, makeMcItem(nextQuestionNumber(all))])} />
+      <AddButton label="Thêm đề viết" onClick={() => update([...section.items, makeWritingItem(nextQuestionNumber(all))])} />
     </div>
   );
 }
-// ════════════════════════════════════════════════════════════════════════════
-// 2c. SPEAKING (đề nói — ghi âm, AI chấm)
+
 // ════════════════════════════════════════════════════════════════════════════
 function SpeakingEditor({ section, all, onChange }: { section: Extract<ThptSection, { type: 'speaking' }>; all: ThptSection[]; onChange: (s: ThptSection) => void }) {
   const update = (items: typeof section.items) => onChange({ ...section, items });

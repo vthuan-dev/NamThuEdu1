@@ -44,7 +44,8 @@ export type SectionType =
   | 'reading_mixed'
   | 'matching'
   | 'listening'
-  | 'speaking';
+  | 'speaking'
+  | 'writing';
 
 interface BaseSection {
   /** id ổn định để React key + reorder */
@@ -227,13 +228,30 @@ export interface MatchingSection extends BaseSection {
   items: MatchingItem[];
 }
 
-// ── 12. Listening (audio + trắc nghiệm) ───────────────────────────────────
-/** Dùng lại shape câu trắc nghiệm; thêm audio cho cả section. */
+// ── 12. Listening (audio + trắc nghiệm / điền chỗ trống) ──────────────────
+/**
+ * Listening item:
+ *  - kind 'mc' (default, backward-compatible): trắc nghiệm A–D
+ *  - kind 'fill_blank': nghe → điền từ/cụm, tự chấm theo accepted_answers
+ */
+export interface ListeningItem {
+  question_number: number;
+  /** default 'mc' khi thiếu (đề cũ) */
+  kind?: 'mc' | 'fill_blank';
+  prompt: string;
+  // kind=mc
+  options?: ThptOption[];
+  correct_id?: string;
+  // kind=fill_blank
+  accepted_answers?: string[];
+  case_sensitive?: boolean;
+  explanation?: string;
+}
 export interface ListeningSection extends BaseSection {
   type: 'listening';
   audio_url: string;
   transcript?: string;
-  items: McQuestionItem[];
+  items: ListeningItem[];
 }
 
 // ── 13. Speaking (đề nói — ghi âm, AI chấm) ───────────────────────────────
@@ -246,6 +264,23 @@ export interface SpeakingItem {
 export interface SpeakingSection extends BaseSection {
   type: 'speaking';
   items: SpeakingItem[];
+}
+
+// ── 14. Writing (viết đoạn / bài văn — giáo viên chấm tay) ────────────────
+export interface WritingItem {
+  question_number: number;
+  /** Đề bài cho học viên */
+  prompt: string;
+  /** Gợi ý số từ tối thiểu (UI soft-hint, không hard-block) */
+  min_words?: number;
+  /** Gợi ý số từ tối đa */
+  max_words?: number;
+  /** Ghi chú / rubric ngắn cho GV — ẩn với HV khi thi */
+  guidance?: string;
+}
+export interface WritingSection extends BaseSection {
+  type: 'writing';
+  items: WritingItem[];
 }
 
 // ── Union ───────────────────────────────────────────────────────────────────
@@ -262,7 +297,8 @@ export type ThptSection =
   | ReadingMixedSection
   | MatchingSection
   | ListeningSection
-  | SpeakingSection;
+  | SpeakingSection
+  | WritingSection;
 
 // ── Full config ──────────────────────────────────────────────────────────
 export interface ThptConfig {

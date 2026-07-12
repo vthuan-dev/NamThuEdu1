@@ -492,13 +492,18 @@ class ThptExamController extends Controller
                 $payload['result'] = $result;
                 $existing->submission_payload = $payload;
 
-                // Speaking check
+                // Speaking + Writing AI (async)
                 $hasSpeakingSection = collect($configForGrading['sections'] ?? [])
                     ->contains(fn($s) => ($s['type'] ?? '') === 'speaking');
                 $rawFeedback = json_decode($existing->sGemini_feedback ?? '{}', true) ?: [];
                 $hasSpeakingAudio = !empty($rawFeedback['speaking_audio'] ?? []);
                 if ($hasSpeakingSection && $hasSpeakingAudio) {
                     \App\Jobs\GradeThptSpeakingJob::dispatch((int) $existing->sId);
+                }
+                $hasWritingSection = collect($configForGrading['sections'] ?? [])
+                    ->contains(fn($s) => ($s['type'] ?? '') === 'writing');
+                if ($hasWritingSection) {
+                    \App\Jobs\GradeThptWritingJob::dispatch((int) $existing->sId);
                 }
 
                 $existing->save();
@@ -638,13 +643,19 @@ class ThptExamController extends Controller
             $submission->submission_payload = $payload;
 
             // Nếu đề có phần Nói + học viên đã ghi âm → AI chấm Nói chạy nền.
-            // Điểm khách quan vẫn hiển thị ngay; job sẽ blend điểm Nói vào sau.
+            // Nếu đề có phần Viết → AI chấm Viết chạy nền.
+            // Điểm khách quan vẫn hiển thị ngay; job sẽ blend điểm chủ quan vào sau.
             $hasSpeakingSection = collect($configForGrading['sections'] ?? [])
                 ->contains(fn($s) => ($s['type'] ?? '') === 'speaking');
             $rawFeedback = json_decode($submission->sGemini_feedback ?? '{}', true) ?: [];
             $hasSpeakingAudio = !empty($rawFeedback['speaking_audio'] ?? []);
             if ($hasSpeakingSection && $hasSpeakingAudio) {
                 \App\Jobs\GradeThptSpeakingJob::dispatch((int) $submission->sId);
+            }
+            $hasWritingSection = collect($configForGrading['sections'] ?? [])
+                ->contains(fn($s) => ($s['type'] ?? '') === 'writing');
+            if ($hasWritingSection) {
+                \App\Jobs\GradeThptWritingJob::dispatch((int) $submission->sId);
             }
         }
         $submission->save();
@@ -733,12 +744,19 @@ class ThptExamController extends Controller
                 }
                 $submission->save();
 
-                // Nếu đề có phần Nói + đã ghi âm → AI chấm Nói chạy nền (blend sau).
+                // AI chủ quan (Nói/Viết) chạy nền nếu chưa có.
                 $hasSpeakingSection = collect($reviewConfig['sections'] ?? [])
                     ->contains(fn($s) => ($s['type'] ?? '') === 'speaking');
                 $rawFb = json_decode($submission->sGemini_feedback ?? '{}', true) ?: [];
                 if ($hasSpeakingSection && !empty($rawFb['speaking_audio'] ?? [])) {
                     \App\Jobs\GradeThptSpeakingJob::dispatch((int) $submission->sId);
+                }
+                $hasWritingSection = collect($reviewConfig['sections'] ?? [])
+                    ->contains(fn($s) => ($s['type'] ?? '') === 'writing');
+                $payloadResult = $payload['result'] ?? [];
+                $writingAlready = !empty($payloadResult['writing']['parts'] ?? []);
+                if ($hasWritingSection && !$writingAlready) {
+                    \App\Jobs\GradeThptWritingJob::dispatch((int) $submission->sId);
                 }
 
                 \Log::warning('THPT result self-healed (graded on read)', [
@@ -835,8 +853,19 @@ class ThptExamController extends Controller
                     }
                     break;
                 case 'mc_questions':
+                    foreach (($s['items'] ?? []) as $ii => $it) {
+                        if ($blank($it['correct_id'] ?? null)) {
+                            $config['sections'][$si]['items'][$ii]['correct_id'] = $firstOptId($it['options'] ?? []);
+                        }
+                    }
+                    break;
                 case 'listening':
                     foreach (($s['items'] ?? []) as $ii => $it) {
+                        $kind = $it['kind'] ?? 'mc';
+                        if ($kind === 'fill_blank') {
+                            // Text answers — no default fill
+                            continue;
+                        }
                         if ($blank($it['correct_id'] ?? null)) {
                             $config['sections'][$si]['items'][$ii]['correct_id'] = $firstOptId($it['options'] ?? []);
                         }
@@ -963,8 +992,15 @@ class ThptExamController extends Controller
                     if (empty($s['audio_url'])) $errors[] = "{$label}: chưa có audio.";
                     if (empty($items)) { $errors[] = "{$label}: chưa có câu hỏi nào."; break; }
                     foreach ($items as $i => $it) {
-                        if (!$hasId($it['correct_id'] ?? null)) {
-                            $errors[] = "{$label} ({$qlabel($it, $i)}): chưa chọn đáp án đúng.";
+                        $kind = $it['kind'] ?? 'mc';
+                        if ($kind === 'fill_blank') {
+                            if (!$hasAccepted($it['accepted_answers'] ?? null)) {
+                                $errors[] = "{$label} ({$qlabel($it, $i)}): chưa nhập đáp án chấp nhận (điền chỗ trống).";
+                            }
+                        } else {
+                            if (!$hasId($it['correct_id'] ?? null)) {
+                                $errors[] = "{$label} ({$qlabel($it, $i)}): chưa chọn đáp án đúng.";
+                            }
                         }
                     }
                     break;
@@ -972,6 +1008,16 @@ class ThptExamController extends Controller
                 case 'speaking':
                     // Phần Nói do AI chấm — không cần đáp án.
                     if (empty($items)) $errors[] = "{$label}: chưa có đề nói nào.";
+                    break;
+
+                case 'writing':
+                    // Phần Viết do giáo viên chấm tay — cần đề bài.
+                    if (empty($items)) { $errors[] = "{$label}: chưa có đề viết nào."; break; }
+                    foreach ($items as $i => $it) {
+                        if (trim((string) ($it['prompt'] ?? '')) === '') {
+                            $errors[] = "{$label} ({$qlabel($it, $i)}): chưa nhập đề bài viết.";
+                        }
+                    }
                     break;
 
                 case 'tf_group':
@@ -1039,14 +1085,24 @@ class ThptExamController extends Controller
                 case 'phonetics':
                 case 'mc_questions':
                 case 'error_identification':
-                case 'listening':
                     foreach (($s['items'] ?? []) as $i => $it) {
                         unset($it['correct_id'], $it['explanation']);
                         $sections[$si]['items'][$i] = $it;
                     }
+                    break;
+                case 'listening':
+                    foreach (($s['items'] ?? []) as $i => $it) {
+                        unset($it['correct_id'], $it['accepted_answers'], $it['explanation']);
+                        $sections[$si]['items'][$i] = $it;
+                    }
                     // Listening: transcript chỉ dành cho giáo viên, ẩn khi học viên thi
-                    if (($s['type'] ?? '') === 'listening') {
-                        unset($sections[$si]['transcript']);
+                    unset($sections[$si]['transcript']);
+                    break;
+                case 'writing':
+                    // Ẩn guidance/rubric của giáo viên khi học viên thi
+                    foreach (($s['items'] ?? []) as $i => $it) {
+                        unset($it['guidance'], $it['explanation']);
+                        $sections[$si]['items'][$i] = $it;
                     }
                     break;
                 case 'word_form':
@@ -1152,11 +1208,28 @@ class ThptExamController extends Controller
                 case 'phonetics':
                 case 'mc_questions':
                 case 'error_identification':
-                case 'listening':
                     foreach ($s['items'] ?? [] as $it) {
                         $qn = $it['question_number'] ?? '?';
                         $checkSingle("q{$qn}", $it['correct_id'] ?? null);
                     }
+                    break;
+
+                case 'listening':
+                    foreach ($s['items'] ?? [] as $it) {
+                        $qn = $it['question_number'] ?? '?';
+                        $kind = $it['kind'] ?? 'mc';
+                        if ($kind === 'fill_blank') {
+                            $accepted = $it['accepted_answers'] ?? [];
+                            $checkSingle("q{$qn}", $accepted[0] ?? '', true, $accepted, (bool)($it['case_sensitive'] ?? false));
+                        } else {
+                            $checkSingle("q{$qn}", $it['correct_id'] ?? null);
+                        }
+                    }
+                    break;
+
+                case 'writing':
+                case 'speaking':
+                    // Subjective — không tự chấm khách quan (writing/speaking: AI job + GV override).
                     break;
 
                 case 'word_form':
@@ -1293,42 +1366,39 @@ class ThptExamController extends Controller
      */
     private function overlayTeacherScores(array $result): array
     {
-        if (!isset($result['speaking']['parts']) || !is_array($result['speaking']['parts'])) {
-            return $result;
-        }
-
-        $parts = $result['speaking']['parts'];
-        $effScores = [];
-
-        foreach ($parts as $key => $node) {
-            if (!is_array($node)) continue;
-
-            if (isset($node['teacher_score'])) {
-                $node['score'] = (float) $node['teacher_score'];
-                if (isset($node['teacher_pronunciation_score'])) {
-                    $node['pronunciation_score'] = (float) $node['teacher_pronunciation_score'];
-                }
-                if (isset($node['teacher_content_score'])) {
-                    $node['content_score'] = (float) $node['teacher_content_score'];
-                }
-                if (isset($node['teacher_feedback']) && $node['teacher_feedback'] !== null && $node['teacher_feedback'] !== '') {
-                    $node['feedback'] = $node['teacher_feedback'];
-                }
-                $node['graded_by'] = 'teacher';
-                $parts[$key] = $node;
+        foreach (['speaking', 'writing'] as $skill) {
+            if (!isset($result[$skill]['parts']) || !is_array($result[$skill]['parts'])) {
+                continue;
             }
-
-            $eff = $node['teacher_score'] ?? ($node['score'] ?? null);
-            if ($eff !== null) {
-                $effScores[] = (float) $eff;
+            $parts = $result[$skill]['parts'];
+            $effScores = [];
+            foreach ($parts as $key => $node) {
+                if (!is_array($node)) continue;
+                if (isset($node['teacher_score'])) {
+                    // Overlay teacher → field hiển thị chính (không đụng DB field AI gốc đã lưu)
+                    $node['score'] = (float) $node['teacher_score'];
+                    if (isset($node['teacher_pronunciation_score'])) {
+                        $node['pronunciation_score'] = $node['teacher_pronunciation_score'];
+                    }
+                    if (isset($node['teacher_content_score'])) {
+                        $node['content_score'] = $node['teacher_content_score'];
+                    }
+                    if (array_key_exists('teacher_feedback', $node) && $node['teacher_feedback'] !== null) {
+                        $node['feedback'] = $node['teacher_feedback'];
+                    }
+                    $node['graded_by'] = 'teacher';
+                    $parts[$key] = $node;
+                }
+                $eff = $node['teacher_score'] ?? ($node['score'] ?? null);
+                if ($eff !== null) {
+                    $effScores[] = (float) $eff;
+                }
+            }
+            $result[$skill]['parts'] = $parts;
+            if (!empty($effScores)) {
+                $result[$skill]['score'] = round(array_sum($effScores) / count($effScores), 2);
             }
         }
-
-        $result['speaking']['parts'] = $parts;
-        if (!empty($effScores)) {
-            $result['speaking']['score'] = round(array_sum($effScores) / count($effScores), 2);
-        }
-
         return $result;
     }
 
