@@ -40,10 +40,12 @@ interface Props {
   speakingParts?: Record<string, any>;
   /** URL bản ghi âm Nói theo câu (review): { "5": url, "6": url } */
   speakingAudio?: Record<string, string>;
+  /** Kết quả AI chấm Viết theo câu (review): { q2: {score, feedback, ...}, ... } */
+  writingParts?: Record<string, any>;
   correctQuestions?: Record<string, boolean>;
 }
 
-export function SectionView({ section, answers, correctAnswers, onAnswerChange, mode, submissionId, speakingParts, speakingAudio, correctQuestions }: Props) {
+export function SectionView({ section, answers, correctAnswers, onAnswerChange, mode, submissionId, speakingParts, speakingAudio, writingParts, correctQuestions }: Props) {
   const typeLabel = TYPE_LABEL[section.type] ?? 'Phần thi';
   // Chia đôi trái–phải cho dạng có bài đọc DÀI tách biệt khỏi câu hỏi
   // (mc_cloze, reading_mixed). word_bank_cloze/open_cloze KHÔNG chia vì ô
@@ -79,7 +81,7 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
           </div>
           {/* Cột câu hỏi — cuộn riêng */}
           <div className="lg:overflow-y-auto lg:pr-1 space-y-5">
-            <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} correctQuestions={correctQuestions} hidePassage />
+            <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} writingParts={writingParts} correctQuestions={correctQuestions} hidePassage />
           </div>
         </div>
       </section>
@@ -89,12 +91,12 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
   return (
     <section className="space-y-5">
       {headerEl}
-      <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} correctQuestions={correctQuestions} />
+      <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} writingParts={writingParts} correctQuestions={correctQuestions} />
     </section>
   );
 }
 
-function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissionId, speakingParts, speakingAudio, correctQuestions, hidePassage }: Props & { hidePassage?: boolean }) {
+function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissionId, speakingParts, speakingAudio, writingParts, correctQuestions, hidePassage }: Props & { hidePassage?: boolean }) {
   const isReview = mode === 'review';
   // Đề Nói: mỗi lần chỉ cho ghi âm 1 đề. activeSpeakingQ = số câu đang ghi (hoặc null).
   const [activeSpeakingQ, setActiveSpeakingQ] = useState<number | null>(null);
@@ -312,15 +314,32 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
     case 'writing': {
       return (
         <div className="space-y-4">
-          <div className="rounded-xl border border-teal-200 bg-teal-50/70 px-3.5 py-2.5 text-xs text-teal-900">
-            Phần viết được AI chấm sau khi nộp; giáo viên có thể chấm lại. Hãy viết đầy đủ theo yêu cầu đề bài.
-          </div>
+          {!isReview && (
+            <div className="rounded-xl border border-teal-200 bg-teal-50/70 px-3.5 py-2.5 text-xs text-teal-900">
+              Phần viết được AI chấm sau khi nộp; giáo viên có thể chấm lại. Hãy viết đầy đủ theo yêu cầu đề bài.
+            </div>
+          )}
           {(section.items as any[]).map((item) => {
             const key = `q${item.question_number}`;
             const val = String(answers[key] ?? '');
             const words = val.trim() ? val.trim().split(/\s+/).length : 0;
             const minW = item.min_words as number | undefined;
             const maxW = item.max_words as number | undefined;
+            const ai = writingParts?.[key];
+
+            if (isReview) {
+              return (
+                <WritingResultCard
+                  key={key}
+                  n={item.question_number}
+                  prompt={item.prompt}
+                  essay={val}
+                  wordCount={words}
+                  result={ai}
+                />
+              );
+            }
+
             return (
               <QCard key={key} n={item.question_number}>
                 {item.prompt && (
@@ -997,5 +1016,104 @@ function ClozePassage({
         })}
       </div>
     </article>
+  );
+}
+
+
+function WritingResultCard({
+  n,
+  prompt,
+  essay,
+  wordCount,
+  result,
+}: {
+  n: number;
+  prompt?: string;
+  essay: string;
+  wordCount: number;
+  result?: any;
+}) {
+  const pending = !result || typeof result.score !== 'number';
+  return (
+    <div className="rounded-2xl border border-emerald-100 bg-white overflow-hidden shadow-sm">
+      <div className="px-4 py-3 border-b border-emerald-50 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-black">
+            {n}
+          </span>
+          <p className="text-sm font-bold text-slate-800 truncate">Bài viết</p>
+        </div>
+        {pending ? (
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-100 px-2.5 py-1 rounded-full">
+            <Loader2 className="w-3 h-3 animate-spin" /> AI đang chấm…
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-xs font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
+            <Sparkles className="w-3 h-3" />
+            {Number(result.score).toFixed(1)}/10
+          </span>
+        )}
+      </div>
+
+      <div className="p-4 space-y-3">
+        {prompt && (
+          <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
+            {prompt}
+          </div>
+        )}
+
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+            Bài làm của bạn · {wordCount} từ
+          </p>
+          <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed border border-slate-200 rounded-xl px-3.5 py-3 bg-white">
+            {essay || <span className="text-slate-400 italic">Không có bài viết.</span>}
+          </div>
+        </div>
+
+        {pending ? (
+          <div className="rounded-xl border border-amber-100 bg-amber-50/70 px-3.5 py-3 text-xs text-amber-900">
+            Hệ thống AI đang chấm bài viết. Điểm và nhận xét sẽ hiện tại đây khi xong — trang tự cập nhật.
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {result.feedback && (
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-3.5 py-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 mb-1">Nhận xét AI</p>
+                <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{result.feedback}</p>
+              </div>
+            )}
+            {Array.isArray(result.suggestions) && result.suggestions.length > 0 && (
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Gợi ý cải thiện</p>
+                <ul className="space-y-1">
+                  {result.suggestions.map((s: string, i: number) => (
+                    <li key={i} className="text-sm text-slate-700 flex gap-2">
+                      <span className="text-emerald-600 font-bold">•</span>
+                      <span>{s}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {result.criteria_detail && typeof result.criteria_detail === 'object' && (
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(result.criteria_detail).map(([k, v]) => (
+                  <div key={k} className="rounded-lg border border-slate-100 bg-white px-2.5 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">{k}</p>
+                    <p className="text-sm font-black text-slate-800 mt-0.5">{String(v)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {result.graded_by && (
+              <p className="text-[10px] text-slate-400">
+                Chấm bởi: {result.graded_by === 'ai' ? 'AI' : result.graded_by === 'teacher' ? 'Giáo viên' : result.graded_by}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
