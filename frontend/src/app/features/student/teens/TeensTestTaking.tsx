@@ -18,7 +18,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import {
   ArrowLeft, ArrowRight, CheckCircle2, Volume2, AlertTriangle,
-  Flag, Clock, ListChecks, Loader2, PenLine, Send, Mic, Square, BookOpen, GripVertical, X,
+  Flag, Clock, ListChecks, Loader2, PenLine, Send, Mic, Square, BookOpen, GripVertical, X, Image as ImageIcon, ZoomIn,
 } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
 import { api } from '../../../../services/api';
@@ -124,6 +124,32 @@ function getPassage(q: any): string {
     if (fromData != null && String(fromData).trim() !== '') return String(fromData).trim();
   }
   return '';
+}
+
+
+// Ảnh đề chung (Listening image-block, giống IELTS).
+// Lưu trong qData.task_image khi GV upload ảnh cho cả group.
+function parseQData(q: any): any {
+  let data = q?.qData;
+  if (typeof data === 'string') {
+    try { data = JSON.parse(data); } catch { data = null; }
+  }
+  return data && typeof data === 'object' ? data : {};
+}
+
+function getTaskImage(q: any): string {
+  if (!q) return '';
+  const direct = q?.qImage_url ?? q?.task_image ?? q?.taskImage;
+  if (direct != null && String(direct).trim() !== '') return String(direct).trim();
+  const data = parseQData(q);
+  const fromData = data.task_image ?? data.taskImage ?? data.image_url ?? data.imageUrl;
+  if (fromData != null && String(fromData).trim() !== '') return String(fromData).trim();
+  return '';
+}
+
+function isListeningSkill(q: any): boolean {
+  const sk = String(q?.qSkill ?? q?.qSection ?? '').toLowerCase();
+  return sk === 'listening';
 }
 
 const SECTION_LABELS: Record<string, string> = {
@@ -635,14 +661,33 @@ export function TeensTestTaking() {
     audioRef.current.play().catch(() => undefined);
   };
 
-  // ─── Chế độ đọc hiểu: gom các câu cùng đoạn đọc, hiển thị bài đọc cố định
+  // ─── Chế độ đọc hiểu / Listening image-block:
+  // gom các câu cùng đoạn đọc hoặc cùng ảnh đề, hiển thị content cố định
   // bên trái + danh sách câu cuộn bên phải. ──────────────────────────────────
   const passage = q ? getPassage(q) : '';
+  const taskImage = q ? getTaskImage(q) : '';
   const isReading = passage.length > 0;
+  // Listening có ảnh đề chung → layout nguyên khối (không trộn với reading)
+  const isImageBlock = !isReading && taskImage.length > 0 && isListeningSkill(q);
+  const isBlockMode = isReading || isImageBlock;
   const groupIndices: number[] = [];
   if (isReading) {
     for (let i = 0; i < total; i++) {
       if (getPassage(questions[i]) === passage) groupIndices.push(i);
+    }
+  } else if (isImageBlock) {
+    const part = Number(q?.qPart ?? 0);
+    for (let i = 0; i < total; i++) {
+      const qi = questions[i];
+      if (getTaskImage(qi) === taskImage && Number(qi?.qPart ?? 0) === part) {
+        groupIndices.push(i);
+      }
+    }
+    // Fallback: cùng ảnh (nếu qPart thiếu)
+    if (groupIndices.length === 0) {
+      for (let i = 0; i < total; i++) {
+        if (getTaskImage(questions[i]) === taskImage) groupIndices.push(i);
+      }
     }
   }
 
@@ -727,8 +772,8 @@ export function TeensTestTaking() {
         </div>
       </div>
 
-      {/* Tab Switcher cho Mobile (chỉ hiện khi có đoạn đọc hiểu) */}
-      {isReading && (
+      {/* Tab Switcher cho Mobile (đọc hiểu / ảnh đề listening) */}
+      {isBlockMode && (
         <div className="lg:hidden flex border-b border-slate-200 bg-white sticky top-[120px] z-20 -mx-4 px-4">
           <button 
             onClick={() => setMobileActiveTab('question')}
@@ -740,61 +785,98 @@ export function TeensTestTaking() {
             onClick={() => setMobileActiveTab('passage')}
             className={`flex-1 py-3 text-center text-sm font-bold border-b-2 transition-colors ${mobileActiveTab === 'passage' ? 'border-teal-600 text-teal-600 font-extrabold' : 'border-transparent text-slate-500'}`}
           >
-            📖 Đoạn văn đọc hiểu
+            {isImageBlock ? '🖼️ Ảnh đề' : '📖 Đoạn văn đọc hiểu'}
           </button>
         </div>
       )}
 
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_240px]">
-        {/* Cột đoạn đọc (luôn render để tránh hook order violation, chỉ hiển thị khi reading) */}
-        <section className={`hidden lg:flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden h-[calc(100vh-12rem)] ${!isReading ? 'invisible' : ''}`}>
+        {/* Cột content block: đoạn đọc HOẶC ảnh đề listening (luôn render để tránh hook order violation) */}
+        <section className={`hidden lg:flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden h-[calc(100vh-12rem)] ${!isBlockMode ? 'invisible' : ''}`}>
           <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-teal-50 to-white flex-shrink-0">
             <div className="flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-teal-600" />
-              <h2 className="text-sm font-bold text-slate-900">Đọc hiểu</h2>
+              {isImageBlock ? <ImageIcon className="w-4 h-4 text-teal-600" /> : <BookOpen className="w-4 h-4 text-teal-600" />}
+              <h2 className="text-sm font-bold text-slate-900">{isImageBlock ? 'Ảnh đề' : 'Đọc hiểu'}</h2>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
-            <HighlightablePassage
-              html={passage}
-              highlights={highlightHook.highlights}
-              selectedColor={highlightHook.selectedColor}
-              onAddHighlight={highlightHook.addHighlight}
-              onRemoveHighlight={highlightHook.removeHighlight}
-              onSelectColor={highlightHook.setSelectedColor}
-              colors={highlightHook.colors}
-              enabled={isReading && !!submissionId}
-            />
+            {isImageBlock ? (
+              <div className="space-y-3">
+                {q?.qMedia_url && (
+                  <button onClick={playAudio}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-white font-semibold text-sm"
+                    style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
+                    <Volume2 className="w-4 h-4" /> Nghe đoạn ghi âm
+                  </button>
+                )}
+                <a href={taskImage} target="_blank" rel="noreferrer" className="block group relative">
+                  <img
+                    src={taskImage}
+                    alt="Ảnh đề"
+                    className="w-full object-contain rounded-xl border border-slate-100 bg-slate-50 max-h-[calc(100vh-18rem)]"
+                  />
+                  <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-black/50 text-white text-[11px] font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ZoomIn className="w-3 h-3" /> Phóng to
+                  </span>
+                </a>
+              </div>
+            ) : (
+              <HighlightablePassage
+                html={passage}
+                highlights={highlightHook.highlights}
+                selectedColor={highlightHook.selectedColor}
+                onAddHighlight={highlightHook.addHighlight}
+                onRemoveHighlight={highlightHook.removeHighlight}
+                onSelectColor={highlightHook.setSelectedColor}
+                colors={highlightHook.colors}
+                enabled={isReading && !!submissionId}
+              />
+            )}
           </div>
         </section>
 
         {/* Cột nội dung câu hỏi */}
         <main className="min-w-0">
           <div className="lg:h-[calc(100vh-12rem)] lg:overflow-y-auto lg:space-y-4 space-y-4">
-            {/* Đoạn đọc cho mobile/tablet — hiển thị dựa trên mobileActiveTab */}
-            <section className={`lg:hidden bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden ${!isReading || mobileActiveTab !== 'passage' ? 'hidden' : 'block'}`}>
+            {/* Đoạn đọc / ảnh đề cho mobile/tablet — hiển thị dựa trên mobileActiveTab */}
+            <section className={`lg:hidden bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden ${!isBlockMode || mobileActiveTab !== 'passage' ? 'hidden' : 'block'}`}>
               <div className="px-5 py-3 border-b border-slate-100 bg-gradient-to-r from-teal-50 to-white">
                 <div className="flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 text-teal-600" />
-                  <h2 className="text-sm font-bold text-slate-900">Đọc hiểu</h2>
+                  {isImageBlock ? <ImageIcon className="w-4 h-4 text-teal-600" /> : <BookOpen className="w-4 h-4 text-teal-600" />}
+                  <h2 className="text-sm font-bold text-slate-900">{isImageBlock ? 'Ảnh đề' : 'Đọc hiểu'}</h2>
                 </div>
               </div>
               <div className="overflow-y-auto px-5 py-4 min-h-[50vh]">
-                <HighlightablePassage
-                  html={passage}
-                  highlights={highlightHook.highlights}
-                  selectedColor={highlightHook.selectedColor}
-                  onAddHighlight={highlightHook.addHighlight}
-                  onRemoveHighlight={highlightHook.removeHighlight}
-                  onSelectColor={highlightHook.setSelectedColor}
-                  colors={highlightHook.colors}
-                  enabled={isReading && !!submissionId}
-                />
+                {isImageBlock ? (
+                  <div className="space-y-3">
+                    {q?.qMedia_url && (
+                      <button onClick={playAudio}
+                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-white font-semibold text-sm"
+                        style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
+                        <Volume2 className="w-4 h-4" /> Nghe đoạn ghi âm
+                      </button>
+                    )}
+                    <a href={taskImage} target="_blank" rel="noreferrer">
+                      <img src={taskImage} alt="Ảnh đề" className="w-full object-contain rounded-xl border border-slate-100 bg-slate-50" />
+                    </a>
+                  </div>
+                ) : (
+                  <HighlightablePassage
+                    html={passage}
+                    highlights={highlightHook.highlights}
+                    selectedColor={highlightHook.selectedColor}
+                    onAddHighlight={highlightHook.addHighlight}
+                    onRemoveHighlight={highlightHook.removeHighlight}
+                    onSelectColor={highlightHook.setSelectedColor}
+                    colors={highlightHook.colors}
+                    enabled={isReading && !!submissionId}
+                  />
+                )}
               </div>
             </section>
 
             {/* Reading mode questions list */}
-            <div className={`${!isReading ? 'hidden' : ''} ${mobileActiveTab === 'question' ? 'block' : 'hidden lg:block'}`}>
+            <div className={`${!isBlockMode ? 'hidden' : ''} ${mobileActiveTab === 'question' ? 'block' : 'hidden lg:block'}`}>
               {groupIndices.map((idx) => {
                 const gq = questions[idx];
                 const gid = getQuestionId(gq);
@@ -822,7 +904,8 @@ export function TeensTestTaking() {
                       </button>
                     </div>
 
-                    {gq?.qMedia_url && (
+                    {/* Audio/ảnh per-câu: ẩn khi đã có image-block chung bên trái */}
+                    {!isImageBlock && gq?.qMedia_url && (
                       <button onClick={(e) => { e.stopPropagation(); const a = new Audio(gq.qMedia_url); a.play().catch(() => undefined); }}
                         className="mb-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-white font-semibold text-sm"
                         style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
@@ -830,7 +913,7 @@ export function TeensTestTaking() {
                       </button>
                     )}
 
-                    {gq?.qImage_url && (
+                    {!isImageBlock && gq?.qImage_url && (
                       <img src={gq.qImage_url} alt="" className="w-full max-h-72 object-contain rounded-xl mb-4 bg-slate-50" />
                     )}
 
@@ -864,8 +947,8 @@ export function TeensTestTaking() {
               </div>
             </div>
 
-            {/* Non-reading mode single question */}
-            <div className={`${isReading ? 'hidden' : ''}`}>
+            {/* Non-block mode single question (đề cũ / speaking / không ảnh) */}
+            <div className={`${isBlockMode ? 'hidden' : ''}`}>
           <section className="rounded-2xl bg-white border border-slate-200 p-5 sm:p-7">
             {/* Section + flag */}
             <div className="flex items-center justify-between mb-4">
@@ -1041,9 +1124,15 @@ export function TeensTestTaking() {
       </div>
 
       {/* Nút nổi xem bài đọc nhanh cho mobile */}
-      {isReading && mobileActiveTab === 'question' && (
+      {isBlockMode && mobileActiveTab === 'question' && (
         <button
           onClick={() => setIsMobilePassageModalOpen(true)}
+          className="lg:hidden fixed bottom-20 right-4 z-40 w-12 h-12 rounded-full bg-teal-600 hover:bg-teal-700 text-white shadow-lg flex items-center justify-center transition-transform active:scale-90"
+          title={isImageBlock ? 'Xem ảnh đề' : 'Xem đoạn văn'}
+        >
+          {isImageBlock ? <ImageIcon className="w-5 h-5" /> : <BookOpen className="w-5 h-5" />}
+        </button>
+      )}
           className="lg:hidden fixed bottom-20 right-4 z-40 w-12 h-12 rounded-full bg-teal-600 hover:bg-teal-700 text-white shadow-lg flex items-center justify-center transition-transform active:scale-90"
         >
           <BookOpen className="w-5 h-5" />
@@ -1107,15 +1196,15 @@ export function TeensTestTaking() {
         </div>
       )}
 
-      {/* Mobile Passage Modal (Xem bài đọc nhanh) */}
+            {/* Mobile Passage / Image Modal (xem nhanh) */}
       {isMobilePassageModalOpen && (
         <div className="lg:hidden fixed inset-0 z-[60] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-lg h-[80vh] flex flex-col shadow-2xl overflow-hidden"
             style={{ animation: 'teensPop 0.2s cubic-bezier(0.34, 1, 0.64, 1) forwards' }}>
             <div className="px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-teal-50 to-white flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-teal-600" />
-                <h3 className="text-base font-bold text-slate-900">Đoạn văn đọc hiểu</h3>
+                {isImageBlock ? <ImageIcon className="w-5 h-5 text-teal-600" /> : <BookOpen className="w-5 h-5 text-teal-600" />}
+                <h3 className="text-base font-bold text-slate-900">{isImageBlock ? 'Ảnh đề' : 'Đoạn văn đọc hiểu'}</h3>
               </div>
               <button 
                 onClick={() => setIsMobilePassageModalOpen(false)}
@@ -1125,16 +1214,31 @@ export function TeensTestTaking() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
-              <HighlightablePassage
-                html={passage}
-                highlights={highlightHook.highlights}
-                selectedColor={highlightHook.selectedColor}
-                onAddHighlight={highlightHook.addHighlight}
-                onRemoveHighlight={highlightHook.removeHighlight}
-                onSelectColor={highlightHook.setSelectedColor}
-                colors={highlightHook.colors}
-                enabled={isReading && !!submissionId}
-              />
+              {isImageBlock ? (
+                <div className="space-y-3">
+                  {q?.qMedia_url && (
+                    <button onClick={playAudio}
+                      className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-white font-semibold text-sm"
+                      style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
+                      <Volume2 className="w-4 h-4" /> Nghe đoạn ghi âm
+                    </button>
+                  )}
+                  <a href={taskImage} target="_blank" rel="noreferrer">
+                    <img src={taskImage} alt="Ảnh đề" className="w-full object-contain rounded-xl border border-slate-100 bg-slate-50" />
+                  </a>
+                </div>
+              ) : (
+                <HighlightablePassage
+                  html={passage}
+                  highlights={highlightHook.highlights}
+                  selectedColor={highlightHook.selectedColor}
+                  onAddHighlight={highlightHook.addHighlight}
+                  onRemoveHighlight={highlightHook.removeHighlight}
+                  onSelectColor={highlightHook.setSelectedColor}
+                  colors={highlightHook.colors}
+                  enabled={isReading && !!submissionId}
+                />
+              )}
             </div>
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex-shrink-0">
               <button 
@@ -1149,7 +1253,7 @@ export function TeensTestTaking() {
         </div>
       )}
 
-      <SubmitDialog
+<SubmitDialog
         open={showSubmit}
         total={total}
         answered={answeredCount}

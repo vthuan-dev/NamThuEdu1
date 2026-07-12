@@ -3,7 +3,8 @@
  *
  * Route: /giao-vien/de-thi/teens/:skill/tao-moi  (skill = listening | speaking)
  *
- * - Listening: mỗi nhóm = 1 audio + nhiều câu trắc nghiệm (tự chấm).
+ * - Listening: mỗi nhóm = 1 audio + (tuỳ chọn) 1 ảnh đề chung + nhiều câu
+ *   trắc nghiệm / điền từ (tự chấm). Có ảnh → HS thấy layout "nguyên khối" giống IELTS.
  * - Speaking: nhiều "part", mỗi part = 1 đề nói (học viên ghi âm → AI chấm).
  *
  * Lưu qua POST /teacher/exams/teens (TeensExamController) — tạo Exam + Question
@@ -13,7 +14,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
   ArrowLeft, Save, Plus, Trash2, Headphones, Mic, Upload, Loader2,
-  CheckCircle2, Volume2, AlertTriangle,
+  CheckCircle2, Volume2, AlertTriangle, Image as ImageIcon, PenLine, ListChecks,
 } from "lucide-react";
 import { useToast } from "../../../../../hooks/useToast";
 import { api } from "../../../../../services/api";
@@ -25,14 +26,42 @@ const TEAL_MID = "#14B8A6";
 let _uid = 0;
 const uid = () => `t${Date.now()}_${_uid++}`;
 
+type QType = "multiple_choice" | "fill_blank";
+
 interface Option { id: string; content: string; isCorrect: boolean }
-interface LQuestion { id: string; qContent: string; options: Option[] }
-interface LGroup { id: string; audioUrl: string; uploading: boolean; questions: LQuestion[] }
+interface LQuestion {
+  id: string;
+  qContent: string;
+  qType: QType;
+  options: Option[];
+  correctText: string;
+}
+interface LGroup {
+  id: string;
+  audioUrl: string;
+  uploading: boolean;
+  taskImage: string;
+  imageUploading: boolean;
+  questions: LQuestion[];
+}
 interface SPart { id: string; qContent: string; prepSeconds: number; speakSeconds: number }
 
 const newOption = (): Option => ({ id: uid(), content: "", isCorrect: false });
-const newLQuestion = (): LQuestion => ({ id: uid(), qContent: "", options: [newOption(), newOption(), newOption(), newOption()] });
-const newLGroup = (): LGroup => ({ id: uid(), audioUrl: "", uploading: false, questions: [newLQuestion()] });
+const newLQuestion = (type: QType = "multiple_choice"): LQuestion => ({
+  id: uid(),
+  qContent: "",
+  qType: type,
+  options: [newOption(), newOption(), newOption(), newOption()],
+  correctText: "",
+});
+const newLGroup = (): LGroup => ({
+  id: uid(),
+  audioUrl: "",
+  uploading: false,
+  taskImage: "",
+  imageUploading: false,
+  questions: [newLQuestion()],
+});
 const newSPart = (): SPart => ({ id: uid(), qContent: "", prepSeconds: 30, speakSeconds: 120 });
 
 const btnPrimary = "inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white transition-transform hover:scale-[1.02] active:scale-95 disabled:opacity-60";
@@ -91,9 +120,31 @@ export function CreateTeensExam() {
     }
   };
 
+  const uploadTaskImage = async (gid: string, file: File) => {
+    updateGroup(gid, (g) => ({ ...g, imageUploading: true }));
+    try {
+      const fd = new FormData();
+      fd.append("image", file, file.name);
+      fd.append("questionId", `teens-listening-img-${gid}`);
+      const token = localStorage.getItem("auth_token");
+      const endpoint = token ? "/teacher/upload/image" : "/test/upload/image";
+      const { data: result } = await api.post(endpoint, fd, { headers: { "Content-Type": "multipart/form-data" } });
+      if (result.success && result.data?.imageUrl) {
+        updateGroup(gid, (g) => ({ ...g, taskImage: result.data.imageUrl, imageUploading: false }));
+        success("Đã tải ảnh đề lên.");
+      } else {
+        throw new Error(result.message || "Upload thất bại");
+      }
+    } catch (e: any) {
+      updateGroup(gid, (g) => ({ ...g, imageUploading: false }));
+      error(`Lỗi tải ảnh: ${e?.message || "Không xác định"}`);
+    }
+  };
+
   const addGroup = () => setGroups((p) => [...p, newLGroup()]);
   const removeGroup = (gid: string) => setGroups((p) => (p.length > 1 ? p.filter((g) => g.id !== gid) : p));
-  const addQuestion = (gid: string) => updateGroup(gid, (g) => ({ ...g, questions: [...g.questions, newLQuestion()] }));
+  const addQuestion = (gid: string, type: QType = "multiple_choice") =>
+    updateGroup(gid, (g) => ({ ...g, questions: [...g.questions, newLQuestion(type)] }));
   const removeQuestion = (gid: string, qid: string) =>
     updateGroup(gid, (g) => ({ ...g, questions: g.questions.length > 1 ? g.questions.filter((q) => q.id !== qid) : g.questions }));
   const updateQuestion = (gid: string, qid: string, fn: (q: LQuestion) => LQuestion) =>
@@ -115,12 +166,24 @@ export function CreateTeensExam() {
     if (isListening) {
       for (let gi = 0; gi < groups.length; gi++) {
         const g = groups[gi];
+        const hasImage = !!g.taskImage.trim();
         for (let qi = 0; qi < g.questions.length; qi++) {
           const q = g.questions[qi];
-          if (!stripHtml(q.qContent)) return `Phần ${gi + 1}, câu ${qi + 1}: chưa nhập câu hỏi.`;
-          const filled = q.options.filter((o) => stripHtml(o.content));
-          if (filled.length < 2) return `Phần ${gi + 1}, câu ${qi + 1}: cần ít nhất 2 lựa chọn.`;
-          if (!q.options.some((o) => o.isCorrect && stripHtml(o.content))) return `Phần ${gi + 1}, câu ${qi + 1}: chưa chọn đáp án đúng.`;
+          // Có ảnh đề → qContent optional
+          if (!hasImage && !stripHtml(q.qContent)) {
+            return `Phần ${gi + 1}, câu ${qi + 1}: chưa nhập câu hỏi.`;
+          }
+          if (q.qType === "fill_blank") {
+            if (!q.correctText.trim()) {
+              return `Phần ${gi + 1}, câu ${qi + 1}: chưa nhập đáp án điền từ.`;
+            }
+          } else {
+            const filled = q.options.filter((o) => stripHtml(o.content));
+            if (filled.length < 2) return `Phần ${gi + 1}, câu ${qi + 1}: cần ít nhất 2 lựa chọn.`;
+            if (!q.options.some((o) => o.isCorrect && stripHtml(o.content))) {
+              return `Phần ${gi + 1}, câu ${qi + 1}: chưa chọn đáp án đúng.`;
+            }
+          }
         }
       }
     } else {
@@ -149,10 +212,21 @@ export function CreateTeensExam() {
       if (isListening) {
         body.groups = groups.map((g) => ({
           audio_url: g.audioUrl || null,
-          questions: g.questions.map((q) => ({
-            qContent: q.qContent.trim(),
-            options: q.options.filter((o) => stripHtml(o.content)).map((o) => ({ content: o.content.trim(), isCorrect: o.isCorrect })),
-          })),
+          task_image: g.taskImage || null,
+          questions: g.questions.map((q, qi) => {
+            const base: any = {
+              qContent: stripHtml(q.qContent) ? q.qContent.trim() : `Câu ${qi + 1}`,
+              qType: q.qType,
+            };
+            if (q.qType === "fill_blank") {
+              base.correctAnswer = q.correctText.trim();
+            } else {
+              base.options = q.options
+                .filter((o) => stripHtml(o.content))
+                .map((o) => ({ content: o.content.trim(), isCorrect: o.isCorrect }));
+            }
+            return base;
+          }),
         }));
       } else {
         const selectedParts: SPart[] = scope === "part" ? parts.slice(scopePart - 1, scopePart) : parts;
@@ -189,7 +263,9 @@ export function CreateTeensExam() {
               Tạo đề {isListening ? "Listening" : "Speaking"} — Teens
             </h1>
             <p className="text-sm text-slate-500">
-              {isListening ? "Audio + câu hỏi trắc nghiệm (tự chấm)" : "Đề nói — học viên ghi âm, AI chấm điểm"}
+              {isListening
+                ? "Audio + ảnh đề (tuỳ chọn) + câu MCQ / điền từ — layout nguyên khối cho HS"
+                : "Đề nói — học viên ghi âm, AI chấm điểm"}
             </p>
           </div>
         </div>
@@ -264,6 +340,14 @@ export function CreateTeensExam() {
         {/* Listening builder */}
         {isListening ? (
           <div className="space-y-4">
+            <div className="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+              <ImageIcon className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>
+                <b>Layout nguyên khối:</b> upload 1 ảnh đề cho cả phần → học viên thấy ảnh + danh sách đáp án (giống IELTS).
+                Không upload ảnh thì vẫn hiện từng câu như cũ.
+              </span>
+            </div>
+
             {groups.map((g, gi) => (
               <div key={g.id} className="bg-white rounded-2xl border border-slate-200 p-5">
                 <div className="flex items-center justify-between mb-4">
@@ -296,66 +380,166 @@ export function CreateTeensExam() {
                   )}
                 </div>
 
+                {/* Task image — shared for whole group */}
+                <div className="mb-4">
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Ảnh đề chung (tuỳ chọn) — form / note / bảng câu hỏi
+                  </label>
+                  {g.taskImage ? (
+                    <div className="rounded-xl border border-sky-200 bg-sky-50/50 p-3">
+                      <div className="flex items-start gap-3">
+                        <img
+                          src={g.taskImage}
+                          alt="Ảnh đề"
+                          className="w-full max-h-72 object-contain rounded-lg bg-white border border-slate-100"
+                        />
+                      </div>
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-xs font-medium text-sky-700 inline-flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> HS sẽ thấy ảnh này nguyên khối
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updateGroup(g.id, (x) => ({ ...x, taskImage: "" }))}
+                          className="text-sm font-medium text-rose-500 hover:text-rose-600 inline-flex items-center gap-1"
+                        >
+                          <Trash2 className="w-4 h-4" /> Xoá ảnh
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <label className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-sky-200 bg-sky-50/30 px-4 py-6 cursor-pointer hover:border-sky-400 transition-colors text-sm font-medium text-slate-500">
+                      {g.imageUploading ? <Loader2 className="w-5 h-5 animate-spin text-sky-500" /> : <ImageIcon className="w-5 h-5 text-sky-500" />}
+                      {g.imageUploading ? "Đang tải ảnh…" : "Upload ảnh đề (jpg, png, webp…)"}
+                      <span className="text-xs text-slate-400 font-normal">1 ảnh dùng chung cho tất cả câu trong phần này</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={g.imageUploading}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) uploadTaskImage(g.id, f);
+                          e.currentTarget.value = "";
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+
                 {/* Questions */}
                 <div className="space-y-4">
                   {g.questions.map((q, qi) => (
                     <div key={q.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center justify-between mb-2 gap-2">
                         <span className="text-sm font-bold text-slate-700">Câu {qi + 1}</span>
-                        {g.questions.length > 1 && (
-                          <button onClick={() => removeQuestion(g.id, q.id)} className="text-slate-400 hover:text-rose-500">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                      <div className="mb-3">
-                        <RichTextInput value={q.qContent}
-                          onChange={(html) => updateQuestion(g.id, q.id, (x) => ({ ...x, qContent: html }))}
-                          placeholder="Nội dung câu hỏi…" />
-                      </div>
-                      <div className="space-y-2">
-                        {q.options.map((opt, oi) => (
-                          <div key={opt.id} className="flex items-center gap-2">
-                            <button type="button"
-                              onClick={() => updateQuestion(g.id, q.id, (x) => ({ ...x, options: x.options.map((o) => ({ ...o, isCorrect: o.id === opt.id })) }))}
-                              className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-colors"
-                              style={{ background: opt.isCorrect ? TEAL : "#E2E8F0", color: opt.isCorrect ? "#fff" : "#64748B" }}
-                              title="Chọn làm đáp án đúng">
-                              {opt.isCorrect ? <CheckCircle2 className="w-4 h-4" /> : String.fromCharCode(65 + oi)}
+                        <div className="flex items-center gap-2">
+                          {/* Type toggle */}
+                          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
+                            <button
+                              type="button"
+                              onClick={() => updateQuestion(g.id, q.id, (x) => ({ ...x, qType: "multiple_choice" }))}
+                              className="px-2.5 py-1 rounded-md text-xs font-bold inline-flex items-center gap-1 transition-colors"
+                              style={q.qType === "multiple_choice"
+                                ? { background: TEAL, color: "#fff" }
+                                : { color: "#64748B" }}
+                            >
+                              <ListChecks className="w-3 h-3" /> MCQ
                             </button>
-                            <div className="flex-1">
-                              <RichTextInput value={opt.content}
-                                onChange={(html) => updateQuestion(g.id, q.id, (x) => ({ ...x, options: x.options.map((o) => (o.id === opt.id ? { ...o, content: html } : o)) }))}
-                                placeholder={`Lựa chọn ${String.fromCharCode(65 + oi)}`} />
-                            </div>
-                            {q.options.length > 2 && (
-                              <button onClick={() => updateQuestion(g.id, q.id, (x) => ({ ...x, options: x.options.filter((o) => o.id !== opt.id) }))}
-                                className="text-slate-300 hover:text-rose-500 flex-shrink-0">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => updateQuestion(g.id, q.id, (x) => ({ ...x, qType: "fill_blank" }))}
+                              className="px-2.5 py-1 rounded-md text-xs font-bold inline-flex items-center gap-1 transition-colors"
+                              style={q.qType === "fill_blank"
+                                ? { background: TEAL, color: "#fff" }
+                                : { color: "#64748B" }}
+                            >
+                              <PenLine className="w-3 h-3" /> Điền từ
+                            </button>
                           </div>
-                        ))}
+                          {g.questions.length > 1 && (
+                            <button onClick={() => removeQuestion(g.id, q.id)} className="text-slate-400 hover:text-rose-500">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      {q.options.length < 6 && (
-                        <button onClick={() => updateQuestion(g.id, q.id, (x) => ({ ...x, options: [...x.options, newOption()] }))}
-                          className="mt-2 text-sm font-medium text-teal-600 hover:text-teal-700 inline-flex items-center gap-1">
-                          <Plus className="w-3.5 h-3.5" /> Thêm lựa chọn
-                        </button>
+
+                      <div className="mb-3">
+                        <RichTextInput
+                          value={q.qContent}
+                          onChange={(html) => updateQuestion(g.id, q.id, (x) => ({ ...x, qContent: html }))}
+                          placeholder={g.taskImage
+                            ? "Nhãn câu (tuỳ chọn, VD: Câu 1) — đề đã nằm trên ảnh"
+                            : "Nội dung câu hỏi…"}
+                        />
+                      </div>
+
+                      {q.qType === "fill_blank" ? (
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                            Đáp án đúng * <span className="font-normal text-slate-400">(biến thể: museum / the museum)</span>
+                          </label>
+                          <input
+                            className={inputCls}
+                            value={q.correctText}
+                            onChange={(e) => updateQuestion(g.id, q.id, (x) => ({ ...x, correctText: e.target.value }))}
+                            placeholder="VD: museum"
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <div className="space-y-2">
+                            {q.options.map((opt, oi) => (
+                              <div key={opt.id} className="flex items-center gap-2">
+                                <button type="button"
+                                  onClick={() => updateQuestion(g.id, q.id, (x) => ({ ...x, options: x.options.map((o) => ({ ...o, isCorrect: o.id === opt.id })) }))}
+                                  className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-colors"
+                                  style={{ background: opt.isCorrect ? TEAL : "#E2E8F0", color: opt.isCorrect ? "#fff" : "#64748B" }}
+                                  title="Chọn làm đáp án đúng">
+                                  {opt.isCorrect ? <CheckCircle2 className="w-4 h-4" /> : String.fromCharCode(65 + oi)}
+                                </button>
+                                <div className="flex-1">
+                                  <RichTextInput value={opt.content}
+                                    onChange={(html) => updateQuestion(g.id, q.id, (x) => ({ ...x, options: x.options.map((o) => (o.id === opt.id ? { ...o, content: html } : o)) }))}
+                                    placeholder={`Lựa chọn ${String.fromCharCode(65 + oi)}`} />
+                                </div>
+                                {q.options.length > 2 && (
+                                  <button onClick={() => updateQuestion(g.id, q.id, (x) => ({ ...x, options: x.options.filter((o) => o.id !== opt.id) }))}
+                                    className="text-slate-300 hover:text-rose-500 flex-shrink-0">
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                          {q.options.length < 6 && (
+                            <button onClick={() => updateQuestion(g.id, q.id, (x) => ({ ...x, options: [...x.options, newOption()] }))}
+                              className="mt-2 text-sm font-medium text-teal-600 hover:text-teal-700 inline-flex items-center gap-1">
+                              <Plus className="w-3.5 h-3.5" /> Thêm lựa chọn
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   ))}
                 </div>
 
-                <button onClick={() => addQuestion(g.id)}
-                  className="mt-4 w-full py-2.5 rounded-xl border border-dashed border-slate-200 text-sm font-semibold text-slate-500 hover:border-teal-300 hover:text-teal-600 transition-colors inline-flex items-center justify-center gap-1.5">
-                  <Plus className="w-4 h-4" /> Thêm câu hỏi
-                </button>
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button onClick={() => addQuestion(g.id, "multiple_choice")}
+                    className="py-2.5 rounded-xl border border-dashed border-slate-200 text-sm font-semibold text-slate-500 hover:border-teal-300 hover:text-teal-600 transition-colors inline-flex items-center justify-center gap-1.5">
+                    <Plus className="w-4 h-4" /> Thêm câu MCQ
+                  </button>
+                  <button onClick={() => addQuestion(g.id, "fill_blank")}
+                    className="py-2.5 rounded-xl border border-dashed border-slate-200 text-sm font-semibold text-slate-500 hover:border-teal-300 hover:text-teal-600 transition-colors inline-flex items-center justify-center gap-1.5">
+                    <Plus className="w-4 h-4" /> Thêm câu điền từ
+                  </button>
+                </div>
               </div>
             ))}
             <button onClick={addGroup}
               className="w-full py-3 rounded-2xl border border-dashed border-teal-200 bg-teal-50/40 text-sm font-bold text-teal-700 hover:bg-teal-50 transition-colors inline-flex items-center justify-center gap-2">
-              <Plus className="w-4 h-4" /> Thêm phần (audio mới)
+              <Plus className="w-4 h-4" /> Thêm phần (audio / ảnh mới)
             </button>
           </div>
         ) : (

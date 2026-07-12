@@ -15,10 +15,14 @@ use Illuminate\Support\Facades\Validator;
  * Mô hình dữ liệu: quan hệ Exam + Question + Answer (giống TeensExamSeeder),
  * để tái sử dụng tối đa hạ tầng sẵn có:
  *   - Player teens (TeensTestTaking) chạy theo exam.questions, đã phát qMedia_url
- *     và render trắc nghiệm → Listening tự chấm.
+ *     và render trắc nghiệm / fill → Listening tự chấm.
  *   - Speaking: học viên ghi âm → upload vào sGemini_feedback['speaking_audio'],
  *     submit kích hoạt GradeVstepSubjectiveJob → VstepGradingService.gradeSpeaking
  *     (bắt theo qSkill='speaking' + qPart) chấm bằng Groq Whisper + LLM.
+ *
+ * Listening layout "nguyên khối" (IELTS-style):
+ *   groups[].task_image  → lưu vào qData.task_image cho mọi câu trong group
+ *   questions[].qType    → multiple_choice | fill_blank
  *
  * Endpoints (teacher):
  *   POST /api/teacher/exams/teens   → tạo đề listening hoặc speaking
@@ -30,7 +34,16 @@ class TeensExamController extends Controller
      *
      * Body chung: { skill, eTitle, eDescription?, eDuration_minutes? }
      *  - skill = 'listening':
-     *      groups: [ { audio_url, questions: [ { qContent, options:[{content,isCorrect}] } ] } ]
+     *      groups: [ {
+     *        audio_url?,
+     *        task_image?,
+     *        questions: [ {
+     *          qContent?,
+     *          qType?: multiple_choice|fill_blank,
+     *          options?: [{content,isCorrect}],   // MCQ
+     *          correctAnswer?: string             // fill_blank
+     *        } ]
+     *      } ]
      *  - skill = 'speaking':
      *      parts: [ { qContent, prepSeconds?, speakSeconds? } ]
      */
@@ -59,11 +72,14 @@ class TeensExamController extends Controller
             $rules = array_merge($rules, [
                 'groups'                          => 'required|array|min:1',
                 'groups.*.audio_url'              => 'nullable|string|max:1000',
+                'groups.*.task_image'             => 'nullable|string|max:1000',
                 'groups.*.questions'              => 'required|array|min:1',
-                'groups.*.questions.*.qContent'   => 'required|string',
-                'groups.*.questions.*.options'    => 'required|array|min:2',
-                'groups.*.questions.*.options.*.content'   => 'required|string',
-                'groups.*.questions.*.options.*.isCorrect' => 'required|boolean',
+                'groups.*.questions.*.qContent'   => 'nullable|string',
+                'groups.*.questions.*.qType'      => 'nullable|in:multiple_choice,fill_blank',
+                'groups.*.questions.*.correctAnswer' => 'nullable|string|max:500',
+                'groups.*.questions.*.options'    => 'nullable|array',
+                'groups.*.questions.*.options.*.content'   => 'required_with:groups.*.questions.*.options|string',
+                'groups.*.questions.*.options.*.isCorrect' => 'required_with:groups.*.questions.*.options|boolean',
             ]);
         } else { // speaking
             $rules = array_merge($rules, [
@@ -83,16 +99,49 @@ class TeensExamController extends Controller
             ], 400);
         }
 
-        // Listening: bắt buộc mỗi câu có đúng 1 đáp án đúng
+        // Listening: validate theo loại câu
         if ($skill === 'listening') {
             foreach ($request->input('groups', []) as $gi => $group) {
+                $taskImage = trim((string) ($group['task_image'] ?? ''));
                 foreach (($group['questions'] ?? []) as $qi => $q) {
-                    $correct = collect($q['options'] ?? [])->filter(fn($o) => filter_var($o['isCorrect'] ?? false, FILTER_VALIDATE_BOOLEAN))->count();
-                    if ($correct < 1) {
+                    $qType = strtolower((string) ($q['qType'] ?? 'multiple_choice'));
+                    if (!in_array($qType, ['multiple_choice', 'fill_blank'], true)) {
+                        $qType = 'multiple_choice';
+                    }
+
+                    $content = trim(strip_tags((string) ($q['qContent'] ?? '')));
+                    // Có ảnh đề chung → qContent optional (fallback "Câu N")
+                    if ($taskImage === '' && $content === '') {
                         return response()->json([
                             'status'  => 'error',
-                            'message' => "Phần " . ($gi + 1) . ", câu " . ($qi + 1) . " chưa chọn đáp án đúng.",
+                            'message' => 'Phần ' . ($gi + 1) . ', câu ' . ($qi + 1) . ' chưa nhập câu hỏi.',
                         ], 400);
+                    }
+
+                    if ($qType === 'fill_blank') {
+                        $correct = trim((string) ($q['correctAnswer'] ?? ''));
+                        if ($correct === '') {
+                            return response()->json([
+                                'status'  => 'error',
+                                'message' => 'Phần ' . ($gi + 1) . ', câu ' . ($qi + 1) . ' (điền từ) chưa có đáp án đúng.',
+                            ], 400);
+                        }
+                    } else {
+                        $options = collect($q['options'] ?? []);
+                        $filled = $options->filter(fn($o) => trim(strip_tags((string) ($o['content'] ?? ''))) !== '');
+                        if ($filled->count() < 2) {
+                            return response()->json([
+                                'status'  => 'error',
+                                'message' => 'Phần ' . ($gi + 1) . ', câu ' . ($qi + 1) . ' cần ít nhất 2 lựa chọn.',
+                            ], 400);
+                        }
+                        $correct = $filled->filter(fn($o) => filter_var($o['isCorrect'] ?? false, FILTER_VALIDATE_BOOLEAN))->count();
+                        if ($correct < 1) {
+                            return response()->json([
+                                'status'  => 'error',
+                                'message' => 'Phần ' . ($gi + 1) . ', câu ' . ($qi + 1) . ' chưa chọn đáp án đúng.',
+                            ], 400);
+                        }
                     }
                 }
             }
@@ -128,12 +177,33 @@ class TeensExamController extends Controller
                 if ($skill === 'listening') {
                     foreach ($request->input('groups', []) as $gi => $group) {
                         $audioUrl = $group['audio_url'] ?? null;
-                        foreach (($group['questions'] ?? []) as $q) {
+                        $taskImage = trim((string) ($group['task_image'] ?? ''));
+                        $hasImage = $taskImage !== '';
+
+                        foreach (($group['questions'] ?? []) as $qi => $q) {
                             $order++;
+                            $qType = strtolower((string) ($q['qType'] ?? 'multiple_choice'));
+                            if (!in_array($qType, ['multiple_choice', 'fill_blank'], true)) {
+                                $qType = 'multiple_choice';
+                            }
+
+                            $rawContent = trim((string) ($q['qContent'] ?? ''));
+                            $plainContent = trim(strip_tags($rawContent));
+                            $qContent = $plainContent !== ''
+                                ? $rawContent
+                                : ('Câu ' . ($qi + 1));
+
+                            $qData = [
+                                'layout' => $hasImage ? 'image_block' : 'list',
+                            ];
+                            if ($hasImage) {
+                                $qData['task_image'] = $taskImage;
+                            }
+
                             $question = Question::create([
                                 'exam_id'        => $exam->eId,
-                                'qContent'       => $q['qContent'],
-                                'qType'          => 'multiple_choice',
+                                'qContent'       => $qContent,
+                                'qType'          => $qType,
                                 'qSection'       => 'listening',
                                 'qSkill'         => 'listening',
                                 'qSection_order' => $order,
@@ -142,14 +212,27 @@ class TeensExamController extends Controller
                                 'qPoints'        => 1,
                                 'qDifficulty'    => 'medium',
                                 'age_group'      => 'teens',
+                                'qData'          => $qData,
                             ]);
 
-                            foreach (($q['options'] ?? []) as $opt) {
+                            if ($qType === 'fill_blank') {
                                 Answer::create([
                                     'question_id' => $question->qId,
-                                    'aContent'    => $opt['content'],
-                                    'aIs_correct' => filter_var($opt['isCorrect'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                                    'aContent'    => trim((string) ($q['correctAnswer'] ?? '')),
+                                    'aIs_correct' => true,
                                 ]);
+                            } else {
+                                foreach (($q['options'] ?? []) as $opt) {
+                                    $optContent = trim((string) ($opt['content'] ?? ''));
+                                    if (trim(strip_tags($optContent)) === '') {
+                                        continue;
+                                    }
+                                    Answer::create([
+                                        'question_id' => $question->qId,
+                                        'aContent'    => $optContent,
+                                        'aIs_correct' => filter_var($opt['isCorrect'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                                    ]);
+                                }
                             }
                         }
                     }
