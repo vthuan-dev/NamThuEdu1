@@ -25,7 +25,7 @@ export interface SectionTypeMeta {
   label: string;
   description: string;
   icon: string; // lucide icon name
-  group: 'language' | 'reading' | 'writing' | 'audio';
+  group: 'language' | 'reading' | 'writing' | 'listening' | 'speaking';
   autoGrade: boolean;
 }
 
@@ -131,7 +131,7 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
     label: 'Nghe (Listening)',
     description: 'Audio + trắc nghiệm / điền chỗ trống — tự chấm',
     icon: 'Headphones',
-    group: 'audio',
+    group: 'listening',
     autoGrade: true,
   },
   {
@@ -139,7 +139,7 @@ export const SECTION_TYPES: SectionTypeMeta[] = [
     label: 'Nói (Speaking)',
     description: 'Đề nói — học viên ghi âm, AI chấm điểm',
     icon: 'Mic',
-    group: 'audio',
+    group: 'speaking',
     autoGrade: false,
   },
 ];

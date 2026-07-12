@@ -13,13 +13,14 @@ const GROUP_LABELS: Record<string, string> = {
   language: 'Ngôn ngữ (Use of English)',
   reading: 'Đọc hiểu',
   writing: 'Viết',
-  audio: 'Nghe & Nói (Listening & Speaking)',
+  listening: 'Nghe (Listening)',
+  speaking: 'Nói (Speaking)',
 };
 
 export function AddSectionModal({ open, onClose, onPick }: Props) {
   if (!open) return null;
 
-  const groups = ['language', 'reading', 'writing', 'audio'] as const;
+  const groups = ['language', 'reading', 'writing', 'listening', 'speaking'] as const;
 
   return (
     <div

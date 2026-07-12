@@ -362,13 +362,20 @@ export function SectionEditor({ section, allSections, onChange }: Props) {
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-function ItemCard({ n, onRemove, children }: { n: number; onRemove: () => void; children: React.ReactNode }) {
+function ItemCard({ n, onRemove, typeLabel, children }: { n: number; onRemove: () => void; typeLabel?: string; children: React.ReactNode }) {
   return (
     <div className="rounded-2xl p-5 bg-white border border-slate-200">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
           <QuestionBadge n={n} />
-          <h3 className="text-sm font-bold text-slate-900">Câu {n}</h3>
+          <h3 className="text-sm font-bold text-slate-900">
+            Câu {n}
+            {typeLabel && (
+              <span className="text-slate-400 font-normal text-xs ml-1.5">
+                · {typeLabel}
+              </span>
+            )}
+          </h3>
         </div>
         <DeleteBtn onClick={onRemove} />
       </div>
@@ -546,7 +553,7 @@ function PhoneticsEditor({ section, all, onChange }: { section: Extract<ThptSect
       </div>
 
       {section.items.map((item, idx) => (
-        <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
+        <ItemCard key={idx} n={item.question_number} typeLabel={section.variant === 'stress' ? 'Trọng âm' : 'Phát âm'} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {item.words.map((w, wi) => {
               const isCorrect = item.correct_id === w.id;
@@ -667,7 +674,7 @@ function McQuestionsEditor({ section, all, onChange }: { section: Extract<ThptSe
       </div>
 
       {section.items.map((item, idx) => (
-        <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
+        <ItemCard key={idx} n={item.question_number} typeLabel="Trắc nghiệm" onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
           <FormattedTextarea
             value={item.prompt}
             onChange={(v) => {
@@ -785,7 +792,7 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
       {section.items.map((item: any, idx) => {
         const kind: 'mc' | 'fill_blank' = item.kind === 'fill_blank' ? 'fill_blank' : 'mc';
         return (
-          <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
+          <ItemCard key={idx} n={item.question_number} typeLabel={kind === 'fill_blank' ? 'Nghe điền chỗ trống' : 'Nghe trắc nghiệm'} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
             <div className="flex items-center gap-2 mb-3">
               <span className="text-xs font-bold text-slate-500">Dạng:</span>
               <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-slate-100">
@@ -896,7 +903,7 @@ function WritingEditor({ section, all, onChange }: { section: Extract<ThptSectio
       </div>
 
       {section.items.map((item, idx) => (
-        <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
+        <ItemCard key={idx} n={item.question_number} typeLabel="Viết đoạn / bài văn" onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
           <FormattedTextarea
             value={item.prompt}
             onChange={(v) => {
@@ -970,7 +977,7 @@ function SpeakingEditor({ section, all, onChange }: { section: Extract<ThptSecti
     <div className="space-y-4">
       <InlineGuide type="speaking" />
       {section.items.map((item, idx) => (
-        <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
+        <ItemCard key={idx} n={item.question_number} typeLabel="Nói (Speaking)" onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
           <FormattedTextarea
             value={item.prompt}
             onChange={(v) => {
@@ -1023,7 +1030,7 @@ function WordFormEditor({ section, all, onChange }: { section: Extract<ThptSecti
     <div className="space-y-4">
       <InlineGuide type="word_form" />
       {section.items.map((item, idx) => (
-        <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
+        <ItemCard key={idx} n={item.question_number} typeLabel="Chia dạng từ" onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
           <div className="space-y-2">
             <input
               type="text"
@@ -1075,7 +1082,7 @@ function ErrorIdEditor({ section, all, onChange }: { section: Extract<ThptSectio
     <div className="space-y-4">
       <InlineGuide type="error_identification" />
       {section.items.map((item, idx) => (
-        <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
+        <ItemCard key={idx} n={item.question_number} typeLabel="Tìm lỗi sai" onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
           <input
             type="text"
             value={item.sentence ?? ''}
@@ -1354,7 +1361,7 @@ function TfGroupEditor({ section, all, onChange }: { section: Extract<ThptSectio
     <div className="space-y-4">
       <InlineGuide type="tf_group" />
       {section.items.map((item, idx) => (
-        <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
+        <ItemCard key={idx} n={item.question_number} typeLabel="Đúng / Sai" onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <FormattedTextarea
               value={item.context}
@@ -1607,7 +1614,7 @@ function MatchingEditor({ section, all, onChange }: { section: Extract<ThptSecti
     <div className="space-y-4">
       <InlineGuide type="matching" />
       {section.items.map((item, idx) => (
-        <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
+        <ItemCard key={idx} n={item.question_number} typeLabel="Nối câu" onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="space-y-2">
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Cột trái (1-4) + đáp án</p>
@@ -1681,7 +1688,7 @@ function TransformationEditor({ section, all, onChange }: { section: Extract<Thp
     <div className="space-y-4">
       <InlineGuide type="sentence_transformation" />
       {section.items.map((item, idx) => (
-        <ItemCard key={idx} n={item.question_number} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
+        <ItemCard key={idx} n={item.question_number} typeLabel="Viết lại câu" onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
           <div className="space-y-2">
             <input
               type="text"
