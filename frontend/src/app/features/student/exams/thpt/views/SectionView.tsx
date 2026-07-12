@@ -266,10 +266,6 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
         </div>
       );
     }
-)}
-        </>
-      );
-    }
 
     case 'speaking': {
       const sec = section as any;
