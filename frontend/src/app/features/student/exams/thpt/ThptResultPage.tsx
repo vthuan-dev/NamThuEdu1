@@ -462,15 +462,21 @@ export function ThptResultPage() {
         {activeSection && (
           <section className="rounded-2xl bg-white overflow-hidden"
             style={{ border: '1.5px solid #E2E8F0', boxShadow: '0 1px 6px rgba(0,0,0,0.04)' }}>
-            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-2">
+            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between gap-3">
               {(() => { const m = getSectionMeta(activeSection.type ?? ''); const I = m.Icon; return (
-                <><div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: m.bg }}>
-                  <I className="w-3.5 h-3.5" style={{ color: m.color }} />
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.bg }}>
+                    <I className="w-3.5 h-3.5" style={{ color: m.color }} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: m.color }}>{m.label}</p>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: '#1F2937' }} className="truncate">{activeSection.title ?? 'Xem lại'}</p>
+                  </div>
                 </div>
-                <p style={{ fontSize: 13, fontWeight: 700, color: '#1F2937' }}>{activeSection.title ?? 'Xem lại'}</p></>
               ); })()}
+              <span className="text-[11px] font-semibold text-slate-400 shrink-0">Xem lại bài làm</span>
             </div>
-            <div className="p-4">
+            <div className="p-3 sm:p-4">
               <SectionView
                 key={activeSection.id}
                 section={activeSection}
@@ -482,6 +488,7 @@ export function ThptResultPage() {
                 speakingParts={result.speaking?.parts}
                 speakingAudio={speakingAudio}
                 writingParts={result.writing?.parts}
+                hideHeader
               />
             </div>
           </section>

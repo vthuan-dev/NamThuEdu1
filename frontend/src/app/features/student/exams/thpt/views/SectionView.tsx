@@ -43,9 +43,11 @@ interface Props {
   /** Kết quả AI chấm Viết theo câu (review): { q2: {score, feedback, ...}, ... } */
   writingParts?: Record<string, any>;
   correctQuestions?: Record<string, boolean>;
+  /** Ẩn header section (dùng khi trang ngoài đã có tiêu đề riêng) */
+  hideHeader?: boolean;
 }
 
-export function SectionView({ section, answers, correctAnswers, onAnswerChange, mode, submissionId, speakingParts, speakingAudio, writingParts, correctQuestions }: Props) {
+export function SectionView({ section, answers, correctAnswers, onAnswerChange, mode, submissionId, speakingParts, speakingAudio, writingParts, correctQuestions, hideHeader }: Props) {
   const typeLabel = TYPE_LABEL[section.type] ?? 'Phần thi';
   // Chia đôi trái–phải cho dạng có bài đọc DÀI tách biệt khỏi câu hỏi
   // (mc_cloze, reading_mixed). word_bank_cloze/open_cloze KHÔNG chia vì ô
@@ -55,7 +57,7 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
     (section.type === 'mc_cloze' || section.type === 'reading_mixed') &&
     !!passageText && passageText.trim().length > 0;
 
-  const headerEl = (
+  const headerEl = !hideHeader ? (
     // Ghim header khi cuộn để học viên luôn thấy dạng đề đang làm.
     // top-[68px] để nằm ngay dưới ThptTopBar (sticky top-0).
     <header className="sticky top-[68px] z-20 relative overflow-hidden rounded-2xl bg-white/95 backdrop-blur border border-slate-200 p-4 pl-6 shadow-sm">
@@ -68,7 +70,7 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
         <p className="text-sm text-slate-500 mt-1 leading-relaxed max-w-2xl line-clamp-2">{section.instructions}</p>
       )}
     </header>
-  );
+  ) : null;
 
   if (isSplitReading) {
     return (
@@ -1033,87 +1035,186 @@ function WritingResultCard({
   wordCount: number;
   result?: any;
 }) {
-  const pending = !result || typeof result.score !== 'number';
+  const graded = !!result && typeof result.score === 'number';
+  const score = graded ? Number(result.score) : 0;
+  const scoreColor = score >= 8 ? '#10B981' : score >= 6.5 ? '#0D9488' : score >= 5 ? '#F59E0B' : '#EF4444';
+  const scoreLabel = score >= 8 ? 'Xuất sắc' : score >= 6.5 ? 'Khá tốt' : score >= 5 ? 'Trung bình' : 'Cần luyện thêm';
+  const suggestions: string[] = Array.isArray(result?.suggestions) ? result.suggestions : [];
+  const criteria = result?.criteria_detail && typeof result.criteria_detail === 'object'
+    ? Object.entries(result.criteria_detail as Record<string, unknown>)
+    : [];
+  const gradedBy = result?.graded_by === 'teacher' ? 'Giáo viên' : result?.graded_by === 'ai' ? 'AI' : result?.graded_by;
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [showEssay, setShowEssay] = useState(true);
+
+  const criteriaLabel = (raw: string) => {
+    const key = raw.toLowerCase();
+    if (key.includes('task') || key.includes('content') || key.includes('idea')) return 'Nội dung';
+    if (key.includes('organ') || key.includes('coher') || key.includes('struct')) return 'Bố cục';
+    if (key.includes('vocab') || key.includes('lexical') || key.includes('range')) return 'Từ vựng';
+    if (key.includes('grammar') || key.includes('accur') || key.includes('lang')) return 'Ngữ pháp';
+    if (key.includes('mechan') || key.includes('spell') || key.includes('punct')) return 'Chính tả';
+    return raw.replace(/_/g, ' ');
+  };
+
   return (
-    <div className="rounded-2xl border border-emerald-100 bg-white overflow-hidden shadow-sm">
-      <div className="px-4 py-3 border-b border-emerald-50 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-black">
+    <article className="rounded-2xl bg-white border border-slate-200 overflow-hidden shadow-[0_1px_8px_rgba(15,23,42,0.04)]">
+      {/* Header */}
+      <div className="px-4 sm:px-5 py-3.5 border-b border-slate-100 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-600 text-white text-[13px] font-bold tabular-nums">
             {n}
           </span>
-          <p className="text-sm font-bold text-slate-800 truncate">Bài viết</p>
+          <div className="min-w-0">
+            <p className="text-[13px] font-semibold uppercase tracking-wider text-slate-400">Câu {n} · Viết</p>
+            <p className="text-xs text-slate-500 tabular-nums">{wordCount} từ · bài làm của bạn</p>
+          </div>
         </div>
-        {pending ? (
-          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-100 px-2.5 py-1 rounded-full">
-            <Loader2 className="w-3 h-3 animate-spin" /> AI đang chấm…
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1 text-xs font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
+        {graded ? (
+          <span
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black text-white shrink-0"
+            style={{ background: scoreColor }}
+          >
             <Sparkles className="w-3 h-3" />
-            {Number(result.score).toFixed(1)}/10
+            {score.toFixed(1)}/10
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-100 px-2.5 py-1 rounded-full shrink-0">
+            <Loader2 className="w-3 h-3 animate-spin" /> Đang chấm
           </span>
         )}
       </div>
 
-      <div className="p-4 space-y-3">
-        {prompt && (
-          <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5">
-            {prompt}
-          </div>
-        )}
-
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-            Bài làm của bạn · {wordCount} từ
-          </p>
-          <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed border border-slate-200 rounded-xl px-3.5 py-3 bg-white">
-            {essay || <span className="text-slate-400 italic">Không có bài viết.</span>}
-          </div>
-        </div>
-
-        {pending ? (
-          <div className="rounded-xl border border-amber-100 bg-amber-50/70 px-3.5 py-3 text-xs text-amber-900">
-            Hệ thống AI đang chấm bài viết. Điểm và nhận xét sẽ hiện tại đây khi xong — trang tự cập nhật.
-          </div>
+      <div className="p-4 sm:p-5 space-y-4">
+        {/* Score panel first — student cares most about this */}
+        {!graded ? (
+          essay.trim() ? (
+            <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <Loader2 className="w-4 h-4 animate-spin text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-amber-900">AI đang chấm bài viết</p>
+                <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+                  Điểm và nhận xét sẽ hiện ngay tại đây khi xong — trang tự cập nhật, không cần nộp lại.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <XCircle className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              <p className="text-sm font-medium text-slate-500">Bạn chưa viết bài cho câu này.</p>
+            </div>
+          )
         ) : (
-          <div className="space-y-2.5">
-            {result.feedback && (
-              <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-3.5 py-3">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 mb-1">Nhận xét AI</p>
-                <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{result.feedback}</p>
+          <div className="rounded-xl border border-slate-200 overflow-hidden">
+            <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-emerald-50/70 to-white border-b border-slate-100">
+              <div
+                className="w-16 h-16 rounded-2xl flex flex-col items-center justify-center flex-shrink-0 text-white shadow-sm"
+                style={{ background: scoreColor }}
+              >
+                <span className="text-xl font-extrabold leading-none tabular-nums">{score.toFixed(1)}</span>
+                <span className="text-[9px] font-bold opacity-85 mt-0.5">/ 10</span>
               </div>
-            )}
-            {Array.isArray(result.suggestions) && result.suggestions.length > 0 && (
-              <div className="rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-3">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Gợi ý cải thiện</p>
-                <ul className="space-y-1">
-                  {result.suggestions.map((s: string, i: number) => (
-                    <li key={i} className="text-sm text-slate-700 flex gap-2">
-                      <span className="text-emerald-600 font-bold">•</span>
-                      <span>{s}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {result.criteria_detail && typeof result.criteria_detail === 'object' && (
-              <div className="grid grid-cols-2 gap-2">
-                {Object.entries(result.criteria_detail).map(([k, v]) => (
-                  <div key={k} className="rounded-lg border border-slate-100 bg-white px-2.5 py-2">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">{k}</p>
-                    <p className="text-sm font-black text-slate-800 mt-0.5">{String(v)}</p>
+              <div className="flex-1 min-w-0">
+                <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-700 mb-1">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  {gradedBy === 'Giáo viên' ? 'Giáo viên chấm' : 'AI chấm điểm'}
+                </div>
+                <p className="text-sm font-bold text-slate-800">{scoreLabel}</p>
+                {criteria.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                    {criteria.slice(0, 4).map(([k, v]) => (
+                      <span
+                        key={k}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-white border border-slate-200 text-slate-600"
+                      >
+                        {criteriaLabel(k)}
+                        <b className="text-slate-800 tabular-nums">{String(v)}</b>
+                      </span>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-            )}
-            {result.graded_by && (
-              <p className="text-[10px] text-slate-400">
-                Chấm bởi: {result.graded_by === 'ai' ? 'AI' : result.graded_by === 'teacher' ? 'Giáo viên' : result.graded_by}
-              </p>
+            </div>
+
+            <div className="p-4 space-y-3.5">
+              {result?.feedback && (
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">Nhận xét</p>
+                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{result.feedback}</p>
+                </div>
+              )}
+
+              {suggestions.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Gợi ý cải thiện</p>
+                  <ul className="space-y-1.5">
+                    {suggestions.map((s, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                        <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                        <span className="leading-relaxed">{s}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {criteria.length > 4 && (
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  {criteria.map(([k, v]) => (
+                    <div key={k} className="rounded-lg border border-slate-100 bg-slate-50/80 px-2.5 py-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">
+                        {criteriaLabel(k)}
+                      </p>
+                      <p className="text-sm font-black text-slate-800 mt-0.5 tabular-nums">{String(v)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Prompt — collapsible to reduce noise */}
+        {prompt && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowPrompt((v) => !v)}
+              className="w-full px-3.5 py-2.5 flex items-center justify-between gap-2 text-left hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Đề bài</span>
+              <span className="text-xs font-semibold text-teal-700">{showPrompt ? 'Thu gọn' : 'Xem đề'}</span>
+            </button>
+            {showPrompt && (
+              <div className="px-3.5 pb-3 text-sm text-slate-700 whitespace-pre-wrap leading-relaxed border-t border-slate-100 pt-2.5">
+                {prompt}
+              </div>
             )}
           </div>
         )}
+
+        {/* Essay — collapsible, open by default */}
+        <div className="rounded-xl border border-slate-200 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowEssay((v) => !v)}
+            className="w-full px-3.5 py-2.5 flex items-center justify-between gap-2 text-left bg-white hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Bài làm · {wordCount} từ
+            </span>
+            <span className="text-xs font-semibold text-teal-700">{showEssay ? 'Thu gọn' : 'Xem bài'}</span>
+          </button>
+          {showEssay && (
+            <div className="px-3.5 pb-3.5 border-t border-slate-100 pt-2.5">
+              <div className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto pr-1">
+                {essay || <span className="text-slate-400 italic">Không có bài viết.</span>}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </article>
   );
 }
+
