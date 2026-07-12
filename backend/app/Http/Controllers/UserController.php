@@ -194,8 +194,11 @@ class UserController extends Controller
             ], 404);
         }
 
-        // Generate random password (8 characters: letters + numbers)
-        $newPassword = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 8);
+        // Default reset password is always "user123" (optional override allowed).
+        $newPassword = trim((string) $request->input('new_password', ''));
+        if ($newPassword === '') {
+            $newPassword = 'user123';
+        }
 
         try {
             $user->update([
@@ -3224,8 +3227,9 @@ class UserController extends Controller
             ], 404);
         }
 
+        // Optional custom password; empty/missing => default "user123"
         $validator = Validator::make($request->all(), [
-            'new_password' => 'required|string|min:6',
+            'new_password' => 'nullable|string|min:6',
         ]);
 
         if ($validator->fails()) {
@@ -3237,11 +3241,15 @@ class UserController extends Controller
         }
 
         try {
+            $plainPassword = trim((string) $request->input('new_password', ''));
+            if ($plainPassword === '') {
+                $plainPassword = 'user123';
+            }
+
             $student->update([
-                'uPassword' => Hash::make($request->new_password),
+                'uPassword' => Hash::make($plainPassword),
                 // SECURITY: do not persist the plaintext password. The new
-                // password is surfaced to the teacher in the response (and/or
-                // the teacher chose it themselves), never stored on disk.
+                // password is surfaced to the teacher in the response only.
             ]);
 
             return response()->json([
@@ -3251,6 +3259,8 @@ class UserController extends Controller
                     'student_id' => $student->uId,
                     'student_name' => $student->uName,
                     'student_phone' => $student->uPhone,
+                    // Returned once so teacher can hand credentials to student.
+                    'new_password' => $plainPassword,
                     'reset_by' => $user->uId,
                     'reset_at' => now()->toISOString(),
                 ]

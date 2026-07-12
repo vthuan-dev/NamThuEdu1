@@ -23,6 +23,7 @@ import {
   Check,
   AlertTriangle,
   X,
+  KeyRound,
 } from "lucide-react";
 import { useToast } from "../../../../hooks/useToast";
 import { useDebounce } from "../../../../hooks/useDebounce";
@@ -31,6 +32,7 @@ import { ToastContainer } from "../../../../components/ui";
 import { useNavigate } from "react-router";
 import { EditStudentModal } from "./EditStudentModal";
 import { ExamScheduleModal } from "./ExamScheduleModal";
+import { StudentCredentialsModal } from "./StudentCredentialsModal";
 import { getApiUrl, getAssetUrl } from "../../../../utils/apiConfig";
 import { formatVNDate } from "@/utils/dateUtils";
 
@@ -85,6 +87,13 @@ export function StudentManagement() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [scheduleStudent, setScheduleStudent] = useState<any>(null);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [credentialsStudent, setCredentialsStudent] = useState<{
+    id: number;
+    name: string;
+    phone: string;
+    password: string;
+  } | null>(null);
+  const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false);
 
   // Filter students by course (frontend only, since backend doesn't have course field)
   const filteredStudents = useMemo(() => {
@@ -530,6 +539,17 @@ export function StudentManagement() {
   const handleScheduleClick = (student: typeof students[0]) => {
     setScheduleStudent(student);
     setIsScheduleModalOpen(true);
+  };
+
+  // View / reset student credentials (password is only known after reset = user123)
+  const handleCredentialsClick = (student: typeof students[0]) => {
+    setCredentialsStudent({
+      id: student.id,
+      name: student.name,
+      phone: student.phone,
+      password: "", // hashed in DB; teacher can reset to user123 then view
+    });
+    setIsCredentialsModalOpen(true);
   };
 
   const handleSaveEdit = async (updatedStudent: any) => {
@@ -1142,6 +1162,13 @@ export function StudentManagement() {
                             <Edit className="w-4 h-4 text-[#6B7280]" />
                           </button>
                           <button 
+                            onClick={(e) => { e.stopPropagation(); handleCredentialsClick(student); }}
+                            className="p-2 hover:bg-[#FFF7ED] rounded-lg transition-colors"
+                            title="Xem / reset mật khẩu"
+                          >
+                            <KeyRound className="w-4 h-4 text-[#F59E0B]" />
+                          </button>
+                          <button 
                             onClick={(e) => { e.stopPropagation(); handleScheduleClick(student); }}
                             className="p-2 hover:bg-[#FFF7ED] rounded-lg transition-colors"
                             title="Lịch thi / nhắc nhở ôn luyện"
@@ -1362,6 +1389,25 @@ export function StudentManagement() {
         student={scheduleStudent}
         toast={toast}
       />
+
+      {/* Student credentials: view after reset + reset to user123 */}
+      {credentialsStudent && (
+        <StudentCredentialsModal
+          isOpen={isCredentialsModalOpen}
+          mode="reset"
+          onClose={() => {
+            setIsCredentialsModalOpen(false);
+            setCredentialsStudent(null);
+          }}
+          studentData={credentialsStudent}
+          onPasswordReset={(newPassword) => {
+            setCredentialsStudent((prev) =>
+              prev ? { ...prev, password: newPassword } : null
+            );
+            toast.success(`Đã reset mật khẩu về "user123" cho ${credentialsStudent.name}`);
+          }}
+        />
+      )}
 
       {/* Toast Container */}
       <ToastContainer toasts={toasts} onClose={removeToast} />
