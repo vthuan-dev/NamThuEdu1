@@ -36,22 +36,18 @@ import {
   getAdultExams,
 } from "../../../../services/examGroupsApi";
 import { AssignModal, type AssignExam } from "../assignments/AssignModal";
-import { formatVNDate } from "@/utils/dateUtils";
+import { formatVNDateTime, isRecentlyCreated } from "@/utils/dateUtils";
 
-/** Đề được tạo trong N ngày gần đây → hiện badge "Mới tạo". */
-function isRecentlyCreated(createdAt: string | null | undefined, withinDays = 2): boolean {
-  if (!createdAt) return false;
-  const raw = String(createdAt).trim();
-  if (!raw) return false;
-  // Backend thường trả "YYYY-MM-DD HH:mm:ss" (giờ VN)
-  const iso = raw.includes("T")
-    ? raw
-    : raw.replace(" ", "T") + (raw.includes("+") || raw.endsWith("Z") ? "" : "+07:00");
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return false;
-  const ms = withinDays * 24 * 60 * 60 * 1000;
-  // Cho phép lệch clock nhỏ về phía tương lai
-  return Date.now() - t <= ms && Date.now() - t >= -60_000;
+/** Ưu tiên thời điểm xuất bản thật (THPT versions) → updated → created. */
+function getExamPublishAt(exam: any): string | null {
+  const versions = exam?.thpt_versions;
+  if (Array.isArray(versions) && versions.length > 0) {
+    for (let i = versions.length - 1; i >= 0; i--) {
+      const at = versions[i]?.published_at;
+      if (at) return String(at);
+    }
+  }
+  return exam?.eUpdated_at || exam?.updated_at || exam?.eCreated_at || null;
 }
 
 interface KidsExam {
@@ -1029,6 +1025,15 @@ export function AllExams() {
                     {isSelected && (
                       <span className="absolute top-0 left-0 right-0 h-0.5 bg-gray-900" />
                     )}
+                    {/* Ribbon góc phải: đề mới tạo ≤ 2 ngày */}
+                    {isRecentlyCreated(exam.eCreated_at, 2) && (
+                      <span
+                        className="absolute top-3 -right-8 rotate-45 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[10px] font-extrabold uppercase tracking-wider px-10 py-0.5 shadow-md"
+                        title="Đề được tạo trong 2 ngày gần đây"
+                      >
+                        Mới
+                      </span>
+                    )}
                   </div>
 
                   {/* Card body */}
@@ -1069,11 +1074,11 @@ export function AllExams() {
                       <div className="flex items-center gap-1.5 flex-wrap justify-end">
                         {isRecentlyCreated(exam.eCreated_at, 2) && (
                           <span
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide bg-gradient-to-r from-rose-500 to-orange-500 text-white shadow-sm shadow-rose-200/60"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-gradient-to-r from-rose-500 to-orange-500 text-white shadow-md shadow-rose-300/50 ring-2 ring-rose-200/70 animate-pulse"
                             title="Đề được tạo trong 2 ngày gần đây"
                           >
                             <Sparkles className="w-3 h-3" />
-                            Mới tạo
+                            Mới
                           </span>
                         )}
                         {exam.eStatus === "draft" && (
@@ -1152,10 +1157,32 @@ export function AllExams() {
                           {exam.eDuration} phút
                         </span>
                       )}
-                      <span className="inline-flex items-center gap-1 ml-auto text-gray-400 text-[10px]">
-                        <Calendar className="w-3 h-3 text-gray-400" />
-                        {formatVNDate(exam.eCreated_at.replace(' ', 'T') + '+07:00')}
-                      </span>
+                      <div className="ml-auto flex flex-col items-end gap-0.5 text-[10px] leading-tight">
+                        <span
+                          className="inline-flex items-center gap-1 text-gray-500"
+                          title="Thời điểm tạo đề"
+                        >
+                          <Calendar className="w-3 h-3 text-gray-400" />
+                          <span className="text-gray-400">Tạo</span>
+                          <span className="font-semibold text-slate-600">
+                            {formatVNDateTime(exam.eCreated_at)}
+                          </span>
+                        </span>
+                        {(exam.eStatus === "published" ||
+                          exam.eStatus === "active" ||
+                          exam.eStatus === "pending") && (
+                          <span
+                            className="inline-flex items-center gap-1 text-emerald-700"
+                            title="Thời điểm xuất bản (theo lần tạo/cập nhật gần nhất có sẵn)"
+                          >
+                            <Clock className="w-3 h-3 text-emerald-500" />
+                            <span className="text-emerald-600/80">Xuất bản</span>
+                            <span className="font-semibold">
+                              {formatVNDateTime(getExamPublishAt(exam))}
+                            </span>
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
