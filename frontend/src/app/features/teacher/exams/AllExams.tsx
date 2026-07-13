@@ -1025,7 +1025,7 @@ export function AllExams() {
                     {/* Ribbon góc phải: đề mới tạo ≤ 2 ngày */}
                     {isRecentlyCreated(exam.eCreated_at, 2) && (
                       <span
-                        className="absolute top-3 -right-8 rotate-45 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[10px] font-extrabold uppercase tracking-wider px-10 py-0.5 shadow-md"
+                        className="absolute top-3 -right-8 rotate-45 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[10px] font-extrabold uppercase tracking-wider px-10 py-0.5 shadow-md animate-pulse"
                         title="Đề được tạo trong 2 ngày gần đây"
                       >
                         Mới
