@@ -167,18 +167,18 @@ const SECTION_GUIDE: Record<string, GuideContent> = {
       'Gốc: "He is too young to drive."\nĐầu câu: "He isn\'t…"\n→ He isn\'t old enough to drive.',
   },
   listening: {
-    short: 'Tải audio (+ ảnh đề nếu cần) + câu trắc nghiệm và/hoặc điền chỗ trống.',
+    short: 'Tải audio (+ ảnh đề nếu cần) + bảng đáp án trắc nghiệm / điền chỗ trống.',
     grading: 'auto',
     steps: [
       'Tải file audio (mp3 / m4a / wav…).',
-      'Tuỳ chọn: tải 1 ảnh đề nguyên khối (form/note) — HS thấy trái ảnh, phải câu (kiểu IELTS).',
-      'Thêm transcript nếu muốn (ẩn với học viên).',
-      'Mỗi câu: chọn dạng Trắc nghiệm hoặc Điền chỗ trống.',
-      'Trắc nghiệm: 4 phương án + chọn đáp án đúng.',
-      'Điền chỗ trống: prompt (có ____) + đáp án chấp nhận (cách bằng dấu phẩy).',
+      'Tuỳ chọn: tải 1 ảnh đề nguyên khối (form/note) — HS thấy trái ảnh, phải bảng đáp án (kiểu IELTS).',
+      'Có ảnh đề: KHÔNG gõ lại câu hỏi — chỉ thêm dòng đáp án (label = số câu trên ảnh, value = đáp án).',
+      'Không ảnh đề: mỗi câu nhập prompt + đáp án như bình thường.',
+      'Trắc nghiệm: chọn A/B/C/D đúng (text option có thể để trống nếu đã in trên ảnh).',
+      'Điền chỗ trống: nhập các đáp án chấp nhận, cách bằng dấu phẩy.',
     ],
     example:
-      '[Audio + Ảnh form] → What time is the meeting?\nA. 9AM   B. 10AM ✓\n\n[Audio] → The train leaves at ____.\n→ Đáp án: 8.30 / 8:30',
+      '[Ảnh form có câu 1–5] → bảng đáp án:\n1 → 8.30 / 8:30\n2 → B\n3 → library\n…',
   },
   speaking: {
     short: 'Đề nói — học viên ghi âm, AI chấm.',
@@ -898,8 +898,8 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
           <span className="text-[10px] font-semibold uppercase tracking-wide text-sky-600">Tuỳ chọn · IELTS-style</span>
         </div>
         <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
-          Upload 1 ảnh chứa/note cho cả phần. Học viên sẽ thấy ảnh bên trái, câu hỏi/đáp án bên phải.
-          Không upload thì vẫn dùng layout câu hỏi dọc như cũ.
+          Upload 1 ảnh chứa/note cho cả phần. Học viên: trái = ảnh đề, phải = bảng đáp án (label → value).
+          Có ảnh đề thì không gõ lại câu hỏi — chỉ khai báo đáp án. Không upload thì layout câu hỏi dọc như cũ.
           <br />
           <span className="text-sky-600 font-medium">Mẹo: bấm vào khung rồi dán ảnh (Ctrl + V), hoặc kéo-thả file ảnh vào đây.</span>
         </p>
@@ -958,105 +958,243 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
         )}
       </div>
 
-      {section.items.map((item: any, idx) => {
-        const kind: 'mc' | 'fill_blank' = item.kind === 'fill_blank' ? 'fill_blank' : 'mc';
-        return (
-          <ItemCard key={idx} n={item.question_number} typeLabel={kind === 'fill_blank' ? 'Nghe điền chỗ trống' : 'Nghe trắc nghiệm'} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs font-bold text-slate-500">Dạng:</span>
-              <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-slate-100">
-                {([
-                  { k: 'mc' as const, l: 'Trắc nghiệm' },
-                  { k: 'fill_blank' as const, l: 'Điền chỗ trống' },
-                ]).map(({ k, l }) => (
+      {isImageBlock ? (
+        /* ── Image-block: câu hỏi đã trên ảnh → chỉ khai báo đáp án ── */
+        <div className="rounded-xl bg-white border border-slate-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100 bg-sky-50/50">
+            <p className="text-xs font-bold text-sky-800">Bảng đáp án · label → value</p>
+            <p className="text-[11px] text-sky-700/80 mt-0.5 leading-relaxed">
+              Câu hỏi đã nằm trên ảnh — không gõ lại câu hỏi. Mỗi dòng = 1 câu: label (số câu trên ảnh) → value (đáp án đúng).
+            </p>
+          </div>
+
+          <div className="divide-y divide-slate-100">
+            {section.items.map((item: any, idx) => {
+              const kind: 'mc' | 'fill_blank' = item.kind === 'fill_blank' ? 'fill_blank' : 'mc';
+              return (
+                <div key={idx} className="px-4 py-3 flex flex-col sm:flex-row sm:items-start gap-3">
+                  {/* Label = số câu trên ảnh */}
+                  <div className="flex items-center gap-2 sm:w-28 flex-shrink-0">
+                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-sky-600 text-white text-sm font-bold tabular-nums">
+                      {item.question_number}
+                    </span>
+                    <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-slate-100">
+                      {([
+                        { k: 'fill_blank' as const, l: 'Điền' },
+                        { k: 'mc' as const, l: 'MCQ' },
+                      ]).map(({ k, l }) => (
+                        <button
+                          key={k}
+                          type="button"
+                          onClick={() => setKind(idx, k)}
+                          className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all cursor-pointer ${
+                            kind === k ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                          }`}
+                        >
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Value = đáp án */}
+                  <div className="flex-1 min-w-0 space-y-2">
+                    {kind === 'fill_blank' ? (
+                      <>
+                        <label className="block text-[11px] font-bold text-slate-500">
+                          Đáp án chấp nhận <span className="font-normal text-slate-400">(cách bằng dấu phẩy)</span>
+                        </label>
+                        <AcceptedAnswersInput
+                          value={Array.isArray(item.accepted_answers) ? item.accepted_answers : []}
+                          onChange={(v) => {
+                            const items = [...section.items];
+                            items[idx] = { ...item, kind: 'fill_blank', prompt: item.prompt || '', accepted_answers: v };
+                            update(items);
+                          }}
+                          placeholder="vd: 8.30, 8:30, half past eight"
+                        />
+                        <label className="inline-flex items-center gap-2 text-[11px] text-slate-600 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={!!item.case_sensitive}
+                            onChange={(e) => {
+                              const items = [...section.items];
+                              items[idx] = { ...item, kind: 'fill_blank', case_sensitive: e.target.checked };
+                              update(items);
+                            }}
+                          />
+                          Phân biệt hoa/thường
+                        </label>
+                      </>
+                    ) : (
+                      <>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1">
+                          Chọn đáp án đúng (nội dung A–D có thể để trống nếu đã in trên ảnh)
+                        </label>
+                        <div className="space-y-1.5">
+                          {(item.options ?? []).map((opt: any, oi: number) => (
+                            <OptionRow
+                              key={opt.id}
+                              letter={opt.id}
+                              text={opt.text}
+                              isCorrect={item.correct_id === opt.id}
+                              onPick={() => {
+                                const items = [...section.items];
+                                items[idx] = { ...item, kind: 'mc', prompt: item.prompt || '', correct_id: opt.id };
+                                update(items);
+                              }}
+                              onTextChange={(v) => {
+                                const items = [...section.items];
+                                const options = [...(item.options ?? [])];
+                                options[oi] = { ...opt, text: v };
+                                items[idx] = { ...item, kind: 'mc', options };
+                                update(items);
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
                   <button
-                    key={k}
                     type="button"
-                    onClick={() => setKind(idx, k)}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
-                      kind === k ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
-                    }`}
+                    onClick={() => update(section.items.filter((_, i) => i !== idx))}
+                    className="self-start sm:self-center p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
+                    title="Xoá câu"
                   >
-                    {l}
+                    <Trash2 className="w-4 h-4" />
                   </button>
-                ))}
-              </div>
-            </div>
+                </div>
+              );
+            })}
+          </div>
 
-            <FormattedTextarea
-              value={item.prompt ?? ''}
-              onChange={(v) => {
-                const items = [...section.items];
-                items[idx] = { ...item, prompt: v };
-                update(items);
-              }}
-              rows={2}
-              placeholder={
-                isImageBlock
-                  ? (kind === 'fill_blank'
-                    ? 'Câu hỏi ngắn (ảnh đề đã hiện bên trái) — dùng ____ nếu cần'
-                    : 'Câu hỏi ngắn (ảnh đề đã hiện bên trái HS)')
-                  : (kind === 'fill_blank' ? 'Câu hỏi / prompt (dùng ____ cho chỗ trống)' : 'Nội dung câu hỏi nghe')
+          {section.items.length === 0 && (
+            <p className="px-4 py-6 text-center text-sm text-slate-400">
+              Chưa có câu nào — thêm số câu khớp với ảnh đề.
+            </p>
+          )}
+
+          <div className="px-4 py-3 border-t border-slate-100 flex flex-wrap gap-2 bg-slate-50/50">
+            <AddButton
+              label="Thêm điền chỗ trống"
+              onClick={() =>
+                update([
+                  ...section.items,
+                  { ...makeListeningFillItem(nextQuestionNumber(all)), prompt: '' },
+                ])
               }
-              className="mb-3"
             />
+            <AddButton
+              label="Thêm trắc nghiệm"
+              onClick={() =>
+                update([
+                  ...section.items,
+                  { ...makeListeningMcItem(nextQuestionNumber(all)), prompt: '' },
+                ])
+              }
+            />
+          </div>
+        </div>
+      ) : (
+        /* ── Layout mặc định: full card + prompt ── */
+        <>
+          {section.items.map((item: any, idx) => {
+            const kind: 'mc' | 'fill_blank' = item.kind === 'fill_blank' ? 'fill_blank' : 'mc';
+            return (
+              <ItemCard key={idx} n={item.question_number} typeLabel={kind === 'fill_blank' ? 'Nghe điền chỗ trống' : 'Nghe trắc nghiệm'} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xs font-bold text-slate-500">Dạng:</span>
+                  <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-slate-100">
+                    {([
+                      { k: 'mc' as const, l: 'Trắc nghiệm' },
+                      { k: 'fill_blank' as const, l: 'Điền chỗ trống' },
+                    ]).map(({ k, l }) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => setKind(idx, k)}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                          kind === k ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                        }`}
+                      >
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-            {kind === 'fill_blank' ? (
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-500">Đáp án chấp nhận (cách bằng dấu phẩy)</label>
-                <AcceptedAnswersInput
-                  value={Array.isArray(item.accepted_answers) ? item.accepted_answers : []}
+                <FormattedTextarea
+                  value={item.prompt ?? ''}
                   onChange={(v) => {
                     const items = [...section.items];
-                    items[idx] = { ...item, kind: 'fill_blank', accepted_answers: v };
+                    items[idx] = { ...item, prompt: v };
                     update(items);
                   }}
-                  placeholder="8.30, 8:30, half past eight"
+                  rows={2}
+                  placeholder={kind === 'fill_blank' ? 'Câu hỏi / prompt (dùng ____ cho chỗ trống)' : 'Nội dung câu hỏi nghe'}
+                  className="mb-3"
                 />
-                <label className="inline-flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={!!item.case_sensitive}
-                    onChange={(e) => {
-                      const items = [...section.items];
-                      items[idx] = { ...item, kind: 'fill_blank', case_sensitive: e.target.checked };
-                      update(items);
-                    }}
-                  />
-                  Phân biệt hoa/thường
-                </label>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {(item.options ?? []).map((opt: any, oi: number) => (
-                  <OptionRow
-                    key={opt.id}
-                    letter={opt.id}
-                    text={opt.text}
-                    isCorrect={item.correct_id === opt.id}
-                    onPick={() => {
-                      const items = [...section.items];
-                      items[idx] = { ...item, kind: 'mc', correct_id: opt.id };
-                      update(items);
-                    }}
-                    onTextChange={(v) => {
-                      const items = [...section.items];
-                      const options = [...(item.options ?? [])];
-                      options[oi] = { ...opt, text: v };
-                      items[idx] = { ...item, kind: 'mc', options };
-                      update(items);
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-          </ItemCard>
-        );
-      })}
-      <div className="flex flex-wrap gap-2">
-        <AddButton label="Thêm trắc nghiệm" onClick={() => update([...section.items, makeListeningMcItem(nextQuestionNumber(all))])} />
-        <AddButton label="Thêm điền chỗ trống" onClick={() => update([...section.items, makeListeningFillItem(nextQuestionNumber(all))])} />
-      </div>
+
+                {kind === 'fill_blank' ? (
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-slate-500">Đáp án chấp nhận (cách bằng dấu phẩy)</label>
+                    <AcceptedAnswersInput
+                      value={Array.isArray(item.accepted_answers) ? item.accepted_answers : []}
+                      onChange={(v) => {
+                        const items = [...section.items];
+                        items[idx] = { ...item, kind: 'fill_blank', accepted_answers: v };
+                        update(items);
+                      }}
+                      placeholder="8.30, 8:30, half past eight"
+                    />
+                    <label className="inline-flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!item.case_sensitive}
+                        onChange={(e) => {
+                          const items = [...section.items];
+                          items[idx] = { ...item, kind: 'fill_blank', case_sensitive: e.target.checked };
+                          update(items);
+                        }}
+                      />
+                      Phân biệt hoa/thường
+                    </label>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {(item.options ?? []).map((opt: any, oi: number) => (
+                      <OptionRow
+                        key={opt.id}
+                        letter={opt.id}
+                        text={opt.text}
+                        isCorrect={item.correct_id === opt.id}
+                        onPick={() => {
+                          const items = [...section.items];
+                          items[idx] = { ...item, kind: 'mc', correct_id: opt.id };
+                          update(items);
+                        }}
+                        onTextChange={(v) => {
+                          const items = [...section.items];
+                          const options = [...(item.options ?? [])];
+                          options[oi] = { ...opt, text: v };
+                          items[idx] = { ...item, kind: 'mc', options };
+                          update(items);
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </ItemCard>
+            );
+          })}
+          <div className="flex flex-wrap gap-2">
+            <AddButton label="Thêm trắc nghiệm" onClick={() => update([...section.items, makeListeningMcItem(nextQuestionNumber(all))])} />
+            <AddButton label="Thêm điền chỗ trống" onClick={() => update([...section.items, makeListeningFillItem(nextQuestionNumber(all))])} />
+          </div>
+        </>
+      )}
     </div>
   );
 }

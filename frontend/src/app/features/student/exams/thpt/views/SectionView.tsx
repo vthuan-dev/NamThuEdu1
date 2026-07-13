@@ -276,6 +276,118 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
     case 'listening': {
       const hideAudio = !!hidePassage; // image-block parent đã render audio sticky
       const isReviewMode = mode === 'review';
+      const isAnswerSheet = !!hidePassage; // image_block: câu hỏi nằm trên ảnh
+
+      // ── Image-block: bảng đáp án label → value (câu hỏi đã nằm trên ảnh) ──
+      if (isAnswerSheet) {
+        return (
+          <div className="space-y-3">
+            <div className="rounded-xl border border-teal-200 bg-teal-50/70 px-3.5 py-2.5 text-xs text-teal-900 leading-relaxed">
+              <b>Hướng dẫn:</b> Câu hỏi nằm trên <b>ảnh đề</b> bên trái. Chỉ điền / chọn đáp án theo đúng <b>số câu</b> trên ảnh (label → value).
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+              <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Bảng đáp án
+                </span>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  {(section.items as any[]).length} câu
+                </span>
+              </div>
+              {/* Header row: Label | Value */}
+              <div className="hidden sm:grid grid-cols-[3.5rem_1fr] gap-3 px-4 py-2 border-b border-slate-100 bg-white">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Câu</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Đáp án</span>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {(section.items as any[]).map((item) => {
+                  const key = `q${item.question_number}`;
+                  const kind = item.kind === 'fill_blank' ? 'fill_blank' : 'mc';
+                  // Prompt chỉ hiện nếu GV cố tình nhập (thường để trống khi đã có ảnh)
+                  const prompt = String(item.prompt || '').trim();
+
+                  if (kind === 'fill_blank') {
+                    return (
+                      <div key={key} className="px-4 py-2.5 grid grid-cols-[3.5rem_1fr] gap-3 items-center">
+                        <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-teal-600 text-white text-sm font-bold tabular-nums">
+                          {item.question_number}
+                        </span>
+                        <div className="min-w-0 space-y-1">
+                          {prompt ? (
+                            <p className="text-xs text-slate-500 leading-snug">{prompt}</p>
+                          ) : null}
+                          <TextAnswer
+                            value={String(answers[key] ?? '')}
+                            onChange={(v) => onAnswerChange?.(key, v)}
+                            isReview={isReviewMode}
+                            correct={correctAnswers ? String(correctAnswers[key] ?? '') : undefined}
+                            isCorrectMap={correctQuestions?.[key]}
+                          />
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  const options = item.options ?? [];
+                  const userVal = String(answers[key] ?? '');
+                  const correctVal = String(correctAnswers?.[key] ?? '');
+                  // Option text trống (đã in trên ảnh) → chỉ hiện A/B/C/D
+                  const labelsOnly = options.length === 0 || options.every((o: any) => !String(o.text || '').trim());
+                  const opts = options.length > 0 ? options : [{ id: 'A' }, { id: 'B' }, { id: 'C' }, { id: 'D' }];
+
+                  return (
+                    <div key={key} className="px-4 py-2.5 grid grid-cols-[3.5rem_1fr] gap-3 items-center">
+                      <span className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-teal-600 text-white text-sm font-bold tabular-nums">
+                        {item.question_number}
+                      </span>
+                      <div className="min-w-0 space-y-1.5">
+                        {prompt ? (
+                          <p className="text-xs text-slate-500 leading-snug">{prompt}</p>
+                        ) : null}
+                        {labelsOnly ? (
+                          <div className="flex flex-wrap gap-2">
+                            {opts.map((opt: any) => (
+                              <ChoiceButton
+                                key={opt.id}
+                                letter={opt.id}
+                                label=""
+                                letterOnly
+                                picked={userVal === opt.id}
+                                correct={isReviewMode && correctVal === opt.id}
+                                wrong={isReviewMode && userVal === opt.id && correctVal !== opt.id}
+                                onClick={() => onAnswerChange?.(key, opt.id)}
+                                disabled={isReviewMode}
+                              />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {options.map((opt: any) => (
+                              <ChoiceButton
+                                key={opt.id}
+                                letter={opt.id}
+                                label={opt.text}
+                                picked={userVal === opt.id}
+                                correct={isReviewMode && correctVal === opt.id}
+                                wrong={isReviewMode && userVal === opt.id && correctVal !== opt.id}
+                                onClick={() => onAnswerChange?.(key, opt.id)}
+                                disabled={isReviewMode}
+                                block
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // ── Layout mặc định: full card + prompt ──
       return (
         <div className="space-y-4">
           {!hideAudio && section.audio_url && (
@@ -861,6 +973,7 @@ function ChoiceButton({
   disabled,
   onClick,
   block,
+  letterOnly,
 }: {
   letter: string;
   label: ReactNode;
@@ -871,6 +984,8 @@ function ChoiceButton({
   disabled?: boolean;
   onClick: () => void;
   block?: boolean;
+  /** Chỉ hiện chữ cái A/B/C/D — dùng khi nội dung đã in trên ảnh đề */
+  letterOnly?: boolean;
 }) {
   const border = correct
     ? 'border-emerald-400 bg-emerald-50'
@@ -886,6 +1001,30 @@ function ChoiceButton({
     : picked
     ? 'bg-teal-600 text-white'
     : 'bg-slate-100 text-slate-500';
+
+  // Chế độ chỉ chữ cái (label/value sheet khi câu hỏi đã nằm trên ảnh)
+  if (letterOnly) {
+    const letterCls = correct
+      ? 'border-emerald-400 bg-emerald-500 text-white'
+      : wrong
+      ? 'border-red-400 bg-red-500 text-white'
+      : picked
+      ? 'border-teal-500 bg-teal-600 text-white'
+      : 'border-slate-200 bg-white text-slate-700 hover:border-teal-300 hover:bg-teal-50';
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={`Chọn ${letter}`}
+        className={`inline-flex items-center justify-center w-10 h-10 rounded-xl border text-sm font-bold transition-all duration-150 cursor-pointer active:scale-[0.97] disabled:cursor-default disabled:active:scale-100 ${letterCls}`}
+      >
+        {letter}
+      </button>
+    );
+  }
+
+  const hasLabel = !(label === '' || label == null);
   return (
     <button
       type="button"
@@ -896,10 +1035,12 @@ function ChoiceButton({
       <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 transition-colors ${badge}`}>
         {letter}
       </span>
-      <span className="flex-1 min-w-0">
-        <span className="text-sm text-slate-800">{label || <span className="text-slate-300">…</span>}</span>
-        {sub && <span className="block text-[11px] text-slate-500">[{sub}]</span>}
-      </span>
+      {hasLabel && (
+        <span className="flex-1 min-w-0">
+          <span className="text-sm text-slate-800">{label}</span>
+          {sub && <span className="block text-[11px] text-slate-500">[{sub}]</span>}
+        </span>
+      )}
       {correct && <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />}
       {wrong && <XCircle className="w-4 h-4 text-red-600 flex-shrink-0" />}
     </button>
