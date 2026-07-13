@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { CheckCircle2, XCircle, Headphones, Mic, Sparkles, Loader2 } from 'lucide-react';
+import { CheckCircle2, XCircle, Headphones, Mic, Sparkles, Loader2, FileText, PenLine } from 'lucide-react';
 import type { ThptAnswers, ThptSection, ViewMode } from '../types';
 import { ThptSpeakingRecorder } from '../components/ThptSpeakingRecorder';
 import { splitPhoneticWord, formatErrorSentence } from '../../../../../../utils/examUtils';
@@ -386,6 +386,8 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             const minW = item.min_words as number | undefined;
             const maxW = item.max_words as number | undefined;
             const ai = writingParts?.[key];
+            const underMin = typeof minW === 'number' && words > 0 && words < minW;
+            const overMax = typeof maxW === 'number' && words > maxW;
 
             if (isReview) {
               return (
@@ -401,29 +403,45 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             }
 
             return (
-              <QCard key={key} n={item.question_number}>
-                {item.prompt && (
-                  <div className="text-sm text-slate-800 mb-3 whitespace-pre-wrap leading-relaxed">
-                    {item.prompt}
+              <QCard key={key} n={item.question_number} label="Viết">
+                {item.prompt && <PromptBox text={item.prompt} />}
+
+                <div className="mt-4 rounded-xl border border-slate-200 bg-white overflow-hidden">
+                  <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 border-b border-slate-100 bg-slate-50/80">
+                    <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      <PenLine className="w-3.5 h-3.5 text-teal-600" />
+                      Bài làm của bạn
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px]">
+                      {(minW || maxW) && (
+                        <span className="text-slate-400 font-medium">
+                          {minW ? `≥ ${minW}` : ''}
+                          {minW && maxW ? ' · ' : ''}
+                          {maxW ? `≤ ${maxW}` : ''} từ
+                        </span>
+                      )}
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-md font-bold tabular-nums ${
+                          underMin || overMax
+                            ? 'bg-amber-100 text-amber-800'
+                            : words > 0
+                            ? 'bg-teal-100 text-teal-800'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        {words} từ
+                      </span>
+                    </div>
                   </div>
-                )}
-                {(minW || maxW) && (
-                  <p className="text-xs text-slate-500 mb-2">
-                    Gợi ý số từ:{' '}
-                    {minW ? `tối thiểu ${minW}` : ''}
-                    {minW && maxW ? ' · ' : ''}
-                    {maxW ? `tối đa ${maxW}` : ''}
-                    <span className="ml-2 font-semibold text-slate-700">({words} từ)</span>
-                  </p>
-                )}
-                <textarea
-                  value={val}
-                  onChange={(e) => onAnswerChange?.(key, e.target.value)}
-                  disabled={mode === 'review'}
-                  rows={10}
-                  placeholder="Viết bài của bạn tại đây…"
-                  className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-3 focus:outline-none focus:ring-2 focus:ring-blue-200 resize-y disabled:bg-slate-50 disabled:text-slate-600"
-                />
+                  <textarea
+                    value={val}
+                    onChange={(e) => onAnswerChange?.(key, e.target.value)}
+                    disabled={mode === 'review'}
+                    rows={12}
+                    placeholder="Viết bài của bạn tại đây…"
+                    className="w-full text-sm text-slate-800 border-0 px-3.5 py-3.5 focus:outline-none focus:ring-0 resize-y min-h-[220px] disabled:bg-slate-50 disabled:text-slate-600 leading-relaxed"
+                  />
+                </div>
               </QCard>
             );
           })}
@@ -801,17 +819,35 @@ function SpeakingResultCard({ n, prompt, result, audioUrl }: { n: number; prompt
   );
 }
 
-function QCard({ n, children }: { n: number; children: React.ReactNode }) {
+function QCard({ n, children, label }: { n: number; children: React.ReactNode; label?: string }) {
   return (
     <article className="rounded-2xl bg-white border border-slate-200 p-5 transition-colors hover:border-slate-300">
       <div className="flex items-center gap-2.5 mb-3.5">
         <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-teal-600 text-white text-[13px] font-bold tabular-nums">
           {n}
         </span>
-        <h3 className="text-[13px] font-semibold uppercase tracking-wider text-slate-400">Câu {n}</h3>
+        <h3 className="text-[13px] font-semibold uppercase tracking-wider text-slate-400">
+          Câu {n}{label ? ` · ${label}` : ''}
+        </h3>
       </div>
       {children}
     </article>
+  );
+}
+
+/** Khung đề bài — tách rõ nội dung câu hỏi / yêu cầu khỏi vùng trả lời. */
+function PromptBox({ text, title = 'Đề bài' }: { text: string; title?: string }) {
+  return (
+    <div className="relative rounded-xl border border-teal-200/80 bg-gradient-to-br from-teal-50/90 via-white to-slate-50 px-4 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+      <span className="absolute left-0 top-3 bottom-3 w-1 rounded-r-full bg-teal-500" />
+      <div className="flex items-center gap-1.5 mb-2 pl-1">
+        <FileText className="w-3.5 h-3.5 text-teal-600" />
+        <p className="text-[11px] font-bold uppercase tracking-wider text-teal-700">{title}</p>
+      </div>
+      <div className="pl-1 text-[15px] text-slate-800 whitespace-pre-wrap leading-relaxed font-medium">
+        {text}
+      </div>
+    </div>
   );
 }
 
