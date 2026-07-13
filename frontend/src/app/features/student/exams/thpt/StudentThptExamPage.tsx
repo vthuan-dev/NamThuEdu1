@@ -17,6 +17,7 @@ import { ThptTopBar } from './components/ThptTopBar';
 import { ThptPartNavigator } from './components/ThptPartNavigator';
 import { ThptBottomNav } from './components/ThptBottomNav';
 import { SectionView } from './views/SectionView';
+import { parseVNDate } from '../../../../../utils/dateUtils';
 
 const AUTOSAVE_INTERVAL_MS = 30_000;
 
@@ -27,10 +28,64 @@ function thptDeadlineKey(examId?: string, submissionId?: number | null) {
 function readThptDeadline(key: string): number | null {
   try {
     const value = Number(localStorage.getItem(key));
-    return Number.isFinite(value) && value > Date.now() ? value : null;
+    return Number.isFinite(value) && value > 0 ? value : null;
   } catch {
     return null;
   }
+}
+
+/**
+ * Neo deadline tuyệt đối theo sStart_time server (UTC-safe).
+ * Không dùng new Date(naive) vì browser parse local → timer nhảy full lại.
+ */
+function resolveThptDeadline(opts: {
+  examId?: string;
+  submissionId?: number | null;
+  sStartTime?: string | null;
+  durationMin: number;
+  serverRemainingSec?: number | null;
+  serverDeadlineAt?: string | null;
+}): number {
+  const { examId, submissionId, sStartTime, durationMin, serverRemainingSec, serverDeadlineAt } = opts;
+  const now = Date.now();
+  const durationMs = Math.max(1, durationMin) * 60_000;
+  const key = thptDeadlineKey(examId, submissionId);
+
+  // 1) Ưu tiên deadline_at ISO từ server
+  const fromDeadlineAt = parseVNDate(serverDeadlineAt)?.getTime();
+  // 2) sStart_time + duration (UTC-safe)
+  const startedMs = parseVNDate(sStartTime)?.getTime();
+  const fromStart = startedMs != null ? startedMs + durationMs : null;
+  // 3) remaining giây server (wall-clock từ lúc nhận response)
+  const fromRemaining =
+    serverRemainingSec != null && Number.isFinite(serverRemainingSec)
+      ? now + Math.max(0, Number(serverRemainingSec)) * 1000
+      : null;
+
+  // Chọn mốc sớm nhất trong các mốc server hợp lệ → không bao giờ "cộng thêm giờ"
+  const serverCandidates = [fromDeadlineAt, fromStart, fromRemaining].filter(
+    (v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0,
+  );
+  let deadline = serverCandidates.length > 0 ? Math.min(...serverCandidates) : now + durationMs;
+
+  // localStorage chỉ được dùng nếu KHÔNG trễ hơn server (tránh reset full)
+  // và không sớm hơn quá 2 phút so với server (tránh clock lệch quá đà)
+  const stored = readThptDeadline(key);
+  if (stored != null && serverCandidates.length > 0) {
+    const serverBest = Math.min(...serverCandidates);
+    if (stored <= serverBest + 2000) {
+      deadline = Math.min(deadline, stored);
+    }
+  } else if (stored != null && serverCandidates.length === 0) {
+    deadline = stored;
+  }
+
+  try {
+    localStorage.setItem(key, String(deadline));
+  } catch {
+    /* ignore */
+  }
+  return deadline;
 }
 
 export function StudentThptExamPage() {
@@ -91,12 +146,25 @@ export function StudentThptExamPage() {
         if (!mounted || !startData) return;
 
         const sid = startData.submission_id;
-        const startedAt = startData.sStart_time ? new Date(startData.sStart_time).getTime() : Date.now();
-        setStartedAtServer(new Date(startedAt).toISOString());
+        const durationFromServer = Number(startData.duration_minutes);
+        const effectiveDurationMin =
+          Number.isFinite(durationFromServer) && durationFromServer > 0
+            ? durationFromServer
+            : durationMin;
+        setTotalDurationSec(effectiveDurationMin * 60);
+
+        const startedParsed = parseVNDate(startData.sStart_time);
+        setStartedAtServer((startedParsed ?? new Date()).toISOString());
         setSubmissionId(sid);
-        const key = thptDeadlineKey(examId, sid);
-        const deadline = readThptDeadline(key) ?? startedAt + durationMin * 60_000;
-        localStorage.setItem(key, String(deadline));
+
+        const deadline = resolveThptDeadline({
+          examId,
+          submissionId: sid,
+          sStartTime: startData.sStart_time,
+          durationMin: effectiveDurationMin,
+          serverRemainingSec: startData.time_remaining_seconds,
+          serverDeadlineAt: startData.deadline_at,
+        });
         setRemainingSec(Math.max(0, Math.floor((deadline - Date.now()) / 1000)));
         const restored = startData.submission_payload?.answers || {};
         Object.entries(restored).forEach(([k, v]) => session.setAnswer(k, v));
@@ -188,20 +256,32 @@ export function StudentThptExamPage() {
   }, [submissionId, examId, isSubmitting, session.answers, navigate, toast]);
 
   // Manual countdown (THPT-specific; session.timeRemaining not used here)
+  // Deadline neo absolute trong localStorage — không reset khi re-render / đổi phần.
   useEffect(() => {
     if (loading || !config || !submissionId) return;
     const key = thptDeadlineKey(examId, submissionId);
-    const t = window.setInterval(() => {
+    const tick = () => {
       const deadline = Number(localStorage.getItem(key));
       const next = Number.isFinite(deadline) ? Math.max(0, Math.floor((deadline - Date.now()) / 1000)) : 0;
       setRemainingSec(next);
+      return next;
+    };
+    // Sync ngay 1 nhịp (tránh đứng yên 1s sau load)
+    const first = tick();
+    if (first <= 0) {
+      handleSubmit(true).catch(() => {});
+      return;
+    }
+    const t = window.setInterval(() => {
+      const next = tick();
       if (next <= 0) {
         window.clearInterval(t);
         handleSubmit(true).catch(() => {});
       }
     }, 1000);
     return () => window.clearInterval(t);
-  }, [loading, config, submissionId, examId, handleSubmit]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ neo theo submission; handleSubmit luôn đọc state mới nhất qua closure submit
+  }, [loading, config, submissionId, examId]);
 
   // Manual server auto-save every 30s via THPT-specific endpoint
   const saveDraft = useCallback(async () => {

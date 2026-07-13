@@ -466,9 +466,10 @@ class ThptExamController extends Controller
                 ?? $exam->eDuration_minutes
                 ?? 60);
 
-            $startedAt = $existing->sStart_time;
-            $timeElapsed = now()->diffInMinutes($startedAt);
-            $timeRemaining = $durationMin - $timeElapsed;
+            $startedAt = $existing->sStart_time ? \Carbon\Carbon::parse($existing->sStart_time) : now();
+            // Dùng giây để không mất thời gian do floor phút (diffInMinutes)
+            $timeElapsedSec = max(0, $startedAt->diffInSeconds(now()));
+            $timeRemaining = ($durationMin * 60 - $timeElapsedSec) / 60;
 
             if ($timeRemaining <= 0) {
                 // Tự động nộp bài khi hết giờ
@@ -512,6 +513,7 @@ class ThptExamController extends Controller
             }
 
             $existingPayload = $existing->submission_payload ?? [];
+            $remainingSec = max(0, (int) round($timeRemaining * 60));
             return response()->json([
                 'status' => 'success',
                 'data' => [
@@ -521,6 +523,9 @@ class ThptExamController extends Controller
                     'resumed' => true,
                     // Trả snapshot config để student tiếp tục với đúng version đã start
                     'exam_snapshot' => $existingPayload['exam_snapshot'] ?? null,
+                    'duration_minutes' => $durationMin,
+                    'time_remaining_seconds' => $remainingSec,
+                    'deadline_at' => $startedAt->copy()->addMinutes($durationMin)->toIso8601String(),
                 ],
             ]);
         }
@@ -558,6 +563,7 @@ class ThptExamController extends Controller
             ],
         ]);
 
+        $durationMinNew = (int) ($exam->eDuration_minutes ?? self::DEFAULT_DURATION_MINUTES);
         return response()->json([
             'status' => 'success',
             'data' => [
@@ -565,6 +571,9 @@ class ThptExamController extends Controller
                 'sStart_time' => $submission->sStart_time,
                 'submission_payload' => $submission->submission_payload,
                 'resumed' => false,
+                'duration_minutes' => $durationMinNew,
+                'time_remaining_seconds' => $durationMinNew * 60,
+                'deadline_at' => \Carbon\Carbon::parse($submission->sStart_time)->addMinutes($durationMinNew)->toIso8601String(),
             ],
         ]);
     }
