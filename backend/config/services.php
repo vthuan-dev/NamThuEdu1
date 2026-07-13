@@ -36,11 +36,6 @@ return [
         'verify_ssl' => env('GROQ_VERIFY_SSL', true),
     ],
 
-    'azure_speech' => [
-        'key'    => env('AZURE_SPEECH_KEY'),
-        'region' => env('AZURE_SPEECH_REGION', 'eastasia'),
-    ],
-
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
         // Danh sách key để xoay vòng khi 1 key hết quota / bị rate-limit.

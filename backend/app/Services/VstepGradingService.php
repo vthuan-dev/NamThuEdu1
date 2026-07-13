@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Log;
  * Writing  → Groq LLM  (llama-3.3-70b-versatile) with VSTEP rubric
  * Speaking → Groq Whisper (whisper-large-v3-turbo) transcribe audio
  *            → Groq LLM evaluate transcript with VSTEP speaking criteria
+ *            → Pronunciation derived from Whisper signals (no external service)
  *
  * Config in .env:
  *   GROQ_API_KEY=gsk_...
@@ -119,17 +120,17 @@ class VstepGradingService
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    //  SPEAKING  (Azure Pronunciation 40% + Groq Whisper→LLM 60%)
+    //  SPEAKING  (Whisper pronunciation 35% + Groq LLM content 65%)
     // ═══════════════════════════════════════════════════════════════════════
 
     /**
-     * Grade speaking parts using hybrid Azure + Groq scoring.
+     * Grade speaking parts using Groq Whisper + LLM scoring.
      *
      * Per part:
-     *   1. Groq Whisper  → transcript text
-     *   2. Azure Speech  → Pronunciation Assessment (Accuracy, Fluency, Prosody → /10)
+     *   1. Groq Whisper  → transcript text + pronunciation signals
+     *   2. Whisper signals → Pronunciation score (Accuracy, Fluency, Clarity → /10)
      *   3. Groq LLM      → Content evaluation (Coherence, Vocabulary, Grammar → /10)
-     *   4. Part score    = 0.4 × azure_pronunciation + 0.6 × groq_content
+     *   4. Part score    = 0.35 × pronunciation + 0.65 × groq_content
      *
      * Returns overall Speaking score 0-10.
      */

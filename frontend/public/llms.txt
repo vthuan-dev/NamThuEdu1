@@ -17,7 +17,7 @@ Website chính thức: https://namthuedu.vn
 
 ## Tính năng nổi bật
 
-- Chấm bài Writing/Speaking bằng AI (Groq LLM + Azure Speech)
+- Chấm bài Writing/Speaking bằng AI (Groq LLM + Whisper)
 - Hệ thống gamification: huy hiệu, xu thưởng, bảng xếp hạng
 - Giáo viên giao bài và theo dõi tiến độ real-time
 - Học viên làm bài thi online có giới hạn thời gian
