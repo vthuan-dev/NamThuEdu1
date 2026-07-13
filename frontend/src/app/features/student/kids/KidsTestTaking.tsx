@@ -139,6 +139,8 @@ export function KidsTestTaking() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [resumeDraft, setResumeDraft] = useState<any>(null);
   const [startedAtServer, setStartedAtServer] = useState('');
+  const [serverRemainingSec, setServerRemainingSec] = useState<number | null>(null);
+  const [serverDeadlineAt, setServerDeadlineAt] = useState<string | null>(null);
   const [showActiveSessionModal, setShowActiveSessionModal] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -158,6 +160,8 @@ export function KidsTestTaking() {
     examId: exam?.id ?? exam?.eId ?? (isDirect ? assignmentId : 0),
     durationMinutes: exam?.eDuration_minutes ?? exam?.exam_duration ?? 30,
     startedAtServer,
+    serverRemainingSec,
+    serverDeadlineAt,
     examType: exam?.exam_type ?? 'KIDS',
     role: 'kids',
     // ✅ F5-resistant: KHÔNG auto-submit khi rời/đóng tab. pagehide cũng fire
@@ -219,6 +223,11 @@ export function KidsTestTaking() {
       } else {
         // Fallback: use current time as start (shouldn't happen in normal flow)
         setStartedAtServer(new Date().toISOString());
+      }
+      {
+        const rem = data?.time_remaining_seconds ?? (typeof data?.timeRemaining === 'number' && data.timeRemaining > 180 ? data.timeRemaining : (typeof data?.timeRemaining === 'number' ? data.timeRemaining * 60 : null));
+        setServerRemainingSec(rem != null && Number.isFinite(Number(rem)) ? Number(rem) : null);
+        setServerDeadlineAt(data?.deadline_at ?? null);
       }
       setSubmissionId(sid);
       setExam(fetchedExam);

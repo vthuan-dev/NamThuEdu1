@@ -202,6 +202,8 @@ export function StudentVstepExamPage() {
   const [startError, setStartError] = useState<string | null>(null);
   const [submissionId, setSubmissionId] = useState<number | null>(null);
   const [startedAtServer, setStartedAtServer] = useState('');
+  const [serverRemainingSec, setServerRemainingSec] = useState<number | null>(null);
+  const [serverDeadlineAt, setServerDeadlineAt] = useState<string | null>(null);
   // duration từ server — fallback về TOTAL_MINUTES nếu API không trả
   const [examDurationMinutes, setExamDurationMinutes] = useState(TOTAL_MINUTES);
 
@@ -211,6 +213,8 @@ export function StudentVstepExamPage() {
     examId: examId ? parseInt(examId) : 0,
     durationMinutes: examDurationMinutes,
     startedAtServer,
+    serverRemainingSec,
+    serverDeadlineAt,
     examType: 'VSTEP',
     role: 'adults',
     enableAutoSubmitOnUnload: !reviewMode,
@@ -674,6 +678,11 @@ export function StudentVstepExamPage() {
           } else {
             // Fallback: assume just started
             setStartedAtServer(new Date().toISOString());
+          }
+          {
+            const rem = data?.time_remaining_seconds ?? data?.time_remaining ?? null;
+            setServerRemainingSec(rem != null && Number.isFinite(Number(rem)) ? Number(rem) : null);
+            setServerDeadlineAt(data?.deadline_at ?? null);
           }
           
           // ✅ FIX: Use actual exam duration from backend — không hardcode TOTAL_MINUTES

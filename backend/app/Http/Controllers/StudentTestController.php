@@ -419,11 +419,12 @@ class StudentTestController extends Controller
                                        ->first();
 
         if ($existingSubmission) {
-            // Kiểm tra thời gian còn lại
-            $timeElapsed = now()->diffInMinutes($existingSubmission->sStart_time);
-            $timeRemaining = $assignment->exam->eDuration_minutes - $timeElapsed;
+            $timer = $this->computeTimerState(
+                $existingSubmission->sStart_time,
+                (int) ($assignment->exam->eDuration_minutes ?? 60)
+            );
 
-            if ($timeRemaining <= 0) {
+            if ($timer['expired']) {
                 // Tự động nộp bài hết thời gian
                 return $this->autoSubmit($existingSubmission);
             }
@@ -433,7 +434,11 @@ class StudentTestController extends Controller
                 'message' => 'Bạn có bài thi đang làm dở. Bạn có thể tiếp tục làm bài.',
                 'data' => [
                     'submissionId' => $existingSubmission->sId,
-                    'timeRemaining' => $timeRemaining,
+                    'sStart_time' => $existingSubmission->sStart_time,
+                    'started_at' => $existingSubmission->sStart_time,
+                    'timeRemaining' => $timer['remaining_minutes'],
+                    'time_remaining_seconds' => $timer['remaining_seconds'],
+                    'deadline_at' => $timer['deadline_at'],
                     'canResume' => true
                 ]
             ], 200);
@@ -475,11 +480,20 @@ class StudentTestController extends Controller
             });
         });
 
+        $timerNew = $this->computeTimerState(
+            $submission->sStart_time,
+            (int) ($exam->eDuration_minutes ?? 60)
+        );
+
         return response()->json([
             'status' => 'success',
             'data' => [
                 'submissionId' => $submission->sId,
                 'sStart_time'  => $submission->sStart_time,
+                'started_at'   => $submission->sStart_time,
+                'timeRemaining' => $timerNew['remaining_minutes'],
+                'time_remaining_seconds' => $timerNew['remaining_seconds'],
+                'deadline_at' => $timerNew['deadline_at'],
                 'exam'         => $this->buildExamData($exam),
             ]
         ]);
@@ -1441,12 +1455,14 @@ class StudentTestController extends Controller
             ], 404);
         }
 
-        // Kiểm tra thời gian còn lại
-        $timeElapsed = now()->diffInMinutes($submission->sStart_time);
-        $timeRemaining = $submission->exam->eDuration_minutes - $timeElapsed;
+        // Kiểm tra thời gian còn lại (second-precision)
+        $timer = $this->computeTimerState(
+            $submission->sStart_time,
+            (int) ($submission->exam->eDuration_minutes ?? 60)
+        );
 
         // Nếu hết thời gian, tự động nộp bài
-        if ($timeRemaining <= 0) {
+        if ($timer['expired']) {
             return $this->autoSubmit($submission);
         }
 
@@ -1469,7 +1485,10 @@ class StudentTestController extends Controller
             'data' => [
                 'submissionId' => $submission->sId,
                 'sStart_time'  => $submission->sStart_time,
-                'timeRemaining' => $timeRemaining,
+                'started_at'   => $submission->sStart_time,
+                'timeRemaining' => $timer['remaining_minutes'],
+                'time_remaining_seconds' => $timer['remaining_seconds'],
+                'deadline_at' => $timer['deadline_at'],
                 'exam'         => $this->buildExamData($exam),
                 'savedAnswers' => $submission->answers,
             ]
@@ -1962,6 +1981,35 @@ class StudentTestController extends Controller
         ]);
     }
 
+
+    /**
+     * Tính thời gian còn lại (giây) + deadline tuyệt đối từ sStart_time + duration minutes.
+     * Dùng chung cho start/resume của assignment, kids, teens — second-precision.
+     *
+     * @return array{remaining_seconds:int, remaining_minutes:int, deadline_at:string, expired:bool}
+     */
+    private function computeTimerState($startTime, int $durationMinutes): array
+    {
+        $durationMin = max(1, (int) $durationMinutes);
+        $durationSec = $durationMin * 60;
+        $start = $startTime
+            ? \Carbon\Carbon::parse($startTime)
+            : now();
+        $deadline = $start->copy()->addSeconds($durationSec);
+        $remainingSec = $deadline->isPast()
+            ? 0
+            : max(0, (int) now()->diffInSeconds($deadline, false));
+        // remaining_minutes: floor giây → phút (tương thích FE cũ dùng phút)
+        $remainingMin = (int) floor($remainingSec / 60);
+
+        return [
+            'remaining_seconds' => $remainingSec,
+            'remaining_minutes' => $remainingMin,
+            'deadline_at'       => $deadline->toIso8601String(),
+            'expired'           => $remainingSec <= 0,
+        ];
+    }
+
     private function isStudentEligible($studentId, $assignment)
     {
         if ($assignment->taTarget_type === 'student') {
@@ -1997,8 +2045,9 @@ class StudentTestController extends Controller
             $duration = $exam->eDuration_minutes ?? $exam->eDuration ?? 0;
             // sStart_time luôn ở quá khứ → số phút đã trôi qua phải dương.
             // Truyền absolute=true để không bị âm khi Carbon trả về giá trị có dấu.
-            $timeElapsed = \Carbon\Carbon::parse($submission->sStart_time)->diffInMinutes(now(), true);
-            $timeRemaining = max(0, $duration - $timeElapsed);
+            $timerDash = $this->computeTimerState($submission->sStart_time, (int) $duration);
+            $timeRemaining = $timerDash['remaining_minutes'];
+            $timeRemainingSeconds = $timerDash['remaining_seconds'];
 
             // Tiến độ làm bài: số câu đã trả lời (đáp án khác rỗng) trên tổng số câu của đề.
             // getQuestionsCount() xử lý đúng cả THPT (đếm theo thpt_config) lẫn đề thường.
@@ -2016,6 +2065,8 @@ class StudentTestController extends Controller
                 'type'               => $exam->eType,
                 'skill'              => $exam->eSkill,
                 'time_remaining'     => $timeRemaining,
+                'time_remaining_seconds' => $timeRemainingSeconds,
+                'deadline_at'        => $timerDash['deadline_at'],
                 'total_duration'     => $duration,
                 'started_at'         => $submission->sStart_time,
                 'answered_questions' => $answeredQuestions,
@@ -3556,6 +3607,7 @@ class StudentTestController extends Controller
                 $existing->save();
             }
 
+            $deadlineAt = \Carbon\Carbon::parse($startTime)->addSeconds($totalSeconds)->toIso8601String();
             return response()->json([
                 'status' => 'success',
                 'data'   => [
@@ -3563,6 +3615,8 @@ class StudentTestController extends Controller
                     'started_at'     => $startTime,
                     'total_duration' => $totalSeconds,
                     'time_remaining' => $remaining,
+                    'time_remaining_seconds' => $remaining,
+                    'deadline_at'    => $deadlineAt,
                     'savedAnswers'   => $savedAnswers, // ← NEW: return saved answers
                     'practice_scope' => $existing->submission_payload['practice_scope'] ?? null,
                     // backward-compat (phút)
@@ -3588,6 +3642,7 @@ class StudentTestController extends Controller
 
         $submission = Submission::create($createPayload);
 
+        $deadlineAtNew = \Carbon\Carbon::parse($submission->sStart_time)->addSeconds($totalSeconds)->toIso8601String();
         return response()->json([
             'status' => 'success',
             'data'   => [
@@ -3595,6 +3650,8 @@ class StudentTestController extends Controller
                 'started_at'     => $submission->sStart_time,
                 'total_duration' => $totalSeconds,
                 'time_remaining' => $totalSeconds,
+                'time_remaining_seconds' => $totalSeconds,
+                'deadline_at'    => $deadlineAtNew,
                 'practice_scope' => $practiceScopeReq,
                 // backward-compat (phút)
                 'timeRemaining'  => $exam->eDuration_minutes ?? 179,
@@ -4692,10 +4749,10 @@ class StudentTestController extends Controller
             $existing = null;
         }
 
+        $timerState = null;
         if ($existing) {
-            $timeElapsed   = now()->diffInMinutes($existing->sStart_time);
-            $timeRemaining = $duration - $timeElapsed;
-            if ($timeRemaining <= 0) {
+            $timerState = $this->computeTimerState($existing->sStart_time, (int) $duration);
+            if ($timerState['expired']) {
                 $this->autoSubmit($existing);
                 return response()->json([
                     'status' => 'error',
@@ -4717,7 +4774,7 @@ class StudentTestController extends Controller
                 'sStatus'     => 'in_progress',
                 'last_activity_at' => now(),
             ]);
-            $timeRemaining = $duration;
+            $timerState = $this->computeTimerState($submission->sStart_time, (int) $duration);
             $savedAnswers  = collect();
         }
 
@@ -4728,7 +4785,10 @@ class StudentTestController extends Controller
             'data'   => [
                 'submissionId'  => $submission->sId,
                 'sStart_time'   => $submission->sStart_time,
-                'timeRemaining' => $timeRemaining,
+                'started_at'    => $submission->sStart_time,
+                'timeRemaining' => $timerState['remaining_minutes'],
+                'time_remaining_seconds' => $timerState['remaining_seconds'],
+                'deadline_at' => $timerState['deadline_at'],
                 'exam'          => $this->buildExamData($exam),
                 'savedAnswers'  => $savedAnswers,
                 'resumed'       => !empty($existing),
@@ -4880,10 +4940,10 @@ class StudentTestController extends Controller
             $existing = null;
         }
 
+        $timerState = null;
         if ($existing) {
-            $timeElapsed   = now()->diffInMinutes($existing->sStart_time);
-            $timeRemaining = $duration - $timeElapsed;
-            if ($timeRemaining <= 0) {
+            $timerState = $this->computeTimerState($existing->sStart_time, (int) $duration);
+            if ($timerState['expired']) {
                 $this->autoSubmit($existing);
                 return response()->json([
                     'status' => 'error',
@@ -4905,7 +4965,7 @@ class StudentTestController extends Controller
                 'sStatus'     => 'in_progress',
                 'last_activity_at' => now(),
             ]);
-            $timeRemaining = $duration;
+            $timerState = $this->computeTimerState($submission->sStart_time, (int) $duration);
             $savedAnswers  = collect();
         }
 
@@ -4916,7 +4976,10 @@ class StudentTestController extends Controller
             'data'   => [
                 'submissionId'  => $submission->sId,
                 'sStart_time'   => $submission->sStart_time,
-                'timeRemaining' => $timeRemaining,
+                'started_at'    => $submission->sStart_time,
+                'timeRemaining' => $timerState['remaining_minutes'],
+                'time_remaining_seconds' => $timerState['remaining_seconds'],
+                'deadline_at' => $timerState['deadline_at'],
                 'exam'          => $this->buildExamData($exam),
                 'savedAnswers'  => $savedAnswers,
                 'resumed'       => !empty($existing),

@@ -206,12 +206,16 @@ export function TestTakingVSTEP() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [exam, setExam] = useState<any>(null);
   const [startedAtServer, setStartedAtServer] = useState('');
+  const [serverRemainingSec, setServerRemainingSec] = useState<number | null>(null);
+  const [serverDeadlineAt, setServerDeadlineAt] = useState<string | null>(null);
 
   const session = useExamSession({
     submissionId,
     examId: exam?.id ?? exam?.eId ?? 0,
     durationMinutes: exam?.eDuration_minutes ?? exam?.exam_duration ?? 179,
     startedAtServer,
+    serverRemainingSec,
+    serverDeadlineAt,
     examType: exam?.exam_type ?? 'VSTEP',
     role: 'adults',
     onSubmitted: (res: any) => {
@@ -420,6 +424,12 @@ export function TestTakingVSTEP() {
         setStartedAtServer(data.sStart_time || data.started_at);
       } else {
         setStartedAtServer(new Date().toISOString());
+      }
+      // Sticky remaining — server-truth (giây) để F5/tiếp tục không đếm lại full
+      {
+        const rem = data?.time_remaining_seconds ?? (typeof data?.timeRemaining === 'number' && data.timeRemaining > 180 ? data.timeRemaining : (typeof data?.timeRemaining === 'number' ? data.timeRemaining * 60 : null));
+        setServerRemainingSec(rem != null && Number.isFinite(Number(rem)) ? Number(rem) : null);
+        setServerDeadlineAt(data?.deadline_at ?? null);
       }
       setExam(rawExam);
       setSubmissionId(sid);

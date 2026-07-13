@@ -73,6 +73,13 @@ export interface UseExamSessionOptions {
   durationMinutes: number;
   /** ISO string BE trả về tại thời điểm Start — nguồn thời gian thật. */
   startedAtServer: string;
+  /**
+   * Số giây còn lại server-truth lúc start/resume (ưu tiên khi neo deadline).
+   * Giúp F5/tiếp tục không đếm lại từ đầu dù parse startedAt lệch TZ.
+   */
+  serverRemainingSec?: number | null;
+  /** ISO deadline tuyệt đối từ BE (nếu có). */
+  serverDeadlineAt?: string | null;
   initialAnswers?: Record<string, unknown>;
   examType: string;
   role: ExamRole;
@@ -171,6 +178,8 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
     examId,
     durationMinutes,
     startedAtServer,
+    serverRemainingSec = null,
+    serverDeadlineAt = null,
     initialAnswers,
     examType,
     role,
@@ -248,31 +257,47 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
       durationMinutes,
       answers: { ...(initialAnswers ?? {}) },
     });
-    // Deadline tuyệt đối sticky theo submissionId.
-    // Ưu tiên localStorage; chỉ fallback sang startedAt khi CHƯA có mốc.
+    // Deadline tuyệt đối sticky theo submissionId — áp dụng cho MỌI loại đề.
+    // Ưu tiên (lấy mốc SỚM NHẤT trong các candidate còn hạn):
+    //   1) localStorage sticky
+    //   2) serverRemainingSec (giây còn lại server-truth)
+    //   3) serverDeadlineAt ISO
+    //   4) startedAtServer + duration
+    //   5) fallback full duration (chỉ lần đầu)
     // KHÔNG BAO GIỜ ghi đè mốc cũ bằng mốc muộn hơn (tránh đếm lại từ đầu).
     const durationSec = Math.max(1, durationMinutes) * 60;
     const key = timerStorageKey(role, examType, submissionId);
     timerStorageKeyRef.current = key;
     const now = Date.now();
+    const maxDeadline = now + durationSec * 1000;
+    const candidates: number[] = [];
+
     const storedDeadline = readStoredDeadline(key);
+    if (storedDeadline != null && storedDeadline > now) {
+      candidates.push(storedDeadline);
+    }
+
+    if (serverRemainingSec != null && Number.isFinite(Number(serverRemainingSec))) {
+      const fromRemaining = now + Math.max(0, Number(serverRemainingSec)) * 1000;
+      if (fromRemaining > now) candidates.push(fromRemaining);
+    }
+
+    const fromDeadlineAt = parseVNDate(serverDeadlineAt)?.getTime()
+      ?? (serverDeadlineAt ? new Date(serverDeadlineAt).getTime() : NaN);
+    if (Number.isFinite(fromDeadlineAt) && fromDeadlineAt > now) {
+      candidates.push(fromDeadlineAt);
+    }
+
     const parsed = parseVNDate(startedAtServer)?.getTime()
       ?? (startedAtServer ? new Date(startedAtServer).getTime() : NaN);
-    const fromStart = Number.isFinite(parsed) ? parsed + durationSec * 1000 : null;
-
-    let deadlineMs: number;
-    if (storedDeadline != null && fromStart != null) {
-      // Lấy mốc sớm hơn → remaining không nhảy full
-      deadlineMs = Math.min(storedDeadline, fromStart);
-    } else if (storedDeadline != null) {
-      deadlineMs = storedDeadline;
-    } else if (fromStart != null) {
-      deadlineMs = fromStart;
-    } else {
-      deadlineMs = now + durationSec * 1000;
+    if (Number.isFinite(parsed)) {
+      const fromStart = parsed + durationSec * 1000;
+      if (fromStart > now) candidates.push(fromStart);
     }
+
+    let deadlineMs = candidates.length > 0 ? Math.min(...candidates) : maxDeadline;
     // Không vượt full duration tính từ bây giờ
-    deadlineMs = Math.min(deadlineMs, now + durationSec * 1000);
+    deadlineMs = Math.min(deadlineMs, maxDeadline);
 
     deadlineMsRef.current = deadlineMs;
     startedAtMsRef.current = deadlineMs - durationSec * 1000;
@@ -284,7 +309,7 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
     setWarningLevel(null);
     setTimeRemaining(Math.max(0, Math.floor((deadlineMs - now) / 1000)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [submissionId, startedAtServer, durationMinutes, role, examType]);
+  }, [submissionId, startedAtServer, durationMinutes, role, examType, serverRemainingSec, serverDeadlineAt]);
 
   // ─── Flush queue → BE (idempotent)
   const flushQueue = useCallback(async (): Promise<void> => {
