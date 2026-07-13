@@ -281,7 +281,7 @@ export function StudentThptExamPage() {
       />
       <ThptTopBar examTitle={examTitle} totalSeconds={remainingSec} totalDurationSec={totalDurationSec} onRestart={handleRestart} />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-6 pt-6 pb-24 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
         <div className="min-w-0">
           {activeSection && (
             <SectionView

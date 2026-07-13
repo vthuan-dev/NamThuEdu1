@@ -23,7 +23,7 @@ export function ThptBottomNav({
 }: Props) {
   const isLast = activePart >= totalParts - 1;
   return (
-    <footer className="sticky bottom-0 z-30 bg-white border-t border-slate-200">
+    <footer className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 shadow-[0_-6px_20px_rgba(15,23,42,0.06)]">
       <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between gap-3">
         <button
           type="button"
