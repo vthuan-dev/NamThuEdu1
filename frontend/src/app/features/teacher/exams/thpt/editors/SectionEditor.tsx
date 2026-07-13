@@ -1,5 +1,5 @@
 import type { ThptSection } from '../../../../../../types/thpt';
-import { useState } from 'react';
+import { useState, type ClipboardEvent, type DragEvent } from 'react';
 import { Upload, Loader2, Volume2, Trash2 } from 'lucide-react';
 import { api } from '../../../../../../services/api';
 import {
@@ -774,6 +774,41 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
     }
   };
 
+  // Cho phép dán ảnh (Ctrl+V) hoặc kéo-thả file ảnh vào khu vực ảnh đề.
+  const extractImageFile = (items?: DataTransferItemList | null, files?: FileList | null): File | null => {
+    if (items) {
+      for (const it of Array.from(items)) {
+        if (it.kind === 'file' && it.type.startsWith('image/')) {
+          const f = it.getAsFile();
+          if (f) return f;
+        }
+      }
+    }
+    if (files) {
+      const f = Array.from(files).find((x) => x.type.startsWith('image/'));
+      if (f) return f;
+    }
+    return null;
+  };
+
+  const handlePasteImage = (e: ClipboardEvent<HTMLDivElement>) => {
+    if (imageUploading) return;
+    const file = extractImageFile(e.clipboardData?.items, e.clipboardData?.files);
+    if (file) {
+      e.preventDefault();
+      uploadTaskImage(file);
+    }
+  };
+
+  const handleDropImage = (e: DragEvent<HTMLDivElement>) => {
+    if (imageUploading) return;
+    const file = extractImageFile(e.dataTransfer?.items, e.dataTransfer?.files);
+    if (file) {
+      e.preventDefault();
+      uploadTaskImage(file);
+    }
+  };
+
   const setKind = (idx: number, kind: 'mc' | 'fill_blank') => {
     const item = section.items[idx] as any;
     const qn = item.question_number;
@@ -851,7 +886,13 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
       </div>
 
       {/* Task image uploader */}
-      <div className="rounded-xl bg-white border border-slate-200 p-4">
+      <div
+        className="rounded-xl bg-white border border-slate-200 p-4 focus:outline-none focus:ring-2 focus:ring-sky-200"
+        tabIndex={0}
+        onPaste={handlePasteImage}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={handleDropImage}
+      >
         <div className="flex items-center justify-between gap-2 mb-2">
           <p className="text-xs font-bold text-slate-500">Ảnh đề nguyên khối (form / note)</p>
           <span className="text-[10px] font-semibold uppercase tracking-wide text-sky-600">Tuỳ chọn · IELTS-style</span>
@@ -859,6 +900,8 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
         <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
           Upload 1 ảnh chứa/note cho cả phần. Học viên sẽ thấy ảnh bên trái, câu hỏi/đáp án bên phải.
           Không upload thì vẫn dùng layout câu hỏi dọc như cũ.
+          <br />
+          <span className="text-sky-600 font-medium">Mẹo: bấm vào khung rồi dán ảnh (Ctrl + V), hoặc kéo-thả file ảnh vào đây.</span>
         </p>
         {section.task_image ? (
           <div className="space-y-2">
@@ -896,9 +939,10 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
             </div>
           </div>
         ) : (
-          <label className="flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-sky-200 bg-sky-50/40 px-4 py-4 cursor-pointer hover:border-sky-400 transition-colors text-sm font-medium text-sky-700">
+          <label className="flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-sky-200 bg-sky-50/40 px-4 py-5 cursor-pointer hover:border-sky-400 transition-colors text-sm font-medium text-sky-700">
             {imageUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            {imageUploading ? 'Đang tải ảnh…' : 'Chọn ảnh đề (jpg, png, webp…)'}
+            {imageUploading ? 'Đang tải ảnh…' : 'Chọn ảnh đề · dán (Ctrl+V) · kéo-thả'}
+            <span className="text-[11px] font-normal text-sky-600/80">jpg, png, webp…</span>
             <input
               type="file"
               accept="image/*"
