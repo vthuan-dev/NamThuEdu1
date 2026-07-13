@@ -222,11 +222,17 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
     setCurrent({ skill, partNumber });
   };
 
-  // Reset the displayed time when switching skill.
-  // Preview mode does NOT count down — it just shows the allotted time per skill.
+  // Reset the displayed time when switching skill (or speaking part).
+  // Preview mode does NOT count down — it just shows the allotted time.
+  // Speaking is timed per part (Part 1 = 3m, Part 2 = 4m, Part 3 = 5m).
   useEffect(() => {
-    setTimeLeft(SKILL_TIME[current.skill] * 60);
-  }, [current.skill]);
+    if (current.skill === "speaking") {
+      const recSec = SPEAKING_TIMES[current.partNumber]?.recSec ?? SKILL_TIME.speaking * 60;
+      setTimeLeft(recSec);
+    } else {
+      setTimeLeft(SKILL_TIME[current.skill] * 60);
+    }
+  }, [current.skill, current.partNumber]);
 
   // Countdown disabled in preview mode (giáo viên chỉ xem trước, không tính giờ).
 

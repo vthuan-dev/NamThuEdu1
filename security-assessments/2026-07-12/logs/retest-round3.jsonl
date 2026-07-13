@@ -1,0 +1,18 @@
+﻿{"origins":{"value":["https://namthuedu.vn","https://www.namthuedu.vn","http://localhost:5173","http://127.0.0.1:5173","http://localhost:3000","http://127.0.0.1:3000","http://localhost:8000","http://127.0.0.1:8000"],"Count":8},"t":"runtime_cors_config"}
+{"body":"{\"status\":\"success\",\"data\":{\"message\":\"N\\u1ebfu s\\u1ed1 \\u0111i\\u1ec7n tho\\u1ea1i t\\u1ed3n t\\u1ea1i trong h\\u1ec7 th\\u1ed1ng, m\\u00e3 OTP \\u0111\\u00e3 \\u0111\\u01b0\\u1ee3c g\\u1eedi.\"}}","status":200,"t":"otp_existing","hasDebug":false,"hasOtp6":false}
+{"body":"{\"status\":\"success\",\"data\":{\"message\":\"N\\u1ebfu s\\u1ed1 \\u0111i\\u1ec7n tho\\u1ea1i t\\u1ed3n t\\u1ea1i trong h\\u1ec7 th\\u1ed1ng, m\\u00e3 OTP \\u0111\\u00e3 \\u0111\\u01b0\\u1ee3c g\\u1eedi.\"}}","status":200,"t":"otp_unknown"}
+{"body":"{\"status\":\"error\",\"message\":\"Vui l\\u00f2ng nh\\u1eadp \\u0111\\u1ea7y \\u0111\\u1ee7 th\\u00f4ng tin\",\"errors\":{\"password\":[\"The password must be at least 6 characters.\"]}}","status":400,"t":"reset_bad"}
+{"allowed":false,"t":"cors_evil","acao":null,"credentials":false,"origin":"https://evil.example"}
+{"allowed":true,"t":"cors_local5173","acao":"http://127.0.0.1:5173","credentials":true,"origin":"http://127.0.0.1:5173"}
+{"allowed":true,"t":"cors_localhost5173","acao":"http://localhost:5173","credentials":true,"origin":"http://localhost:5173"}
+{"allowed":true,"t":"cors_prod","acao":"https://namthuedu.vn","credentials":true,"origin":"https://namthuedu.vn"}
+{"allowed":true,"t":"cors_prodwww","acao":"https://www.namthuedu.vn","credentials":true,"origin":"https://www.namthuedu.vn"}
+{"allowed":false,"t":"cors_oldcom","acao":null,"credentials":false,"origin":"https://namthuedu.com"}
+{"allowed":false,"t":"cors_none","acao":null,"credentials":false,"origin":null}
+{"status":200,"t":"refresh_valid","hasStack":false,"rotated":true}
+{"ok":true,"status":401,"t":"refresh_reuse"}
+{"ok":true,"status":401,"t":"refresh_forged"}
+{"private":0,"t":"public_tests","nonPub":0,"total":2}
+{"admin":true,"t":"logins","teacher":true,"student":true}
+{"ok":true,"status":403,"t":"rbac_student"}
+{"ok":true,"status":200,"t":"rbac_teacher"}

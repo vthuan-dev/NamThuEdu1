@@ -1,0 +1,21 @@
+﻿{"body":"{\"status\":\"healthy\",\"service\":\"NamThu Education API\",\"timestamp\":\"2026-07-12T02:01:31.417149Z\",\"uptime\":\"OK\"}","status":200,"t":"health"}
+{"body":"{\"status\":\"success\",\"data\":{\"message\":\"N\\u1ebfu s\\u1ed1 \\u0111i\\u1ec7n tho\\u1ea1i t\\u1ed3n t\\u1ea1i trong h\\u1ec7 th\\u1ed1ng, m\\u00e3 OTP \\u0111\\u00e3 \\u0111\\u01b0\\u1ee3c g\\u1eedi.\"}}","generic":false,"hasDebug":false,"t":"otp_existing","hasMock":false,"hasOtp6":false,"status":200}
+{"body":"{\"status\":\"success\",\"data\":{\"message\":\"N\\u1ebfu s\\u1ed1 \\u0111i\\u1ec7n tho\\u1ea1i t\\u1ed3n t\\u1ea1i trong h\\u1ec7 th\\u1ed1ng, m\\u00e3 OTP \\u0111\\u00e3 \\u0111\\u01b0\\u1ee3c g\\u1eedi.\"}}","status":200,"t":"otp_unknown"}
+{"body":"{\"status\":\"error\",\"message\":\"M\\u00e3 OTP kh\\u00f4ng ch\\u00ednh x\\u00e1c ho\\u1eb7c \\u0111\\u00e3 h\\u1ebft h\\u1ea1n\"}","status":400,"t":"reset_bad_otp_known"}
+{"body":"{\"status\":\"error\",\"message\":\"M\\u00e3 OTP kh\\u00f4ng ch\\u00ednh x\\u00e1c ho\\u1eb7c \\u0111\\u00e3 h\\u1ebft h\\u1ea1n\"}","status":400,"t":"reset_bad_otp_unknown"}
+{"ok":true,"t":"login_after_failed_reset","role":"student"}
+{"hasCredentials":false,"t":"cors_evil","reflects":false,"snippet":"HTTP/1.1 200 OK\r\nHost: 127.0.0.1:8000\r\nConnection: close\r\nX-Powered-By: PHP/8.2.12\r\nCache-Control: no-cache, private\r\nDate: Sun, 12 Jul 2026 02:01:33 GMT\r\nContent-Type: application/json\r\nX-RateLimit-Limit: 300\r\nX-RateLimit-Remaining: 293\r\nAccess-Control-Allow-Methods: GET, POST, PUT, DELETE, PATCH, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept, Origin"}
+{"t":"cors_local","credentials":true,"allows":true,"snippet":"HTTP/1.1 200 OK\r\nHost: 127.0.0.1:8000\r\nConnection: close\r\nX-Powered-By: PHP/8.2.12\r\nCache-Control: no-cache, private\r\nDate: Sun, 12 Jul 2026 02:01:33 GMT\r\nContent-Type: application/json\r\nX-RateLimit-Limit: 300\r\nX-RateLimit-Remaining: 292\r\nAccess-Control-Allow-Origin: http://127.0.0.1:5173\r\nAccess-Control-Allow-Credentials: true\r\nVary: Origin\r\nAccess-Control-Allow-Methods: GET, POST, PUT, DELETE, P"}
+{"t":"cors_prod","credentials":false,"allows":false}
+{"hasAcao":false,"t":"cors_no_origin","snippet":"HTTP/1.1 200 OK\r\nHost: 127.0.0.1:8000\r\nConnection: close\r\nX-Powered-By: PHP/8.2.12\r\nCache-Control: no-cache, private\r\nDate: Sun, 12 Jul 2026 02:01:33 GMT\r\nContent-Type: application/json\r\nX-RateLimit-Limit: 300\r\nX-RateLimit-Remaining: 290\r\nAccess-Control-Allow-Methods: GET, POST, PUT, DELETE, PATCH, "}
+{"hasAt":true,"t":"login_refresh_setup","hasRt":true,"rtLen":64}
+{"rotated":true,"t":"refresh_valid","hasStack":false,"bodyPreview":"{\"status\":\"success\",\"data\":{\"access_token\":\"340|AMK5zfj6XRFhJPkXUC7ILzRhOMLOV6z1PYXmKVGz\",\"token_type\":\"Bearer\",\"expires_in\":86400,\"refresh_token\":\"QRcXOVGBOG3dnlA03aE5WfpcQds1jFLV5HSwtecExCGOxWgdyvutEN2OF8fZ7FXm\",\"user\"","status":200,"hasNewAccess":true}
+{"body":"{\"status\":\"error\",\"message\":\"Refresh token kh\\u00f4ng h\\u1ee3p l\\u1ec7 ho\\u1eb7c \\u0111\\u00e3 h\\u1ebft h\\u1ea1n\"}","status":401,"t":"refresh_reuse_old","ok_is_401":true}
+{"body":"{\"status\":\"error\",\"message\":\"Refresh token kh\\u00f4ng h\\u1ee3p l\\u1ec7 ho\\u1eb7c \\u0111\\u00e3 h\\u1ebft h\\u1ea1n\"}","status":401,"t":"refresh_forged","ok_is_401":true}
+{"body":"{\"status\":\"error\",\"message\":\"Refresh token kh\\u00f4ng h\\u1ee3p l\\u1ec7\",\"errors\":{\"refresh_token\":[\"The refresh token field is required.\"]}}","status":400,"t":"refresh_empty"}
+{"nonPublished":0,"t":"public_tests","total":2,"sample":[{"status":"published","title":"Cambridge Starters – Bài thi mẫu","visibility":"public","id":105},{"status":"published","title":"Cambridge IELTS Academic Sample — Full Test","visibility":"public","id":8}],"privateCount":0,"count":2}
+{"ok":true,"t":"login_role","gotRole":"student","role":"student"}
+{"ok":true,"t":"login_role","gotRole":"teacher","role":"teacher"}
+{"ok":true,"t":"login_role","gotRole":"admin","role":"admin"}
+{"body":"","status":403,"t":"rbac_student_teacher","ok_is_403":true}
+{"ok":true,"status":200,"t":"rbac_teacher_teacher"}
