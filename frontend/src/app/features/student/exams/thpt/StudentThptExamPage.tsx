@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { api } from '../../../../../services/api';
@@ -35,8 +35,15 @@ function readThptDeadline(key: string): number | null {
 }
 
 /**
- * Neo deadline tuyệt đối theo sStart_time server (UTC-safe).
- * Không dùng new Date(naive) vì browser parse local → timer nhảy full lại.
+ * Neo deadline tuyệt đối — KHÔNG BAO GIỜ reset về full khi đã có mốc cũ.
+ *
+ * Ưu tiên:
+ *  1) localStorage đã lưu cho submissionId (sticky qua F5/đổi phần)
+ *  2) time_remaining_seconds từ server (số giây còn lại, không phụ thuộc TZ parse)
+ *  3) deadline_at ISO server
+ *  4) fallback full duration (chỉ lần đầu)
+ *
+ * Khi có nhiều mốc → lấy mốc SỚM HƠN (remaining ít hơn) để chống "đếm lại từ đầu".
  */
 function resolveThptDeadline(opts: {
   examId?: string;
@@ -46,39 +53,36 @@ function resolveThptDeadline(opts: {
   serverRemainingSec?: number | null;
   serverDeadlineAt?: string | null;
 }): number {
-  const { examId, submissionId, sStartTime, durationMin, serverRemainingSec, serverDeadlineAt } = opts;
+  const { examId, submissionId, durationMin, serverRemainingSec, serverDeadlineAt } = opts;
   const now = Date.now();
   const durationMs = Math.max(1, durationMin) * 60_000;
   const key = thptDeadlineKey(examId, submissionId);
+  const maxDeadline = now + durationMs;
 
-  // 1) Ưu tiên deadline_at ISO từ server
-  const fromDeadlineAt = parseVNDate(serverDeadlineAt)?.getTime();
-  // 2) sStart_time + duration (UTC-safe)
-  const startedMs = parseVNDate(sStartTime)?.getTime();
-  const fromStart = startedMs != null ? startedMs + durationMs : null;
-  // 3) remaining giây server (wall-clock từ lúc nhận response)
-  const fromRemaining =
-    serverRemainingSec != null && Number.isFinite(serverRemainingSec)
-      ? now + Math.max(0, Number(serverRemainingSec)) * 1000
-      : null;
+  const candidates: number[] = [];
 
-  // Chọn mốc sớm nhất trong các mốc server hợp lệ → không bao giờ "cộng thêm giờ"
-  const serverCandidates = [fromDeadlineAt, fromStart, fromRemaining].filter(
-    (v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0,
-  );
-  let deadline = serverCandidates.length > 0 ? Math.min(...serverCandidates) : now + durationMs;
-
-  // localStorage chỉ được dùng nếu KHÔNG trễ hơn server (tránh reset full)
-  // và không sớm hơn quá 2 phút so với server (tránh clock lệch quá đà)
+  // Sticky local — ưu tiên tuyệt đối nếu còn hạn
   const stored = readThptDeadline(key);
-  if (stored != null && serverCandidates.length > 0) {
-    const serverBest = Math.min(...serverCandidates);
-    if (stored <= serverBest + 2000) {
-      deadline = Math.min(deadline, stored);
-    }
-  } else if (stored != null && serverCandidates.length === 0) {
-    deadline = stored;
+  if (stored != null && stored > now) {
+    candidates.push(stored);
   }
+
+  // Server remaining (giây) — không phụ thuộc parse datetime
+  if (serverRemainingSec != null && Number.isFinite(Number(serverRemainingSec))) {
+    candidates.push(now + Math.max(0, Number(serverRemainingSec)) * 1000);
+  }
+
+  // deadline_at ISO (nếu có)
+  const fromDeadlineAt = parseVNDate(serverDeadlineAt)?.getTime();
+  if (fromDeadlineAt != null && Number.isFinite(fromDeadlineAt)) {
+    candidates.push(fromDeadlineAt);
+  }
+
+  // Lấy mốc sớm nhất (còn ít thời gian hơn) → không bao giờ nhảy full
+  let deadline = candidates.length > 0 ? Math.min(...candidates) : maxDeadline;
+
+  // Không cho vượt full duration
+  deadline = Math.min(deadline, maxDeadline);
 
   try {
     localStorage.setItem(key, String(deadline));
@@ -120,7 +124,7 @@ export function StudentThptExamPage() {
     startedAtServer,
     examType: 'THPT',
     role: 'adults',
-    enableAutoSubmitOnUnload: true,
+    enableAutoSubmitOnUnload: false,
   });
 
   useEffect(() => {
@@ -255,32 +259,49 @@ export function StudentThptExamPage() {
     setIsSubmitting(false);
   }, [submissionId, examId, isSubmitting, session.answers, navigate, toast]);
 
-  // Manual countdown (THPT-specific; session.timeRemaining not used here)
-  // Deadline neo absolute trong localStorage — không reset khi re-render / đổi phần.
+  // Manual countdown — deadline sticky trong localStorage, interval chỉ gắn 1 lần / submission.
+  const handleSubmitRef = useRef(handleSubmit);
+  handleSubmitRef.current = handleSubmit;
+
   useEffect(() => {
     if (loading || !config || !submissionId) return;
     const key = thptDeadlineKey(examId, submissionId);
+    let stopped = false;
+
     const tick = () => {
-      const deadline = Number(localStorage.getItem(key));
-      const next = Number.isFinite(deadline) ? Math.max(0, Math.floor((deadline - Date.now()) / 1000)) : 0;
+      const raw = Number(localStorage.getItem(key));
+      // Nếu localStorage mất key giữa chừng → giữ remainingSec hiện tại, KHÔNG reset full
+      if (!Number.isFinite(raw) || raw <= 0) {
+        setRemainingSec((prev) => {
+          if (prev <= 0) return 0;
+          return prev; // giữ nguyên
+        });
+        return -1; // signal: missing key
+      }
+      const next = Math.max(0, Math.floor((raw - Date.now()) / 1000));
       setRemainingSec(next);
       return next;
     };
-    // Sync ngay 1 nhịp (tránh đứng yên 1s sau load)
+
     const first = tick();
-    if (first <= 0) {
-      handleSubmit(true).catch(() => {});
+    if (first === 0) {
+      handleSubmitRef.current(true).catch(() => {});
       return;
     }
-    const t = window.setInterval(() => {
+
+    const timer = window.setInterval(() => {
+      if (stopped) return;
       const next = tick();
-      if (next <= 0) {
-        window.clearInterval(t);
-        handleSubmit(true).catch(() => {});
+      if (next === 0) {
+        window.clearInterval(timer);
+        handleSubmitRef.current(true).catch(() => {});
       }
     }, 1000);
-    return () => window.clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ neo theo submission; handleSubmit luôn đọc state mới nhất qua closure submit
+
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
   }, [loading, config, submissionId, examId]);
 
   // Manual server auto-save every 30s via THPT-specific endpoint

@@ -27,6 +27,7 @@ import {
   type ExamDraft,
   type ExamRole,
 } from '../../lib/exam/examDraftStorage';
+import { parseVNDate } from '../../utils/dateUtils';
 
 const DEFAULT_DRAFT_DEBOUNCE_MS = 1500;
 const DEFAULT_HEARTBEAT_MS = 30_000;
@@ -193,12 +194,10 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
   const [online, setOnline] = useState<boolean>(
     typeof navigator !== 'undefined' ? navigator.onLine : true,
   );
-  // ✅ FIX: Tính timeRemaining từ startedAtServer, KHÔNG phải durationMinutes
-  const [timeRemaining, setTimeRemaining] = useState<number>(() => {
-    const startMs = new Date(startedAtServer).getTime();
-    const elapsed = (Date.now() - startMs) / 1000;
-    return Math.max(0, Math.floor(durationMinutes * 60 - elapsed));
-  });
+  // Initial: full duration; effect sẽ sync đúng deadline sticky ngay sau mount
+  const [timeRemaining, setTimeRemaining] = useState<number>(() =>
+    Math.max(0, Math.floor(durationMinutes * 60)),
+  );
   const [hasOtherTab, setHasOtherTab] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [warningLevel, setWarningLevel] = useState<TimeWarningLevel>(null);
@@ -249,16 +248,31 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
       durationMinutes,
       answers: { ...(initialAnswers ?? {}) },
     });
-    // Cập nhật reference time mỗi khi submissionId / startedAtServer đổi.
-    // Deadline tuyệt đối được lưu theo submissionId để F5/đóng mở tab không reset giờ.
-    const durationSec = durationMinutes * 60;
+    // Deadline tuyệt đối sticky theo submissionId.
+    // Ưu tiên localStorage; chỉ fallback sang startedAt khi CHƯA có mốc.
+    // KHÔNG BAO GIỜ ghi đè mốc cũ bằng mốc muộn hơn (tránh đếm lại từ đầu).
+    const durationSec = Math.max(1, durationMinutes) * 60;
     const key = timerStorageKey(role, examType, submissionId);
     timerStorageKeyRef.current = key;
-    const parsed = new Date(startedAtServer).getTime();
     const now = Date.now();
     const storedDeadline = readStoredDeadline(key);
-    const fallbackStartedAt = Number.isFinite(parsed) ? parsed : now;
-    const deadlineMs = storedDeadline ?? fallbackStartedAt + durationSec * 1000;
+    const parsed = parseVNDate(startedAtServer)?.getTime()
+      ?? (startedAtServer ? new Date(startedAtServer).getTime() : NaN);
+    const fromStart = Number.isFinite(parsed) ? parsed + durationSec * 1000 : null;
+
+    let deadlineMs: number;
+    if (storedDeadline != null && fromStart != null) {
+      // Lấy mốc sớm hơn → remaining không nhảy full
+      deadlineMs = Math.min(storedDeadline, fromStart);
+    } else if (storedDeadline != null) {
+      deadlineMs = storedDeadline;
+    } else if (fromStart != null) {
+      deadlineMs = fromStart;
+    } else {
+      deadlineMs = now + durationSec * 1000;
+    }
+    // Không vượt full duration tính từ bây giờ
+    deadlineMs = Math.min(deadlineMs, now + durationSec * 1000);
 
     deadlineMsRef.current = deadlineMs;
     startedAtMsRef.current = deadlineMs - durationSec * 1000;

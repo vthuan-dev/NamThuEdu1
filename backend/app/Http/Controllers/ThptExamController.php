@@ -467,9 +467,23 @@ class ThptExamController extends Controller
                 ?? 60);
 
             $startedAt = $existing->sStart_time ? \Carbon\Carbon::parse($existing->sStart_time) : now();
-            // Dùng giây để không mất thời gian do floor phút (diffInMinutes)
-            $timeElapsedSec = max(0, $startedAt->diffInSeconds(now()));
-            $timeRemaining = ($durationMin * 60 - $timeElapsedSec) / 60;
+            $payloadTmp = $existing->submission_payload ?? [];
+
+            // Absolute deadline snapshot — nguồn sự thật, không phụ thuộc TZ client
+            if (!empty($payloadTmp['timer_deadline_at'])) {
+                $deadlineAt = \Carbon\Carbon::parse($payloadTmp['timer_deadline_at']);
+            } else {
+                // Backfill cho submission cũ (chưa có timer_deadline_at)
+                $deadlineAt = $startedAt->copy()->addMinutes($durationMin);
+                $payloadTmp['timer_deadline_at'] = $deadlineAt->toIso8601String();
+                $existing->submission_payload = $payloadTmp;
+                $existing->save();
+            }
+
+            $remainingSecExact = $deadlineAt->isPast()
+                ? 0
+                : max(0, now()->diffInSeconds($deadlineAt));
+            $timeRemaining = $remainingSecExact / 60;
 
             if ($timeRemaining <= 0) {
                 // Tự động nộp bài khi hết giờ
@@ -525,7 +539,8 @@ class ThptExamController extends Controller
                     'exam_snapshot' => $existingPayload['exam_snapshot'] ?? null,
                     'duration_minutes' => $durationMin,
                     'time_remaining_seconds' => $remainingSec,
-                    'deadline_at' => $startedAt->copy()->addMinutes($durationMin)->toIso8601String(),
+                    'deadline_at' => $existingPayload['timer_deadline_at']
+                        ?? $startedAt->copy()->addMinutes($durationMin)->toIso8601String(),
                 ],
             ]);
         }
@@ -560,6 +575,8 @@ class ThptExamController extends Controller
                     'config' => $exam->thpt_config,
                     'eDuration_minutes' => $exam->eDuration_minutes,
                 ],
+                // Absolute deadline (ISO) — nguồn sự thật cho timer, không phụ thuộc TZ client
+                'timer_deadline_at' => now()->addMinutes((int) ($exam->eDuration_minutes ?? self::DEFAULT_DURATION_MINUTES))->toIso8601String(),
             ],
         ]);
 
@@ -573,7 +590,8 @@ class ThptExamController extends Controller
                 'resumed' => false,
                 'duration_minutes' => $durationMinNew,
                 'time_remaining_seconds' => $durationMinNew * 60,
-                'deadline_at' => \Carbon\Carbon::parse($submission->sStart_time)->addMinutes($durationMinNew)->toIso8601String(),
+                'deadline_at' => $submission->submission_payload['timer_deadline_at']
+                    ?? now()->addMinutes($durationMinNew)->toIso8601String(),
             ],
         ]);
     }
