@@ -766,10 +766,16 @@ export function StudentVstepExamPage() {
     .finally(() => setLoading(false));
   }, [examId, starting, startError, reviewMode, teacherMode]);
 
-  /* ── Reset per-skill timer when skill changes ────────────── */
+  /* ── Reset timer when skill (or speaking part) changes ────── */
   useEffect(() => {
-    setSkillTimeLeft(SKILL_TIME[current.skill] * 60);
-  }, [current.skill]);
+    if (current.skill === "speaking") {
+      // Speaking is timed per part (Part 1 = 3m, Part 2 = 4m, Part 3 = 5m).
+      const recSec = SPEAKING_TIMES[current.partNumber]?.recSec ?? SKILL_TIME.speaking * 60;
+      setSkillTimeLeft(recSec);
+    } else {
+      setSkillTimeLeft(SKILL_TIME[current.skill] * 60);
+    }
+  }, [current.skill, current.partNumber]);
 
   /* ── Per-skill countdown ─────────────────────────────────── */
   useEffect(() => {
@@ -780,11 +786,23 @@ export function StudentVstepExamPage() {
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [current.skill]);
+  }, [current.skill, current.partNumber]);
 
   /* ── Auto-advance skill when per-skill timer hits 0 ──────── */
   useEffect(() => {
     if (skillTimeLeft > 0) return;
+    // Speaking: each part is timed separately → advance part-by-part first.
+    if (current.skill === "speaking") {
+      const spNums = speakingParts.map((p) => p.partNumber).sort((a, b) => a - b);
+      const pIdx = spNums.indexOf(current.partNumber);
+      if (pIdx >= 0 && pIdx < spNums.length - 1) {
+        navigate2("speaking", spNums[pIdx + 1]);
+        return;
+      }
+      // last speaking part done → submit
+      handleAutoSubmit();
+      return;
+    }
     const present: SkillKey[] = [];
     if (listeningParts.length > 0) present.push("listening");
     if (readingParts.length > 0) present.push("reading");
@@ -799,7 +817,7 @@ export function StudentVstepExamPage() {
       handleAutoSubmit();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [skillTimeLeft, current.skill, listeningParts.length, readingParts.length, writingTasks.length, speakingParts.length]);
+  }, [skillTimeLeft, current.skill, current.partNumber, listeningParts.length, readingParts.length, writingTasks.length, speakingParts.length]);
 
   /* ── Auto-submit on timeout ─────────────────────────────── */
   // Dùng same robust flow như handleSubmit: bulk save có retry, nếu thất bại
