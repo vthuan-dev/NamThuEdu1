@@ -653,6 +653,11 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
                             }`}
                           >
                             Part {pn}
+                            {s === "speaking" && (
+                              <span className="ml-1 font-medium opacity-70">
+                                · {Math.max(1, Math.round((SPEAKING_TIMES[pn]?.recSec ?? 180) / 60))}m
+                              </span>
+                            )}
                             {isPartComplete(s, pn) && (
                               <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-emerald-500 text-white rounded-full flex items-center justify-center text-[9px] font-bold leading-none">
                                 ✓
