@@ -25,7 +25,6 @@ import {
   Users,
   MoreVertical,
   Send,
-  Sparkles,
 } from "lucide-react";
 import { getKidsExams, deleteKidsExam } from "../../../../services/kidsExamApi";
 import { api } from "../../../../services/api";
@@ -1039,7 +1038,7 @@ export function AllExams() {
                   {/* Card body */}
                   <div className="relative p-4 flex-1 flex flex-col">
                     {/* Top row: checkbox/owner-badge + status */}
-                    <div className="flex items-center justify-between gap-2 mb-3 min-h-[24px]">
+                    <div className={`flex items-center justify-between gap-2 mb-3 min-h-[24px] ${isRecentlyCreated(exam.eCreated_at, 2) ? "pr-10" : ""}`}>
                       {isOwner ? (
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           <button
@@ -1071,16 +1070,7 @@ export function AllExams() {
                         </span>
                       )}
 
-                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                        {isRecentlyCreated(exam.eCreated_at, 2) && (
-                          <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wide bg-gradient-to-r from-rose-500 to-orange-500 text-white shadow-md shadow-rose-300/50 ring-2 ring-rose-200/70 animate-pulse"
-                            title="Đề được tạo trong 2 ngày gần đây"
-                          >
-                            <Sparkles className="w-3 h-3" />
-                            Mới
-                          </span>
-                        )}
+                      <div className="flex items-center gap-1.5 flex-wrap justify-end pr-8">
                         {exam.eStatus === "draft" && (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
