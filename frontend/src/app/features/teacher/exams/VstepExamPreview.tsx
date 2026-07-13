@@ -216,26 +216,94 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
       .then((results) => {
         const [L, R, W, S] = results;
 
+        // Normalize payload: API may return { data: {...} } or nested { data: { data: {...} } }
+        const unwrap = (val: any) => val?.data?.data ?? val?.data ?? val ?? null;
+
+        let nextListening: ListeningPart[] = [];
+        let nextReading: ReadingPart[] = [];
+        let nextWriting: WritingTask[] = [];
+        let nextSpeaking: SpeakingPart[] = [];
+        let title = "VSTEP Exam";
+
         if (L.status === "fulfilled") {
-          const d = L.value?.data;
-          setExamTitle(d?.title || "VSTEP Exam");
-          setListeningParts(d?.parts || []);
+          const d = unwrap(L.value);
+          if (d?.title) title = d.title;
+          nextListening = Array.isArray(d?.parts) ? d.parts : [];
+          setListeningParts(nextListening);
         }
         if (R.status === "fulfilled") {
-          const d = R.value?.data;
-          setReadingParts(d?.parts || []);
-          if (d?.title) setExamTitle((t) => d.title || t);
+          const d = unwrap(R.value);
+          if (d?.title) title = d.title;
+          nextReading = Array.isArray(d?.parts) ? d.parts : [];
+          setReadingParts(nextReading);
         }
         if (W.status === "fulfilled") {
-          setWritingTasks(W.value?.data?.tasks || []);
+          const d = unwrap(W.value);
+          if (d?.title) title = d.title;
+          nextWriting = Array.isArray(d?.tasks) ? d.tasks : [];
+          setWritingTasks(nextWriting);
         }
         if (S.status === "fulfilled") {
-          setSpeakingParts(S.value?.data?.parts || []);
+          const d = unwrap(S.value);
+          if (d?.title) title = d.title;
+          nextSpeaking = Array.isArray(d?.parts) ? d.parts : [];
+          setSpeakingParts(nextSpeaking);
+        }
+        setExamTitle(title);
+
+        // ✅ Preview: auto-jump to first skill that actually has content.
+        // Reading-only exam must open Reading, not empty Listening.
+        const hasListening = nextListening.some(
+          (p) => (p.sections?.length ?? 0) > 0 || (p as any).questions?.length > 0
+        );
+        const hasReading = nextReading.some((p) => (p.questions?.length ?? 0) > 0 || !!(p.passage || "").trim());
+        const hasWriting = nextWriting.length > 0;
+        const hasSpeaking = nextSpeaking.length > 0;
+        const present: SkillKey[] = [];
+        if (hasListening) present.push("listening");
+        if (hasReading) present.push("reading");
+        if (hasWriting) present.push("writing");
+        if (hasSpeaking) present.push("speaking");
+
+        if (present.length > 0) {
+          const firstSkill = present[0];
+          let firstPart = PARTS_PER_SKILL[firstSkill][0];
+          if (firstSkill === "listening") {
+            firstPart = nextListening.find((p) => (p.sections?.length ?? 0) > 0)?.partNumber
+              ?? nextListening[0]?.partNumber
+              ?? firstPart;
+          } else if (firstSkill === "reading") {
+            firstPart = nextReading.find((p) => (p.questions?.length ?? 0) > 0 || !!(p.passage || "").trim())?.partNumber
+              ?? nextReading[0]?.partNumber
+              ?? firstPart;
+          } else if (firstSkill === "writing") {
+            firstPart = nextWriting[0]?.taskNumber ?? firstPart;
+          } else if (firstSkill === "speaking") {
+            firstPart = nextSpeaking[0]?.partNumber ?? firstPart;
+          }
+
+          // Only override saved progress if it points to an empty skill.
+          setCurrent((prev) => {
+            const prevOk =
+              (prev.skill === "listening" && hasListening) ||
+              (prev.skill === "reading" && hasReading) ||
+              (prev.skill === "writing" && hasWriting) ||
+              (prev.skill === "speaking" && hasSpeaking);
+            if (prevOk) return prev;
+            return { skill: firstSkill, partNumber: firstPart };
+          });
+          setMaxSkillIdx(present.length - 1);
+          setVisitedParts({
+            listening: new Set(hasListening ? PARTS_PER_SKILL.listening : []),
+            reading: new Set(hasReading ? PARTS_PER_SKILL.reading : []),
+            writing: new Set(hasWriting ? PARTS_PER_SKILL.writing : []),
+            speaking: new Set(hasSpeaking ? PARTS_PER_SKILL.speaking : []),
+          });
         }
       })
       .catch((e) => setError(e?.message || "Không thể tải đề thi"))
       .finally(() => setLoading(false));
-  }, [examId]);
+  }, [examId, admin]);
 
   /* ── Countdown timer — handled by per-skill useEffect above ── */
 
@@ -281,6 +349,32 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
     return { lq, rq, wq, sq, total, answered };
   }, [listeningParts, readingParts, writingTasks, speakingParts, answers, writingDrafts]);
 
+  /** Skills that actually have content — single-skill exams only show that skill in preview. */
+  const availableSkills = useMemo<SkillKey[]>(() => {
+    const present: SkillKey[] = [];
+    if (stats.lq > 0 || listeningParts.some((p) => (p.sections?.length ?? 0) > 0)) present.push("listening");
+    if (stats.rq > 0 || readingParts.some((p) => (p.questions?.length ?? 0) > 0 || !!(p.passage || "").trim())) present.push("reading");
+    if (stats.wq > 0) present.push("writing");
+    if (stats.sq > 0 || speakingParts.length > 0) present.push("speaking");
+    return present;
+  }, [stats, listeningParts, readingParts, speakingParts]);
+
+  /** Parts per skill, filtered to only parts that exist in this exam. */
+  const availableParts = useMemo<Record<SkillKey, number[]>>(() => {
+    return {
+      listening: listeningParts
+        .filter((p) => (p.sections?.length ?? 0) > 0 || (p as any).questions?.length > 0)
+        .map((p) => p.partNumber)
+        .sort((a, b) => a - b),
+      reading: readingParts
+        .filter((p) => (p.questions?.length ?? 0) > 0 || !!(p.passage || "").trim())
+        .map((p) => p.partNumber)
+        .sort((a, b) => a - b),
+      writing: writingTasks.map((t) => t.taskNumber).sort((a, b) => a - b),
+      speaking: speakingParts.map((p) => p.partNumber).sort((a, b) => a - b),
+    };
+  }, [listeningParts, readingParts, writingTasks, speakingParts]);
+
   const setAnswer = (qNum: number, letter: "A" | "B" | "C" | "D") =>
     setAnswers((prev) => ({ ...prev, [qNum]: letter }));
 
@@ -308,6 +402,22 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
           <p className="text-red-600 mb-3">{error}</p>
+          <Link to={backPath} className="text-blue-600 hover:underline">← Quay lại</Link>
+        </div>
+      </div>
+    );
+  }
+
+  // No skill content at all
+  if (!loading && availableSkills.length === 0 && stats.total === 0) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md px-4">
+          <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-3" />
+          <h2 className="text-lg font-semibold text-slate-900 mb-1">Chưa có nội dung để xem trước</h2>
+          <p className="text-sm text-slate-500 mb-4">
+            Đề này chưa có dữ liệu Listening/Reading/Writing/Speaking. Hãy mở lại trang chỉnh sửa để kiểm tra.
+          </p>
           <Link to={backPath} className="text-blue-600 hover:underline">← Quay lại</Link>
         </div>
       </div>
@@ -355,8 +465,11 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
   /* ── Điều hướng next ──────────────────────────────────────── */
   const goNext = () => {
     const order: Array<{ skill: SkillKey; part: number }> = [];
-    (Object.keys(PARTS_PER_SKILL) as SkillKey[]).forEach((s) => {
-      PARTS_PER_SKILL[s].forEach((p) => order.push({ skill: s, part: p }));
+    // Preview: only walk skills/parts that actually have content
+    const skillList = availableSkills.length > 0 ? availableSkills : (Object.keys(PARTS_PER_SKILL) as SkillKey[]);
+    skillList.forEach((s) => {
+      const parts = (availableParts[s]?.length ? availableParts[s] : PARTS_PER_SKILL[s]);
+      parts.forEach((p) => order.push({ skill: s, part: p }));
     });
     const idx = order.findIndex((o) => o.skill === current.skill && o.part === current.partNumber);
     const next = order[idx + 1];
@@ -418,7 +531,7 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
         <footer className="flex-shrink-0 bg-white border-t border-slate-200 shadow-[0_-2px_8px_rgba(0,0,0,0.04)] overflow-visible">
           <div className="relative px-8 py-3 flex items-center justify-center gap-6 overflow-visible">
             {/* Group skills — căn giữa */}
-            {(Object.keys(PARTS_PER_SKILL) as SkillKey[]).map((s) => {
+            {(availableSkills.length > 0 ? availableSkills : (Object.keys(PARTS_PER_SKILL) as SkillKey[])).map((s) => {
               const meta = SKILL_META[s];
               const Icon = meta.icon;
               const totalSkillQs =
@@ -426,39 +539,22 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
                 : s === "reading" ? stats.rq
                 : s === "writing" ? stats.wq
                 : stats.sq;
-              const sIdx = SKILL_ORDER.indexOf(s);
-              const lockedByTimer = current.skill === "listening" && timeLeft > 0 && s !== "listening";
-              const pastSkill = sIdx < maxSkillIdx;
+              // Teacher preview: free navigate across available skills/parts.
+              // Do NOT lock like real exam (timer / past skill).
+              const partsForSkill = (availableParts[s]?.length ? availableParts[s] : PARTS_PER_SKILL[s]);
               return (
                 <div key={s} className="flex flex-col items-center gap-1 flex-shrink-0">
                   <div className="flex items-center gap-1">
-                    {PARTS_PER_SKILL[s].map((pn) => {
+                    {partsForSkill.map((pn) => {
                       const isActive = current.skill === s && current.partNumber === pn;
-                      const isVisited = visitedParts[s]?.has(pn);
-                      const sameSkill = s === current.skill;
-                      // Same skill → free navigate; different skill → need visited
-                      const canClick = !lockedByTimer && !pastSkill && (sameSkill || isVisited);
-                      const tooltip = pastSkill
-                        ? "Không thể quay lại skill đã hoàn thành"
-                        : lockedByTimer
-                        ? "Không thể chuyển skill khi đang nghe"
-                        : (!isVisited && !sameSkill)
-                        ? "Nhấn Tiếp tục để chuyển đến phần này"
-                        : undefined;
-                      const showTip = !!tooltip && !isActive;
                       return (
                         <div key={pn} className="relative group">
                           <button
-                            onClick={() => canClick && navigate2(s, pn)}
-                            disabled={!canClick}
+                            onClick={() => navigate2(s, pn)}
                             className={`relative px-3 py-1.5 rounded-md text-xs font-semibold transition-all whitespace-nowrap ${
                               isActive
                                 ? "bg-amber-400 text-slate-900 shadow-sm"
-                                : pastSkill
-                                ? `${meta.bg} ${meta.color} opacity-40 cursor-not-allowed`
-                                : canClick
-                                ? `${meta.bg} ${meta.color} hover:brightness-95`
-                                : `${meta.bg} ${meta.color} cursor-not-allowed`
+                                : `${meta.bg} ${meta.color} hover:brightness-95`
                             }`}
                           >
                             Part {pn}
@@ -468,15 +564,6 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
                               </span>
                             )}
                           </button>
-                          {showTip && (
-                            <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-[200]
-                                            invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-150">
-                              <div className="bg-slate-800 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-md whitespace-nowrap shadow-lg">
-                                {tooltip}
-                              </div>
-                              <div className="w-2 h-2 bg-slate-800 rotate-45 mx-auto -mt-1" />
-                            </div>
-                          )}
                         </div>
                       );
                     })}
