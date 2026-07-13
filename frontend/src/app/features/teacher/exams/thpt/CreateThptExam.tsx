@@ -147,6 +147,36 @@ export function CreateThptExam() {
     return missing;
   }, [config]);
 
+  /**
+   * Các lỗi chặn xuất bản (đồng bộ rule backend validateThptConfig).
+   * Ví dụ: phần Nghe thiếu audio, thiếu câu hỏi, ...
+   */
+  const publishBlockers = useMemo<string[]>(() => {
+    const issues: string[] = [];
+    for (const [idx, sec] of config.sections.entries()) {
+      const label = sec.title || sectionMeta[sec.type]?.label || `Phần ${idx + 1}`;
+      if (sec.type === 'listening') {
+        if (!String((sec as any).audio_url || '').trim()) {
+          issues.push(`${label}: chưa có audio.`);
+        }
+        if (!Array.isArray((sec as any).items) || (sec as any).items.length === 0) {
+          issues.push(`${label}: chưa có câu hỏi nào.`);
+        }
+      }
+      if (sec.type === 'speaking') {
+        if (!Array.isArray((sec as any).items) || (sec as any).items.length === 0) {
+          issues.push(`${label}: chưa có đề nói nào.`);
+        }
+      }
+      if (sec.type === 'writing') {
+        if (!Array.isArray((sec as any).items) || (sec as any).items.length === 0) {
+          issues.push(`${label}: chưa có đề viết nào.`);
+        }
+      }
+    }
+    return issues;
+  }, [config]);
+
   // ── Init ───────────────────────────────────────────────────────────────
   useEffect(() => {
     let mounted = true;
@@ -227,14 +257,27 @@ export function CreateThptExam() {
 
   const handlePublish = async () => {
     if (!examId) return;
-    // Ràng buộc: mọi câu trắc nghiệm phải có đáp án đúng trước khi xuất bản.
-    if (missingAnswers.length > 0) {
-      const preview = missingAnswers.slice(0, 3).join(' · ');
-      toast.error(
-        `Còn ${missingAnswers.length} câu chưa chọn đáp án đúng. Vui lòng chọn đáp án trước khi xuất bản: ${preview}${missingAnswers.length > 3 ? ' …' : ''}`,
+
+    // 1) Ràng buộc client: thiếu audio / cấu trúc phần
+    if (publishBlockers.length > 0) {
+      const preview = publishBlockers.slice(0, 4).join(' · ');
+      toast.warning(
+        `Chưa xuất bản được — đề chưa đủ nội dung: ${preview}${publishBlockers.length > 4 ? ' …' : ''}`,
+        6000,
       );
       return;
     }
+
+    // 2) Ràng buộc: mọi câu trắc nghiệm / fill phải có đáp án đúng
+    if (missingAnswers.length > 0) {
+      const preview = missingAnswers.slice(0, 3).join(' · ');
+      toast.warning(
+        `Còn ${missingAnswers.length} câu chưa có đáp án đúng. Vui lòng bổ sung trước khi xuất bản: ${preview}${missingAnswers.length > 3 ? ' …' : ''}`,
+        6000,
+      );
+      return;
+    }
+
     const wasRepublish = examStatus === 'published';
     setIsPublishing(true);
     try {
@@ -250,9 +293,23 @@ export function CreateThptExam() {
       }
       navigate('/giao-vien/de-thi');
     } catch (err: any) {
-      const errs = err?.response?.data?.errors;
-      const msg = err?.response?.data?.message || 'Xuất bản thất bại.';
-      toast.error(Array.isArray(errs) ? `${msg}: ${errs.slice(0, 3).join(' · ')}` : msg);
+      const data = err?.response?.data;
+      const errs = data?.errors;
+      const msg = data?.message || 'Xuất bản thất bại.';
+      // 422 validation → warning rõ ràng (vd: thiếu audio Listening)
+      if (err?.response?.status === 422 || (Array.isArray(errs) && errs.length > 0)) {
+        const detail = Array.isArray(errs) && errs.length
+          ? errs.slice(0, 5).join(' · ')
+          : msg;
+        toast.warning(
+          Array.isArray(errs) && errs.length
+            ? `${msg} ${detail}`
+            : msg,
+          7000,
+        );
+      } else {
+        toast.error(msg, 5000);
+      }
     } finally {
       setIsPublishing(false);
     }
