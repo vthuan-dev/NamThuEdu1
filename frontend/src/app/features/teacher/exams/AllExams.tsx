@@ -25,6 +25,7 @@ import {
   Users,
   MoreVertical,
   Send,
+  Sparkles,
 } from "lucide-react";
 import { getKidsExams, deleteKidsExam } from "../../../../services/kidsExamApi";
 import { api } from "../../../../services/api";
@@ -36,6 +37,22 @@ import {
 } from "../../../../services/examGroupsApi";
 import { AssignModal, type AssignExam } from "../assignments/AssignModal";
 import { formatVNDate } from "@/utils/dateUtils";
+
+/** Đề được tạo trong N ngày gần đây → hiện badge "Mới tạo". */
+function isRecentlyCreated(createdAt: string | null | undefined, withinDays = 2): boolean {
+  if (!createdAt) return false;
+  const raw = String(createdAt).trim();
+  if (!raw) return false;
+  // Backend thường trả "YYYY-MM-DD HH:mm:ss" (giờ VN)
+  const iso = raw.includes("T")
+    ? raw
+    : raw.replace(" ", "T") + (raw.includes("+") || raw.endsWith("Z") ? "" : "+07:00");
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return false;
+  const ms = withinDays * 24 * 60 * 60 * 1000;
+  // Cho phép lệch clock nhỏ về phía tương lai
+  return Date.now() - t <= ms && Date.now() - t >= -60_000;
+}
 
 interface KidsExam {
   eId: number;
@@ -1049,7 +1066,16 @@ export function AllExams() {
                         </span>
                       )}
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                        {isRecentlyCreated(exam.eCreated_at, 2) && (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide bg-gradient-to-r from-rose-500 to-orange-500 text-white shadow-sm shadow-rose-200/60"
+                            title="Đề được tạo trong 2 ngày gần đây"
+                          >
+                            <Sparkles className="w-3 h-3" />
+                            Mới tạo
+                          </span>
+                        )}
                         {exam.eStatus === "draft" && (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
