@@ -35,7 +35,7 @@ import {
   getAdultExams,
 } from "../../../../services/examGroupsApi";
 import { AssignModal, type AssignExam } from "../assignments/AssignModal";
-import { formatVNDateTime, isRecentlyCreated } from "@/utils/dateUtils";
+import { formatVNDateTime, getVNTimestamp, isRecentlyCreated } from "@/utils/dateUtils";
 
 /** Ưu tiên thời điểm xuất bản thật (THPT versions) → updated → created. */
 function getExamPublishAt(exam: any): string | null {
@@ -176,9 +176,7 @@ export function AllExams() {
       const merged = deduped
         .filter((e) => e && e.eId && e.eTitle)
         .sort(
-          (a, b) =>
-            new Date(b.eCreated_at.replace(' ', 'T') + '+07:00').getTime() -
-            new Date(a.eCreated_at.replace(' ', 'T') + '+07:00').getTime()
+          (a, b) => getVNTimestamp(b.eCreated_at) - getVNTimestamp(a.eCreated_at)
         );
       setExams(merged);
     } catch (err: any) {
@@ -421,7 +419,7 @@ export function AllExams() {
       const u = e.eUpdated_at || e.updated_at;
       const c = e.eCreated_at;
       const src = sortBy === "updated_desc" ? u || c : c;
-      return src ? new Date(src.replace(' ', 'T') + '+07:00').getTime() : 0;
+      return src ? getVNTimestamp(src) : 0;
     };
     if (sortBy === "title_asc") {
       return (a.eTitle || "").localeCompare(b.eTitle || "", "vi");
