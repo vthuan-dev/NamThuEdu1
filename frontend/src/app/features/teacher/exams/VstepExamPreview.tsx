@@ -69,6 +69,54 @@ const PARTS_PER_SKILL: Record<SkillKey, number[]> = {
   speaking: [1, 2, 3],
 };
 
+
+/* ============================================================
+ *  CONTENT HELPERS — ignore empty skeletons from load APIs
+ * ============================================================ */
+function listeningPartHasContent(p?: ListeningPart | null): boolean {
+  if (!p) return false;
+  const sections = p.sections ?? [];
+  if (!sections.length) {
+    // legacy shape: questions directly on part
+    return Array.isArray((p as any).questions) && (p as any).questions.length > 0;
+  }
+  return sections.some((sec) => {
+    const hasQs = (sec.questions?.length ?? 0) > 0;
+    const hasAudio = !!(sec.audioUrl || "").trim();
+    const hasTranscript = !!(sec.transcript || "").trim();
+    return hasQs || hasAudio || hasTranscript;
+  });
+}
+
+function readingPartHasContent(p?: ReadingPart | null): boolean {
+  if (!p) return false;
+  return (p.questions?.length ?? 0) > 0 || !!(p.passage || "").trim();
+}
+
+function writingTaskHasContent(t?: WritingTask | null): boolean {
+  if (!t) return false;
+  return !!(t.prompt || "").trim() || !!(t.taskName || "").trim();
+}
+
+function speakingPartHasContent(p?: SpeakingPart | null): boolean {
+  if (!p) return false;
+  if (p.part1Data && p.part1Data.length > 0) return true;
+  if (p.part2Data && (p.part2Data.situation || p.part2Data.question)) return true;
+  if (p.part3Data && (p.part3Data.mainTopic || (p.part3Data.followUpQuestions?.length ?? 0) > 0)) return true;
+  return false;
+}
+
+function normalizeSkillKey(raw: unknown): SkillKey | "mixed" | null {
+  const s = String(raw ?? "").toLowerCase().trim();
+  if (!s) return null;
+  if (s === "mixed" || s === "full" || s === "all") return "mixed";
+  if (s === "listening" || s === "l") return "listening";
+  if (s === "reading" || s === "r") return "reading";
+  if (s === "writing" || s === "w") return "writing";
+  if (s === "speaking" || s === "s") return "speaking";
+  return null;
+}
+
 /* ============================================================
  *  COMPONENT
  * ============================================================ */
@@ -85,6 +133,8 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
   const [readingParts, setReadingParts] = useState<ReadingPart[]>([]);
   const [writingTasks, setWritingTasks] = useState<WritingTask[]>([]);
   const [speakingParts, setSpeakingParts] = useState<SpeakingPart[]>([]);
+  /** Declared exam skill from backend (reading/listening/.../mixed). Single-skill exams only preview that skill. */
+  const [declaredSkill, setDeclaredSkill] = useState<SkillKey | "mixed" | null>(null);
 
   const SKILL_ORDER: SkillKey[] = ["listening", "reading", "writing", "speaking"];
 
@@ -181,6 +231,7 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
   // Countdown disabled in preview mode (giáo viên chỉ xem trước, không tính giờ).
 
   // Guard: đề kids bị route nhầm sang preview VSTEP → chuyển về đúng trang kids.
+  // Đồng thời đọc eSkill để preview single-skill (reading-only) không hiện full test.
   useEffect(() => {
     if (!examId) return;
     let cancelled = false;
@@ -196,6 +247,12 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
             admin ? `/admin/de-thi/xem/kids/${examId}` : `/giao-vien/de-thi/${examId}/xem-moi`,
             { replace: true }
           );
+          return;
+        }
+        if (!cancelled) {
+          const skill = normalizeSkillKey(ex?.eSkill ?? ex?.skill ?? ex?.e_skill);
+          setDeclaredSkill(skill);
+          if (ex?.eTitle) setExamTitle(String(ex.eTitle));
         }
       } catch { /* bỏ qua — để luồng VSTEP tự xử lý */ }
     })();
@@ -251,31 +308,37 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
         }
         setExamTitle(title);
 
-        // ✅ Preview: auto-jump to first skill that actually has content.
-        // Reading-only exam must open Reading, not empty Listening.
-        const hasListening = nextListening.some(
-          (p) => (p.sections?.length ?? 0) > 0 || (p as any).questions?.length > 0
-        );
-        const hasReading = nextReading.some((p) => (p.questions?.length ?? 0) > 0 || !!(p.passage || "").trim());
+        // Drop empty skeletons so state never pretends missing skills exist.
+        nextListening = nextListening.filter(listeningPartHasContent);
+        nextReading = nextReading.filter(readingPartHasContent);
+        nextWriting = nextWriting.filter(writingTaskHasContent);
+        nextSpeaking = nextSpeaking.filter(speakingPartHasContent);
+        setListeningParts(nextListening);
+        setReadingParts(nextReading);
+        setWritingTasks(nextWriting);
+        setSpeakingParts(nextSpeaking);
+
+        // ✅ Preview: auto-jump to first skill that actually has REAL content.
+        // Backend listening/speaking loaders return empty skeletons — ignore those.
+        const hasListening = nextListening.length > 0;
+        const hasReading = nextReading.length > 0;
         const hasWriting = nextWriting.length > 0;
         const hasSpeaking = nextSpeaking.length > 0;
-        const present: SkillKey[] = [];
+        let present: SkillKey[] = [];
         if (hasListening) present.push("listening");
         if (hasReading) present.push("reading");
         if (hasWriting) present.push("writing");
         if (hasSpeaking) present.push("speaking");
 
+        // If exam declares a single skill (e.g. reading), force preview to that skill only.
+        // (content may still refine parts; empty declared skill falls back to content detection)
         if (present.length > 0) {
           const firstSkill = present[0];
           let firstPart = PARTS_PER_SKILL[firstSkill][0];
           if (firstSkill === "listening") {
-            firstPart = nextListening.find((p) => (p.sections?.length ?? 0) > 0)?.partNumber
-              ?? nextListening[0]?.partNumber
-              ?? firstPart;
+            firstPart = nextListening[0]?.partNumber ?? firstPart;
           } else if (firstSkill === "reading") {
-            firstPart = nextReading.find((p) => (p.questions?.length ?? 0) > 0 || !!(p.passage || "").trim())?.partNumber
-              ?? nextReading[0]?.partNumber
-              ?? firstPart;
+            firstPart = nextReading[0]?.partNumber ?? firstPart;
           } else if (firstSkill === "writing") {
             firstPart = nextWriting[0]?.taskNumber ?? firstPart;
           } else if (firstSkill === "speaking") {
@@ -292,12 +355,12 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
             if (prevOk) return prev;
             return { skill: firstSkill, partNumber: firstPart };
           });
-          setMaxSkillIdx(present.length - 1);
+          setMaxSkillIdx(Math.max(0, present.length - 1));
           setVisitedParts({
-            listening: new Set(hasListening ? PARTS_PER_SKILL.listening : []),
-            reading: new Set(hasReading ? PARTS_PER_SKILL.reading : []),
-            writing: new Set(hasWriting ? PARTS_PER_SKILL.writing : []),
-            speaking: new Set(hasSpeaking ? PARTS_PER_SKILL.speaking : []),
+            listening: new Set(nextListening.map((p) => p.partNumber)),
+            reading: new Set(nextReading.map((p) => p.partNumber)),
+            writing: new Set(nextWriting.map((t) => t.taskNumber)),
+            speaking: new Set(nextSpeaking.map((p) => p.partNumber)),
           });
         }
       })
@@ -312,7 +375,7 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
     if (skill === "listening") {
       const part = listeningParts.find((p) => p.partNumber === pn);
       if (!part) return false;
-      const qs = part.sections.flatMap((s) => s.questions);
+      const qs = (part.sections ?? []).flatMap((s) => s.questions ?? []);
       return qs.length > 0 && qs.every((q) => answers[q.questionNumber]);
     }
     if (skill === "reading") {
@@ -331,15 +394,19 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
 
   /* ── Stats ────────────────────────────────────────────────── */
   const stats = useMemo(() => {
-    const lq = listeningParts.reduce(
-      (sum, p) => sum + p.sections.reduce((s, sec) => s + (sec.questions?.length || 0), 0),
-      0
-    );
+    const lq = listeningParts.reduce((sum, p) => {
+      const sections = p.sections ?? [];
+      if (!sections.length && Array.isArray((p as any).questions)) {
+        return sum + ((p as any).questions.length || 0);
+      }
+      return sum + sections.reduce((s, sec) => s + (sec.questions?.length || 0), 0);
+    }, 0);
     const rq = readingParts.reduce((sum, p) => sum + (p.questions?.length || 0), 0);
-    const wq = writingTasks.length;
+    const wq = writingTasks.filter(writingTaskHasContent).length;
     const sq = speakingParts.reduce((sum, p) => {
+      if (!speakingPartHasContent(p)) return sum;
       let n = 0;
-      if (p.part1Data) n += p.part1Data.reduce((s, t) => s + t.questions.length, 0);
+      if (p.part1Data) n += p.part1Data.reduce((s, t) => s + (t.questions?.length || 0), 0);
       if (p.part2Data) n += 1;
       if (p.part3Data) n += (p.part3Data.followUpQuestions?.length || 0) + 1;
       return sum + n;
@@ -349,31 +416,59 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
     return { lq, rq, wq, sq, total, answered };
   }, [listeningParts, readingParts, writingTasks, speakingParts, answers, writingDrafts]);
 
-  /** Skills that actually have content — single-skill exams only show that skill in preview. */
-  const availableSkills = useMemo<SkillKey[]>(() => {
+  /** Skills that actually have REAL content — ignore empty API skeletons. */
+  const contentSkills = useMemo<SkillKey[]>(() => {
     const present: SkillKey[] = [];
-    if (stats.lq > 0 || listeningParts.some((p) => (p.sections?.length ?? 0) > 0)) present.push("listening");
-    if (stats.rq > 0 || readingParts.some((p) => (p.questions?.length ?? 0) > 0 || !!(p.passage || "").trim())) present.push("reading");
-    if (stats.wq > 0) present.push("writing");
-    if (stats.sq > 0 || speakingParts.length > 0) present.push("speaking");
+    if (listeningParts.some(listeningPartHasContent) || stats.lq > 0) present.push("listening");
+    if (readingParts.some(readingPartHasContent) || stats.rq > 0) present.push("reading");
+    if (writingTasks.some(writingTaskHasContent) || stats.wq > 0) present.push("writing");
+    if (speakingParts.some(speakingPartHasContent) || stats.sq > 0) present.push("speaking");
     return present;
-  }, [stats, listeningParts, readingParts, speakingParts]);
+  }, [stats, listeningParts, readingParts, writingTasks, speakingParts]);
 
-  /** Parts per skill, filtered to only parts that exist in this exam. */
+  /**
+   * Final skills shown in teacher preview.
+   * - If exam declares single skill (eSkill=reading) → ONLY that skill (even if other skeletons exist).
+   * - If mixed/full/unknown → fall back to content detection.
+   */
+  const availableSkills = useMemo<SkillKey[]>(() => {
+    if (declaredSkill && declaredSkill !== "mixed") {
+      // Single-skill exam: only show that skill if it has content; else still pin to declared skill
+      // so UI doesn't fall back to full 4-skill chrome.
+      if (contentSkills.includes(declaredSkill) || contentSkills.length === 0) {
+        return [declaredSkill];
+      }
+      // Declared skill empty but other content exists (data mismatch) → show content skills
+      return contentSkills;
+    }
+    return contentSkills;
+  }, [declaredSkill, contentSkills]);
+
+  /** Parts per skill, filtered to only parts that have real content. */
   const availableParts = useMemo<Record<SkillKey, number[]>>(() => {
     return {
-      listening: listeningParts
-        .filter((p) => (p.sections?.length ?? 0) > 0 || (p as any).questions?.length > 0)
-        .map((p) => p.partNumber)
-        .sort((a, b) => a - b),
-      reading: readingParts
-        .filter((p) => (p.questions?.length ?? 0) > 0 || !!(p.passage || "").trim())
-        .map((p) => p.partNumber)
-        .sort((a, b) => a - b),
-      writing: writingTasks.map((t) => t.taskNumber).sort((a, b) => a - b),
-      speaking: speakingParts.map((p) => p.partNumber).sort((a, b) => a - b),
+      listening: listeningParts.filter(listeningPartHasContent).map((p) => p.partNumber).sort((a, b) => a - b),
+      reading: readingParts.filter(readingPartHasContent).map((p) => p.partNumber).sort((a, b) => a - b),
+      writing: writingTasks.filter(writingTaskHasContent).map((t) => t.taskNumber).sort((a, b) => a - b),
+      speaking: speakingParts.filter(speakingPartHasContent).map((p) => p.partNumber).sort((a, b) => a - b),
     };
   }, [listeningParts, readingParts, writingTasks, speakingParts]);
+
+  // Keep current skill inside availableSkills (e.g. reading-only after load)
+  useEffect(() => {
+    if (!availableSkills.length) return;
+    if (availableSkills.includes(current.skill)) {
+      // also clamp part to available parts of current skill
+      const parts = availableParts[current.skill] ?? [];
+      if (parts.length && !parts.includes(current.partNumber)) {
+        setCurrent((prev) => ({ ...prev, partNumber: parts[0] }));
+      }
+      return;
+    }
+    const skill = availableSkills[0];
+    const parts = availableParts[skill] ?? PARTS_PER_SKILL[skill];
+    setCurrent({ skill, partNumber: parts[0] ?? 1 });
+  }, [availableSkills, availableParts, current.skill, current.partNumber]);
 
   const setAnswer = (qNum: number, letter: "A" | "B" | "C" | "D") =>
     setAnswers((prev) => ({ ...prev, [qNum]: letter }));
@@ -468,7 +563,7 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
     // Preview: only walk skills/parts that actually have content
     const skillList = availableSkills.length > 0 ? availableSkills : (Object.keys(PARTS_PER_SKILL) as SkillKey[]);
     skillList.forEach((s) => {
-      const parts = (availableParts[s]?.length ? availableParts[s] : PARTS_PER_SKILL[s]);
+      const parts = availableParts[s]?.length ? availableParts[s] : [];
       parts.forEach((p) => order.push({ skill: s, part: p }));
     });
     const idx = order.findIndex((o) => o.skill === current.skill && o.part === current.partNumber);
@@ -541,7 +636,7 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
                 : stats.sq;
               // Teacher preview: free navigate across available skills/parts.
               // Do NOT lock like real exam (timer / past skill).
-              const partsForSkill = (availableParts[s]?.length ? availableParts[s] : PARTS_PER_SKILL[s]);
+              const partsForSkill = availableParts[s]?.length ? availableParts[s] : [];
               return (
                 <div key={s} className="flex flex-col items-center gap-1 flex-shrink-0">
                   <div className="flex items-center gap-1">
