@@ -104,64 +104,41 @@ export const AGE_GROUP_CATALOG: AgeGroupCatalog[] = [
     iconName: 'GraduationCap',
     iconColor: '#0D9488',
     examTypes: [
+      // Listening / Speaking Teens từng là card riêng (TeensAudio) — bị dư vì
+      // creator "Đề tổng hợp" đã có sẵn section Listening (MCQ / điền / ảnh đề)
+      // và Speaking trong AddSectionModal. Giữ 1 entry duy nhất.
       {
         value: 'teens-thpt',
         examType: 'THPT',
         name: 'Đề tổng hợp Teens',
-        description: 'Tự chọn dạng câu hỏi: ngữ pháp, từ vựng, đọc hiểu, nghe… — linh hoạt theo ý bạn',
-        tagline: 'Đề đa dạng cho học viên cấp 2–3: trộn nhiều dạng câu hỏi + phần Nghe trong một đề',
+        description:
+          'Tự chọn dạng trong modal: ngữ pháp, đọc, viết, nghe (MCQ / điền / ảnh đề), nói…',
+        tagline:
+          'Một creator linh hoạt: trộn nhiều phần trong 1 đề — kể cả Listening có ảnh đề và Speaking AI',
         duration: '60 phút',
         iconName: 'GraduationCap',
         iconColor: '#2563EB',
         themeColor: '#2563EB',
         highlights: [
-          { iconName: 'Layers', label: 'Cấu trúc', value: 'Linh hoạt 1-6 phần, tự chọn' },
-          { iconName: 'ListChecks', label: 'Dạng câu', value: 'Ngữ pháp · Đọc hiểu · Nghe · …' },
-          { iconName: 'Users', label: 'Đối tượng', value: 'Lớp 6 → 12, ĐGNL' },
+          { iconName: 'Layers', label: 'Cấu trúc', value: 'Thêm phần linh hoạt trong modal' },
+          {
+            iconName: 'ListChecks',
+            label: 'Dạng câu',
+            value: 'Ngữ pháp · Đọc · Viết · Nghe · Nói',
+          },
+          {
+            iconName: 'Image',
+            label: 'Listening',
+            value: 'MCQ · Điền từ · Ảnh đề nguyên khối',
+          },
+          {
+            iconName: 'Mic',
+            label: 'Speaking',
+            value: 'Ghi âm + AI chấm',
+          },
         ],
         needsSkill: false,
         badge: 'Mới',
-      },
-      {
-        value: 'teens-listening',
-        examType: 'TeensAudio',
-        name: 'Listening Teens',
-        description: 'Audio + ảnh đề nguyên khối + MCQ / điền từ (giống IELTS)',
-        tagline: 'Upload 1 ảnh form/note cho cả phần — HS thấy trái ảnh, phải câu trả lời',
-        duration: '30 phút',
-        iconName: 'Headphones',
-        iconColor: '#0EA5E9',
-        themeColor: '#0EA5E9',
-        highlights: [
-          { iconName: 'Image', label: 'Layout', value: 'Ảnh đề + đáp án 2 cột' },
-          { iconName: 'ListChecks', label: 'Dạng câu', value: 'MCQ · Điền từ' },
-          { iconName: 'Volume2', label: 'Audio', value: '1 file / phần' },
-        ],
-        needsSkill: true,
-        skills: [
-          { value: 'listening', label: 'Listening', description: 'Audio + ảnh đề + câu hỏi' },
-        ],
-        badge: 'Ảnh đề',
-      },
-      {
-        value: 'teens-speaking',
-        examType: 'TeensAudio',
-        name: 'Speaking Teens',
-        description: 'Đề nói — học viên ghi âm, AI chấm điểm',
-        tagline: 'Tạo part speaking riêng hoặc nguyên skill cho học viên teens',
-        duration: '15 phút',
-        iconName: 'Mic',
-        iconColor: '#EC4899',
-        themeColor: '#EC4899',
-        highlights: [
-          { iconName: 'Mic', label: 'Hình thức', value: 'Ghi âm + AI chấm' },
-          { iconName: 'Layers', label: 'Cấu trúc', value: '1 hoặc nhiều part' },
-          { iconName: 'Users', label: 'Đối tượng', value: 'Teens 13–17' },
-        ],
-        needsSkill: true,
-        skills: [
-          { value: 'speaking', label: 'Speaking', description: 'Ghi âm · AI chấm' },
-        ],
       },
     ],
   },
@@ -286,10 +263,12 @@ export function buildCreatorUrl(opts: {
     case 'THPT':
       return '/giao-vien/de-thi/thpt/tao-moi';
 
+/* ── DISABLED: creator riêng TeensAudio bị dư vì THPT modal đã có Listening/Speaking ──
     case 'TeensAudio': {
       const slug = skill === 'speaking' ? 'speaking' : 'listening';
       return `/giao-vien/de-thi/teens/${slug}/tao-moi`;
     }
+    ── /DISABLED ───────────────────────────────────────────────────────────────────── */
 
     case 'IELTS': {
       const slug = !skill || skill === 'mixed' ? 'full' : skill;

@@ -120,7 +120,7 @@ const MODAL_OPTIONS: OptionMeta[] = [
   {
     type: 'listening',
     label: 'Nghe trắc nghiệm',
-    description: 'Tải audio + câu hỏi chọn đáp án A/B/C/D',
+    description: 'Audio + câu hỏi chọn đáp án A/B/C/D — tự chấm',
     icon: 'Headphones',
     group: 'listening',
     initItemKind: 'mc',
@@ -128,7 +128,7 @@ const MODAL_OPTIONS: OptionMeta[] = [
   {
     type: 'listening',
     label: 'Nghe điền chỗ trống',
-    description: 'Tải audio + câu hỏi tự nhập từ điền vào chỗ trống',
+    description: 'Audio + tự nhập từ vào chỗ trống — tự chấm',
     icon: 'PenLine',
     group: 'listening',
     initItemKind: 'fill_blank',
@@ -136,7 +136,7 @@ const MODAL_OPTIONS: OptionMeta[] = [
   {
     type: 'listening',
     label: 'Nghe + ảnh đề (form/note)',
-    description: 'Audio + 1 ảnh đề nguyên khối — HS: trái ảnh, phải câu (kiểu IELTS)',
+    description: 'Audio + 1 ảnh đề nguyên khối (trái ảnh · phải câu) — kiểu IELTS',
     icon: 'Image',
     group: 'listening',
     initItemKind: 'mc',
@@ -146,7 +146,7 @@ const MODAL_OPTIONS: OptionMeta[] = [
   {
     type: 'speaking',
     label: 'Nói (Speaking)',
-    description: 'Đề nói — học viên ghi âm, AI chấm điểm',
+    description: 'Đề nói — học viên ghi âm, AI chấm (có thể nhiều part)',
     icon: 'Mic',
     group: 'speaking',
   },
