@@ -1147,32 +1147,24 @@ export function AllExams() {
                           {exam.eDuration} phút
                         </span>
                       )}
-                      <div className="ml-auto flex flex-col items-end gap-0.5 text-[10px] leading-tight">
-                        <span
-                          className="inline-flex items-center gap-1 text-gray-500"
-                          title="Thời điểm tạo đề"
-                        >
-                          <Calendar className="w-3 h-3 text-gray-400" />
-                          <span className="text-gray-400">Tạo</span>
-                          <span className="font-semibold text-slate-600">
-                            {formatVNDateTime(exam.eCreated_at)}
-                          </span>
-                        </span>
-                        {(exam.eStatus === "published" ||
+                      {(() => {
+                        const isPublished =
+                          exam.eStatus === "published" ||
                           exam.eStatus === "active" ||
-                          exam.eStatus === "pending") && (
+                          exam.eStatus === "pending";
+                        const when = isPublished
+                          ? getExamPublishAt(exam) || exam.eCreated_at
+                          : exam.eCreated_at;
+                        return (
                           <span
-                            className="inline-flex items-center gap-1 text-emerald-700"
-                            title="Thời điểm xuất bản (theo lần tạo/cập nhật gần nhất có sẵn)"
+                            className="inline-flex items-center gap-1 ml-auto text-[10px] text-gray-500"
+                            title={isPublished ? "Thời điểm xuất bản" : "Thời điểm tạo đề"}
                           >
-                            <Clock className="w-3 h-3 text-emerald-500" />
-                            <span className="text-emerald-600/80">Xuất bản</span>
-                            <span className="font-semibold">
-                              {formatVNDateTime(getExamPublishAt(exam))}
-                            </span>
+                            <Calendar className="w-3 h-3 text-gray-400" />
+                            {formatVNDateTime(when)}
                           </span>
-                        )}
-                      </div>
+                        );
+                      })()}
                     </div>
                   </div>
 
