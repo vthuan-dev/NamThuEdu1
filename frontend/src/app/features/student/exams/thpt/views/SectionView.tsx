@@ -83,13 +83,13 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
     return (
       <section className="space-y-5">
         {headerEl}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:h-[calc(100vh-11rem)] lg:min-h-[520px]">
-          {/* Cột bài đọc — cố định khung, cuộn riêng nếu dài */}
-          <div className="lg:h-full lg:overflow-y-auto lg:pr-1 lg:sticky lg:top-[88px] lg:self-start overscroll-contain">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+          {/* Cột bài đọc — sticky, không bẫy wheel */}
+          <div className="lg:sticky lg:top-[88px] lg:self-start">
             <PassageBox text={passageText!} markers={section.type === 'reading_mixed'} />
           </div>
-          {/* Cột câu hỏi — cuộn riêng */}
-          <div className="lg:h-full lg:overflow-y-auto lg:pr-1 space-y-5 overscroll-contain">
+          {/* Cột câu hỏi — cuộn theo trang */}
+          <div className="space-y-5">
             <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} writingParts={writingParts} correctQuestions={correctQuestions} hidePassage />
           </div>
         </div>
@@ -108,29 +108,30 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
             <audio controls src={(section as any).audio_url} className="w-full h-10" />
           </div>
         )}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start lg:h-[calc(100vh-11rem)] lg:min-h-[560px]">
-          {/* Cột ảnh: cố định khung — cuộn câu hỏi không kéo ảnh */}
-          <div className="lg:h-full lg:min-h-0 lg:overflow-hidden">
-            <div className="rounded-2xl border border-slate-200 bg-white p-2.5 sm:p-3 shadow-sm lg:h-full flex flex-col min-h-0">
-              <div className="flex items-center justify-between gap-2 mb-2 px-1 flex-shrink-0">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+          {/* Cột ảnh: sticky — chuột trên ảnh vẫn cuộn trang được */}
+          <div className="lg:sticky lg:top-[88px] lg:self-start">
+            <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="flex items-center justify-between gap-2 mb-2 px-1">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-teal-700">Ảnh đề</span>
                 <a href={taskImage} target="_blank" rel="noreferrer" className="text-[11px] font-semibold text-teal-700 hover:underline">
                   Phóng to
                 </a>
               </div>
-              <div className="relative flex-1 min-h-[320px] lg:min-h-0 rounded-xl border border-slate-100 bg-slate-50 overflow-hidden">
-                <a href={taskImage} target="_blank" rel="noreferrer" className="absolute inset-0 block group">
-                  <img
-                    src={taskImage}
-                    alt="Ảnh đề"
-                    className="w-full h-full object-contain object-top scale-[1.04] origin-top"
-                  />
-                </a>
-              </div>
+              <a href={taskImage} target="_blank" rel="noreferrer" className="block group relative">
+                <img
+                  src={taskImage}
+                  alt="Ảnh đề"
+                  className="w-full object-contain object-top rounded-xl border border-slate-100 bg-slate-50 max-h-[calc(100vh-14rem)] scale-[1.03] origin-top"
+                />
+                <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-black/50 text-white text-[11px] font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                  Phóng to
+                </span>
+              </a>
             </div>
           </div>
-          {/* Cột câu hỏi: cuộn độc lập */}
-          <div className="lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pr-1 space-y-5 overscroll-contain">
+          {/* Cột câu hỏi: cuộn theo trang (không nested scroll) */}
+          <div className="space-y-5">
             <Body
               section={section}
               answers={answers}
