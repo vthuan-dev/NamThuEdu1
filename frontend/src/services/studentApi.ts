@@ -14,6 +14,8 @@ export interface TestAssignment {
   start_time: string;
   end_time: string;
   deadline?: string | null;
+  /** Thời điểm giáo viên giao (alias start_time / taCreated_at). */
+  assigned_at?: string | null;
   is_urgent: boolean;
   time_remaining: string;
   attempts_allowed: number;

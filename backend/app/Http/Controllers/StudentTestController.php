@@ -209,6 +209,7 @@ class StudentTestController extends Controller
                 'total_questions'  => $exam->getQuestionsCount(),
                 'max_score'        => $exam->eTotal_score ?? 100,
                 'start_time'       => $assignment->taCreated_at,
+                'assigned_at'      => $assignment->taCreated_at,
                 'end_time'         => $assignment->taDeadline,
                 'deadline'         => $assignment->taDeadline,
                 'is_urgent'        => $isUrgent,

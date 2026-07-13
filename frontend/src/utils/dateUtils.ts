@@ -76,3 +76,22 @@ export function isRecentlyCreated(
   const ms = withinDays * 24 * 60 * 60 * 1000;
   return now - effective <= ms;
 }
+
+/**
+ * Thời điểm có trong N giờ gần đây không?
+ * Dùng cho badge "Mới giao" (1h) trên bài tập học viên.
+ */
+export function isWithinLastHours(
+  dateStr: string | null | undefined,
+  withinHours = 1,
+): boolean {
+  const d = parseVNDate(dateStr);
+  if (!d) return false;
+  const now = Date.now();
+  const t = d.getTime();
+  // Cho phép lệch TZ tối đa 2h về phía tương lai
+  if (t > now + 2 * 60 * 60 * 1000) return false;
+  const effective = Math.min(t, now);
+  return now - effective <= withinHours * 60 * 60 * 1000;
+}
+

@@ -11,10 +11,11 @@ import {
   Clock, ListChecks, Search, Play, RotateCcw,
   Sparkles, Gift, ClipboardList, BookOpen, AlertTriangle,
   Headphones, Mic, PenLine, FileText, ArrowRight, CheckCircle,
-  CalendarDays,
+  CalendarDays, Zap,
 } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
 import { usePageTitle, PAGE_TITLES } from '../../../../hooks/usePageTitle';
+import { getVNTimestamp, isWithinLastHours } from '@/utils/dateUtils';
 
 const BASE = '/hoc-vien';
 const TEAL = '#0D9488';
@@ -66,6 +67,8 @@ interface TeensExamItem {
   isAssigned: boolean;
   deadline?: string | null;
   createdAt?: string | null;
+  /** Thời điểm giáo viên giao (taCreated_at → start_time). */
+  assignedAt?: string | null;
 }
 
 // ─── Card ──────────────────────────────────────────────────────────────────────
@@ -110,8 +113,18 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
       ? `${BASE}/phong-cho/${item.assignmentId}`
       : `${BASE}/bai-tap`);
 
+  const isNewAssign = isWithinLastHours(item.assignedAt, 1);
+
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-xl bg-white ring-1 ring-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all duration-300 hover:-translate-y-0.5 hover:ring-teal-300/70 hover:shadow-[0_12px_26px_-14px_rgba(13,148,136,0.3)]">
+      {isNewAssign && (
+        <span
+          className="absolute top-3 -right-7 rotate-45 z-20 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[9px] font-extrabold uppercase tracking-wider px-8 py-0.5 shadow-md animate-pulse"
+          title="Giáo viên vừa giao trong 1 giờ gần đây"
+        >
+          Mới
+        </span>
+      )}
       {/* Orb trang trí — hình tròn mờ tông teal/cyan, đậm hơn khi hover (đồng bộ thẻ adults) */}
       <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full opacity-40 group-hover:opacity-70 transition-opacity duration-300 pointer-events-none"
         style={{ background: 'radial-gradient(circle, rgba(45,212,191,0.35), transparent 70%)' }} />
@@ -158,6 +171,16 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
           {showAssignedBadge && effectiveAssigned && (
             <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 rounded px-1.5 py-0.5">
               <Gift className="w-2.5 h-2.5" /> GV giao
+            </span>
+          )}
+          {isWithinLastHours(item.assignedAt, 1) && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wide text-white rounded-full px-2 py-0.5 shadow-sm animate-pulse"
+              style={{ background: 'linear-gradient(135deg, #F43F5E 0%, #F97316 100%)', boxShadow: '0 2px 8px rgba(244,63,94,0.35)' }}
+              title="Giáo viên vừa giao trong 1 giờ gần đây"
+            >
+              <Zap className="w-2.5 h-2.5 fill-current" />
+              Mới giao
             </span>
           )}
         </div>
@@ -241,6 +264,8 @@ export function TeensTests() {
       isAssigned: true,
       deadline: t.deadline ?? null,
       createdAt: t.created_at ?? t.exam_created_at ?? null,
+      // API map taCreated_at → start_time
+      assignedAt: t.assigned_at ?? t.start_time ?? t.created_at ?? null,
     }));
     const isPastDeadline = (d?: string | null) => !!d && new Date(d).getTime() < Date.now();
     return [
@@ -270,7 +295,11 @@ export function TeensTests() {
     // Sort items
     const sorted = [...result];
     if (sortBy === 'newest') {
-      sorted.sort((a, b) => b.examId - a.examId);
+      sorted.sort(
+        (a, b) =>
+          getVNTimestamp(b.assignedAt || b.createdAt) - getVNTimestamp(a.assignedAt || a.createdAt)
+          || b.examId - a.examId,
+      );
     } else if (sortBy === 'duration') {
       sorted.sort((a, b) => (b.duration ?? 0) - (a.duration ?? 0));
     } else if (sortBy === 'questions') {

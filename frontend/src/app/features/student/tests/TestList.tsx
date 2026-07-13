@@ -39,6 +39,7 @@ import {
 import { studentApi } from "../../../../services/studentApi";
 import { getAuthUser } from "../../../../utils/authStorage";
 import { getSkillColor, getSkillIcon } from "../../../../utils/skillHelpers";
+import { isWithinLastHours } from "@/utils/dateUtils";
 
 type TestStatus = 'all' | 'pending' | 'in_progress' | 'completed' | 'overdue';
 type TestType = 'all' | 'IELTS' | 'VSTEP' | 'TOEIC';
@@ -83,6 +84,18 @@ function isOverdue(test: any): boolean {
   if (!test.deadline) return false;
   if (test.status === 'completed') return false;
   return new Date(test.deadline) < new Date();
+}
+
+/** Đề vừa được giáo viên giao trong 1 giờ gần đây. */
+function isNewlyAssigned(test: any): boolean {
+  // Backend map taCreated_at → start_time; fallback assigned_at/created_at nếu có.
+  const when =
+    test?.assigned_at ||
+    test?.start_time ||
+    test?.created_at ||
+    test?.taCreated_at ||
+    null;
+  return isWithinLastHours(when, 1);
 }
 
 function getOverdueDays(deadline: string): number {
@@ -581,6 +594,16 @@ export function TestList() {
                                                              <Clock className="w-2.5 h-2.5" />}
                             {statusMeta.label}
                           </span>
+                          {isNewlyAssigned(test) && (
+                            <span
+                              className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide text-white shadow-sm animate-pulse"
+                              style={{ background: 'linear-gradient(135deg, #F43F5E 0%, #F97316 100%)', boxShadow: '0 2px 8px #F43F5E40' }}
+                              title="Giáo viên vừa giao trong 1 giờ gần đây"
+                            >
+                              <Zap className="w-2.5 h-2.5 fill-current" />
+                              Mới giao
+                            </span>
+                          )}
                         </div>
                         <span className="text-xs font-bold opacity-40 relative z-10" style={{ color: PURPLE }}>
                           #{String(idx + 1).padStart(2, '0')}
@@ -754,6 +777,16 @@ export function TestList() {
                                     style={{ background: "#FEE2E2", color: "#B91C1C" }}>
                                 <Ban className="w-3 h-3" />
                                 Quá hạn
+                              </span>
+                            )}
+                            {isNewlyAssigned(test) && !isCompleted && (
+                              <span
+                                className="px-2.5 py-1 rounded-lg text-xs font-extrabold uppercase tracking-wide flex items-center gap-1 text-white animate-pulse"
+                                style={{ background: 'linear-gradient(135deg, #F43F5E 0%, #F97316 100%)' }}
+                                title="Giáo viên vừa giao trong 1 giờ gần đây"
+                              >
+                                <Zap className="w-3 h-3 fill-current" />
+                                Mới giao
                               </span>
                             )}
                             {isUrgent && !isCompleted && !testIsOverdue && (
