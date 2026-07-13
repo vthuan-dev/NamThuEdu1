@@ -25,12 +25,33 @@ function thptDeadlineKey(examId?: string, submissionId?: number | null) {
   return submissionId ? `thpt_deadline_${submissionId}` : `thpt_deadline_exam_${examId ?? 'unknown'}`;
 }
 
+function thptFreshStartFlag(examId?: string) {
+  return `thpt_fresh_start_${examId ?? 'unknown'}`;
+}
+
 function readThptDeadline(key: string): number | null {
   try {
     const value = Number(localStorage.getItem(key));
     return Number.isFinite(value) && value > 0 ? value : null;
   } catch {
     return null;
+  }
+}
+
+/** Xoa sticky timer/draft local lien quan phien THPT. */
+function clearThptLocalSession(examId?: string, submissionId?: number | null) {
+  try {
+    if (submissionId) {
+      examDraftStorage.clear(submissionId);
+      localStorage.removeItem(thptDeadlineKey(examId, submissionId));
+      localStorage.removeItem(`exam_timer_deadline_${submissionId}`);
+    }
+    if (examId) {
+      localStorage.removeItem(thptDeadlineKey(examId, null));
+      localStorage.removeItem(`exam_timer_deadline_exam_${examId}`);
+    }
+  } catch {
+    /* ignore */
   }
 }
 
@@ -176,7 +197,16 @@ export function StudentThptExamPage() {
           const draft = examDraftStorage.load(sid);
           if (draft && Object.keys(draft.answers).length > 0) setResumeDraft(draft);
         }
-        if (startData.resumed) {
+        // Sau "Lam lai tu dau" server tao submission moi -> /start tra resumed=true.
+        // Bo qua modal 1 lan nho flag sessionStorage.
+        let justRestarted = false;
+        try {
+          justRestarted = sessionStorage.getItem(thptFreshStartFlag(examId)) === '1';
+          if (justRestarted) sessionStorage.removeItem(thptFreshStartFlag(examId));
+        } catch {
+          justRestarted = false;
+        }
+        if (startData.resumed && !justRestarted) {
           setShowActiveSessionModal(true);
         }
         setLoading(false);
@@ -190,19 +220,37 @@ export function StudentThptExamPage() {
     };
   }, [examId, assignmentId]);
 
-  const handleRestart = async () => {
-    if (!window.confirm("Bạn có chắc chắn muốn hủy phiên làm bài hiện tại và làm lại từ đầu? Tất cả câu trả lời của phiên này sẽ bị xóa.")) return;
+  const handleRestart = async (opts?: { skipConfirm?: boolean }) => {
+    if (!opts?.skipConfirm) {
+      const ok = window.confirm(
+        'Bạn có chắc chắn muốn hủy phiên làm bài hiện tại và làm lại từ đầu? Tất cả câu trả lời của phiên này sẽ bị xóa.',
+      );
+      if (!ok) return;
+    }
     try {
       setLoading(true);
-      await api.post(`/student/thpt-exams/${examId}/start`, { restart: true });
-      if (submissionId) {
-        examDraftStorage.clear(submissionId);
-        localStorage.removeItem(thptDeadlineKey(examId, submissionId));
+      setShowActiveSessionModal(false);
+      // 1) Huy phien cu tren server + tao session moi
+      await api.post(`/student/thpt-exams/${examId}/start`, {
+        restart: true,
+        assignment_id: assignmentId ? parseInt(assignmentId) : undefined,
+      });
+      // 2) Xoa sticky timer/draft local
+      clearThptLocalSession(examId, submissionId);
+      // 3) Flag de sau reload khong hien lai modal
+      try {
+        sessionStorage.setItem(thptFreshStartFlag(examId), '1');
+      } catch {
+        /* ignore */
       }
-      window.location.reload();
+      // 4) Hard reload sach (cache-bust query)
+      const url = new URL(window.location.href);
+      url.searchParams.set('_r', String(Date.now()));
+      window.location.replace(url.toString());
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || "Không thể hủy và khởi động lại bài thi.");
+      toast.error(err?.response?.data?.message || 'Không thể hủy và khởi động lại bài thi.');
       setLoading(false);
+      setIsRestarting(false);
     }
   };
 
@@ -425,9 +473,13 @@ export function StudentThptExamPage() {
         open={showActiveSessionModal}
         onContinue={() => setShowActiveSessionModal(false)}
         onRestart={async () => {
+          const ok = window.confirm(
+            'Bạn có chắc chắn muốn hủy phiên làm bài hiện tại và làm lại từ đầu? Tất cả câu trả lời của phiên này sẽ bị xóa.',
+          );
+          if (!ok) return;
           setIsRestarting(true);
           try {
-            await handleRestart();
+            await handleRestart({ skipConfirm: true });
           } finally {
             setIsRestarting(false);
           }

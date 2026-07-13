@@ -454,9 +454,36 @@ class ThptExamController extends Controller
             ->where('sStatus', 'in_progress')
             ->first();
 
-        if ($existing && $request->input('restart')) {
-            $existing->answers()->delete();
-            $existing->delete();
+        // Huy phien do de lam lai tu dau.
+        // Xoa/void TAT CA submission in_progress cua user+exam (tranh sot ban cu).
+        if ($request->boolean('restart')) {
+            $toVoid = Submission::where('exam_id', $examId)
+                ->where('user_id', $user->uId)
+                ->where('sStatus', 'in_progress')
+                ->get();
+
+            foreach ($toVoid as $sub) {
+                try {
+                    \DB::transaction(function () use ($sub) {
+                        $sub->answers()->delete();
+                        $sub->delete();
+                    });
+                } catch (\Throwable $e) {
+                    \Log::warning('THPT restart hard-delete failed, voiding session instead', [
+                        'submission_id' => $sub->sId,
+                        'error' => $e->getMessage(),
+                    ]);
+                    $voidPayload = $sub->submission_payload ?? [];
+                    $voidPayload['answers'] = new \stdClass();
+                    $voidPayload['discarded'] = true;
+                    $voidPayload['discarded_at'] = now()->toIso8601String();
+                    $sub->submission_payload = $voidPayload;
+                    $sub->sStatus = 'auto_submitted';
+                    $sub->sSubmit_time = now();
+                    $sub->auto_submit_reason = 'restart';
+                    $sub->save();
+                }
+            }
             $existing = null;
         }
 
