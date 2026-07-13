@@ -3,6 +3,7 @@ import {
   X, Search, CalendarClock, CalendarCheck, Bell, Send, Loader2,
   Check, Users, FileText, MessageSquare, RotateCcw, ChevronRight,
   MapPin, Mail, Phone, CalendarDays, GraduationCap, UserRound, Globe,
+  AlertTriangle,
 } from "lucide-react";
 import { api } from "../../../../services/api";
 import { getAssetUrl } from "../../../../utils/apiConfig";
@@ -258,10 +259,51 @@ export function AssignModal({ open, exams, onClose, onAssigned }: AssignModalPro
     mode === "class" ? selectedClasses.size > 0
       : mode === "all" ? filtered.length > 0
       : selected.size > 0;
-  const canSubmit = exams.length > 0 && hasTarget && !!deadline && !submitting;
+  const scheduleInvalid = Boolean(
+    deadline &&
+      startTime &&
+      !Number.isNaN(new Date(startTime).getTime()) &&
+      !Number.isNaN(new Date(deadline).getTime()) &&
+      new Date(deadline).getTime() <= new Date(startTime).getTime(),
+  );
+  const canSubmit =
+    exams.length > 0 && hasTarget && !!deadline && !scheduleInvalid && !submitting;
+
+  /** Các điều kiện còn thiếu để bật nút "Giao bài" — hiện warning cam. */
+  const missingRequirements = useMemo(() => {
+    const items: string[] = [];
+    if (exams.length === 0) {
+      items.push("Chưa chọn đề thi để giao.");
+    }
+    if (!hasTarget) {
+      if (mode === "class") {
+        items.push("Chưa chọn lớp nhận đề (tab Lớp học).");
+      } else if (mode === "student") {
+        items.push("Chưa chọn học viên nhận đề (tab Cá nhân).");
+      } else {
+        items.push("Không có học viên phù hợp để giao (tab Tất cả).");
+      }
+    }
+    if (!deadline) {
+      items.push("Chưa đặt hạn chót làm bài (bắt buộc)." );
+    }
+    if (deadline && startTime) {
+      const startMs = new Date(startTime).getTime();
+      const endMs = new Date(deadline).getTime();
+      if (!Number.isNaN(startMs) && !Number.isNaN(endMs) && endMs <= startMs) {
+        items.push("Hạn chót phải sau thời điểm mở làm bài.");
+      }
+    }
+    return items;
+  }, [exams.length, hasTarget, mode, deadline, startTime]);
 
   const handleSubmit = async () => {
-    if (!canSubmit) return;
+    if (!canSubmit) {
+      if (missingRequirements.length > 0) {
+        toast.warning(missingRequirements[0]);
+      }
+      return;
+    }
     setSubmitting(true);
 
     // Xác định targets theo chế độ giao
@@ -608,8 +650,17 @@ export function AssignModal({ open, exams, onClose, onAssigned }: AssignModalPro
                   <CalendarCheck className="w-3.5 h-3.5 text-indigo-500" /> Hạn chót
                   <span className="text-rose-500 font-normal">*</span>
                 </label>
-                <input type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)} className={inputCls} />
-                <p className="text-[11px] text-slate-400">Sau thời điểm này, học viên không làm được đề nữa.</p>
+                <input
+                  type="datetime-local"
+                  value={deadline}
+                  onChange={(e) => setDeadline(e.target.value)}
+                  className={`${inputCls} ${!deadline ? "border-amber-300 bg-amber-50/40 focus:border-amber-400 focus:ring-amber-200" : ""}`}
+                />
+                <p className={`text-[11px] ${!deadline ? "text-amber-600 font-medium" : "text-slate-400"}`}>
+                  {!deadline
+                    ? "Bắt buộc: chọn hạn chót trước khi giao đề."
+                    : "Sau thời điểm này, học viên không làm được đề nữa."}
+                </p>
               </div>
             </div>
 
@@ -677,6 +728,30 @@ export function AssignModal({ open, exams, onClose, onAssigned }: AssignModalPro
           </div>
         </div>
 
+        {/* Warning cam: còn thiếu gì trước khi giao được */}
+        {missingRequirements.length > 0 && !submitting && (
+          <div className="px-5 py-3 border-t border-amber-200 bg-amber-50">
+            <div className="flex items-start gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 ring-1 ring-amber-200">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-semibold text-amber-900 leading-tight">
+                  Chưa đủ thông tin để giao đề
+                </p>
+                <ul className="mt-1.5 space-y-1">
+                  {missingRequirements.map((msg) => (
+                    <li key={msg} className="flex items-start gap-1.5 text-[12px] text-amber-800 leading-snug">
+                      <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                      <span>{msg}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="px-5 py-3.5 border-t border-slate-200 flex items-center justify-between bg-slate-50">
           <p className="text-xs text-slate-500">
@@ -699,8 +774,13 @@ export function AssignModal({ open, exams, onClose, onAssigned }: AssignModalPro
             </button>
             <button
               onClick={handleSubmit}
-              disabled={!canSubmit}
-              className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 hover:shadow-md hover:shadow-indigo-200 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-150 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-y-0 flex items-center gap-2"
+              disabled={submitting}
+              title={missingRequirements[0] || "Giao bài"}
+              className={`px-4 py-2 text-sm font-semibold rounded-lg flex items-center gap-2 transition-all duration-150 ${
+                canSubmit
+                  ? "bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-md hover:shadow-indigo-200 hover:-translate-y-0.5 active:translate-y-0"
+                  : "bg-amber-100 text-amber-800 ring-1 ring-amber-300 hover:bg-amber-200 cursor-pointer"
+              } ${submitting ? "opacity-70 cursor-wait" : ""}`}
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               Giao bài
