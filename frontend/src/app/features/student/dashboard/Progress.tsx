@@ -43,8 +43,14 @@ export function Progress() {
 
   const progress = (data as any)?.data?.data;
   const overview = progress?.overview ?? {};
-  const skillsBreakdown = progress?.skill_analysis?.skills_breakdown ?? [];
-  const recentScores = progress?.trends?.recent_scores ?? [];
+  // Dùng Array.isArray thay cho `?? []`: backend đôi khi trả object (vd {})
+  // thay vì mảng — khi đó `?? []` KHÔNG kích hoạt và .slice/.map sẽ crash trang.
+  const skillsBreakdown = Array.isArray(progress?.skill_analysis?.skills_breakdown)
+    ? progress.skill_analysis.skills_breakdown
+    : [];
+  const recentScores = Array.isArray(progress?.trends?.recent_scores)
+    ? progress.trends.recent_scores
+    : [];
 
   const chartData = recentScores.slice(-10).map((s: any, i: number) => ({
     week: `T${i + 1}`,
