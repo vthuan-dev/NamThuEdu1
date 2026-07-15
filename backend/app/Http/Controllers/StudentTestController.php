@@ -2316,6 +2316,15 @@ class StudentTestController extends Controller
         }
 
         // Recently graded submissions (last 3 days)
+        //
+        // Đơn vị thông báo là PHIÊN LÀM BÀI (submission), KHÔNG gộp theo đề. Vì
+        // cùng 1 đề học viên có thể thi nhiều lần và mỗi lần điểm khác nhau → mỗi
+        // phiên phải có 1 thông báo riêng.
+        //
+        // Mỗi thông báo key theo `graded_<sId>` (id của phiên). Khi giáo viên
+        // chấm lại CÙNG 1 PHIÊN, GradingReviewService dùng $submission->update()
+        // nên giữ nguyên sId → cùng id thông báo → frontend cập nhật điểm mới tại
+        // chỗ, KHÔNG đẻ ra thông báo thứ hai.
         $recentGraded = Submission::where('user_id', $studentId)
             ->where('sStatus', 'graded')
             ->whereNotNull('sGraded_time')
@@ -2362,11 +2371,13 @@ class StudentTestController extends Controller
             $notifications[] = [
                 'id'           => 'graded_' . $submission->sId,
                 'title'        => 'Kết quả bài thi đã có',
-                'message'      => 'Bài thi ' . $submission->exam->eTitle . ' đã được chấm. Điểm: ' . $scoreLabel,
+                'message'      => 'Phiên làm bài "' . $submission->exam->eTitle . '" đã được chấm. Điểm: ' . $scoreLabel,
                 'type'         => 'graded',
                 'color'        => '#10B981',
                 'is_read'      => false,
                 'created_at'   => $submission->sGraded_time,
+                // Trỏ tới đúng phiên (submission) được chấm gần nhất của đề này →
+                // click sẽ mở trang kết quả/chấm điểm của chính phiên đó.
                 'action_url'   => '/ket-qua/' . $submission->sId,
                 'action_label' => 'Xem kết quả',
             ];
