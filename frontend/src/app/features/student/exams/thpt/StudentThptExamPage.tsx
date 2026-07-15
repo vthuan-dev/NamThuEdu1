@@ -134,6 +134,42 @@ export function StudentThptExamPage() {
   const [showActiveSessionModal, setShowActiveSessionModal] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
 
+  // ─── Kéo chỉnh độ rộng panel Tiến độ (aside). Lưu localStorage. ────────────
+  const [navW, setNavW] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('thpt-nav-w'));
+    return saved >= 240 && saved <= 420 ? saved : 280;
+  });
+  const [navDragging, setNavDragging] = useState(false);
+  const navDragRef = useRef(false);
+
+  useEffect(() => {
+    if (!navDragging) return;
+    const onMove = (e: MouseEvent) => {
+      // Panel nằm bên phải: độ rộng = mép phải viewport-container - vị trí chuột
+      const container = document.querySelector('[data-thpt-main]') as HTMLElement | null;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const w = rect.right - e.clientX;
+      setNavW(Math.min(420, Math.max(240, w)));
+    };
+    const onUp = () => {
+      setNavDragging(false);
+      navDragRef.current = false;
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [navDragging]);
+
+  useEffect(() => {
+    localStorage.setItem('thpt-nav-w', String(Math.round(navW)));
+  }, [navW]);
+
   // useExamSession: localStorage layer (layer 2) + online/hasOtherTab UI only.
   // Server save (layer 3) uses the manual saveDraft interval below because
   // THPT answers use composite string keys incompatible with the default
@@ -430,8 +466,8 @@ export function StudentThptExamPage() {
       />
       <ThptTopBar examTitle={examTitle} totalSeconds={remainingSec} totalDurationSec={totalDurationSec} onRestart={handleRestart} />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 pt-6 pb-24 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
-        <div className="min-w-0">
+      <main data-thpt-main className="flex-1 max-w-7xl w-full mx-auto px-6 pt-6 pb-24 flex flex-col lg:flex-row gap-6">
+        <div className="min-w-0 flex-1">
           {activeSection && (
             <SectionView
               key={activeSection.id}
@@ -444,7 +480,27 @@ export function StudentThptExamPage() {
           )}
         </div>
 
-        <ThptPartNavigator config={config} answers={session.answers as ThptAnswers} activeIdx={activeIdx} onSectionChange={setActiveIdx} />
+        {/* Thanh gạt kéo đổi độ rộng panel — chỉ hiện lg+ */}
+        <div
+          onMouseDown={() => {
+            setNavDragging(true);
+            navDragRef.current = true;
+            document.body.style.userSelect = 'none';
+            document.body.style.cursor = 'col-resize';
+          }}
+          className="hidden lg:flex sticky top-24 self-start flex-none items-center justify-center w-3 h-24 cursor-col-resize group"
+          title="Kéo để chỉnh độ rộng bảng Tiến độ"
+        >
+          <div
+            className={`w-1 h-16 rounded-full transition-colors ${
+              navDragging ? 'bg-teal-500' : 'bg-slate-200 group-hover:bg-teal-400'
+            }`}
+          />
+        </div>
+
+        <div className="w-full lg:flex-none lg:w-[var(--nav-w)]" style={{ ['--nav-w' as any]: `${navW}px` }}>
+          <ThptPartNavigator config={config} answers={session.answers as ThptAnswers} activeIdx={activeIdx} onSectionChange={setActiveIdx} />
+        </div>
       </main>
 
       <ThptBottomNav

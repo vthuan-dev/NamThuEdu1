@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, useEffect, useRef, type ReactNode } from 'react';
 import { CheckCircle2, XCircle, Headphones, Mic, Sparkles, Loader2, FileText, PenLine } from 'lucide-react';
 import type { ThptAnswers, ThptSection, ViewMode } from '../types';
 import { ThptSpeakingRecorder } from '../components/ThptSpeakingRecorder';
@@ -85,16 +85,15 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
     return (
       <section className="space-y-5">
         {headerEl}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
-          {/* Cột bài đọc — sticky, không bẫy wheel */}
-          <div className="lg:sticky lg:top-[88px] lg:self-start">
-            <PassageBox text={passageText!} markers={section.type === 'reading_mixed'} />
-          </div>
-          {/* Cột câu hỏi — cuộn theo trang */}
-          <div className="space-y-5">
-            <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} writingParts={writingParts} correctQuestions={correctQuestions} hidePassage />
-          </div>
-        </div>
+        <ResizableSplit
+          storageKey="thpt-reading-split"
+          left={<PassageBox text={passageText!} markers={section.type === 'reading_mixed'} />}
+          right={
+            <div className="space-y-5">
+              <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} writingParts={writingParts} correctQuestions={correctQuestions} hidePassage />
+            </div>
+          }
+        />
       </section>
     );
   }
@@ -1143,6 +1142,95 @@ function TextAnswer({
   );
 }
 
+// ─── Chia đôi có thể kéo chỉnh tỉ lệ: cột bài đọc (trái) ↔ câu hỏi (phải).
+// Chỉ bật thanh gạt ở màn lg+; mobile xếp dọc như cũ. Lưu tỉ lệ vào localStorage.
+function ResizableSplit({
+  left,
+  right,
+  storageKey = 'thpt-reading-split',
+}: {
+  left: ReactNode;
+  right: ReactNode;
+  storageKey?: string;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [leftPct, setLeftPct] = useState<number>(() => {
+    const saved = Number(localStorage.getItem(storageKey));
+    return saved >= 30 && saved <= 70 ? saved : 50;
+  });
+  const [dragging, setDragging] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e: MouseEvent) => {
+      const el = containerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const pct = ((e.clientX - rect.left) / rect.width) * 100;
+      setLeftPct(Math.min(70, Math.max(30, pct)));
+    };
+    const onUp = () => {
+      setDragging(false);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [dragging]);
+
+  useEffect(() => {
+    localStorage.setItem(storageKey, String(Math.round(leftPct)));
+  }, [leftPct, storageKey]);
+
+  return (
+    <div ref={containerRef} className="flex flex-col lg:flex-row gap-5 items-start">
+      {/* Cột bài đọc — sticky, không bẫy wheel */}
+      <div
+        className="w-full min-w-0 lg:sticky lg:top-[88px] lg:self-start"
+        style={isDesktop ? { flex: `0 0 ${leftPct}%`, maxWidth: `${leftPct}%` } : undefined}
+      >
+        {left}
+      </div>
+
+      {/* Thanh gạt — chỉ hiện ở lg+ */}
+      {isDesktop && (
+        <div
+          onMouseDown={() => {
+            setDragging(true);
+            document.body.style.userSelect = 'none';
+            document.body.style.cursor = 'col-resize';
+          }}
+          className="hidden lg:flex lg:sticky lg:top-[88px] flex-none items-center justify-center w-3 h-24 cursor-col-resize group"
+          title="Kéo để chỉnh độ rộng bài đọc"
+        >
+          <div
+            className={`w-1 h-16 rounded-full transition-colors ${
+              dragging ? 'bg-teal-500' : 'bg-slate-200 group-hover:bg-teal-400'
+            }`}
+          />
+        </div>
+      )}
+
+      {/* Cột câu hỏi — cuộn theo trang */}
+      <div className="w-full min-w-0 lg:flex-1">{right}</div>
+    </div>
+  );
+}
+
 function PassageBox({ text, markers }: { text: string; markers?: boolean }) {
   const paragraphs = useMemo(() => text.split(/\n\s*\n/).filter(Boolean), [text]);
 
@@ -1162,7 +1250,11 @@ function PassageBox({ text, markers }: { text: string; markers?: boolean }) {
 
   return (
     <article className="rounded-2xl bg-white border border-slate-200 p-6">
-      <div className="text-sm text-slate-800 leading-relaxed space-y-3">
+      <div className="flex items-center gap-1.5 mb-3">
+        <span className="inline-block w-1 h-4 rounded-full bg-teal-500" />
+        <span className="text-[11px] font-bold uppercase tracking-widest text-teal-700">Bài đọc</span>
+      </div>
+      <div className="text-[15px] text-slate-900 font-medium leading-7 space-y-4">
         {paragraphs.map((para, i) => (
           <p key={i} className="whitespace-pre-wrap">
             {markers
