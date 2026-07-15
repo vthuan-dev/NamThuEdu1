@@ -7,6 +7,8 @@ interface Props {
   answers: ThptAnswers;
   activeIdx: number;
   onSectionChange: (idx: number) => void;
+  /** Báo cho cha biết panel đang nổi (đã kéo ra khỏi vị trí mặc định) để cha thu gọn cột giữ chỗ. */
+  onFloatingChange?: (floating: boolean) => void;
 }
 
 interface QItem {
@@ -55,7 +57,7 @@ function sectionQuestions(s: ThptSection, answers: ThptAnswers): QItem[] {
   }
 }
 
-export function ThptPartNavigator({ config, answers, activeIdx, onSectionChange }: Props) {
+export function ThptPartNavigator({ config, answers, activeIdx, onSectionChange, onFloatingChange }: Props) {
   const perSection = config.sections.map((s) => sectionQuestions(s, answers));
   const total = perSection.reduce((sum, arr) => sum + arr.length, 0);
   const answered = perSection.reduce((sum, arr) => sum + arr.filter((x) => x.answered).length, 0);
@@ -91,6 +93,11 @@ export function ThptPartNavigator({ config, answers, activeIdx, onSectionChange 
       window.removeEventListener('mouseup', onUp);
     };
   }, [dragging]);
+
+  // Báo trạng thái floating cho cha để thu gọn cột giữ chỗ (tránh khoảng trắng thừa).
+  useEffect(() => {
+    onFloatingChange?.(pos !== null);
+  }, [pos, onFloatingChange]);
 
   return (
     <aside

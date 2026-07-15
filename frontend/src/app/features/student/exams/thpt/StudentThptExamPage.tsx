@@ -141,6 +141,8 @@ export function StudentThptExamPage() {
   });
   const [navDragging, setNavDragging] = useState(false);
   const navDragRef = useRef(false);
+  // Khi panel Tiến độ được kéo ra thành floating, thu gọn cột giữ chỗ để nội dung mở rộng full.
+  const [navFloating, setNavFloating] = useState(false);
 
   useEffect(() => {
     if (!navDragging) return;
@@ -480,26 +482,38 @@ export function StudentThptExamPage() {
           )}
         </div>
 
-        {/* Thanh gạt kéo đổi độ rộng panel — chỉ hiện lg+ */}
-        <div
-          onMouseDown={() => {
-            setNavDragging(true);
-            navDragRef.current = true;
-            document.body.style.userSelect = 'none';
-            document.body.style.cursor = 'col-resize';
-          }}
-          className="hidden lg:flex sticky top-24 self-start flex-none items-center justify-center w-3 h-24 cursor-col-resize group"
-          title="Kéo để chỉnh độ rộng bảng Tiến độ"
-        >
+        {/* Thanh gạt kéo đổi độ rộng panel — chỉ hiện lg+ và khi panel chưa nổi */}
+        {!navFloating && (
           <div
-            className={`w-1 h-16 rounded-full transition-colors ${
-              navDragging ? 'bg-teal-500' : 'bg-slate-200 group-hover:bg-teal-400'
-            }`}
-          />
-        </div>
+            onMouseDown={() => {
+              setNavDragging(true);
+              navDragRef.current = true;
+              document.body.style.userSelect = 'none';
+              document.body.style.cursor = 'col-resize';
+            }}
+            className="hidden lg:flex sticky top-24 self-start flex-none items-center justify-center w-3 h-24 cursor-col-resize group"
+            title="Kéo để chỉnh độ rộng bảng Tiến độ"
+          >
+            <div
+              className={`w-1 h-16 rounded-full transition-colors ${
+                navDragging ? 'bg-teal-500' : 'bg-slate-200 group-hover:bg-teal-400'
+              }`}
+            />
+          </div>
+        )}
 
-        <div className="w-full lg:flex-none lg:w-[var(--nav-w)]" style={{ ['--nav-w' as any]: `${navW}px` }}>
-          <ThptPartNavigator config={config} answers={session.answers as ThptAnswers} activeIdx={activeIdx} onSectionChange={setActiveIdx} />
+        {/* Cột giữ chỗ: khi panel nổi thì thu gọn (w-0) để nội dung chiếm full bề ngang */}
+        <div
+          className={navFloating ? 'w-0 flex-none overflow-visible' : 'w-full lg:flex-none lg:w-[var(--nav-w)]'}
+          style={navFloating ? undefined : { ['--nav-w' as any]: `${navW}px` }}
+        >
+          <ThptPartNavigator
+            config={config}
+            answers={session.answers as ThptAnswers}
+            activeIdx={activeIdx}
+            onSectionChange={setActiveIdx}
+            onFloatingChange={setNavFloating}
+          />
         </div>
       </main>
 
