@@ -260,7 +260,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             const key = `q${item.question_number}`;
             return (
               <QCard key={key} n={item.question_number}>
-                <p className="text-sm text-slate-800 mb-2">
+                <p className="text-sm text-slate-900 font-bold mb-2">
                   <span dangerouslySetInnerHTML={{ __html: item.sentence }} />{' '}
                   {item.root_word && (
                     <span className="font-bold text-teal-700">({item.root_word})</span>
@@ -408,7 +408,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
               return (
                 <QCard key={key} n={item.question_number}>
                   {item.prompt && (
-                    <p className="text-sm text-slate-800 mb-3 whitespace-pre-wrap">{item.prompt}</p>
+                    <p className="text-sm text-slate-900 font-bold mb-3 whitespace-pre-wrap">{item.prompt}</p>
                   )}
                   <TextAnswer
                     value={String(answers[key] ?? '')}
@@ -426,7 +426,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             return (
               <QCard key={key} n={item.question_number}>
                 {item.prompt && (
-                  <p className="text-sm text-slate-800 mb-3 whitespace-pre-wrap">{item.prompt}</p>
+                  <p className="text-sm text-slate-900 font-bold mb-3 whitespace-pre-wrap">{item.prompt}</p>
                 )}
                 <div className="space-y-2">
                   {options.map((opt: any) => (
@@ -574,7 +574,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             const key = `q${item.question_number}`;
             return (
               <QCard key={key} n={item.question_number}>
-                <p className="text-sm text-slate-800 mb-2" dangerouslySetInnerHTML={{ __html: item.original }} />
+                <p className="text-sm text-slate-900 font-bold mb-2" dangerouslySetInnerHTML={{ __html: item.original }} />
                 {(item.lead_in || item.prompt_word) && (
                   <p className="text-xs text-slate-500 mb-2">
                     {item.lead_in && <>➜ <span className="font-semibold">{item.lead_in}</span> </>}
@@ -778,7 +778,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
               )}
               {item.kind === 'mc' && (
                 <div className="space-y-2">
-                  <div className="text-sm text-slate-800 font-medium mb-1 space-y-1">
+                  <div className="text-sm text-slate-900 font-bold mb-1 space-y-1 [&_*]:!text-slate-900 [&_*]:!font-bold">
                     {item.prompt.split(/\s+(?=[a-e]\.\s)/i).map((part: string, i: number) => (
                       <p key={i} className="leading-relaxed" dangerouslySetInnerHTML={{ __html: part.trim() }} />
                     ))}
@@ -805,7 +805,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
               )}
               {item.kind === 'sentence_insertion' && (
                 <div className="space-y-2">
-                  <p className="text-sm text-slate-800 font-medium">{item.prompt}</p>
+                  <p className="text-sm text-slate-900 font-bold">{item.prompt}</p>
                   <blockquote className="border-l-4 border-teal-300 pl-3 py-1 italic text-sm text-slate-700 bg-teal-50/40 rounded-r">
                     {item.sentence_to_insert}
                   </blockquote>
@@ -866,7 +866,7 @@ function SpeakingResultCard({ n, prompt, result, audioUrl }: { n: number; prompt
           <Mic className="w-[18px] h-[18px]" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[15px] font-medium text-slate-800 leading-relaxed">{prompt}</p>
+          <p className="text-[15px] font-bold text-slate-900 leading-relaxed">{prompt}</p>
           {audioUrl && <audio controls src={audioUrl} className="w-full h-9 mt-2.5" />}
         </div>
       </div>
@@ -962,7 +962,7 @@ function PromptBox({ text, title = 'Đề bài' }: { text: string; title?: strin
         <FileText className="w-3.5 h-3.5 text-teal-600" />
         <p className="text-[11px] font-bold uppercase tracking-wider text-teal-700">{title}</p>
       </div>
-      <div className="pl-1 text-[15px] text-slate-800 whitespace-pre-wrap leading-relaxed font-medium">
+      <div className="pl-1 text-[15px] text-slate-900 whitespace-pre-wrap leading-relaxed font-bold">
         {text}
       </div>
     </div>
@@ -1081,7 +1081,7 @@ function TfStatementRow({
       }`}
     >
       <span className="text-xs font-bold text-slate-500 w-5 mt-0.5">{idx + 1}.</span>
-      <p className="flex-1 text-sm text-slate-800 leading-relaxed">{text}</p>
+      <p className="flex-1 text-sm text-slate-900 font-bold leading-relaxed">{text}</p>
       <div className="flex items-center gap-0.5 p-0.5 rounded-md bg-slate-100 flex-shrink-0">
         <button
           type="button"
