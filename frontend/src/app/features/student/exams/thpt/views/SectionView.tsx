@@ -1,8 +1,9 @@
 import { useMemo, useState, useEffect, useRef, type ReactNode } from 'react';
-import { CheckCircle2, XCircle, Headphones, Mic, Sparkles, Loader2, FileText, PenLine } from 'lucide-react';
+import { CheckCircle2, XCircle, Headphones, Mic, Sparkles, Loader2, FileText, PenLine, Highlighter } from 'lucide-react';
 import type { ThptAnswers, ThptSection, ViewMode } from '../types';
 import { ThptSpeakingRecorder } from '../components/ThptSpeakingRecorder';
 import { splitPhoneticWord, formatErrorSentence } from '../../../../../../utils/examUtils';
+import { useTextHighlight } from '../../../../../../hooks/exam/useTextHighlight';
 
 const THEME = {
   primary: '#0D9488',
@@ -90,7 +91,7 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
         {headerEl}
         <ResizableSplit
           storageKey="thpt-reading-split"
-          left={<PassageBox text={passageText!} markers={section.type === 'reading_mixed'} />}
+          left={<PassageBox text={passageText!} markers={section.type === 'reading_mixed'} submissionId={submissionId} sectionId={section.id} enabled={mode !== 'review'} />}
           right={
             <div className="space-y-5">
               <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} writingParts={writingParts} correctQuestions={correctQuestions} hidePassage />
@@ -1239,46 +1240,177 @@ function ResizableSplit({
   );
 }
 
-function PassageBox({ text, markers }: { text: string; markers?: boolean }) {
-  const paragraphs = useMemo(() => text.split(/\n\s*\n/).filter(Boolean), [text]);
+// Hash chuỗi id section → số nguyên ổn định, dùng làm passageId cho khóa localStorage.
+function hashId(s: string | number): number {
+  const str = String(s);
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
 
-  const renderParagraph = (para: string) => {
-    const parts: Array<{ kind: 'text' | 'marker'; value: string }> = [];
-    const re = /\[([ABCD])\]/g;
-    let last = 0;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(para)) !== null) {
-      if (m.index > last) parts.push({ kind: 'text', value: para.slice(last, m.index) });
-      parts.push({ kind: 'marker', value: m[1] });
-      last = m.index + m[0].length;
-    }
-    if (last < para.length) parts.push({ kind: 'text', value: para.slice(last) });
-    return parts;
+const MARKER_RE = /\[([ABCD])\]/g;
+
+// Bài đọc có thể bôi đen (highlight) để học viên ghi chú — tái dùng hook
+// useTextHighlight (lưu localStorage, tự khôi phục qua F5) giống IELTS Reading.
+// Vẫn giữ marker [A][B] cho dạng reading_mixed; text render dạng plain (escape)
+// nên không hỗ trợ HTML trong passage — đổi lấy tính chính xác của offset highlight.
+function PassageBox({
+  text,
+  markers,
+  submissionId,
+  sectionId,
+  enabled = true,
+}: {
+  text: string;
+  markers?: boolean;
+  submissionId?: number | null;
+  sectionId?: string | number;
+  enabled?: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const hl = useTextHighlight({
+    submissionId: submissionId || 0,
+    passageId: hashId(sectionId ?? 0),
+    enabled,
+  });
+
+  const [toolbar, setToolbar] = useState<
+    { top: number; left: number; text: string; start: number; end: number } | null
+  >(null);
+
+  // Bắt vùng chọn → tính offset theo textContent của container (khớp lúc render).
+  const handleMouseUp = () => {
+    if (!enabled) return;
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) { setToolbar(null); return; }
+    const selText = sel.toString();
+    if (!selText.trim()) { setToolbar(null); return; }
+    const container = containerRef.current;
+    if (!container) return;
+    const range = sel.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    const before = range.cloneRange();
+    before.selectNodeContents(container);
+    before.setEnd(range.startContainer, range.startOffset);
+    const start = before.toString().length;
+    const end = start + selText.length;
+    setToolbar({ top: rect.top - 52 + window.scrollY, left: rect.left + rect.width / 2, text: selText, start, end });
   };
+
+  const applyHighlight = () => {
+    if (!toolbar) return;
+    hl.addHighlight({
+      text: toolbar.text,
+      startOffset: toolbar.start,
+      endOffset: toolbar.end,
+      color: hl.colors[hl.selectedColor],
+    });
+    window.getSelection()?.removeAllRanges();
+    setToolbar(null);
+  };
+
+  // Render text: chèn xen kẽ các đoạn highlight + marker [A].
+  const content = useMemo(() => {
+    const ranges = [...hl.highlights]
+      .filter((h) => h.startOffset < text.length && h.endOffset <= text.length && h.startOffset < h.endOffset)
+      .sort((a, b) => a.startOffset - b.startOffset);
+
+    type Seg = { text: string; hlId?: string; color?: string };
+    const segs: Seg[] = [];
+    let last = 0;
+    for (const r of ranges) {
+      if (r.startOffset > last) segs.push({ text: text.slice(last, r.startOffset) });
+      segs.push({ text: text.slice(r.startOffset, r.endOffset), hlId: r.id, color: r.color });
+      last = r.endOffset;
+    }
+    if (last < text.length) segs.push({ text: text.slice(last) });
+
+    const renderPlain = (str: string, keyBase: string): ReactNode[] => {
+      if (!markers) return [<span key={keyBase} className="whitespace-pre-wrap">{str}</span>];
+      const nodes: ReactNode[] = [];
+      const re = new RegExp(MARKER_RE.source, 'g');
+      let li = 0;
+      let idx = 0;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(str)) !== null) {
+        if (m.index > li) nodes.push(<span key={`${keyBase}-t${idx}`} className="whitespace-pre-wrap">{str.slice(li, m.index)}</span>);
+        nodes.push(
+          <span key={`${keyBase}-m${idx}`} className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-teal-100 text-teal-700 text-xs font-bold mx-0.5 align-middle">
+            [{m[1]}]
+          </span>
+        );
+        li = m.index + m[0].length;
+        idx++;
+      }
+      if (li < str.length) nodes.push(<span key={`${keyBase}-t${idx}`} className="whitespace-pre-wrap">{str.slice(li)}</span>);
+      return nodes;
+    };
+
+    return segs.map((s, i) =>
+      s.hlId ? (
+        <mark
+          key={`h${i}`}
+          data-hid={s.hlId}
+          onClick={() => { if (enabled && window.confirm('Xóa highlight này?')) hl.removeHighlight(s.hlId!); }}
+          style={{ backgroundColor: s.color, borderRadius: 3, padding: '1px 0', cursor: enabled ? 'pointer' : 'default' }}
+          title={enabled ? 'Click để xóa highlight' : undefined}
+        >
+          {renderPlain(s.text, `h${i}`)}
+        </mark>
+      ) : (
+        <span key={`s${i}`}>{renderPlain(s.text, `s${i}`)}</span>
+      )
+    );
+  }, [text, markers, hl.highlights, enabled, hl]);
 
   return (
     <article className="rounded-2xl bg-white border border-slate-200 p-6">
-      <div className="flex items-center gap-1.5 mb-3">
-        <span className="inline-block w-1 h-4 rounded-full bg-teal-500" />
-        <span className="text-[11px] font-bold uppercase tracking-widest text-teal-700">Bài đọc</span>
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block w-1 h-4 rounded-full bg-teal-500" />
+          <span className="text-[11px] font-bold uppercase tracking-widest text-teal-700">Bài đọc</span>
+        </div>
+        {enabled && (
+          <div className="flex items-center gap-1.5" title="Chọn màu rồi bôi đen đoạn văn để ghi chú">
+            <Highlighter className="w-3.5 h-3.5 text-slate-400" />
+            {(Object.keys(hl.colors) as (keyof typeof hl.colors)[]).map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => hl.setSelectedColor(c)}
+                className={`w-4 h-4 rounded-full border transition-transform hover:scale-110 cursor-pointer ${hl.selectedColor === c ? 'border-slate-700 ring-1 ring-slate-300' : 'border-slate-200'}`}
+                style={{ backgroundColor: hl.colors[c] }}
+                aria-label={`Chọn màu ${c}`}
+              />
+            ))}
+          </div>
+        )}
       </div>
-      <div className="text-[15px] text-slate-900 font-medium leading-7 space-y-4">
-        {paragraphs.map((para, i) => (
-          <p key={i} className="whitespace-pre-wrap">
-            {markers
-              ? renderParagraph(para).map((s, j) =>
-                  s.kind === 'text' ? (
-                    <span key={j} dangerouslySetInnerHTML={{ __html: s.value }} />
-                  ) : (
-                    <span key={j} className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-teal-100 text-teal-700 text-xs font-bold mx-0.5 align-middle">
-                      [{s.value}]
-                    </span>
-                  )
-                )
-              : <span dangerouslySetInnerHTML={{ __html: para }} />}
-          </p>
-        ))}
+      <div
+        ref={containerRef}
+        onMouseUp={handleMouseUp}
+        className="text-[15px] text-slate-900 font-semibold leading-7 select-text"
+        style={{ userSelect: enabled ? 'text' : 'none' }}
+      >
+        {content}
       </div>
+
+      {toolbar && (
+        <div
+          className="fixed z-50 -translate-x-1/2 flex items-center gap-1.5 rounded-lg bg-white shadow-xl border border-slate-200 px-2 py-1.5"
+          style={{ top: toolbar.top, left: toolbar.left }}
+        >
+          <button
+            type="button"
+            onClick={applyHighlight}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold text-slate-800 cursor-pointer"
+            style={{ backgroundColor: hl.colors[hl.selectedColor] }}
+          >
+            <Highlighter className="w-3.5 h-3.5" /> Bôi màu
+          </button>
+          <button type="button" onClick={() => setToolbar(null)} className="px-1.5 py-1 text-xs text-slate-400 hover:text-slate-600 cursor-pointer">✕</button>
+        </div>
+      )}
     </article>
   );
 }
