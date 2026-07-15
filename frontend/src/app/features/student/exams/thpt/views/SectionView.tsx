@@ -65,9 +65,10 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
     section.type === 'listening' && taskImage.length > 0 && layoutMode === 'image_block';
 
   const headerEl = !hideHeader ? (
-    // Ghim header khi cuộn để học viên luôn thấy dạng đề đang làm.
-    // top-[68px] để nằm ngay dưới ThptTopBar (sticky top-0).
-    <header className="sticky top-[68px] z-20 relative overflow-hidden rounded-2xl bg-white/95 backdrop-blur border border-slate-200 py-2.5 px-4 pl-5 shadow-sm">
+    // Nhánh đọc chia đôi: section đã khóa chiều cao & không cuộn → header đứng
+    // yên (flex-none), KHÔNG sticky để tránh offset top-[68px] làm lệch/bị
+    // ThptTopBar che. Các nhánh còn lại vẫn cuộn theo trang nên giữ sticky.
+    <header className={`${isSplitReading ? 'flex-none' : 'sticky top-[68px]'} z-20 relative overflow-hidden rounded-2xl bg-white/95 backdrop-blur border border-slate-200 py-2.5 px-4 pl-5 shadow-sm`}>
       <span className="absolute left-0 top-0 bottom-0 w-1.5" style={{ background: THEME.primary }} />
       <div className="flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
         <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-teal-700">
