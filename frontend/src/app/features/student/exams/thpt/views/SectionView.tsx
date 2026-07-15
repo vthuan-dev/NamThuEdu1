@@ -1197,16 +1197,19 @@ function ResizableSplit({
   }, [leftPct, storageKey]);
 
   return (
-    <div ref={containerRef} className="flex flex-col lg:flex-row gap-5 items-start">
-      {/* Cột bài đọc — sticky, không bẫy wheel */}
+    <div
+      ref={containerRef}
+      className="flex flex-col lg:flex-row gap-5 items-stretch lg:h-[calc(100vh-190px)] lg:min-h-[420px]"
+    >
+      {/* Cột bài đọc — cuộn độc lập trên desktop, không lan sang trang/câu hỏi */}
       <div
-        className="w-full min-w-0 lg:sticky lg:top-[88px] lg:self-start"
+        className="w-full min-w-0 lg:h-full lg:overflow-y-auto lg:overscroll-contain lg:pr-2 [scrollbar-width:thin]"
         style={isDesktop ? { flex: `0 0 ${leftPct}%`, maxWidth: `${leftPct}%` } : undefined}
       >
         {left}
       </div>
 
-      {/* Thanh gạt — chỉ hiện ở lg+ */}
+      {/* Thanh gạt — chỉ hiện ở lg+, cao hết chiều cao cột */}
       {isDesktop && (
         <div
           onMouseDown={() => {
@@ -1214,7 +1217,7 @@ function ResizableSplit({
             document.body.style.userSelect = 'none';
             document.body.style.cursor = 'col-resize';
           }}
-          className="hidden lg:flex lg:sticky lg:top-[88px] flex-none items-center justify-center w-3 h-24 cursor-col-resize group"
+          className="hidden lg:flex flex-none items-center justify-center w-3 lg:h-full cursor-col-resize group"
           title="Kéo để chỉnh độ rộng bài đọc"
         >
           <div
@@ -1225,8 +1228,10 @@ function ResizableSplit({
         </div>
       )}
 
-      {/* Cột câu hỏi — cuộn theo trang */}
-      <div className="w-full min-w-0 lg:flex-1">{right}</div>
+      {/* Cột câu hỏi — cuộn độc lập trên desktop */}
+      <div className="w-full min-w-0 lg:flex-1 lg:h-full lg:overflow-y-auto lg:overscroll-contain lg:pr-1 [scrollbar-width:thin]">
+        {right}
+      </div>
     </div>
   );
 }
