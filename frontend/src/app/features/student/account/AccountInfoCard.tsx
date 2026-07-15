@@ -44,18 +44,33 @@ type Commune = {
 const inputBase =
   'w-full px-3.5 py-2.5 rounded-lg border text-sm text-slate-900 ' +
   'placeholder:text-slate-400 transition-colors ' +
-  'focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100';
+  'focus:outline-none focus:border-[var(--acc)] focus:ring-2 focus:ring-[var(--acc-ring)]';
 
-const inputStyle = { borderColor: '#E8E4F9' };
+const inputStyle = { borderColor: 'var(--acc-border)' };
 
 const labelBase = 'block text-xs font-semibold text-slate-700 mb-1.5';
+
+/** Bộ màu accent — cho phép card đổi màu theo nhóm tuổi (Kids/Teens/Adults). */
+export type AccentTheme = {
+  base: string;   // màu chủ đạo
+  deep: string;   // đậm hơn (hover)
+  soft: string;   // nền nhạt
+  ring: string;   // vòng focus
+  border: string; // viền input
+};
+
+const DEFAULT_ACCENT: AccentTheme = {
+  base: '#7C3AED', deep: '#6D28D9', soft: '#F5F3FF', ring: '#EDE9FE', border: '#E8E4F9',
+};
 
 type Props = {
   /** Whether card is expanded by default. Defaults to true. */
   defaultExpanded?: boolean;
+  /** Bộ màu accent; mặc định tím (Adults). */
+  accent?: AccentTheme;
 };
 
-export function AccountInfoCard({ defaultExpanded = true }: Props = {}) {
+export function AccountInfoCard({ defaultExpanded = true, accent = DEFAULT_ACCENT }: Props = {}) {
   const queryClient = useQueryClient();
   const toast = useToastContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -313,7 +328,16 @@ export function AccountInfoCard({ defaultExpanded = true }: Props = {}) {
   const avatarSrc = getFullMediaUrl(profile?.avatar_url);
 
   return (
-    <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+    <section
+      className="bg-white rounded-2xl border border-slate-200 overflow-hidden"
+      style={{
+        '--acc': accent.base,
+        '--acc-deep': accent.deep,
+        '--acc-soft': accent.soft,
+        '--acc-ring': accent.ring,
+        '--acc-border': accent.border,
+      } as any}
+    >
       {/* Header — clickable for collapse/expand */}
       <button
         type="button"
@@ -322,8 +346,8 @@ export function AccountInfoCard({ defaultExpanded = true }: Props = {}) {
         aria-expanded={expanded}
         aria-controls="account-info-body"
       >
-        <div className="w-10 h-10 rounded-lg bg-violet-50 flex items-center justify-center flex-shrink-0">
-          <User className="w-5 h-5 text-violet-600" />
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--acc-soft)' }}>
+          <User className="w-5 h-5" style={{ color: 'var(--acc)' }} />
         </div>
         <div className="flex-1 min-w-0">
           <h2 className="text-base sm:text-lg font-bold text-slate-900">Thông tin tài khoản</h2>
@@ -373,8 +397,8 @@ export function AccountInfoCard({ defaultExpanded = true }: Props = {}) {
       <div className="flex items-center gap-4 pb-5 mb-5 border-b border-slate-100">
         <div className="relative">
           <div
-            className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-violet-500 via-purple-500 to-indigo-500
-                       text-white flex items-center justify-center text-xl sm:text-2xl font-bold shadow-md shadow-violet-200/60"
+            className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl text-white flex items-center justify-center text-xl sm:text-2xl font-bold shadow-md"
+            style={{ background: `linear-gradient(135deg, ${accent.base}, ${accent.deep})`, boxShadow: `0 8px 20px -6px ${accent.base}55` }}
           >
             {avatarSrc ? (
               <img
@@ -405,7 +429,7 @@ export function AccountInfoCard({ defaultExpanded = true }: Props = {}) {
             onClick={() => fileInputRef.current?.click()}
             disabled={avatarMutation.isPending}
             className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-white border border-slate-200
-                       text-slate-600 hover:text-violet-600 hover:border-violet-300 flex items-center justify-center
+                       text-slate-600 hover:text-[var(--acc)] hover:border-[var(--acc)] flex items-center justify-center
                        transition-colors shadow-sm disabled:opacity-50"
             title="Đổi ảnh đại diện"
           >
@@ -490,7 +514,7 @@ export function AccountInfoCard({ defaultExpanded = true }: Props = {}) {
             {!isEditingAddress ? (
               <div className="flex items-start justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-200">
                 <div className="flex gap-2.5 min-w-0">
-                  <MapPin className="w-5 h-5 text-violet-500 mt-0.5 flex-shrink-0" />
+                  <MapPin className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--acc)' }} />
                   <div className="min-w-0">
                     <p className="text-sm text-slate-800 font-medium leading-relaxed break-words">
                       {form.uAddress || 'Chưa thiết lập địa chỉ'}
@@ -500,15 +524,16 @@ export function AccountInfoCard({ defaultExpanded = true }: Props = {}) {
                 <button
                   type="button"
                   onClick={() => setIsEditingAddress(true)}
-                  className="text-xs font-semibold text-violet-600 hover:text-violet-700 flex items-center gap-1 flex-shrink-0 ml-3 transition-colors"
+                  className="text-xs font-semibold hover:opacity-80 flex items-center gap-1 flex-shrink-0 ml-3 transition-colors"
+                  style={{ color: 'var(--acc)' }}
                 >
                   Thay đổi
                 </button>
               </div>
             ) : (
-              <div className="space-y-3.5 p-4 bg-slate-50/50 rounded-xl border border-violet-100 transition-all">
+              <div className="space-y-3.5 p-4 bg-slate-50/50 rounded-xl border transition-all" style={{ borderColor: 'var(--acc-border)' }}>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-violet-700 flex items-center gap-1.5 uppercase tracking-wider">
+                  <span className="text-xs font-bold flex items-center gap-1.5 uppercase tracking-wider" style={{ color: 'var(--acc-deep)' }}>
                     <MapPin className="w-3.5 h-3.5" /> Chọn địa chỉ
                   </span>
                   {profile?.uAddress && (
@@ -608,8 +633,8 @@ export function AccountInfoCard({ defaultExpanded = true }: Props = {}) {
 
                 {/* Live Preview */}
                 {selectedCommuneCode && (
-                  <div className="p-3 bg-violet-50/50 rounded-lg border border-violet-100 text-xs">
-                    <span className="font-semibold text-violet-700">Xem trước địa chỉ: </span>
+                  <div className="p-3 rounded-lg border text-xs" style={{ background: 'var(--acc-soft)', borderColor: 'var(--acc-border)' }}>
+                    <span className="font-semibold" style={{ color: 'var(--acc-deep)' }}>Xem trước địa chỉ: </span>
                     <span className="text-slate-700">
                       {[
                         detailedAddress,
@@ -650,8 +675,8 @@ export function AccountInfoCard({ defaultExpanded = true }: Props = {}) {
               type="submit"
               disabled={updateMutation.isPending}
               className="group inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold
-                         bg-violet-600 text-white transition-all duration-200 ease-out
-                         hover:bg-violet-700 hover:shadow-lg hover:shadow-violet-200 hover:-translate-y-0.5
+                         bg-[var(--acc)] text-white transition-all duration-200 ease-out
+                         hover:bg-[var(--acc-deep)] hover:shadow-lg hover:-translate-y-0.5
                          active:scale-[0.98] active:shadow-md
                          disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
             >

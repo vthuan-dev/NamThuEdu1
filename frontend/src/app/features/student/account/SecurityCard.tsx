@@ -3,6 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Shield, Monitor, Smartphone, LogOut, Trash2, ChevronDown, Loader2, RefreshCw } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
 import { useToastContext } from '../../../../contexts/ToastContext';
+import type { AccentTheme } from './AccountInfoCard';
+
+const DEFAULT_ACCENT: AccentTheme = {
+  base: '#7C3AED', deep: '#6D28D9', soft: '#F5F3FF', ring: '#EDE9FE', border: '#E8E4F9',
+};
 
 interface Session {
   id: number;
@@ -33,9 +38,13 @@ function DeviceIcon({ name }: { name: string }) {
   return <Monitor className="w-4 h-4" />;
 }
 
-type Props = { defaultExpanded?: boolean };
+type Props = {
+  defaultExpanded?: boolean;
+  /** Bộ màu accent; mặc định tím (Adults). */
+  accent?: AccentTheme;
+};
 
-export function SecurityCard({ defaultExpanded = true }: Props) {
+export function SecurityCard({ defaultExpanded = true, accent = DEFAULT_ACCENT }: Props) {
   const toast = useToastContext();
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -73,7 +82,16 @@ export function SecurityCard({ defaultExpanded = true }: Props) {
   const otherSessions = sessions.filter((s) => !s.is_current);
 
   return (
-    <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+    <section
+      className="bg-white rounded-2xl border border-slate-200 overflow-hidden"
+      style={{
+        '--acc': accent.base,
+        '--acc-deep': accent.deep,
+        '--acc-soft': accent.soft,
+        '--acc-ring': accent.ring,
+        '--acc-border': accent.border,
+      } as any}
+    >
       {/* Header */}
       <button
         type="button"
@@ -81,8 +99,8 @@ export function SecurityCard({ defaultExpanded = true }: Props) {
         className="w-full flex items-center gap-3 p-4 sm:p-6 hover:bg-slate-50/50 transition-colors text-left"
         aria-expanded={expanded}
       >
-        <div className="w-10 h-10 rounded-lg bg-violet-50 flex items-center justify-center flex-shrink-0">
-          <Shield className="w-5 h-5 text-violet-600" />
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--acc-soft)' }}>
+          <Shield className="w-5 h-5" style={{ color: 'var(--acc)' }} />
         </div>
         <div className="flex-1 min-w-0">
           <h2 className="text-base sm:text-lg font-bold text-slate-900">Bảo mật & Thiết bị</h2>
@@ -93,7 +111,7 @@ export function SecurityCard({ defaultExpanded = true }: Props) {
         <div className="flex items-center gap-2">
           {sessions.length > 0 && (
             <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold"
-              style={{ background: '#EDE9FE', color: '#6D28D9' }}>
+              style={{ background: 'var(--acc-ring)', color: 'var(--acc-deep)' }}>
               {sessions.length} thiết bị
             </span>
           )}
@@ -120,16 +138,16 @@ export function SecurityCard({ defaultExpanded = true }: Props) {
                   key={session.id}
                   className="flex items-center gap-3 p-3 rounded-xl border transition-colors"
                   style={{
-                    borderColor: session.is_current ? '#C4B5FD' : '#F1F5F9',
-                    background: session.is_current ? '#FAF5FF' : '#FAFAFA',
+                    borderColor: session.is_current ? 'var(--acc)' : '#F1F5F9',
+                    background: session.is_current ? 'var(--acc-soft)' : '#FAFAFA',
                   }}
                 >
                   {/* Icon */}
                   <div
                     className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
                     style={{
-                      background: session.is_current ? '#EDE9FE' : '#F1F5F9',
-                      color: session.is_current ? '#7C3AED' : '#64748B',
+                      background: session.is_current ? 'var(--acc-ring)' : '#F1F5F9',
+                      color: session.is_current ? 'var(--acc)' : '#64748B',
                     }}
                   >
                     <DeviceIcon name={session.name} />
@@ -143,7 +161,7 @@ export function SecurityCard({ defaultExpanded = true }: Props) {
                       </span>
                       {session.is_current && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold"
-                          style={{ background: '#7C3AED', color: '#fff' }}>
+                          style={{ background: 'var(--acc)', color: '#fff' }}>
                           Thiết bị này
                         </span>
                       )}

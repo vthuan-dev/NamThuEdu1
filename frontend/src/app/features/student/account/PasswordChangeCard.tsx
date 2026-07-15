@@ -3,6 +3,11 @@ import { useMutation } from '@tanstack/react-query';
 import { Lock, Eye, EyeOff, AlertCircle, ShieldCheck, ChevronDown } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
 import { useToastContext } from '../../../../contexts/ToastContext';
+import type { AccentTheme } from './AccountInfoCard';
+
+const DEFAULT_ACCENT: AccentTheme = {
+  base: '#7C3AED', deep: '#6D28D9', soft: '#F5F3FF', ring: '#EDE9FE', border: '#E8E4F9',
+};
 
 type Form = {
   current_password: string;
@@ -13,9 +18,9 @@ type Form = {
 const inputBase =
   'w-full px-3.5 py-2.5 pr-10 rounded-lg border text-sm text-slate-900 ' +
   'placeholder:text-slate-400 transition-colors ' +
-  'focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100';
+  'focus:outline-none focus:border-[var(--acc)] focus:ring-2 focus:ring-[var(--acc-ring)]';
 
-const inputStyle = { borderColor: '#E8E4F9' };
+const inputStyle = { borderColor: 'var(--acc-border)' };
 
 const labelBase = 'block text-xs font-semibold text-slate-700 mb-1.5';
 
@@ -51,9 +56,11 @@ function PasswordStrength({ value }: { value: string }) {
 type Props = {
   /** Whether card is expanded by default. Defaults to false (collapsed). */
   defaultExpanded?: boolean;
+  /** Bộ màu accent; mặc định tím (Adults). */
+  accent?: AccentTheme;
 };
 
-export function PasswordChangeCard({ defaultExpanded = false }: Props = {}) {
+export function PasswordChangeCard({ defaultExpanded = false, accent = DEFAULT_ACCENT }: Props = {}) {
   const toast = useToastContext();
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [form, setForm] = useState<Form>({
@@ -114,7 +121,16 @@ export function PasswordChangeCard({ defaultExpanded = false }: Props = {}) {
   ];
 
   return (
-    <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+    <section
+      className="bg-white rounded-2xl border border-slate-200 overflow-hidden"
+      style={{
+        '--acc': accent.base,
+        '--acc-deep': accent.deep,
+        '--acc-soft': accent.soft,
+        '--acc-ring': accent.ring,
+        '--acc-border': accent.border,
+      } as any}
+    >
       {/* Header — clickable for collapse/expand */}
       <button
         type="button"
@@ -123,8 +139,8 @@ export function PasswordChangeCard({ defaultExpanded = false }: Props = {}) {
         aria-expanded={expanded}
         aria-controls="password-change-body"
       >
-        <div className="w-10 h-10 rounded-lg bg-violet-50 flex items-center justify-center flex-shrink-0">
-          <ShieldCheck className="w-5 h-5 text-violet-600" />
+        <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'var(--acc-soft)' }}>
+          <ShieldCheck className="w-5 h-5" style={{ color: 'var(--acc)' }} />
         </div>
         <div className="flex-1 min-w-0">
           <h2 className="text-base sm:text-lg font-bold text-slate-900">Đổi mật khẩu</h2>
@@ -198,7 +214,7 @@ export function PasswordChangeCard({ defaultExpanded = false }: Props = {}) {
             type="submit"
             disabled={!canSubmit}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold
-                       bg-violet-600 text-white hover:bg-violet-700 active:scale-[0.98] transition-all
+                       bg-[var(--acc)] text-white hover:bg-[var(--acc-deep)] active:scale-[0.98] transition-all
                        disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Lock className="w-4 h-4" />

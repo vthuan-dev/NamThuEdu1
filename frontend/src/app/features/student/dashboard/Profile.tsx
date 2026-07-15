@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Camera, CheckCircle2, GraduationCap, Phone } from 'lucide-react';
 import { AccountInfoCard } from '../account/AccountInfoCard';
 import { PasswordChangeCard } from '../account/PasswordChangeCard';
@@ -85,6 +86,7 @@ export function Profile() {
       label: '#FED7AA', sub: '#FFEDD5',
       chipBg: 'rgba(253,186,116,0.20)', chipText: '#FFEDD5', chipBorder: 'rgba(253,186,116,0.32)',
       avatarShadow: '0 12px 32px -8px rgba(234,88,12,0.45), 0 0 0 3px rgba(255,255,255,0.12)',
+      card: { base: '#EA580C', deep: '#C2410C', soft: '#FFF7ED', ring: '#FFEDD5', border: '#FED7AA' },
     },
     teens: {
       bg: '#F0FDFA',
@@ -94,6 +96,7 @@ export function Profile() {
       label: '#99F6E4', sub: '#CCFBF1',
       chipBg: 'rgba(94,234,212,0.18)', chipText: '#CCFBF1', chipBorder: 'rgba(94,234,212,0.32)',
       avatarShadow: '0 12px 32px -8px rgba(13,148,136,0.45), 0 0 0 3px rgba(255,255,255,0.12)',
+      card: { base: '#0D9488', deep: '#0F766E', soft: '#F0FDFA', ring: '#CCFBF1', border: '#99F6E4' },
     },
     adults: {
       bg: '#F8F7FF',
@@ -103,15 +106,28 @@ export function Profile() {
       label: '#C4B5FD', sub: '#DDD6FE',
       chipBg: 'rgba(167,139,250,0.20)', chipText: '#DDD6FE', chipBorder: 'rgba(167,139,250,0.30)',
       avatarShadow: '0 12px 32px -8px rgba(124,58,237,0.45), 0 0 0 3px rgba(255,255,255,0.12)',
+      card: { base: '#7C3AED', deep: '#6D28D9', soft: '#F5F3FF', ring: '#EDE9FE', border: '#E8E4F9' },
     },
   };
   const T = THEMES[age] ?? THEMES.adults;
+
+  // ─── Motion: reveal nhẹ khi vào, tôn trọng prefers-reduced-motion ──
+  const reduceMotion = useReducedMotion();
+  const reveal = (delay = 0) =>
+    reduceMotion
+      ? { initial: false as const }
+      : {
+          initial: { opacity: 0, y: 16 },
+          animate: { opacity: 1, y: 0 },
+          transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] as const, delay },
+        };
 
   return (
     <div className="min-h-screen" style={{ background: T.bg }}>
 
       {/* ══ Hero ════════════════════════════════════════════════ */}
-      <div
+      <motion.div
+        {...reveal(0)}
         className="relative overflow-hidden"
         style={{ background: T.hero }}
       >
@@ -242,36 +258,36 @@ export function Profile() {
             </button>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* ══ Content ═════════════════════════════════════════════ */}
       <div className="w-full px-4 sm:px-8 lg:px-12 py-8">
         <div className="max-w-[1400px] mx-auto grid grid-cols-1 lg:grid-cols-3 gap-5">
 
           {/* LEFT — main: Account info (wider column) */}
-          <div className="lg:col-span-2 space-y-4">
+          <motion.div {...reveal(0.08)} className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-2 px-1">
               <span className="inline-block w-1 h-4 rounded-full" style={{ background: T.rail }} />
-              <p className="text-[11px] font-bold tracking-[0.14em] uppercase text-slate-500">
+              <p className="text-[11px] font-semibold tracking-wide text-slate-500">
                 Thông tin cá nhân
               </p>
             </div>
-            <AccountInfoCard />
-          </div>
+            <AccountInfoCard accent={T.card} />
+          </motion.div>
 
           {/* RIGHT — sidebar: Security stack */}
-          <aside className="lg:col-span-1 space-y-4">
+          <motion.aside {...reveal(0.16)} className="lg:col-span-1 space-y-4">
             <div className="flex items-center gap-2 px-1">
               <span className="inline-block w-1 h-4 rounded-full" style={{ background: '#F59E0B' }} />
-              <p className="text-[11px] font-bold tracking-[0.14em] uppercase text-slate-500">
+              <p className="text-[11px] font-semibold tracking-wide text-slate-500">
                 Bảo mật &amp; tài khoản
               </p>
             </div>
             <div className="lg:sticky lg:top-4 space-y-4">
-              <PasswordChangeCard />
-              <SecurityCard defaultExpanded={false} />
+              <PasswordChangeCard accent={T.card} />
+              <SecurityCard defaultExpanded={false} accent={T.card} />
             </div>
-          </aside>
+          </motion.aside>
 
         </div>
       </div>
