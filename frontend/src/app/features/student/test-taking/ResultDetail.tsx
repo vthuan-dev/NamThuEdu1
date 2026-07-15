@@ -1,4 +1,5 @@
 import { useParams, useNavigate, Link } from "react-router";
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Eye,
@@ -91,6 +92,17 @@ export function ResultDetail({ modalSubmissionId }: { modalSubmissionId?: number
   const vstepScores = vstepMeta?.vstep_scores || {};
   const examId = submission?.exam_id ?? submission?.exam?.eId;
   const examType = String(submission?.exam?.eType ?? "").toUpperCase();
+  const isThpt = examType === "THPT";
+
+  // THPT lưu bài trong submission_payload (không phải submission_answers) và chấm
+  // theo thang 10 → modal/trang kết quả chung hiển thị sai (điểm 1/10, 0/0 câu).
+  // Chuyển sang trang kết quả THPT chuyên biệt.
+  useEffect(() => {
+    if (isThpt && submissionId) {
+      window.dispatchEvent(new Event("close-result-modal"));
+      navigate(`/hoc-vien/ket-qua-thpt/${submissionId}`, { replace: true });
+    }
+  }, [isThpt, submissionId, navigate]);
 
   const getSkillReviewUrl = (key: string) => {
     if (examType === "IELTS" && examId) {

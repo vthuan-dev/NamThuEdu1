@@ -33,8 +33,11 @@ export function AnswerReview() {
   const examType = String(rawData?.submission_info?.exam_type ?? "").toUpperCase();
   const isVstep = examType === "VSTEP";
   const isIelts = examType === "IELTS";
-  // Cả VSTEP và IELTS đều có UI review riêng → AnswerReview chỉ là trung gian redirect
-  const shouldRedirect = isVstep || isIelts;
+  const isThpt = examType === "THPT";
+  // VSTEP/IELTS/THPT đều có UI review riêng → AnswerReview chỉ là trung gian redirect.
+  // THPT lưu bài trong submission_payload (không phải submission_answers), nên UI
+  // review chung sẽ rỗng → phải chuyển sang trang kết quả THPT chuyên biệt.
+  const shouldRedirect = isVstep || isIelts || isThpt;
   const examId = rawData?.submission_info?.exam_id;
 
   // Ensure modal is closed on mount
@@ -43,6 +46,12 @@ export function AnswerReview() {
   }, []);
 
   useEffect(() => {
+    // THPT chỉ cần submissionId (trang kết quả tự tải payload theo submission).
+    if (isThpt && submissionId) {
+      window.dispatchEvent(new Event("close-result-modal"));
+      navigate(`/hoc-vien/ket-qua-thpt/${submissionId}`, { replace: true });
+      return;
+    }
     if (shouldRedirect && examId && submissionId) {
       window.dispatchEvent(new Event("close-result-modal"));
       const ieltsSkill = String(rawData?.submission_info?.exam_skill ?? "listening").toLowerCase();
@@ -52,7 +61,7 @@ export function AnswerReview() {
         navigate(`/hoc-vien/lam-bai-vstep/${examId}?review=${submissionId}`, { replace: true });
       }
     }
-  }, [shouldRedirect, isIelts, examId, submissionId, navigate, rawData]);
+  }, [shouldRedirect, isIelts, isThpt, examId, submissionId, navigate, rawData]);
 
   const rawItems = rawData?.detailed_answers ?? (Array.isArray(rawData) ? rawData : []);
   const items: any[] = Array.isArray(rawItems)
