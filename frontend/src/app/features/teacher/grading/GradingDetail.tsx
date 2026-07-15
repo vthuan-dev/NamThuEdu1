@@ -1,5 +1,13 @@
-import { Fragment, useState, useMemo, useEffect, useRef, useLayoutEffect, lazy, Suspense } from "react";
+import { Fragment, useState, useMemo, useEffect, useRef, useLayoutEffect, Suspense } from "react";
+import { lazyWithReload } from "../../../../utils/lazyWithReload";
 import { api } from "../../../../services/api";
+
+// Lazy-load các khung chấm điểm theo loại đề. Bọc lazyWithReload để tự reload
+// 1 lần khi chunk 404 (deploy mới đổi hash). Khai báo ở module scope để không
+// tạo lại component mỗi lần render (tránh remount + mất state).
+const LazyIeltsGrading = lazyWithReload(() => import("./IeltsGradingDetail").then((m) => ({ default: m.IeltsGradingDetail })));
+const LazyThptGrading = lazyWithReload(() => import("./ThptGradingDetail").then((m) => ({ default: m.ThptGradingDetail })));
+const LazyKidsGrading = lazyWithReload(() => import("./KidsGradingDetail").then((m) => ({ default: m.KidsGradingDetail })));
 import { gradingApi } from "../../../../services/gradingApi";
 import { KidsAnswerReview } from "./KidsAnswerReview";
 import { useTranslation } from "react-i18next";
@@ -2235,20 +2243,18 @@ export function GradingDetail() {
 
   if (examType === "IELTS") {
     // Lazy-load to avoid pulling IELTS bundle for VSTEP users
-    const Lazy = lazy(() => import("./IeltsGradingDetail").then((m) => ({ default: m.IeltsGradingDetail })));
     return (
       <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-slate-500">Loading IELTS grading…</div>}>
-        <Lazy />
+        <LazyIeltsGrading />
       </Suspense>
     );
   }
 
   if (examType === "THPT") {
     // Teens THPT grading is payload-based — fully separate from VSTEP/IELTS.
-    const LazyThpt = lazy(() => import("./ThptGradingDetail").then((m) => ({ default: m.ThptGradingDetail })));
     return (
       <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-slate-500">Đang tải trang chấm điểm…</div>}>
-        <LazyThpt submissionId={Number(submissionId)} />
+        <LazyThptGrading submissionId={Number(submissionId)} />
       </Suspense>
     );
   }
@@ -2256,10 +2262,9 @@ export function GradingDetail() {
   if (isKids) {
     // Kids grading: phân loại theo task type, toggle Đúng/Sai từng ô — tách hẳn khung VSTEP.
     // Nhận diện qua kids_task_config nên đề GENERAL chứa câu Kids vẫn vào đúng khung này.
-    const LazyKids = lazy(() => import("./KidsGradingDetail").then((m) => ({ default: m.KidsGradingDetail })));
     return (
       <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-slate-500">Đang tải trang chấm điểm…</div>}>
-        <LazyKids />
+        <LazyKidsGrading />
       </Suspense>
     );
   }
