@@ -83,7 +83,9 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
 
   if (isSplitReading) {
     return (
-      <section className="space-y-5">
+      // Khóa chiều cao đúng viewport (trừ topbar 68 + pt-6 24 + pb-24 96 = 188px)
+      // => trang KHÔNG cuộn nữa; header đứng yên (flex-none); chỉ 2 cột cuộn nội bộ.
+      <section className="flex flex-col gap-3 lg:h-[calc(100vh-188px)] lg:overflow-hidden">
         {headerEl}
         <ResizableSplit
           storageKey="thpt-reading-split"
@@ -1199,7 +1201,7 @@ function ResizableSplit({
   return (
     <div
       ref={containerRef}
-      className="flex flex-col lg:flex-row gap-5 items-stretch lg:h-[calc(100vh-190px)] lg:min-h-[420px]"
+      className="flex flex-col lg:flex-row gap-5 items-stretch lg:flex-1 lg:min-h-0"
     >
       {/* Cột bài đọc — cuộn độc lập trên desktop, không lan sang trang/câu hỏi */}
       <div
