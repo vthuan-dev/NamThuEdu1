@@ -147,16 +147,22 @@ export function StudentDashboard() {
     })) || [];
 
   const progress = (progressData as any)?.data?.data;
-  const skillData =
-    progress?.skill_analysis?.skills_breakdown?.map((s: any) => ({
-      skill: s.skill_name,
-      score: Number(s.average_score || 0),
-    })) || [];
-  const chartData =
-    progress?.trends?.recent_scores?.slice(-7).map((s: any, i: number) => ({
-      week: `T${i + 1}`,
-      score: Number(s.score || 0),
-    })) || [];
+  // Dùng Array.isArray thay cho `?.map`/`?.slice`: backend đôi khi trả object ({})
+  // thay vì mảng — khi đó optional chaining KHÔNG chặn và .map/.slice sẽ crash trang.
+  const skillsBreakdownRaw = progress?.skill_analysis?.skills_breakdown;
+  const skillData = Array.isArray(skillsBreakdownRaw)
+    ? skillsBreakdownRaw.map((s: any) => ({
+        skill: s.skill_name,
+        score: Number(s.average_score || 0),
+      }))
+    : [];
+  const recentScoresRaw = progress?.trends?.recent_scores;
+  const chartData = Array.isArray(recentScoresRaw)
+    ? recentScoresRaw.slice(-7).map((s: any, i: number) => ({
+        week: `T${i + 1}`,
+        score: Number(s.score || 0),
+      }))
+    : [];
 
   const stats = {
     pendingTests: pendingAssignments.length,
