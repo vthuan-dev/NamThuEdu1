@@ -91,8 +91,6 @@ export function DailyMotivationPopup({
         schedule={schedule}
         onClose={() => setOpen(false)}
         accent={accent}
-        accentMid={accentMid}
-        accentSoft={accentSoft}
       />
     );
   }
