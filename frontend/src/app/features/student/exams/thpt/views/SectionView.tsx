@@ -223,7 +223,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             return (
               <QCard key={key} n={item.question_number}>
                 {!isError && item.prompt && (
-                  <div className="text-sm text-slate-900 leading-relaxed font-semibold mb-3 space-y-1">
+                  <div className="text-sm text-slate-900 leading-relaxed font-bold mb-3 space-y-1 [&_*]:!text-slate-900 [&_*]:!font-bold">
                     {item.prompt.split(/\s+(?=[a-e]\.\s)/i).map((part: string, i: number) => (
                       <p key={i} className="leading-relaxed" dangerouslySetInnerHTML={{ __html: part.trim() }} />
                     ))}
