@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { motion, AnimatePresence } from "framer-motion";
 import { usePageTitle, PAGE_TITLES } from "../../../../hooks";
 import {
   ClipboardList,
@@ -29,6 +30,7 @@ import {
   HelpCircle,
   RotateCcw,
   ChevronRight,
+  ChevronDown,
   Sparkles,
   Trophy,
   FileText,
@@ -45,6 +47,20 @@ type TestStatus = 'all' | 'pending' | 'in_progress' | 'completed' | 'overdue';
 type TestType = 'all' | 'IELTS' | 'VSTEP' | 'TOEIC';
 type TestFormat = 'all' | 'FULL_4_SKILLS' | 'MINI_MOCK' | 'DIAGNOSTIC';
 type ViewMode = 'grid' | 'list';
+
+const typeOptions: { value: TestType; label: string }[] = [
+  { value: 'all',   label: 'Tất cả loại' },
+  { value: 'IELTS', label: 'IELTS' },
+  { value: 'VSTEP', label: 'VSTEP' },
+  { value: 'TOEIC', label: 'TOEIC' },
+];
+
+const formatOptions: { value: TestFormat; label: string }[] = [
+  { value: 'all',            label: 'Tất cả dạng' },
+  { value: 'FULL_4_SKILLS',  label: 'Full 4 Skills' },
+  { value: 'MINI_MOCK',      label: 'Mini Mock' },
+  { value: 'DIAGNOSTIC',     label: 'Diagnostic' },
+];
 
 // Theme palettes — kids gets rose/pink (matches KidsLayout), others get sky/cyan
 const THEME_KIDS    = { PRIMARY: '#F43F5E', PRIMARY_LIGHT: '#FFE4E6', PRIMARY_MID: '#FB7185', ACCENT: '#EC4899', ACCENT_LIGHT: '#FCE7F3' };
@@ -150,6 +166,84 @@ function getFormatMeta(format?: string) {
     return { label: 'Diagnostic', icon: Target, color: '#F59E0B', bg: '#FEF3C7' };
   }
   return { label: 'Full 4 Skills', icon: FileCheck, color: '#0EA5E9', bg: '#E0F2FE' };
+}
+
+interface CustomFilterDropdownProps<T> {
+  value: T;
+  onChange: (value: T) => void;
+  options: { value: T; label: string }[];
+  isKids: boolean;
+  PRIMARY: string;
+}
+
+function CustomFilterDropdown<T>({
+  value,
+  onChange,
+  options,
+  isKids,
+  PRIMARY,
+}: CustomFilterDropdownProps<T>) {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedOption = options.find((opt) => opt.value === value) || options[0];
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+    >
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center justify-between gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold cursor-pointer transition-all duration-200 bg-white border-[1.5px] select-none ${
+          isKids
+            ? "border-[#DDD6FE] hover:border-rose-300 hover:bg-rose-50/10"
+            : "border-[#DDD6FE] hover:border-purple-300 hover:bg-purple-50/10"
+        }`}
+        style={{ color: String(value) !== 'all' ? PRIMARY : "#374151" }}
+      >
+        <span>{selectedOption.label}</span>
+        <ChevronDown 
+          className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : 'rotate-0'}`} 
+        />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 4, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 4, scale: 0.95 }}
+            transition={{ duration: 0.12 }}
+            className="absolute left-0 mt-1.5 w-44 rounded-xl bg-white border border-gray-100 shadow-xl py-1 z-30 overflow-hidden"
+          >
+            {options.map((opt) => {
+              const active = opt.value === value;
+              return (
+                <button
+                  key={String(opt.value)}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left px-3.5 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
+                    active
+                      ? isKids
+                        ? "bg-rose-50 text-rose-600 font-bold"
+                        : "bg-purple-50 text-purple-700 font-bold"
+                      : "text-gray-600 hover:bg-gray-50"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 export function TestList() {
@@ -370,30 +464,20 @@ export function TestList() {
 
           {/* Filters */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            <select value={type} onChange={(e) => setType(e.target.value as TestType)}
-              className={`px-3 py-2.5 rounded-xl outline-none text-sm font-semibold cursor-pointer transition-all duration-200 bg-white border-[1.5px] ${
-                isKids
-                  ? "border-[#DDD6FE] hover:border-rose-300 hover:bg-rose-50/10"
-                  : "border-[#DDD6FE] hover:border-purple-300 hover:bg-purple-50/10"
-              }`}
-              style={{ color: type !== 'all' ? PRIMARY : "#374151" }}>
-              <option value="all">Tất cả loại</option>
-              <option value="IELTS">IELTS</option>
-              <option value="VSTEP">VSTEP</option>
-              <option value="TOEIC">TOEIC</option>
-            </select>
-            <select value={format} onChange={(e) => setFormat(e.target.value as TestFormat)}
-              className={`px-3 py-2.5 rounded-xl outline-none text-sm font-semibold cursor-pointer transition-all duration-200 bg-white border-[1.5px] ${
-                isKids
-                  ? "border-[#DDD6FE] hover:border-rose-300 hover:bg-rose-50/10"
-                  : "border-[#DDD6FE] hover:border-purple-300 hover:bg-purple-50/10"
-              }`}
-              style={{ color: format !== 'all' ? PRIMARY : "#374151" }}>
-              <option value="all">Tất cả dạng</option>
-              <option value="FULL_4_SKILLS">Full 4 Skills</option>
-              <option value="MINI_MOCK">Mini Mock</option>
-              <option value="DIAGNOSTIC">Diagnostic</option>
-            </select>
+            <CustomFilterDropdown
+              value={type}
+              onChange={setType}
+              options={typeOptions}
+              isKids={isKids}
+              PRIMARY={PRIMARY}
+            />
+            <CustomFilterDropdown
+              value={format}
+              onChange={setFormat}
+              options={formatOptions}
+              isKids={isKids}
+              PRIMARY={PRIMARY}
+            />
             {hasActiveFilters && (
               <button onClick={() => { setType('all'); setFormat('all'); setSearch(''); }}
                 className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-bold text-sm transition-all bg-white text-red-500 border-[1.5px] border-red-100 hover:bg-red-50 hover:border-red-200"
