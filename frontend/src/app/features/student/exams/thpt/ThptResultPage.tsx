@@ -367,17 +367,42 @@ export function ThptResultPage() {
             </div>
           </div>
 
-          {/* ── Stats divider row ── */}
-          <div className="flex divide-x divide-slate-100 border-t border-slate-100">
+          {/* ── Stats strip ── premium, color-coded tiles */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 border-t border-slate-100 pt-4 mt-1">
             {[
-              { label: 'Tổng câu', value: `${totalCorrect}/${totalQuestions}` },
-              { label: 'Câu đúng', value: totalCorrect },
-              { label: 'Câu sai', value: totalQuestions - totalCorrect },
-              { label: 'Số phần', value: result.sections.length },
+              { label: 'Tổng câu', value: `${totalCorrect}/${totalQuestions}`, Icon: FileText,
+                color: '#0D9488', bg: 'linear-gradient(135deg,#F0FDFA,#CCFBF1)', ring: '#99F6E4' },
+              { label: 'Câu đúng', value: totalCorrect, Icon: CheckCircle,
+                color: '#059669', bg: 'linear-gradient(135deg,#ECFDF5,#D1FAE5)', ring: '#A7F3D0' },
+              { label: 'Câu sai', value: totalQuestions - totalCorrect, Icon: XCircle,
+                color: '#E11D48', bg: 'linear-gradient(135deg,#FFF1F2,#FFE4E6)', ring: '#FECDD3' },
+              { label: 'Số phần', value: result.sections.length, Icon: BookOpen,
+                color: '#2563EB', bg: 'linear-gradient(135deg,#EFF6FF,#DBEAFE)', ring: '#BFDBFE' },
             ].map(st => (
-              <div key={st.label} className="flex-1 py-3 text-center">
-                <p style={{ fontSize: 15, fontWeight: 800, color: '#1F2937', lineHeight: 1 }}>{st.value}</p>
-                <p style={{ fontSize: 9.5, color: '#9CA3AF', marginTop: 2 }}>{st.label}</p>
+              <div
+                key={st.label}
+                className="group relative flex items-center gap-2.5 rounded-2xl px-3 py-2.5 overflow-hidden transition-all duration-300 ease-out hover:-translate-y-0.5"
+                style={{ background: st.bg, border: `1px solid ${st.ring}` }}
+              >
+                {/* Sheen sweep on hover */}
+                <span
+                  className="pointer-events-none absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-out"
+                  style={{ background: 'linear-gradient(110deg,transparent,rgba(255,255,255,0.55),transparent)' }}
+                />
+                <div
+                  className="relative w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110"
+                  style={{ background: `${st.color}1A`, border: `1px solid ${st.color}30` }}
+                >
+                  <st.Icon className="w-[18px] h-[18px]" style={{ color: st.color }} />
+                </div>
+                <div className="relative min-w-0 text-left">
+                  <p style={{ fontSize: 19, fontWeight: 900, color: st.color, lineHeight: 1, letterSpacing: '-0.02em' }}>
+                    {st.value}
+                  </p>
+                  <p style={{ fontSize: 10, fontWeight: 700, color: '#64748B', marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    {st.label}
+                  </p>
+                </div>
               </div>
             ))}
           </div>
