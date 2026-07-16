@@ -36,6 +36,7 @@ interface Submission {
   examTitle: string;
   examType: string;
   examId: string;
+  questionsCount: number;
   classId: string;
   className: string;
   ageGroup: string; // kids | teens | adults | ''
@@ -140,6 +141,7 @@ export function GradingQueue() {
     examTitle: sub.exam?.eTitle || "—",
     examType: sub.exam?.eType || "General",
     examId: String(sub.exam?.eId ?? sub.sExam_id ?? ""),
+    questionsCount: Number(sub.questions_count ?? 0),
     classId: String(sub.user?.class_id ?? sub.user?.class?.cId ?? ""),
     className: sub.user?.class?.cName ?? "",
     ageGroup: (sub.user?.age_group ?? "").toLowerCase(),
@@ -938,7 +940,14 @@ export function GradingQueue() {
                         {/* Exam */}
                         <td className="px-5 py-4 max-w-[200px]">
                           <p className="text-sm font-semibold text-slate-800 truncate">{sub.examTitle}</p>
-                          <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">{sub.examType}</span>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">{sub.examType}</span>
+                            {sub.questionsCount > 0 && (
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">
+                                {sub.questionsCount} câu
+                              </span>
+                            )}
+                          </div>
                         </td>
                         {/* Time */}
                         <td className="px-5 py-4 whitespace-nowrap">

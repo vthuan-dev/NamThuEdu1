@@ -95,6 +95,13 @@ class GradingController extends Controller
                 ->map(fn($g) => $g->first())
                 ->values();
         }
+
+        // Đính kèm số câu hỏi của đề cho mỗi bài làm — giúp giáo viên phân biệt
+        // đúng phiên/đề khi chấm (tránh nhầm giữa các phiên của cùng một đề).
+        $submissions->each(function ($s) {
+            $s->questions_count = $s->exam ? $s->exam->getQuestionsCount() : 0;
+        });
+
         return response()->json([
             'status' => 'success',
             'data' => $submissions
