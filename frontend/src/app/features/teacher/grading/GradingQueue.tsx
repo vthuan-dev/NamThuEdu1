@@ -76,10 +76,17 @@ function AnimatedDots() {
           style={{ animation: `dotBounce 1.2s ease-in-out ${i * 0.2}s infinite` }}
         />
       ))}
-      <style>{`
+            <style>{`
         @keyframes dotBounce {
           0%, 80%, 100% { opacity: 0.2; transform: translateY(0); }
           40% { opacity: 1; transform: translateY(-3px); }
+        }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-up {
+          animation: fadeInUp 300ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
       `}</style>
     </span>
@@ -297,7 +304,7 @@ export function GradingQueue() {
       ageGroup: string;
       submissions: Submission[];
     }>();
-    
+
     sortedAndFiltered.forEach((sub) => {
       const key = sub.studentName;
       if (!map.has(key)) {
@@ -311,7 +318,7 @@ export function GradingQueue() {
       }
       map.get(key)!.submissions.push(sub);
     });
-    
+
     return Array.from(map.values());
   }, [sortedAndFiltered]);
 
@@ -832,9 +839,9 @@ export function GradingQueue() {
           {/* ── Split Layout: Students List (Left) & Submissions List (Right) ── */}
           {!loading && !error && (
             <div className="flex flex-col lg:flex-row gap-6 items-start">
-              {/* Left Panel: Student List Sidebar (320px) */}
-              <div className="w-full lg:w-[320px] lg:flex-shrink-0 flex flex-col gap-2.5">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
+                            {/* Left Panel: Student List Sidebar (320px) */}
+              <div className="w-full lg:w-[320px] lg:flex-shrink-0 bg-white border border-slate-100 rounded-2xl p-4 flex flex-col gap-3 shadow-sm">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
                   Danh sách học sinh ({studentList.length})
                 </p>
                 <div className="flex flex-col gap-2 max-h-[600px] overflow-y-auto pr-1 scrollbar-thin">
@@ -848,12 +855,15 @@ export function GradingQueue() {
                         key={stu.studentName}
                         type="button"
                         onClick={() => setSelectedStudentName(stu.studentName)}
-                        className={`group flex items-center gap-3 text-left p-3 rounded-xl border transition-all cursor-pointer ${
+                        className={`group relative flex items-center gap-3 text-left p-3.5 rounded-xl border transition-all duration-200 active:scale-[0.99] overflow-hidden cursor-pointer ${
                           isSelected
-                            ? "bg-violet-50/70 border-violet-200 shadow-sm"
-                            : "bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/40"
+                            ? "bg-violet-50/60 border-violet-200 shadow-sm pl-4"
+                            : "bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/40 hover:translate-x-0.5"
                         }`}
                       >
+                        {isSelected && (
+                          <span className="absolute left-0 top-3.5 bottom-3.5 w-1 bg-violet-600 rounded-r-full" />
+                        )}
                         {/* Student avatar */}
                         <div className="relative flex-shrink-0">
                           {stu.studentAvatarUrl ? (
@@ -903,16 +913,16 @@ export function GradingQueue() {
                 </div>
               </div>
 
-              {/* Right Panel: Student Submissions Detail (flex-1) */}
-              <div className="flex-1 w-full bg-white rounded-2xl border border-slate-100 p-5 lg:p-6 overflow-hidden">
+                            {/* Right Panel: Student Submissions Detail (flex-1) */}
+              <div className="flex-1 w-full bg-white rounded-2xl border border-slate-100 p-5 lg:p-6 overflow-hidden shadow-sm">
                 {selectedStudentData ? (
-                  <div className="flex flex-col gap-5">
+                  <div key={selectedStudentName} className="flex flex-col gap-5 animate-fade-in-up">
                     {/* Header: Student Info */}
                     <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                       <div>
                         <h2 className="text-lg font-bold text-slate-800">{selectedStudentData.studentName}</h2>
                         <p className="text-xs text-slate-500 mt-1">
-                          Nhóm tuổi: <span className="capitalize font-semibold text-slate-600">{selectedStudentData.ageGroup === "kids" ? "Trẻ em" : selectedStudentData.ageGroup === "teens" ? "Thiếu niên" : selectedStudentData.ageGroup === "adults" ? "Người lớn" : selectedStudentData.ageGroup}</span> · 
+                          Nhóm tuổi: <span className="capitalize font-semibold text-slate-600">{selectedStudentData.ageGroup === "kids" ? "Trẻ em" : selectedStudentData.ageGroup === "teens" ? "Thiếu niên" : selectedStudentData.ageGroup === "adults" ? "Người lớn" : selectedStudentData.ageGroup}</span> ·
                           Tổng bài nộp: <span className="font-semibold text-slate-600">{selectedStudentData.submissions.length}</span>
                         </p>
                       </div>
@@ -941,7 +951,7 @@ export function GradingQueue() {
                             <th className={`px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider ${sourceTab !== "assigned" ? "rounded-tl-2xl" : ""}`}>
                               {t("teacher.grading.table.exam")}
                             </th>
-                            <th 
+                            <th
                               onClick={() => handleSort("time")}
                               className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group"
                             >
@@ -957,7 +967,7 @@ export function GradingQueue() {
                             <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                               {t("teacher.grading.table.status")}
                             </th>
-                            <th 
+                            <th
                               onClick={() => handleSort("score")}
                               className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group"
                             >
@@ -970,7 +980,7 @@ export function GradingQueue() {
                                 )}
                               </div>
                             </th>
-                            <th 
+                            <th
                               onClick={() => handleSort("gradedTime")}
                               className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group"
                             >
