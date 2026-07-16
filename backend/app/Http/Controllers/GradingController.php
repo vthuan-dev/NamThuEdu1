@@ -87,14 +87,11 @@ class GradingController extends Controller
             $query->whereNotNull('assignment_id');
         }
 
+        // Hiển thị TẤT CẢ các phiên: học viên nộp/làm đề đó bao nhiêu lần thì có
+        // bấy nhiêu kết quả (mỗi lần nộp = 1 dòng riêng). KHÔNG dedup theo
+        // user_id-assignment_id nữa — trước đây gộp về 1 phiên mới nhất khiến các
+        // phiên khác (kể cả bài đã chấm) bị ẩn, gây nhầm khi giáo viên xem lại.
         $submissions = $query->orderBy('sSubmit_time', 'desc')->get();
-
-        if ($source !== 'practice') {
-            $submissions = $submissions
-                ->groupBy(fn($s) => $s->user_id . '-' . $s->assignment_id)
-                ->map(fn($g) => $g->first())
-                ->values();
-        }
 
         // Đính kèm số câu hỏi của đề cho mỗi bài làm — giúp giáo viên phân biệt
         // đúng phiên/đề khi chấm (tránh nhầm giữa các phiên của cùng một đề).
