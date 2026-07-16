@@ -835,6 +835,17 @@ class ThptExamController extends Controller
         // Học viên thấy điểm giáo viên ở các câu đã chấm lại (Req 6.7).
         $result = $this->overlayTeacherScores($result);
 
+        // ── Áp override chấm tay của giáo viên lên phần khách quan khi ĐỌC ──────
+        // Giáo viên có thể toggle đúng/sai 1 câu (answer_overrides) hoặc đổi đáp án
+        // đúng MCQ (correct_overrides). gradeSubmission KHÔNG biết các override này
+        // (chỉ lưu trong payload) → phải áp lại để sections[].correct_count/raw_score
+        // và correct_answers khớp đúng điều giáo viên đã chỉnh. Idempotent, an toàn.
+        $answerOverrides = is_array($payload['answer_overrides'] ?? null) ? $payload['answer_overrides'] : [];
+        $correctOverrides = is_array($payload['correct_overrides'] ?? null) ? $payload['correct_overrides'] : [];
+        if (!empty($answerOverrides) || !empty($correctOverrides)) {
+            $result = $this->applyGradingOverrides($result, $answers, $reviewConfig, $answerOverrides, $correctOverrides);
+        }
+
         // ── Đồng bộ điểm thô khách quan từ sections (nguồn chuẩn duy nhất) ──────
         // raw_score/raw_score_max top-level có thể bị ghi đè độc lập khi giáo viên
         // update điểm (objective_raw_score) → lệch với thống kê per-section
@@ -1440,6 +1451,201 @@ class ThptExamController extends Controller
             }
         }
         return false;
+    }
+
+    /**
+     * Áp override chấm tay của giáo viên lên phần khách quan (in-memory, khi đọc).
+     *
+     * Trang chấm của giáo viên (ThptGradingDetail) cho phép:
+     *  - answer_overrides: toggle đúng/sai 1 mục. Key theo FE: "{sid}-{qn}" (mục đơn),
+     *    "{sid}-{qn}-s{i}" (mệnh đề tf_group), "{sid}-{qn}-r{i}" (dòng matching).
+     *  - correct_overrides: đổi đáp án đúng câu MCQ. Key "{sid}-{qn}" => id đáp án mới.
+     * với sid = section['id'] ?? type (khớp cách FE build key).
+     *
+     * gradeSubmission KHÔNG biết các override này (chỉ lưu trong payload) nên ở đây
+     * tính lại correct_count/raw_score từng section + correct_answers (MCQ) để trang
+     * kết quả học viên khớp đúng điều giáo viên đã chấm. Idempotent, không sửa DB.
+     * raw_score tổng được đồng bộ lại ở bước sau (sync từ sections) trong getResult.
+     */
+    private function applyGradingOverrides(array $result, array $answers, array $config, array $answerOverrides, array $correctOverrides): array
+    {
+        $sections = $config['sections'] ?? [];
+        if (empty($sections)) {
+            return $result;
+        }
+
+        $resultSections = is_array($result['sections'] ?? null) ? array_values($result['sections']) : [];
+        $correctAnswers = is_array($result['correct_answers'] ?? null) ? $result['correct_answers'] : [];
+
+        foreach ($sections as $idx => $s) {
+            $type = $s['type'] ?? '';
+            if (in_array($type, ['speaking', 'writing'], true)) {
+                continue;
+            }
+            if (!isset($resultSections[$idx])) {
+                continue;
+            }
+
+            $sid = $s['id'] ?? $type;
+            $pts = (float) ($s['points_per_question'] ?? 1);
+            $secCorrect = 0;
+            $secRaw = 0.0;
+
+            // Mục đơn (MCQ id-based hoặc text). MCQ áp được correct_overrides.
+            $evalSingle = function ($qn, bool $original, bool $isMcq, $studentAns)
+                use ($sid, $answerOverrides, $correctOverrides, &$correctAnswers) {
+                $key = "{$sid}-{$qn}";
+                if (array_key_exists($key, $answerOverrides)) {
+                    return (bool) $answerOverrides[$key];
+                }
+                if ($isMcq && array_key_exists($key, $correctOverrides)) {
+                    $newCorrect = $correctOverrides[$key];
+                    $correctAnswers["q{$qn}"] = $newCorrect;
+                    return $studentAns !== null && (string) $studentAns === (string) $newCorrect;
+                }
+                return $original;
+            };
+
+            // Mục con (tf statement / matching row): chỉ answer_overrides (toggle).
+            $evalSub = function (string $subKey, bool $original) use ($answerOverrides) {
+                if (array_key_exists($subKey, $answerOverrides)) {
+                    return (bool) $answerOverrides[$subKey];
+                }
+                return $original;
+            };
+
+            $award = function (bool $ok) use (&$secCorrect, &$secRaw, $pts) {
+                if ($ok) {
+                    $secCorrect++;
+                    $secRaw += $pts;
+                }
+            };
+
+            switch ($type) {
+                case 'phonetics':
+                case 'mc_questions':
+                case 'error_identification':
+                    foreach ($s['items'] ?? [] as $it) {
+                        $qn = $it['question_number'] ?? '?';
+                        $sa = $answers["q{$qn}"] ?? null;
+                        $orig = $sa !== null && (string) $sa === (string) ($it['correct_id'] ?? '');
+                        $award($evalSingle($qn, $orig, true, $sa));
+                    }
+                    break;
+
+                case 'listening':
+                    foreach ($s['items'] ?? [] as $it) {
+                        $qn = $it['question_number'] ?? '?';
+                        $sa = $answers["q{$qn}"] ?? null;
+                        if (($it['kind'] ?? 'mc') === 'fill_blank') {
+                            $accepted = $it['accepted_answers'] ?? [];
+                            $orig = $sa !== null && $sa !== '' && $this->matchOpenCloze((string) $sa, $accepted, (bool) ($it['case_sensitive'] ?? false));
+                            $award($evalSingle($qn, $orig, false, $sa));
+                        } else {
+                            $orig = $sa !== null && (string) $sa === (string) ($it['correct_id'] ?? '');
+                            $award($evalSingle($qn, $orig, true, $sa));
+                        }
+                    }
+                    break;
+
+                case 'word_form':
+                    foreach ($s['items'] ?? [] as $it) {
+                        $qn = $it['question_number'] ?? '?';
+                        $sa = $answers["q{$qn}"] ?? null;
+                        $accepted = $it['accepted_answers'] ?? [];
+                        $orig = $sa !== null && $sa !== '' && $this->matchOpenCloze((string) $sa, $accepted, (bool) ($it['case_sensitive'] ?? false));
+                        $award($evalSingle($qn, $orig, false, $sa));
+                    }
+                    break;
+
+                case 'sentence_transformation':
+                    foreach ($s['items'] ?? [] as $it) {
+                        $qn = $it['question_number'] ?? '?';
+                        $sa = $answers["q{$qn}"] ?? null;
+                        $accepted = $it['accepted_answers'] ?? [];
+                        $orig = $sa !== null && $sa !== '' && $this->matchOpenCloze((string) $sa, $accepted, false);
+                        $award($evalSingle($qn, $orig, false, $sa));
+                    }
+                    break;
+
+                case 'tf_group':
+                    foreach ($s['items'] ?? [] as $it) {
+                        $qn = $it['question_number'] ?? '?';
+                        foreach ($it['statements'] ?? [] as $i => $st) {
+                            $ansKey = "q{$qn}.s" . ($i + 1);
+                            $expected = (bool) ($st['correct'] ?? false);
+                            $orig = array_key_exists($ansKey, $answers) && (bool) $answers[$ansKey] === $expected;
+                            $award($evalSub("{$sid}-{$qn}-s{$i}", $orig));
+                        }
+                    }
+                    break;
+
+                case 'reading_mixed':
+                    foreach ($s['items'] ?? [] as $it) {
+                        $kind = $it['kind'] ?? null;
+                        $qn = $it['question_number'] ?? '?';
+                        if ($kind === 'tf_group') {
+                            foreach ($it['statements'] ?? [] as $i => $st) {
+                                $ansKey = "q{$qn}.s" . ($i + 1);
+                                $expected = (bool) ($st['correct'] ?? false);
+                                $orig = array_key_exists($ansKey, $answers) && (bool) $answers[$ansKey] === $expected;
+                                $award($evalSub("{$sid}-{$qn}-s{$i}", $orig));
+                            }
+                        } elseif ($kind === 'mc') {
+                            $sa = $answers["q{$qn}"] ?? null;
+                            $orig = $sa !== null && (string) $sa === (string) ($it['correct_id'] ?? '');
+                            $award($evalSingle($qn, $orig, true, $sa));
+                        } elseif ($kind === 'sentence_insertion') {
+                            $sa = $answers["q{$qn}"] ?? null;
+                            $orig = $sa !== null && (string) $sa === (string) ($it['correct_marker'] ?? '');
+                            $award($evalSingle($qn, $orig, true, $sa));
+                        }
+                    }
+                    break;
+
+                case 'matching':
+                    foreach ($s['items'] ?? [] as $it) {
+                        $qn = $it['question_number'] ?? '?';
+                        foreach (($it['answers'] ?? []) as $i => $expectedLetter) {
+                            $ansKey = "q{$qn}.{$i}";
+                            $orig = ($answers[$ansKey] ?? null) === $expectedLetter;
+                            $award($evalSub("{$sid}-{$qn}-r{$i}", $orig));
+                        }
+                    }
+                    break;
+
+                case 'mc_cloze':
+                    foreach ($s['blanks'] ?? [] as $b) {
+                        $qn = $b['question_number'] ?? '?';
+                        $sa = $answers["q{$qn}"] ?? null;
+                        $orig = $sa !== null && (string) $sa === (string) ($b['correct_id'] ?? '');
+                        $award($evalSingle($qn, $orig, true, $sa));
+                    }
+                    break;
+
+                case 'word_bank_cloze':
+                case 'open_cloze':
+                    foreach ($s['blanks'] ?? [] as $b) {
+                        $qn = $b['question_number'] ?? '?';
+                        $sa = $answers["q{$qn}"] ?? null;
+                        $accepted = $b['accepted_answers'] ?? [];
+                        $orig = $sa !== null && $sa !== '' && $this->matchOpenCloze((string) $sa, $accepted, (bool) ($b['case_sensitive'] ?? false));
+                        $award($evalSingle($qn, $orig, false, $sa));
+                    }
+                    break;
+
+                default:
+                    // Type không rõ → giữ nguyên số liệu gốc, không đụng.
+                    continue 2;
+            }
+
+            $resultSections[$idx]['correct_count'] = $secCorrect;
+            $resultSections[$idx]['raw_score'] = $secRaw;
+        }
+
+        $result['sections'] = $resultSections;
+        $result['correct_answers'] = $correctAnswers;
+        return $result;
     }
 
     /**
