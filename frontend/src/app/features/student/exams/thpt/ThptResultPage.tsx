@@ -215,6 +215,12 @@ export function ThptResultPage() {
   const totalCorrect   = result.sections.reduce((s, p) => s + p.correct_count, 0);
   const totalQuestions = result.sections.reduce((s, p) => s + p.total_count, 0);
   const accuracy       = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+  // Điểm thô hiển thị luôn tính TỪ CÁC SECTION (cùng nguồn với ô Câu đúng/Câu sai)
+  // để 4 con số không bao giờ lệch nhau. Field top-level result.raw_score có thể bị
+  // giáo viên ghi đè khi chấm/update điểm → gây mâu thuẫn (vd thô 50/50 nhưng chỉ 13
+  // câu đúng). Điểm tổng (đã bao gồm override) vẫn hiển thị riêng ở vòng tròn điểm.
+  const rawFromSections    = result.sections.reduce((s, p) => s + (p.raw_score ?? 0), 0);
+  const rawMaxFromSections = result.sections.reduce((s, p) => s + (p.raw_max ?? 0), 0);
   // Cap thời gian hiển thị theo giới hạn của đề: sTime_taken (durationSec) tính
   // bằng now()-start nên có thể lố vài giây khi auto-submit trễ (vd 60:02). Nếu
   // làm >= giới hạn thì hiển thị đúng bằng giới hạn (max), không vượt quá.
@@ -322,7 +328,7 @@ export function ThptResultPage() {
                     </span>
                   )}
                   <p style={{ fontSize: 11, color: '#6B7280', marginTop: 8 }}>
-                    Điểm thô (trắc nghiệm): {result.raw_score}/{result.raw_score_max}
+                    Điểm thô (trắc nghiệm): {rawFromSections}/{rawMaxFromSections}
                   </p>
                   {result.speaking && typeof result.speaking.score === 'number' && (
                     <p className="inline-flex items-center gap-1 mt-1" style={{ fontSize: 11, color: '#7C3AED', fontWeight: 700 }}>
