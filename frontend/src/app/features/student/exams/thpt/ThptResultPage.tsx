@@ -230,12 +230,12 @@ export function ThptResultPage() {
   const totalCorrect   = result.sections.reduce((s, p) => s + p.correct_count, 0);
   const totalQuestions = result.sections.reduce((s, p) => s + p.total_count, 0);
   const accuracy       = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
-  // Điểm thô hiển thị luôn tính TỪ CÁC SECTION (cùng nguồn với ô Câu đúng/Câu sai)
-  // để 4 con số không bao giờ lệch nhau. Field top-level result.raw_score có thể bị
-  // giáo viên ghi đè khi chấm/update điểm → gây mâu thuẫn (vd thô 50/50 nhưng chỉ 13
-  // câu đúng). Điểm tổng (đã bao gồm override) vẫn hiển thị riêng ở vòng tròn điểm.
-  const rawFromSections    = result.sections.reduce((s, p) => s + (p.raw_score ?? 0), 0);
-  const rawMaxFromSections = result.sections.reduce((s, p) => s + (p.raw_max ?? 0), 0);
+  // Điểm thô khách quan lấy thẳng từ result.raw_score/raw_score_max — backend là
+  // NGUỒN CHUẨN DUY NHẤT: getResult đã tính lại 2 field này từ sections (loại trừ
+  // nói/viết) nên luôn khớp với thống kê Câu đúng/Câu sai, kể cả khi giáo viên
+  // update điểm. Điểm tổng (đã gồm override) vẫn hiển thị riêng ở vòng tròn điểm.
+  const rawFromSections    = result.raw_score ?? 0;
+  const rawMaxFromSections = result.raw_score_max ?? 0;
   // Cap thời gian hiển thị theo giới hạn của đề: sTime_taken (durationSec) tính
   // bằng now()-start nên có thể lố vài giây khi auto-submit trễ (vd 60:02). Nếu
   // làm >= giới hạn thì hiển thị đúng bằng giới hạn (max), không vượt quá.

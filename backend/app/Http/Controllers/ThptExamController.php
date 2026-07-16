@@ -835,6 +835,29 @@ class ThptExamController extends Controller
         // Học viên thấy điểm giáo viên ở các câu đã chấm lại (Req 6.7).
         $result = $this->overlayTeacherScores($result);
 
+        // ── Đồng bộ điểm thô khách quan từ sections (nguồn chuẩn duy nhất) ──────
+        // raw_score/raw_score_max top-level có thể bị ghi đè độc lập khi giáo viên
+        // update điểm (objective_raw_score) → lệch với thống kê per-section
+        // (correct_count/total_count) mà học viên nhìn thấy (vd thô 50/50 nhưng chỉ
+        // 13 câu đúng). Luôn tính lại từ sections để 2 nguồn không bao giờ mâu thuẫn.
+        // Điểm TỔNG của giáo viên vẫn tách riêng ở scaled_score/teacher_override_score.
+        if (!empty($result['sections']) && is_array($result['sections'])) {
+            $rawFromSections = 0.0;
+            $rawMaxFromSections = 0.0;
+            foreach ($result['sections'] as $sec) {
+                // Bỏ qua phần chủ quan (nói/viết) — không tính vào điểm thô trắc nghiệm.
+                if (in_array($sec['type'] ?? '', ['speaking', 'writing'], true)) {
+                    continue;
+                }
+                $rawFromSections += (float) ($sec['raw_score'] ?? 0);
+                $rawMaxFromSections += (float) ($sec['raw_max'] ?? 0);
+            }
+            if ($rawMaxFromSections > 0) {
+                $result['raw_score'] = $rawFromSections;
+                $result['raw_score_max'] = $rawMaxFromSections;
+            }
+        }
+
         // Bản ghi âm phần Nói (để học viên nghe lại khi xem kết quả).
         $rawFeedback = json_decode($submission->sGemini_feedback ?? '{}', true) ?: [];
         $speakingAudio = $rawFeedback['speaking_audio'] ?? [];
