@@ -433,6 +433,7 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         // Grading
         Route::get('/submissions', [GradingController::class, 'index']);
         Route::post('/submissions/bulk-approve', [GradingController::class, 'bulkApprove']);
+        Route::post('/submissions/bulk-delete', [GradingController::class, 'bulkDelete']);
         Route::get('/submissions/{id}', [GradingController::class, 'show']);
     Route::delete('/submissions/{id}', [GradingController::class, 'destroy']);
         Route::post('/submissions/{id}/grade', [GradingController::class, 'grade']);

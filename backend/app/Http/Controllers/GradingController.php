@@ -35,7 +35,7 @@ class GradingController extends Controller
      *     @OA\Response(response=200, description="Submissions retrieved successfully"),
      *     @OA\Response(response=401, description="Unauthorized")
      * )
-     * 
+     *
      * GET /api/teacher/submissions
      * Lấy danh sách bài làm (có filter)
      */
@@ -127,7 +127,7 @@ class GradingController extends Controller
      *     @OA\Response(response=200, description="Submission details retrieved successfully"),
      *     @OA\Response(response=404, description="Submission not found")
      * )
-     * 
+     *
      * GET /api/teacher/submissions/{id}
      * Lấy chi tiết bài làm với tất cả câu trả lời
      */
@@ -164,7 +164,7 @@ class GradingController extends Controller
                     ? $submission->sGemini_feedback
                     : json_decode($submission->sGemini_feedback, true))
                 : [];
-            
+
             $speakingAudio = $raw['speaking_audio'] ?? [];
             if (!empty($speakingAudio)) {
                 // VSTEP Speaking: 1 part = 1 audio = 1 grading task
@@ -270,7 +270,7 @@ class GradingController extends Controller
      *     @OA\Response(response=200, description="Submission graded successfully"),
      *     @OA\Response(response=404, description="Submission not found")
      * )
-     * 
+     *
      * POST /api/teacher/submissions/{id}/grade
      * Chấm điểm bài làm
      */
@@ -383,15 +383,15 @@ class GradingController extends Controller
             if ($isVstep) {
                 // For VSTEP: calculate skill scores and update sGemini_feedback + sScore
                 $sub = Submission::with(['answers.question'])->find($id);
-                
+
                 $listeningCorrect = 0;
                 $listeningMax = 0;
                 $readingCorrect = 0;
                 $readingMax = 0;
-                
+
                 $writingScores = [];
                 $speakingScores = [];
-                
+
                 foreach ($sub->answers as $ans) {
                     $sec = strtolower($ans->question->qSkill ?? $ans->question->qSection ?? '');
                     $qPoints = $ans->question->qPoints ?? 1;
@@ -402,7 +402,7 @@ class GradingController extends Controller
                     $pointsAwarded = $isSubjective
                         ? ($ans->saPoints_awarded ?? $ans->saAi_score ?? 0)
                         : ($ans->saPoints_awarded ?? 0);
-                    
+
                     if ($sec === 'listening') {
                         $listeningMax += $qPoints;
                         $listeningCorrect += $pointsAwarded;
@@ -415,12 +415,12 @@ class GradingController extends Controller
                         $speakingScores[] = $pointsAwarded;
                     }
                 }
-                
+
                 $listeningScore = $listeningMax > 0 ? round(($listeningCorrect / $listeningMax) * 10, 2) : null;
                 $readingScore = $readingMax > 0 ? round(($readingCorrect / $readingMax) * 10, 2) : null;
                 $writingScore = count($writingScores) > 0 ? round(array_sum($writingScores) / count($writingScores), 2) : null;
                 $speakingScore = count($speakingScores) > 0 ? round(array_sum($speakingScores) / count($speakingScores), 2) : null;
-                
+
                 // Read and update sGemini_feedback
                 $raw = $sub->sGemini_feedback ? (json_decode($sub->sGemini_feedback, true) ?: []) : [];
                 $vstepScores = $raw['vstep_scores'] ?? [];
@@ -444,7 +444,7 @@ class GradingController extends Controller
                 }
 
                 $raw['vstep_scores'] = $vstepScores;
-                
+
                 // Also update speaking_results parts in JSON if they exist, to stay in sync with answers
                 if (isset($raw['speaking_results']) && is_array($raw['speaking_results'])) {
                     foreach ($sub->answers as $ans) {
@@ -457,7 +457,7 @@ class GradingController extends Controller
                         }
                     }
                 }
-                
+
                 if ($request->has('score') && !$request->has('skill_overrides')) {
                     $totalScore = (float) $request->score;
                 } else {
@@ -468,11 +468,11 @@ class GradingController extends Controller
                         $vstepScores['writing']   ?? null,
                         $vstepScores['speaking']  ?? null,
                     ], fn($v) => !is_null($v));
-                    
+
                     $overallAvg = count($available) > 0 ? round(array_sum($available) / count($available), 2) : 0;
                     $totalScore = round($overallAvg * 10, 2);
                 }
-                
+
                 $submission->update([
                     'sGemini_feedback' => json_encode($raw),
                     'sTeacher_feedback' => $request->feedback ?? $request->sTeacher_feedback,
@@ -596,7 +596,7 @@ class GradingController extends Controller
                 } else {
                     $totalScore = $request->score ?? $this->calculateTotalScore($id);
                 }
-                
+
                 $submission->update([
                     'sTeacher_feedback' => $request->feedback ?? $request->sTeacher_feedback,
                     'sScore' => $totalScore,
@@ -640,7 +640,7 @@ class GradingController extends Controller
      *     @OA\Response(response=200, description="Auto-grading completed successfully"),
      *     @OA\Response(response=404, description="Submission not found")
      * )
-     * 
+     *
      * POST /api/teacher/submissions/{id}/auto-grade
      * Tự động chấm câu trắc nghiệm
      */
@@ -675,7 +675,7 @@ class GradingController extends Controller
 
             foreach ($submission->answers as $submissionAnswer) {
                 $question = $submissionAnswer->question;
-                
+
                 // Auto-grade only specific question types
                 if (in_array($question->qType, ['multiple_choice', 'true_false_not_given', 'yes_no_not_given', 'fill_blank', 'true_false'])) {
                     $isCorrect = $this->checkAnswer($question, $submissionAnswer->saAnswer_text);
@@ -758,7 +758,7 @@ class GradingController extends Controller
      *     ),
      *     @OA\Response(response=200, description="Detailed grading completed successfully")
      * )
-     * 
+     *
      * POST /api/teacher/submissions/{id}/detailed-grade
      * Chấm thủ công với nhận xét chi tiết
      */
@@ -882,7 +882,7 @@ class GradingController extends Controller
      *     ),
      *     @OA\Response(response=200, description="Class report generated successfully")
      * )
-     * 
+     *
      * GET /api/teacher/classes/{classId}/report
      * Xem báo cáo kết quả lớp học
      */
@@ -976,7 +976,7 @@ class GradingController extends Controller
      *     security={{"bearerAuth":{}}},
      *     @OA\Response(response=200, description="Grading statistics retrieved successfully")
      * )
-     * 
+     *
      * GET /api/teacher/grading/statistics
      * Thống kê chấm điểm tổng quan
      */
@@ -1198,7 +1198,7 @@ class GradingController extends Controller
     private function checkAnswer($question, $studentAnswer)
     {
         $correctAnswers = $question->answers()->where('aIs_correct', true)->get();
-        
+
         if ($correctAnswers->isEmpty()) {
             return false;
         }
@@ -1207,14 +1207,14 @@ class GradingController extends Controller
 
         foreach ($correctAnswers as $correctAnswer) {
             $correctText = trim(strtolower($correctAnswer->aContent));
-            
+
             // Exact match for multiple choice
             if ($question->qType === 'multiple_choice') {
                 if ($studentAnswer === $correctText) {
                     return true;
                 }
             }
-            
+
             // Flexible matching for fill-in-blank
             if ($question->qType === 'fill_blank') {
                 // Remove extra spaces and check
@@ -1222,7 +1222,7 @@ class GradingController extends Controller
                     return true;
                 }
             }
-            
+
             // Boolean questions
             if (in_array($question->qType, ['true_false_not_given', 'yes_no_not_given'])) {
                 if ($studentAnswer === $correctText) {
@@ -1241,7 +1241,7 @@ class GradingController extends Controller
     {
         $totalStudents = $studentIds->count();
         $studentsWithSubmissions = $submissions->pluck('user_id')->unique()->count();
-        
+
         if ($submissions->isEmpty()) {
             return [
                 'total_students' => $totalStudents,
@@ -1287,7 +1287,7 @@ class GradingController extends Controller
         return $submissions->groupBy('exam_id')->map(function($examSubmissions) {
             $exam = $examSubmissions->first()->exam;
             $scores = $examSubmissions->pluck('sScore')->filter();
-            
+
             return [
                 'exam_id' => $exam->eId,
                 'exam_title' => $exam->eTitle,
@@ -1309,7 +1309,7 @@ class GradingController extends Controller
         return $submissions->groupBy('user_id')->map(function($studentSubmissions) {
             $student = $studentSubmissions->first()->user;
             $scores = $studentSubmissions->pluck('sScore')->filter();
-            
+
             return [
                 'student_id' => $student->uId,
                 'student_name' => $student->uName,
@@ -1327,11 +1327,11 @@ class GradingController extends Controller
     private function getQuestionAnalysis($submissions)
     {
         $questionStats = [];
-        
+
         foreach ($submissions as $submission) {
             foreach ($submission->answers as $answer) {
                 $questionId = $answer->question_id;
-                
+
                 if (!isset($questionStats[$questionId])) {
                     $questionStats[$questionId] = [
                         'question_id' => $questionId,
@@ -1343,7 +1343,7 @@ class GradingController extends Controller
                         'total_points' => 0
                     ];
                 }
-                
+
                 $questionStats[$questionId]['total_attempts']++;
                 if ($answer->saIs_correct) {
                     $questionStats[$questionId]['correct_attempts']++;
@@ -1351,15 +1351,15 @@ class GradingController extends Controller
                 $questionStats[$questionId]['total_points'] += $answer->saPoints_awarded ?? 0;
             }
         }
-        
+
         // Calculate averages and success rates
         foreach ($questionStats as &$stat) {
-            $stat['success_rate'] = $stat['total_attempts'] > 0 ? 
+            $stat['success_rate'] = $stat['total_attempts'] > 0 ?
                 round(($stat['correct_attempts'] / $stat['total_attempts']) * 100, 2) : 0;
-            $stat['average_score'] = $stat['total_attempts'] > 0 ? 
+            $stat['average_score'] = $stat['total_attempts'] > 0 ?
                 round($stat['total_points'] / $stat['total_attempts'], 2) : 0;
         }
-        
+
         return array_values($questionStats);
     }
 
@@ -1371,18 +1371,18 @@ class GradingController extends Controller
         $gradedSubmissions = $submissions->where('sStatus', 'graded')
                                        ->whereNotNull('sSubmit_time')
                                        ->whereNotNull('sGraded_time');
-        
+
         if ($gradedSubmissions->isEmpty()) {
             return 0;
         }
-        
+
         $totalMinutes = 0;
         foreach ($gradedSubmissions as $submission) {
             $submitTime = \Carbon\Carbon::parse($submission->sSubmit_time);
             $gradedTime = \Carbon\Carbon::parse($submission->sGraded_time);
             $totalMinutes += $submitTime->diffInMinutes($gradedTime);
         }
-        
+
         return round($totalMinutes / $gradedSubmissions->count(), 2);
     }
 
@@ -1404,7 +1404,7 @@ class GradingController extends Controller
             $readingMax = 0;
             $writingScores = [];
             $speakingScores = [];
-            
+
             foreach ($submission->answers as $ans) {
                 if (!$ans->question) continue;
                 $sec = strtolower($ans->question->qSkill ?? $ans->question->qSection ?? '');
@@ -1414,7 +1414,7 @@ class GradingController extends Controller
                 $pointsAwarded = $isSubjective
                     ? ($ans->saPoints_awarded ?? $ans->saAi_score ?? 0)
                     : ($ans->saPoints_awarded ?? 0);
-                
+
                 if ($sec === 'listening') {
                     $listeningMax += $qPoints;
                     $listeningCorrect += $pointsAwarded;
@@ -1427,25 +1427,25 @@ class GradingController extends Controller
                     $speakingScores[] = $pointsAwarded;
                 }
             }
-            
+
             $listeningScore = $listeningMax > 0 ? round(($listeningCorrect / $listeningMax) * 10, 2) : null;
             $readingScore = $readingMax > 0 ? round(($readingCorrect / $readingMax) * 10, 2) : null;
             $writingScore = count($writingScores) > 0 ? round(array_sum($writingScores) / count($writingScores), 2) : null;
             $speakingScore = count($speakingScores) > 0 ? round(array_sum($speakingScores) / count($speakingScores), 2) : null;
-            
+
             // Read and update sGemini_feedback's vstep_scores
             $raw = $submission->sGemini_feedback ? (json_decode($submission->sGemini_feedback, true) ?: []) : [];
             $vstepScores = $raw['vstep_scores'] ?? [];
-            
+
             if (!is_null($listeningScore)) $vstepScores['listening'] = $listeningScore;
             if (!is_null($readingScore)) $vstepScores['reading'] = $readingScore;
             if (!is_null($writingScore)) $vstepScores['writing'] = $writingScore;
             if (!is_null($speakingScore)) $vstepScores['speaking'] = $speakingScore;
-            
+
             $raw['vstep_scores'] = $vstepScores;
             $submission->sGemini_feedback = json_encode($raw);
             $submission->save();
-            
+
             // Recalculate average
             $available = array_filter([
                 $vstepScores['listening'] ?? null,
@@ -1453,7 +1453,7 @@ class GradingController extends Controller
                 $vstepScores['writing']   ?? null,
                 $vstepScores['speaking']  ?? null,
             ], fn($v) => !is_null($v));
-            
+
             $overallAvg = count($available) > 0 ? round(array_sum($available) / count($available), 2) : 0;
             return round($overallAvg * 10, 2);
         }
@@ -1549,13 +1549,13 @@ class GradingController extends Controller
 
             // 3. Update all submissions' answers and scores for this question to ensure consistency
             $subAnswers = SubmissionAnswer::where('question_id', $questionId)->get();
-            
+
             // Lock all affected submissions in sorted order to prevent deadlocks and ensure consistency under concurrent load
             $submissionIds = $subAnswers->pluck('submission_id')->unique()->sort()->values()->toArray();
             if (!empty($submissionIds)) {
                 Submission::whereIn('sId', $submissionIds)->lockForUpdate()->get();
             }
-            
+
             // We also check letter-based matching (A, B, C, D)
             // Retrieve all answers of the question sorted by aOrder if available, else aId
             $firstAnswer = $question->answers->first();
@@ -1563,7 +1563,7 @@ class GradingController extends Controller
             $allAnswers = $hasOrder
                 ? $question->answers->sortBy('aOrder')->values()
                 : $question->answers->sortBy('aId')->values();
-            
+
             $targetIndex = -1;
             foreach ($allAnswers as $idx => $ans) {
                 if ($ans->aId == $correctAnswerId) {
@@ -1571,14 +1571,14 @@ class GradingController extends Controller
                     break;
                 }
             }
-            
+
             $letters = ['a', 'b', 'c', 'd'];
             $targetLetter = ($targetIndex >= 0 && $targetIndex < count($letters)) ? $letters[$targetIndex] : '';
             $newCorrectText = trim(strtolower($targetAnswer->aContent));
 
             foreach ($subAnswers as $subAnswer) {
                 $studentAnswerText = trim(strtolower($subAnswer->saAnswer_text));
-                
+
                 $isCorrect = false;
                 if ($studentAnswerText === $newCorrectText) {
                     $isCorrect = true;
@@ -1787,6 +1787,81 @@ class GradingController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Lỗi hệ thống khi xóa bài làm.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * POST /api/teacher/submissions/bulk-delete
+     * Xóa hàng loạt kết quả bài làm của học sinh
+     */
+    public function bulkDelete(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Bạn không có quyền truy cập.'
+            ], 401);
+        }
+
+        $ids = $request->input('submission_ids', []);
+        if (empty($ids)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Vui lòng chọn danh sách bài làm cần xóa.'
+            ], 400);
+        }
+
+        // Lấy danh sách bài làm hợp lệ thuộc quyền của giáo viên
+        $submissions = Submission::whereIn('sId', $ids)
+                                 ->whereHas('exam', function($q) use ($user) {
+                                     $q->where('eTeacher_id', $user->uId);
+                                 })
+                                 ->get();
+
+        if ($submissions->isEmpty()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Không tìm thấy bài làm nào hợp lệ để xóa.'
+            ], 404);
+        }
+
+        try {
+            \Illuminate\Support\Facades\DB::beginTransaction();
+
+            $submissionIds = $submissions->pluck('sId')->all();
+
+            // 1. Xóa lịch sử chấm điểm liên quan
+            \Illuminate\Support\Facades\DB::table('grading_history')->whereIn('submission_id', $submissionIds)->delete();
+
+            // 2. Xóa các câu trả lời chi tiết
+            \Illuminate\Support\Facades\DB::table('submission_answers')->whereIn('submission_id', $submissionIds)->delete();
+
+            // 3. Xóa các bài làm chính
+            Submission::whereIn('sId', $submissionIds)->delete();
+
+            \Illuminate\Support\Facades\DB::commit();
+
+            $notFound = array_values(array_diff($ids, $submissionIds));
+            $skippedCount = count($notFound);
+
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'deleted_ids' => $submissionIds,
+                    'deleted_count' => count($submissionIds),
+                    'skipped_count' => $skippedCount,
+                    'message' => 'Đã xóa thành công ' . count($submissionIds) . ' bài làm.' . ($skippedCount > 0 ? " Bỏ qua {$skippedCount} bài không hợp lệ." : "")
+                ]
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Lỗi hệ thống khi xóa hàng loạt.',
                 'error' => $e->getMessage()
             ], 500);
         }

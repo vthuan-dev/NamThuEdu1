@@ -510,8 +510,10 @@ export function GradingQueue() {
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Submission | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
-    const handleDeleteSubmission = async (id: string) => {
+      const handleDeleteSubmission = async (id: string) => {
     try {
       setDeletingId(id);
       const res = await api.delete(`/teacher/submissions/${id}`);
@@ -533,6 +535,46 @@ export function GradingQueue() {
       toast.error(err.response?.data?.message || "Lỗi hệ thống khi xóa bài làm.");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedCount === 0 || bulkDeleting) return;
+    setShowBulkDeleteConfirm(true);
+  };
+
+  const executeBulkDelete = async () => {
+    const ids = selectedVisibleIds;
+    setBulkDeleting(true);
+    setBulkMessage(null);
+    try {
+      const { data: result } = await api.post("/teacher/submissions/bulk-delete", {
+        submission_ids: ids.map((id) => Number(id)),
+      });
+      if (result.status === "success") {
+        const deletedIds: number[] = result.data?.deleted_ids ?? [];
+        const deletedSet = new Set(deletedIds.map(String));
+        
+        // Remove deleted items from local state
+        setSubmissions((prev) => prev.filter((s) => !deletedSet.has(s.id)));
+        
+        // Clear selection for the deleted items
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          deletedSet.forEach((id) => next.delete(id));
+          return next;
+        });
+        
+        toast.success(result.data?.message || `Đã xóa thành công ${deletedIds.length} bài làm.`);
+      } else {
+        toast.error(result.message || "Không thể xóa hàng loạt.");
+      }
+    } catch (err: any) {
+      console.error("Bulk delete error:", err);
+      toast.error(err?.response?.data?.message || "Lỗi khi xóa hàng loạt bài làm.");
+    } finally {
+      setBulkDeleting(false);
+      setShowBulkDeleteConfirm(false);
     }
   };
 
@@ -931,7 +973,7 @@ export function GradingQueue() {
                             </button>
                           )}
 
-                          {selectedCount > 0 && (
+                                                    {selectedCount > 0 && (
                             <div className="flex items-center gap-2 bg-violet-50/80 border border-violet-200 px-2.5 py-1 rounded-xl shadow-sm">
                               <span className="text-xs font-bold text-violet-700">
                                 Đã chọn {selectedCount} bài
@@ -939,7 +981,7 @@ export function GradingQueue() {
                               <button
                                 type="button"
                                 onClick={handleBulkApprove}
-                                disabled={bulkApproving}
+                                disabled={bulkApproving || bulkDeleting}
                                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-extrabold hover:bg-violet-700 disabled:opacity-60 shadow-sm transition-all active:scale-95 cursor-pointer"
                               >
                                 {bulkApproving ? (
@@ -949,10 +991,23 @@ export function GradingQueue() {
                                 )}
                                 Duyệt
                               </button>
+
+                              {/* Bulk Delete Button */}
+                              <button
+                                type="button"
+                                onClick={handleBulkDelete}
+                                disabled={bulkDeleting || bulkApproving}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-extrabold hover:bg-rose-700 disabled:opacity-60 shadow-sm transition-all active:scale-95 cursor-pointer"
+                                title="Xóa hàng loạt bài làm đã chọn"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                Xóa
+                              </button>
+
                               <button
                                 type="button"
                                 onClick={() => setSelectedIds(new Set())}
-                                disabled={bulkApproving}
+                                disabled={bulkApproving || bulkDeleting}
                                 className="px-2 py-1 rounded-lg text-xs font-bold text-slate-500 hover:bg-white transition-all cursor-pointer"
                                 title="Bỏ chọn tất cả"
                               >
@@ -1281,7 +1336,7 @@ export function GradingQueue() {
       </div>
 
             {/* Review Modal */}
-            {/* Custom Delete Confirmation Modal */}
+                  {/* Custom Delete Confirmation Modal */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-white rounded-2xl border border-slate-100 max-w-md w-full shadow-2xl p-6 flex flex-col gap-4 animate-scale-in">
@@ -1331,6 +1386,63 @@ export function GradingQueue() {
                 className="flex-1 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white text-xs font-bold shadow-sm shadow-rose-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 {deletingId === deleteTarget.id ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Đang xóa...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Xác nhận xóa
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Bulk Delete Confirmation Modal */}
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl border border-slate-100 max-w-md w-full shadow-2xl p-6 flex flex-col gap-4 animate-scale-in">
+            {/* Warning Icon */}
+            <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center flex-shrink-0 mx-auto">
+              <AlertCircle className="w-6 h-6 animate-pulse" />
+            </div>
+
+            {/* Modal Content */}
+            <div className="text-center">
+              <h3 className="text-md font-bold text-slate-800">Xác nhận xóa hàng loạt</h3>
+              <p className="text-xs text-slate-500 mt-2">
+                Bạn có chắc chắn muốn xóa vĩnh viễn <span className="font-bold text-rose-650 text-sm">{selectedCount}</span> kết quả bài làm đã chọn của các học sinh?
+              </p>
+
+              {/* Warning box */}
+              <div className="bg-rose-50/50 border border-rose-100 rounded-xl p-3.5 text-left mt-4 text-[11px] leading-relaxed text-rose-800 space-y-1">
+                <p className="font-bold text-rose-700 uppercase tracking-wider mb-1">Cảnh báo quan trọng:</p>
+                <p>• Tất cả {selectedCount} kết quả này sẽ biến mất hoàn toàn trên cả tài khoản GV & HS.</p>
+                <p>• Lượt làm bài tương ứng của học sinh sẽ được hoàn trả.</p>
+                <p className="font-bold">• Hành động này KHÔNG THỂ HOÀN TÁC.</p>
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex items-center gap-3 mt-2">
+              <button
+                type="button"
+                onClick={() => setShowBulkDeleteConfirm(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={bulkDeleting}
+                onClick={executeBulkDelete}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white text-xs font-bold shadow-sm shadow-rose-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                {bulkDeleting ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     Đang xóa...
