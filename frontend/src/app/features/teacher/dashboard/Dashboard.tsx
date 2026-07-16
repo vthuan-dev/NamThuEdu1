@@ -455,6 +455,9 @@ export function Dashboard() {
                     />
                   </div>
                 )}
+                <p className="text-[10px] text-slate-400 mt-1 font-normal leading-tight block">
+                  Số bài đã nộp / tổng số bài đã giao
+                </p>
               </div>
             </button>
           </div>
