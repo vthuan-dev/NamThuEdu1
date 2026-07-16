@@ -1206,12 +1206,12 @@ export function GradingQueue() {
                                           <Trash2 className="w-4 h-4" />
                                         )}
                                       </button>
-                                      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/del:flex flex-col items-center z-50">
-                                        <div className="bg-slate-800 text-white text-[11px] rounded-lg px-3 py-2 whitespace-nowrap shadow-xl text-center leading-snug">
+                                                                            <div className="pointer-events-none absolute bottom-full right-0 mb-2 hidden group-hover/del:flex flex-col items-end z-50">
+                                        <div className="bg-slate-800 text-white text-[11px] rounded-lg px-3 py-2 whitespace-nowrap shadow-xl text-right leading-snug">
                                           <p className="font-semibold text-rose-400">Xóa kết quả bài làm</p>
                                           <p className="text-slate-300 mt-0.5">Xóa vĩnh viễn khỏi tài khoản HS & GV</p>
                                         </div>
-                                        <div className="border-4 border-transparent border-t-slate-800" />
+                                        <div className="border-4 border-transparent border-t-slate-800 mr-3" />
                                       </div>
                                     </div>
                                   </div>
