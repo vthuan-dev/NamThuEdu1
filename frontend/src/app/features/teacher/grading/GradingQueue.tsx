@@ -764,80 +764,7 @@ export function GradingQueue() {
           </div>
 
           {/* ── Loading / Error ── */}
-          {/* Bulk approve bar — only for assigned submissions */}
-          {sourceTab === "assigned" && (
-            <div className="flex flex-wrap items-center gap-2 px-1">
-              {pendingSelectableSubs.length > 0 && selectedCount === 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedIds(new Set(pendingSelectableSubs.map((s) => s.id)));
-                    setBulkMessage(null);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 hover:bg-violet-100 transition-colors"
-                >
-                  <CheckSquare className="w-3.5 h-3.5" />
-                  Chọn tất cả chờ duyệt ({pendingSelectableSubs.length})
-                </button>
-              )}
-              {selectedCount > 0 && (
-                <div className="flex flex-wrap items-center gap-3 w-full px-4 py-3 rounded-2xl border border-violet-200 bg-violet-50/80 shadow-sm">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-violet-800">
-                    <CheckSquare className="w-4 h-4" />
-                    Đã chọn {selectedCount}/{selectableSubs.length} bài
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleBulkApprove}
-                    disabled={bulkApproving}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 disabled:opacity-60 shadow-sm shadow-violet-200 transition-colors"
-                  >
-                    {bulkApproving ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Đang phê duyệt...
-                      </>
-                    ) : (
-                      <>
-                        <UserCheck className="w-4 h-4" />
-                        Phê duyệt {selectedCount} bài
-                      </>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Bỏ chọn chỉ các dòng đang hiển thị
-                      toggleSelectAll(false);
-                    }}
-                    disabled={bulkApproving}
-                    className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-white/80 transition-colors"
-                  >
-                    Bỏ chọn
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedIds(new Set());
-                      setBulkMessage(null);
-                    }}
-                    disabled={bulkApproving}
-                    className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-white/80 transition-colors"
-                  >
-                    Xóa hết lựa chọn
-                  </button>
-                  {bulkMessage && (
-                    <span className="text-xs font-medium text-emerald-700 ml-auto">{bulkMessage}</span>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-          {sourceTab === "assigned" && bulkMessage && selectedCount === 0 && (
-            <div className="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-700 font-medium">
-              {bulkMessage}
-            </div>
-          )}
+          
 
           {loading && (
             <div className="flex items-center justify-center py-20">
@@ -932,8 +859,8 @@ export function GradingQueue() {
               <div className="flex-1 w-full bg-white rounded-2xl border border-slate-100 p-5 lg:p-6 overflow-hidden shadow-sm">
                 {selectedStudentData ? (
                   <div key={selectedStudentName} className="flex flex-col gap-5 animate-fade-in-up">
-                    {/* Header: Student Info */}
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                                        {/* Header: Student Info */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-3">
                       <div>
                         <h2 className="text-lg font-bold text-slate-800">{selectedStudentData.studentName}</h2>
                         <p className="text-xs text-slate-500 mt-1">
@@ -941,6 +868,61 @@ export function GradingQueue() {
                           Tổng bài nộp: <span className="font-semibold text-slate-600">{selectedStudentData.submissions.length}</span>
                         </p>
                       </div>
+
+                      {/* Compact Bulk approval actions */}
+                      {sourceTab === "assigned" && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {pendingSelectableSubs.length > 0 && selectedCount === 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedIds(new Set(pendingSelectableSubs.map((s) => s.id)));
+                                setBulkMessage(null);
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-violet-700 bg-violet-50 border border-violet-100 hover:bg-violet-150 transition-all active:scale-95 cursor-pointer"
+                            >
+                              <CheckSquare className="w-3.5 h-3.5" />
+                              Chọn tất cả chờ duyệt ({pendingSelectableSubs.length})
+                            </button>
+                          )}
+
+                          {selectedCount > 0 && (
+                            <div className="flex items-center gap-2 bg-violet-50/80 border border-violet-200 px-2.5 py-1 rounded-xl shadow-sm">
+                              <span className="text-xs font-bold text-violet-700">
+                                Đã chọn {selectedCount} bài
+                              </span>
+                              <button
+                                type="button"
+                                onClick={handleBulkApprove}
+                                disabled={bulkApproving}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-extrabold hover:bg-violet-700 disabled:opacity-60 shadow-sm transition-all active:scale-95 cursor-pointer"
+                              >
+                                {bulkApproving ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <UserCheck className="w-3 h-3" />
+                                )}
+                                Duyệt
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedIds(new Set())}
+                                disabled={bulkApproving}
+                                className="px-2 py-1 rounded-lg text-xs font-bold text-slate-500 hover:bg-white transition-all cursor-pointer"
+                                title="Bỏ chọn tất cả"
+                              >
+                                Bỏ chọn
+                              </button>
+                            </div>
+                          )}
+
+                          {bulkMessage && (
+                            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-xl animate-fade-in-up">
+                              {bulkMessage}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Table of Submissions */}
