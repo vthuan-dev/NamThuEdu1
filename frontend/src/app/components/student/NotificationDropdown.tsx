@@ -397,10 +397,13 @@ export function NotificationDropdown({ activeColor = "#7C3AED", hoverBg = "hover
               </div>
             ) : (
               <div className="divide-y divide-slate-50">
-                {notifications.map((notif) => {
+                {notifications.map((notif, idx) => {
                   const Icon = getIcon(notif.type);
                   const color = notif.color || "#7C3AED";
                   const isUnread = !notif.is_read;
+                  // Zebra striping: xen ke dam/nhat giua 2 thong bao lien nhau
+                  // de de phan biet tung muc (dong chan = nen sang, dong le = nen xam nhat).
+                  const zebraBg = idx % 2 === 1 ? "#F5F6F8" : "#FFFFFF";
                   const url = resolveStudentActionUrl(notif.action_url);
                   const isResultUrl = url?.includes("/ket-qua/");
                   const isExamSchedule = String(notif.id).startsWith("exam_schedule_");
@@ -462,7 +465,7 @@ export function NotificationDropdown({ activeColor = "#7C3AED", hoverBg = "hover
                       {...wrapperProps}
                       className="group flex items-start gap-3.5 px-4 py-3.5 transition-all duration-300 hover:bg-slate-50/50 cursor-pointer relative"
                       style={{
-                        background: isUnread ? "rgba(124,58,237,0.02)" : "white",
+                        background: isUnread ? "rgba(124,58,237,0.06)" : zebraBg,
                         borderLeft: isUnread ? `4px solid ${color}` : "4px solid transparent",
                       }}
                     >
