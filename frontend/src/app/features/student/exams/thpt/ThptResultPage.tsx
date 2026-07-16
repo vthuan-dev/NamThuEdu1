@@ -227,8 +227,11 @@ export function ThptResultPage() {
     );
   }
 
-  const totalCorrect   = result.sections.reduce((s, p) => s + p.correct_count, 0);
-  const totalQuestions = result.sections.reduce((s, p) => s + p.total_count, 0);
+  // Guard: submission cu/bi loi co the thieu result.sections → tranh crash ca trang
+  // (Cannot read properties of undefined 'reduce'). Luon dung mang an toan.
+  const sections = Array.isArray(result.sections) ? result.sections : [];
+  const totalCorrect   = sections.reduce((s, p) => s + p.correct_count, 0);
+  const totalQuestions = sections.reduce((s, p) => s + p.total_count, 0);
   const accuracy       = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
   // Điểm thô khách quan lấy thẳng từ result.raw_score/raw_score_max — backend là
   // NGUỒN CHUẨN DUY NHẤT: getResult đã tính lại 2 field này từ sections (loại trừ
@@ -246,10 +249,10 @@ export function ThptResultPage() {
   const activeSection  = config.sections[activeIdx];
   const cfgSections = config.sections ?? [];
   const hasSpeakingSection = cfgSections.some((s) => s.type === 'speaking')
-    || result.sections.some((s) => s.type === 'speaking');
+    || sections.some((s) => s.type === 'speaking');
   const speakingScored     = !!result.speaking && typeof result.speaking.score === 'number';
   const hasWritingSection  = cfgSections.some((s) => s.type === 'writing')
-    || result.sections.some((s) => s.type === 'writing');
+    || sections.some((s) => s.type === 'writing');
   const writingScored      = !!result.writing && typeof result.writing.score === 'number';
   const speakingPending    = hasSpeakingSection && !speakingScored;
   const writingPending     = hasWritingSection && !writingScored;
@@ -402,7 +405,7 @@ export function ThptResultPage() {
                 color: '#059669', bg: 'linear-gradient(135deg,#ECFDF5,#D1FAE5)', ring: '#A7F3D0' },
               { label: 'Câu sai', value: totalQuestions - totalCorrect, Icon: XCircle,
                 color: '#E11D48', bg: 'linear-gradient(135deg,#FFF1F2,#FFE4E6)', ring: '#FECDD3' },
-              { label: 'Số phần', value: result.sections.length, Icon: BookOpen,
+              { label: 'Số phần', value: sections.length, Icon: BookOpen,
                 color: '#2563EB', bg: 'linear-gradient(135deg,#EFF6FF,#DBEAFE)', ring: '#BFDBFE' },
             ].map(st => (
               <div
@@ -440,7 +443,7 @@ export function ThptResultPage() {
             Chi tiết từng phần
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {result.sections.map((sec, idx) => {
+            {sections.map((sec, idx) => {
               const isActive  = activeIdx === idx;
               const isSpeaking = sec.type === 'speaking';
               const isWriting  = sec.type === 'writing';
@@ -517,8 +520,8 @@ export function ThptResultPage() {
           const isWriting = activeSection.type === 'writing';
           const isAiSkill = isSpeaking || isWriting;
           const aiBlock = isSpeaking ? result.speaking : isWriting ? result.writing : null;
-          const activeStat = result.sections.find((s) => s.section_id === activeSection.id)
-            ?? result.sections[activeIdx];
+          const activeStat = sections.find((s) => s.section_id === activeSection.id)
+            ?? sections[activeIdx];
           const objCorrect = activeStat?.correct_count ?? 0;
           const objTotal = activeStat?.total_count ?? 0;
           const aiReady = !!aiBlock && typeof aiBlock.score === 'number';
