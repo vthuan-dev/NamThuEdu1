@@ -109,6 +109,8 @@ export function GradingQueue() {
 
   const [searchQuery, setSearchQuery]   = useState("");
   const [selectedStudentName, setSelectedStudentName] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 8;
   const [filterStatus, setFilterStatus] = useState("");
   const [filterExam, setFilterExam]     = useState("");   // theo đề thi (examId)
   const [filterClass, setFilterClass]   = useState("");   // theo lớp (classId)
@@ -337,9 +339,22 @@ export function GradingQueue() {
     return studentList.find((s) => s.studentName === selectedStudentName) || null;
   }, [studentList, selectedStudentName]);
 
-  const selectedStudentSubmissions = useMemo(() => {
+    const selectedStudentSubmissions = useMemo(() => {
     return selectedStudentData?.submissions || [];
   }, [selectedStudentData]);
+
+  // Reset page when selection or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedStudentName, sourceTab, searchQuery, filterExam, filterClass, filterRole]);
+
+  const totalItems = selectedStudentSubmissions.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedSubmissions = useMemo(() => {
+    return selectedStudentSubmissions.slice(startIndex, endIndex);
+  }, [selectedStudentSubmissions, startIndex, endIndex]);
 
   // Multi-select: chọn NHIỀU bài cùng lúc trên tab giao bài.
   // Ưu tiên bài chờ duyệt; vẫn cho chọn bài đã duyệt nếu giáo viên muốn phê duyệt lại.
@@ -1004,7 +1019,7 @@ export function GradingQueue() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                          {selectedStudentSubmissions.map((sub) => {
+                          {paginatedSubmissions.map((sub) => {
                             const cfg = STATUS_CONFIG[sub.status] ?? STATUS_CONFIG.submitted;
                             const isReviewed = !!sub.teacher_reviewed_at;
                             const isChanged = changedIds.has(sub.id);
@@ -1121,9 +1136,53 @@ export function GradingQueue() {
                               </tr>
                             );
                           })}
-                        </tbody>
+                                                </tbody>
                       </table>
                     </div>
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-2">
+                        <p className="text-xs text-slate-500 font-medium">
+                          Hiển thị <span className="font-semibold text-slate-700">{startIndex + 1}</span> - <span className="font-semibold text-slate-700">{Math.min(endIndex, totalItems)}</span> trên <span className="font-semibold text-slate-700">{totalItems}</span> bài
+                        </p>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            disabled={currentPage === 1}
+                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                            className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                          >
+                            Trước
+                          </button>
+                          {Array.from({ length: totalPages }).map((_, idx) => {
+                            const p = idx + 1;
+                            const isCurrent = p === currentPage;
+                            return (
+                              <button
+                                key={p}
+                                type="button"
+                                onClick={() => setCurrentPage(p)}
+                                className={`w-8 h-8 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                  isCurrent
+                                    ? "bg-violet-600 text-white shadow-sm"
+                                    : "text-slate-600 hover:bg-slate-50 border border-transparent hover:border-slate-200"
+                                }`}
+                              >
+                                {p}
+                              </button>
+                            );
+                          })}
+                          <button
+                            type="button"
+                            disabled={currentPage === totalPages}
+                            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                            className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                          >
+                            Sau
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-20 text-center">
