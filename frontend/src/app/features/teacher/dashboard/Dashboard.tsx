@@ -345,6 +345,7 @@ export function Dashboard() {
                 value={statsLoading ? "..." : (dashboardStats?.classes_today ?? 0).toString()}
                 label="Buổi hôm nay"
                 tone="indigo"
+                title="Số lớp học có lịch học diễn ra trong ngày hôm nay"
               />
               <HeroStatTile
                 icon={AlertCircle}
@@ -353,12 +354,14 @@ export function Dashboard() {
                 tone="amber"
                 pulse={(dashboardStats?.pending_grading ?? 0) > 0}
                 onClick={() => navigate("/giao-vien/cham-diem")}
+                title="Số bài thi tự luận (Writing/Speaking) của học sinh đang chờ giáo viên chấm điểm"
               />
               <HeroStatTile
                 icon={CheckCircle2}
                 value={statsLoading ? "..." : (dashboardStats?.deadlines_this_week ?? 0).toString()}
                 label="Deadline tuần"
                 tone="emerald"
+                title="Số lượng bài tập/đề thi sẽ đến hạn nộp trong tuần này"
               />
 
               {/* Divider */}
@@ -709,6 +712,7 @@ function HeroStatTile({
   tone,
   pulse = false,
   onClick,
+  title,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   value: string;
@@ -716,6 +720,7 @@ function HeroStatTile({
   tone: "indigo" | "amber" | "emerald";
   pulse?: boolean;
   onClick?: () => void;
+  title?: string;
 }) {
   const toneStyles = {
     indigo: {
@@ -742,6 +747,7 @@ function HeroStatTile({
       type="button"
       onClick={onClick}
       disabled={!isClickable}
+      title={title}
       className={`relative flex items-center gap-2.5 bg-white border border-gray-200 rounded-xl pl-2.5 pr-3.5 py-2 transition-all ${
         isClickable
           ? `cursor-pointer hover:-translate-y-0.5 hover:shadow-sm ${toneStyles.hoverBorder}`
