@@ -741,12 +741,12 @@ function HeroStatTile({
   }[tone];
 
   const isClickable = !!onClick;
+  const Component = isClickable ? "button" : "div";
 
   return (
-    <button
-      type="button"
+    <Component
+      type={isClickable ? "button" : undefined}
       onClick={onClick}
-      disabled={!isClickable}
       title={title}
       className={`relative flex items-center gap-2.5 bg-white border border-gray-200 rounded-xl pl-2.5 pr-3.5 py-2 transition-all ${
         isClickable
@@ -767,7 +767,7 @@ function HeroStatTile({
         <p className="text-slate-900 text-[15px] font-bold tabular-nums">{value}</p>
         <p className="text-slate-500 text-[10px] font-medium mt-0.5">{label}</p>
       </div>
-    </button>
+    </Component>
   );
 }
 
