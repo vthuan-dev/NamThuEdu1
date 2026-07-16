@@ -554,17 +554,17 @@ export function GradingQueue() {
       if (result.status === "success") {
         const deletedIds: number[] = result.data?.deleted_ids ?? [];
         const deletedSet = new Set(deletedIds.map(String));
-        
+
         // Remove deleted items from local state
         setSubmissions((prev) => prev.filter((s) => !deletedSet.has(s.id)));
-        
+
         // Clear selection for the deleted items
         setSelectedIds((prev) => {
           const next = new Set(prev);
           deletedSet.forEach((id) => next.delete(id));
           return next;
         });
-        
+
         toast.success(result.data?.message || `Đã xóa thành công ${deletedIds.length} bài làm.`);
       } else {
         toast.error(result.message || "Không thể xóa hàng loạt.");
@@ -1140,18 +1140,27 @@ export function GradingQueue() {
                                     />
                                   </td>
                                 )}
-                                                                <td className="px-4 py-3.5">
-                                  <Link
-                                    to={
-                                      sub.examType?.toLowerCase().includes("vstep") && sub.examId
-                                        ? `/giao-vien/xem-vstep/${sub.examId}?review=${sub.id}&teacher=1`
-                                        : `/giao-vien/cham-diem/${sub.id}`
-                                    }
-                                    className="font-semibold text-slate-800 line-clamp-2 max-w-[200px] hover:text-violet-600 hover:underline transition-colors block cursor-pointer"
-                                    title="Click để xem chi tiết bài làm & sửa điểm"
-                                  >
-                                    {sub.examTitle}
-                                  </Link>
+                                                                                                <td className="px-4 py-3.5">
+                                  {selectedCount > 0 ? (
+                                    <span
+                                      className="font-semibold text-slate-400 line-clamp-2 max-w-[200px]"
+                                      title="Vui lòng bỏ chọn hàng loạt để thao tác chi tiết"
+                                    >
+                                      {sub.examTitle}
+                                    </span>
+                                  ) : (
+                                    <Link
+                                      to={
+                                        sub.examType?.toLowerCase().includes("vstep") && sub.examId
+                                          ? `/giao-vien/xem-vstep/${sub.examId}?review=${sub.id}&teacher=1`
+                                          : `/giao-vien/cham-diem/${sub.id}`
+                                      }
+                                      className="font-semibold text-slate-800 line-clamp-2 max-w-[200px] hover:text-violet-600 hover:underline transition-colors block cursor-pointer"
+                                      title="Click để xem chi tiết bài làm & sửa điểm"
+                                    >
+                                      {sub.examTitle}
+                                    </Link>
+                                  )}
                                   <div className="flex items-center gap-1.5 mt-1">
                                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-bold uppercase">
                                       {sub.examType}
@@ -1205,40 +1214,58 @@ export function GradingQueue() {
                                     )}
                                   </td>
                                 )}
-                                                                <td className="px-4 py-3.5">
+                                                                                                <td className="px-4 py-3.5">
                                   <div className="flex items-center gap-2">
                                     {/* Eye: view detail */}
                                     <div className="relative group/tip">
-                                      <Link
-                                        to={
-                                          sub.examType?.toLowerCase().includes("vstep") && sub.examId
-                                            ? `/giao-vien/xem-vstep/${sub.examId}?review=${sub.id}&teacher=1`
-                                            : `/giao-vien/cham-diem/${sub.id}`
-                                        }
-                                        className="p-2 rounded-xl bg-sky-50 text-sky-600 hover:bg-sky-100 transition-all active:scale-95 block cursor-pointer"
-                                      >
-                                        <Eye className="w-4 h-4" />
-                                      </Link>
-                                      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tip:flex flex-col items-center z-50">
-                                        <div className="bg-slate-800 text-white text-[11px] rounded-lg px-3 py-2 whitespace-nowrap shadow-xl text-center leading-snug">
-                                          <p className="font-semibold">Xem chi tiết bài làm</p>
-                                          <p className="text-slate-300 mt-0.5">Kiểm tra đáp án, chấm và sửa điểm</p>
-                                        </div>
-                                        <div className="border-4 border-transparent border-t-slate-800" />
-                                      </div>
+                                      {selectedCount > 0 ? (
+                                        <span
+                                          className="p-2 rounded-xl bg-slate-50 text-slate-400 border border-slate-100 block cursor-not-allowed opacity-40"
+                                          title="Vui lòng bỏ chọn hàng loạt để xem chi tiết"
+                                        >
+                                          <Eye className="w-4 h-4" />
+                                        </span>
+                                      ) : (
+                                        <>
+                                          <Link
+                                            to={
+                                              sub.examType?.toLowerCase().includes("vstep") && sub.examId
+                                                ? `/giao-vien/xem-vstep/${sub.examId}?review=${sub.id}&teacher=1`
+                                                : `/giao-vien/cham-diem/${sub.id}`
+                                            }
+                                            className="p-2 rounded-xl bg-sky-50 text-sky-600 hover:bg-sky-100 transition-all active:scale-95 block cursor-pointer"
+                                          >
+                                            <Eye className="w-4 h-4" />
+                                          </Link>
+                                          <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tip:flex flex-col items-center z-50">
+                                            <div className="bg-slate-800 text-white text-[11px] rounded-lg px-3 py-2 whitespace-nowrap shadow-xl text-center leading-snug">
+                                              <p className="font-semibold">Xem chi tiết bài làm</p>
+                                              <p className="text-slate-300 mt-0.5">Kiểm tra đáp án, chấm và sửa điểm</p>
+                                            </div>
+                                            <div className="border-4 border-transparent border-t-slate-800" />
+                                          </div>
+                                        </>
+                                      )}
                                     </div>
 
-                                                                        {/* Review button */}
+                                    {/* Review button */}
                                     <div className="relative group/rev">
                                       <button
                                         type="button"
+                                        disabled={selectedCount > 0}
                                         onClick={() => setReviewTarget(sub)}
-                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                          sourceTab !== 'assigned'
-                                            ? "bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100"
-                                            : isReviewed
-                                            ? "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                                            : "bg-violet-600 text-white hover:bg-violet-700 shadow-sm shadow-violet-200"
+                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                          selectedCount > 0
+                                            ? "bg-slate-50 border border-slate-100 text-slate-400 cursor-not-allowed opacity-50"
+                                            : "cursor-pointer"
+                                        } ${
+                                          selectedCount === 0 && (
+                                            sourceTab !== 'assigned'
+                                              ? "bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100"
+                                              : isReviewed
+                                              ? "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                              : "bg-violet-600 text-white hover:bg-violet-700 shadow-sm shadow-violet-200"
+                                          )
                                         }`}
                                       >
                                         <UserCheck className="w-3.5 h-3.5" />
@@ -1246,14 +1273,18 @@ export function GradingQueue() {
                                       </button>
                                     </div>
 
-                                                                        {/* Delete button */}
+                                    {/* Delete button */}
                                     <div className="relative group/del">
                                       <button
                                         type="button"
-                                        disabled={deletingId === sub.id}
+                                        disabled={selectedCount > 0 || deletingId === sub.id}
                                         onClick={() => setDeleteTarget(sub)}
-                                        className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-                                        title="Xóa vĩnh viễn kết quả bài làm"
+                                        className={`p-2 rounded-xl transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
+                                          selectedCount > 0
+                                            ? "bg-slate-50 text-slate-400 border border-slate-100"
+                                            : "bg-rose-50 text-rose-600 hover:bg-rose-100 cursor-pointer"
+                                        }`}
+                                        title={selectedCount > 0 ? "Vui lòng bỏ chọn hàng loạt để xóa riêng lẻ" : "Xóa vĩnh viễn kết quả bài làm"}
                                       >
                                         {deletingId === sub.id ? (
                                           <Loader2 className="w-4.5 h-4.5 animate-spin" />
@@ -1261,13 +1292,15 @@ export function GradingQueue() {
                                           <Trash2 className="w-4 h-4" />
                                         )}
                                       </button>
-                                                                            <div className="pointer-events-none absolute bottom-full right-0 mb-2 hidden group-hover/del:flex flex-col items-end z-50">
-                                        <div className="bg-slate-800 text-white text-[11px] rounded-lg px-3 py-2 whitespace-nowrap shadow-xl text-right leading-snug">
-                                          <p className="font-semibold text-rose-400">Xóa kết quả bài làm</p>
-                                          <p className="text-slate-300 mt-0.5">Xóa vĩnh viễn khỏi tài khoản HS & GV</p>
+                                      {selectedCount === 0 && (
+                                        <div className="pointer-events-none absolute bottom-full right-0 mb-2 hidden group-hover/del:flex flex-col items-end z-50">
+                                          <div className="bg-slate-800 text-white text-[11px] rounded-lg px-3 py-2 whitespace-nowrap shadow-xl text-right leading-snug">
+                                            <p className="font-semibold text-rose-400">Xóa kết quả bài làm</p>
+                                            <p className="text-slate-300 mt-0.5">Xóa vĩnh viễn khỏi tài khoản HS & GV</p>
+                                          </div>
+                                          <div className="border-4 border-transparent border-t-slate-800 mr-3" />
                                         </div>
-                                        <div className="border-4 border-transparent border-t-slate-800 mr-3" />
-                                      </div>
+                                      )}
                                     </div>
                                   </div>
                                 </td>
