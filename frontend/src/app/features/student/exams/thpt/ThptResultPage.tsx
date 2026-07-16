@@ -215,8 +215,13 @@ export function ThptResultPage() {
   const totalCorrect   = result.sections.reduce((s, p) => s + p.correct_count, 0);
   const totalQuestions = result.sections.reduce((s, p) => s + p.total_count, 0);
   const accuracy       = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
-  const minutes = Math.floor(durationSec / 60);
-  const seconds = durationSec % 60;
+  // Cap thời gian hiển thị theo giới hạn của đề: sTime_taken (durationSec) tính
+  // bằng now()-start nên có thể lố vài giây khi auto-submit trễ (vd 60:02). Nếu
+  // làm >= giới hạn thì hiển thị đúng bằng giới hạn (max), không vượt quá.
+  const limitSec = (config.total_duration_minutes ?? 0) * 60;
+  const cappedDurationSec = limitSec > 0 ? Math.min(durationSec, limitSec) : durationSec;
+  const minutes = Math.floor(cappedDurationSec / 60);
+  const seconds = cappedDurationSec % 60;
   const activeSection  = config.sections[activeIdx];
   const cfgSections = config.sections ?? [];
   const hasSpeakingSection = cfgSections.some((s) => s.type === 'speaking')
