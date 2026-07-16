@@ -47,7 +47,7 @@ export function IeltsReadingView({
   const passages = payload.passages ?? [];
   const [activeIdx, setActiveIdx] = useState(0);
   const [mobileTab, setMobileTab] = useState<'question' | 'passage'>('question');
-
+  
   // Reset tab về 'question' khi chuyển Passage
   useEffect(() => {
     setMobileTab('question');

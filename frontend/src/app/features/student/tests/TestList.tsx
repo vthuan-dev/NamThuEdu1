@@ -323,11 +323,19 @@ export function TestList() {
               const Icon = tab.icon;
               const active = status === tab.key;
               const isOverdueTab = tab.key === 'overdue';
-              const tabBg = active ? (isOverdueTab ? '#DC2626' : PRIMARY) : 'transparent';
-              const tabColor = active ? '#fff' : (isOverdueTab ? '#DC2626' : '#6B7280');
+              const tabBg = active ? (isOverdueTab ? '#DC2626' : PRIMARY) : undefined;
+              const tabColor = active ? '#fff' : undefined;
+              const hoverClasses = active
+                ? ""
+                : isOverdueTab
+                ? "text-red-600 bg-transparent hover:bg-red-50 hover:text-red-700"
+                : isKids
+                ? "text-gray-500 bg-transparent hover:bg-rose-50 hover:text-rose-600"
+                : "text-gray-500 bg-transparent hover:bg-purple-50 hover:text-purple-700";
+
               return (
                 <button key={tab.key} onClick={() => setStatus(tab.key as TestStatus)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-bold transition-all duration-200"
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${hoverClasses}`}
                   style={{
                     background: tabBg,
                     color: tabColor,
@@ -363,16 +371,24 @@ export function TestList() {
           {/* Filters */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <select value={type} onChange={(e) => setType(e.target.value as TestType)}
-              className="px-3 py-2.5 rounded-xl outline-none text-sm font-semibold cursor-pointer"
-              style={{ background: "#fff", border: "1.5px solid #DDD6FE", color: type !== 'all' ? PRIMARY : "#374151" }}>
+              className={`px-3 py-2.5 rounded-xl outline-none text-sm font-semibold cursor-pointer transition-all duration-200 bg-white border-[1.5px] ${
+                isKids
+                  ? "border-[#DDD6FE] hover:border-rose-300 hover:bg-rose-50/10"
+                  : "border-[#DDD6FE] hover:border-purple-300 hover:bg-purple-50/10"
+              }`}
+              style={{ color: type !== 'all' ? PRIMARY : "#374151" }}>
               <option value="all">Tất cả loại</option>
               <option value="IELTS">IELTS</option>
               <option value="VSTEP">VSTEP</option>
               <option value="TOEIC">TOEIC</option>
             </select>
             <select value={format} onChange={(e) => setFormat(e.target.value as TestFormat)}
-              className="px-3 py-2.5 rounded-xl outline-none text-sm font-semibold cursor-pointer"
-              style={{ background: "#fff", border: "1.5px solid #DDD6FE", color: format !== 'all' ? PRIMARY : "#374151" }}>
+              className={`px-3 py-2.5 rounded-xl outline-none text-sm font-semibold cursor-pointer transition-all duration-200 bg-white border-[1.5px] ${
+                isKids
+                  ? "border-[#DDD6FE] hover:border-rose-300 hover:bg-rose-50/10"
+                  : "border-[#DDD6FE] hover:border-purple-300 hover:bg-purple-50/10"
+              }`}
+              style={{ color: format !== 'all' ? PRIMARY : "#374151" }}>
               <option value="all">Tất cả dạng</option>
               <option value="FULL_4_SKILLS">Full 4 Skills</option>
               <option value="MINI_MOCK">Mini Mock</option>
@@ -380,8 +396,8 @@ export function TestList() {
             </select>
             {hasActiveFilters && (
               <button onClick={() => { setType('all'); setFormat('all'); setSearch(''); }}
-                className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-bold text-sm transition-all hover:bg-red-50"
-                style={{ color: "#EF4444", border: "1.5px solid #FEE2E2", background: "#fff" }}>
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-bold text-sm transition-all bg-white text-red-500 border-[1.5px] border-red-100 hover:bg-red-50 hover:border-red-200"
+              >
                 <X className="w-3.5 h-3.5" />
                 Xóa
               </button>

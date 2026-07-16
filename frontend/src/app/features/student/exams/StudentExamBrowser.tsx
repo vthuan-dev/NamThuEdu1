@@ -1022,11 +1022,11 @@ export function StudentExamBrowser() {
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all duration-200 active:scale-95 ${
-                    active ? "" : "hover:bg-purple-50 hover:text-purple-600"
+                    active ? "" : "text-gray-500 hover:bg-purple-50 hover:text-purple-600"
                   }`}
                   style={{
-                    background: active ? tab.color : "transparent",
-                    color: active ? "#fff" : "#6B7280",
+                    background: active ? tab.color : undefined,
+                    color: active ? "#fff" : undefined,
                     boxShadow: active ? `0 2px 10px ${tab.color}50` : "none",
                   }}
                 >
@@ -1081,9 +1081,8 @@ export function StudentExamBrowser() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortType)}
-              className="pl-2 pr-6 py-1.5 rounded-lg text-xs font-semibold outline-none appearance-none cursor-pointer transition-all border border-purple-200 hover:border-purple-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95"
+              className="pl-2 pr-6 py-1.5 rounded-lg text-xs font-semibold outline-none appearance-none cursor-pointer transition-all bg-white border border-purple-200 hover:border-purple-400 hover:shadow-sm hover:-translate-y-0.5 active:scale-95"
               style={{
-                background: "#fff",
                 color: sortBy !== "default" ? PURPLE : "#6B7280",
               }}
             >
