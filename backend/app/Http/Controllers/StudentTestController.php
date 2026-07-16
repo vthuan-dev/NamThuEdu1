@@ -44,11 +44,11 @@ class StudentTestController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
-                'id'             => $goal->id,
-                'goal_title'     => $goal->goal_title,
-                'target_date'    => $goal->target_date->toDateString(),
-                'target_level'   => $goal->target_level,
-                'description'    => $goal->description,
+                'id' => $goal->id,
+                'goal_title' => $goal->goal_title,
+                'target_date' => $goal->target_date->toDateString(),
+                'target_level' => $goal->target_level,
+                'description' => $goal->description,
                 'days_remaining' => $daysRemaining,
             ],
         ]);
@@ -70,7 +70,7 @@ class StudentTestController extends Controller
      */
     private function applyAgeGroupExamFilter($examQuery, ?string $ageGroup): void
     {
-        $vstepOnly     = ['VSTEP'];
+        $vstepOnly = ['VSTEP'];
         $kidsOnlyTypes = ['STARTERS', 'MOVERS', 'FLYERS'];
 
         // Ẩn VSTEP với học viên không phải adults
@@ -120,40 +120,42 @@ class StudentTestController extends Controller
         $ageGroup = $user->age_group;
 
         // Get assignments for student (individual or class-based)
-        $assignments = TestAssignment::with(['exam' => function ($q) {
-                                            $q->withCount('questions');
-                                        }])
-                                    ->whereHas('exam', function ($q) use ($ageGroup) {
-                                        $this->applyAgeGroupExamFilter($q, $ageGroup);
-                                    })
-                                    ->where(function ($query) use ($user, $classIds) {
-                                        // Individual assignments
-                                        $query->where(function ($q) use ($user) {
-                                            $q->where('taTarget_type', 'student')
-                                              ->where('taTarget_id', $user->uId);
-                                        })
-                                        // Class assignments
-                                        ->orWhere(function ($q) use ($classIds) {
-                                            $q->where('taTarget_type', 'class')
-                                              ->whereIn('taTarget_id', $classIds);
-                                        });
-                                    })
-                                    ->orderBy('taCreated_at', 'desc')
-                                    ->get();
+        $assignments = TestAssignment::with([
+            'exam' => function ($q) {
+                $q->withCount('questions');
+            }
+        ])
+            ->whereHas('exam', function ($q) use ($ageGroup) {
+                $this->applyAgeGroupExamFilter($q, $ageGroup);
+            })
+            ->where(function ($query) use ($user, $classIds) {
+                // Individual assignments
+                $query->where(function ($q) use ($user) {
+                    $q->where('taTarget_type', 'student')
+                        ->where('taTarget_id', $user->uId);
+                })
+                    // Class assignments
+                    ->orWhere(function ($q) use ($classIds) {
+                    $q->where('taTarget_type', 'class')
+                        ->whereIn('taTarget_id', $classIds);
+                });
+            })
+            ->orderBy('taCreated_at', 'desc')
+            ->get();
 
         // Bulk-fetch all submissions for these assignments (avoid N+1)
         $assignmentIds = $assignments->pluck('taId')->all();
         $submissionsByAssignment = Submission::where('user_id', $user->uId)
-                                            ->whereIn('assignment_id', $assignmentIds)
-                                            ->orderBy('sStart_time', 'desc')
-                                            ->get()
-                                            ->groupBy('assignment_id');
+            ->whereIn('assignment_id', $assignmentIds)
+            ->orderBy('sStart_time', 'desc')
+            ->get()
+            ->groupBy('assignment_id');
 
         $now = now();
         $grouped = [
-            'pending'     => [],
+            'pending' => [],
             'in_progress' => [],
-            'completed'   => [],
+            'completed' => [],
         ];
 
         foreach ($assignments as $assignment) {
@@ -162,10 +164,10 @@ class StudentTestController extends Controller
                 continue;
             }
 
-            $subs           = $submissionsByAssignment->get($assignment->taId, collect());
-            $attemptsUsed   = $subs->count();
-            $inProgressSub  = $subs->firstWhere('sStatus', 'in_progress');
-            $finishedSub    = $subs->first(function ($s) {
+            $subs = $submissionsByAssignment->get($assignment->taId, collect());
+            $attemptsUsed = $subs->count();
+            $inProgressSub = $subs->firstWhere('sStatus', 'in_progress');
+            $finishedSub = $subs->first(function ($s) {
                 return in_array($s->sStatus, ['submitted', 'graded']);
             });
 
@@ -179,13 +181,13 @@ class StudentTestController extends Controller
             }
 
             // Deadline & urgency
-            $deadline      = $assignment->taDeadline;
-            $isUrgent      = false;
+            $deadline = $assignment->taDeadline;
+            $isUrgent = false;
             $timeRemaining = '';
             if ($deadline) {
                 $deadlineCarbon = \Carbon\Carbon::parse($deadline);
-                $hours          = $now->diffInHours($deadlineCarbon, false);
-                $isUrgent       = $hours >= 0 && $hours <= 24;
+                $hours = $now->diffInHours($deadlineCarbon, false);
+                $isUrgent = $hours >= 0 && $hours <= 24;
                 if ($hours < 0) {
                     $timeRemaining = 'Đã hết hạn';
                 } elseif ($hours < 1) {
@@ -200,26 +202,26 @@ class StudentTestController extends Controller
             $relevantSub = $inProgressSub ?? $finishedSub;
 
             $item = [
-                'assignment_id'    => $assignment->taId,
-                'exam_id'          => $exam->eId,
-                'exam_title'       => $exam->eTitle,
-                'exam_type'        => $exam->eType,
-                'exam_skill'       => $exam->eSkill,
-                'exam_duration'    => $exam->eDuration_minutes ?? $exam->eDuration ?? 0,
-                'total_questions'  => $exam->getQuestionsCount(),
-                'max_score'        => $exam->eTotal_score ?? 100,
-                'start_time'       => $assignment->taCreated_at,
-                'assigned_at'      => $assignment->taCreated_at,
-                'end_time'         => $assignment->taDeadline,
-                'deadline'         => $assignment->taDeadline,
-                'is_urgent'        => $isUrgent,
-                'time_remaining'   => $timeRemaining,
+                'assignment_id' => $assignment->taId,
+                'exam_id' => $exam->eId,
+                'exam_title' => $exam->eTitle,
+                'exam_type' => $exam->eType,
+                'exam_skill' => $exam->eSkill,
+                'exam_duration' => $exam->eDuration_minutes ?? $exam->eDuration ?? 0,
+                'total_questions' => $exam->getQuestionsCount(),
+                'max_score' => $exam->eTotal_score ?? 100,
+                'start_time' => $assignment->taCreated_at,
+                'assigned_at' => $assignment->taCreated_at,
+                'end_time' => $assignment->taDeadline,
+                'deadline' => $assignment->taDeadline,
+                'is_urgent' => $isUrgent,
+                'time_remaining' => $timeRemaining,
                 'attempts_allowed' => $assignment->taMax_attempt,
-                'attempts_used'    => $attemptsUsed,
-                'status'           => $status,
-                'submission_id'    => $relevantSub ? $relevantSub->sId : null,
-                'score'            => $finishedSub ? (float) $finishedSub->sScore : null,
-                'submitted_at'     => $finishedSub ? $finishedSub->sSubmit_time : null,
+                'attempts_used' => $attemptsUsed,
+                'status' => $status,
+                'submission_id' => $relevantSub ? $relevantSub->sId : null,
+                'score' => $finishedSub ? (float) $finishedSub->sScore : null,
+                'submitted_at' => $finishedSub ? $finishedSub->sSubmit_time : null,
             ];
 
             $grouped[$status][] = $item;
@@ -227,7 +229,7 @@ class StudentTestController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data'   => $grouped,
+            'data' => $grouped,
         ]);
     }
 
@@ -263,7 +265,7 @@ class StudentTestController extends Controller
         }
 
         $assignment = TestAssignment::with(['exam.questions.answers', 'exam.contentBlocks'])
-                                    ->find($id);
+            ->find($id);
 
         if (!$assignment) {
             return response()->json([
@@ -304,32 +306,32 @@ class StudentTestController extends Controller
 
         // Hide correct answers from students and add frontend compatibility aliases
         $exam = $assignment->exam;
-        $exam->questions->each(function($question) {
+        $exam->questions->each(function ($question) {
             // Add alias for frontend compatibility
             $question->qPassage = $question->qPassage_text;
             $question->qSkill = $question->qSkill ?? $question->qSection;
-            
+
             // Hide correct answers
-            $question->answers->each(function($answer) {
+            $question->answers->each(function ($answer) {
                 unset($answer->aIs_correct);
             });
         });
 
         $attemptsUsed = Submission::where('user_id', $user->uId)
-                                 ->where('assignment_id', $id)
-                                 ->count();
+            ->where('assignment_id', $id)
+            ->count();
 
         $responseData = [
-            'taId'         => $assignment->taId,
-            'taDeadline'   => $assignment->taDeadline,
+            'taId' => $assignment->taId,
+            'taDeadline' => $assignment->taDeadline,
             'taMax_attempt' => $assignment->taMax_attempt,
             'attemptsUsed' => $attemptsUsed,
-            'exam'         => $this->buildExamData($exam),
+            'exam' => $this->buildExamData($exam),
         ];
 
         return response()->json([
             'status' => 'success',
-            'data'   => $responseData,
+            'data' => $responseData,
         ]);
     }
 
@@ -365,7 +367,7 @@ class StudentTestController extends Controller
         }
 
         $assignment = TestAssignment::with(['exam.questions.answers', 'exam.contentBlocks'])
-                                    ->find($id);
+            ->find($id);
 
         if (!$assignment) {
             return response()->json([
@@ -414,9 +416,9 @@ class StudentTestController extends Controller
 
         // Check if there's already an in_progress submission (resume takes priority over attempt limit)
         $existingSubmission = Submission::where('user_id', $user->uId)
-                                       ->where('assignment_id', $id)
-                                       ->where('sStatus', 'in_progress')
-                                       ->first();
+            ->where('assignment_id', $id)
+            ->where('sStatus', 'in_progress')
+            ->first();
 
         if ($existingSubmission) {
             $timer = $this->computeTimerState(
@@ -446,8 +448,8 @@ class StudentTestController extends Controller
 
         // Check attempt limit (only when starting a brand-new attempt)
         $attemptsUsed = Submission::where('user_id', $user->uId)
-                                 ->where('assignment_id', $id)
-                                 ->count();
+            ->where('assignment_id', $id)
+            ->count();
 
         if ($attemptsUsed >= $assignment->taMax_attempt) {
             return response()->json([
@@ -469,13 +471,13 @@ class StudentTestController extends Controller
 
         // Hide correct answers and add frontend compatibility aliases
         $exam = $assignment->exam;
-        $exam->questions->each(function($question) {
+        $exam->questions->each(function ($question) {
             // Add alias for frontend compatibility
             $question->qPassage = $question->qPassage_text;
             $question->qSkill = $question->qSkill ?? $question->qSection;
-            
+
             // Hide correct answers from students
-            $question->answers->each(function($answer) {
+            $question->answers->each(function ($answer) {
                 unset($answer->aIs_correct);
             });
         });
@@ -489,12 +491,12 @@ class StudentTestController extends Controller
             'status' => 'success',
             'data' => [
                 'submissionId' => $submission->sId,
-                'sStart_time'  => $submission->sStart_time,
-                'started_at'   => $submission->sStart_time,
+                'sStart_time' => $submission->sStart_time,
+                'started_at' => $submission->sStart_time,
                 'timeRemaining' => $timerNew['remaining_minutes'],
                 'time_remaining_seconds' => $timerNew['remaining_seconds'],
                 'deadline_at' => $timerNew['deadline_at'],
-                'exam'         => $this->buildExamData($exam),
+                'exam' => $this->buildExamData($exam),
             ]
         ]);
     }
@@ -556,9 +558,9 @@ class StudentTestController extends Controller
             $result = DB::transaction(function () use ($request, $submissionId, $user) {
                 // Lock the submission row to prevent concurrent answer modifications / submissions
                 $submission = Submission::where('sId', $submissionId)
-                                       ->where('user_id', $user->uId)
-                                       ->lockForUpdate()
-                                       ->first();
+                    ->where('user_id', $user->uId)
+                    ->lockForUpdate()
+                    ->first();
 
                 if (!$submission) {
                     return [
@@ -673,35 +675,44 @@ class StudentTestController extends Controller
         try {
             $result = DB::transaction(function () use ($request, $submissionId, $user) {
                 $submission = Submission::where('sId', $submissionId)
-                                       ->where('user_id', $user->uId)
-                                       ->lockForUpdate()
-                                       ->first();
+                    ->where('user_id', $user->uId)
+                    ->lockForUpdate()
+                    ->first();
 
                 if (!$submission) {
-                    return ['status' => 404, 'data' => [
-                        'status' => 'error',
-                        'message' => 'Không tìm thấy bài làm.'
-                    ]];
+                    return [
+                        'status' => 404,
+                        'data' => [
+                            'status' => 'error',
+                            'message' => 'Không tìm thấy bài làm.'
+                        ]
+                    ];
                 }
 
                 if ($submission->sStatus !== 'in_progress') {
                     $completedStatuses = ['graded', 'auto_submitted', 'submitted', 'grading_subjective', 'partially_graded'];
                     if (in_array($submission->sStatus, $completedStatuses, true)) {
-                        return ['status' => 200, 'data' => [
-                            'status' => 'success',
+                        return [
+                            'status' => 200,
                             'data' => [
-                                'saved' => 0,
-                                'skipped' => count($request->answers),
-                                'errors' => [['reason' => 'Bài làm đã được nộp trước đó.']],
-                                'message' => 'Bài làm đã được nộp trước đó.'
+                                'status' => 'success',
+                                'data' => [
+                                    'saved' => 0,
+                                    'skipped' => count($request->answers),
+                                    'errors' => [['reason' => 'Bài làm đã được nộp trước đó.']],
+                                    'message' => 'Bài làm đã được nộp trước đó.'
+                                ]
                             ]
-                        ]];
+                        ];
                     }
 
-                    return ['status' => 400, 'data' => [
-                        'status' => 'error',
-                        'message' => 'Bài làm đã được nộp hoặc không thể chỉnh sửa.'
-                    ]];
+                    return [
+                        'status' => 400,
+                        'data' => [
+                            'status' => 'error',
+                            'message' => 'Bài làm đã được nộp hoặc không thể chỉnh sửa.'
+                        ]
+                    ];
                 }
 
                 // Pre-fetch all valid question IDs of this exam to avoid N+1
@@ -737,15 +748,18 @@ class StudentTestController extends Controller
 
                 $submission->update(['last_activity_at' => now()]);
 
-                return ['status' => 200, 'data' => [
-                    'status' => 'success',
+                return [
+                    'status' => 200,
                     'data' => [
-                        'saved' => $saved,
-                        'skipped' => $skipped,
-                        'errors' => $errors,
-                        'message' => "Đã lưu {$saved} câu trả lời.",
+                        'status' => 'success',
+                        'data' => [
+                            'saved' => $saved,
+                            'skipped' => $skipped,
+                            'errors' => $errors,
+                            'message' => "Đã lưu {$saved} câu trả lời.",
+                        ]
                     ]
-                ]];
+                ];
             });
 
             return response()->json($result['data'], $result['status']);
@@ -823,9 +837,9 @@ class StudentTestController extends Controller
         }
 
         $submission = Submission::with(['exam.questions.answers', 'answers'])
-                               ->where('sId', $submissionId)
-                               ->where('user_id', $user->uId)
-                               ->first();
+            ->where('sId', $submissionId)
+            ->where('user_id', $user->uId)
+            ->first();
 
         if (!$submission) {
             return response()->json([
@@ -984,10 +998,10 @@ class StudentTestController extends Controller
             if ($missingQuestions->count() > 0) {
                 $rowsToInsert = $missingQuestions->map(function ($q) use ($submissionId) {
                     return [
-                        'submission_id'    => $submissionId,
-                        'question_id'      => $q->qId,
-                        'saAnswer_text'    => '',
-                        'saIs_correct'     => null, // gradeAnswers sẽ set lại
+                        'submission_id' => $submissionId,
+                        'question_id' => $q->qId,
+                        'saAnswer_text' => '',
+                        'saIs_correct' => null, // gradeAnswers sẽ set lại
                         'saPoints_awarded' => null,
                     ];
                 })->all();
@@ -998,7 +1012,7 @@ class StudentTestController extends Controller
 
             // Grade all answers — skip subjective (writing/speaking) for VSTEP/IELTS
             $isVstepTx = in_array(strtoupper($submission->exam->eType ?? ''), ['VSTEP', 'IELTS']);
-            $subjTypes  = ['essay', 'writing', 'speaking'];
+            $subjTypes = ['essay', 'writing', 'speaking'];
             $gradingResult = $this->gradeAnswers($submission->answers, $submission->exam_id, $isVstepTx, $subjTypes);
             if ($gradingResult['error']) {
                 DB::rollBack();
@@ -1006,7 +1020,7 @@ class StudentTestController extends Controller
             }
 
             $scorePercentage = $gradingResult['scorePercentage'];
-            $vstepMeta       = $gradingResult['vstepMeta'];
+            $vstepMeta = $gradingResult['vstepMeta'];
 
             // VSTEP/IELTS: W+S need AI grading — only if writing answer has meaningful content (>=30 chars)
             $hasSubjectiveContent = false;
@@ -1016,12 +1030,13 @@ class StudentTestController extends Controller
                 $examSections = $submission->exam->questions
                     ->map(fn($q) => strtolower($q->qSection ?? $q->qSkill ?? ''))
                     ->unique()->filter()->values()->all();
-                $hasWritingSection  = in_array('writing', $examSections, true);
+                $hasWritingSection = in_array('writing', $examSections, true);
                 $hasSpeakingSection = in_array('speaking', $examSections, true);
 
                 $hasWriting = $submission->answers->contains(function ($a) {
                     $sec = strtolower($a->question->qSection ?? $a->question->qSkill ?? '');
-                    if ($sec !== 'writing') return false;
+                    if ($sec !== 'writing')
+                        return false;
                     return strlen(trim($a->saAnswer_text ?? '')) >= 30;
                 });
                 $rawFeedback = json_decode($submission->sGemini_feedback ?? '{}', true) ?? [];
@@ -1072,10 +1087,10 @@ class StudentTestController extends Controller
             }
 
             $updateData = [
-                'sSubmit_time'           => now(),
+                'sSubmit_time' => now(),
                 'submit_idempotency_key' => $idempotencyKey,
-                'sScore'                 => $scorePercentage,
-                'sStatus'                => $finalStatus,
+                'sScore' => $scorePercentage,
+                'sStatus' => $finalStatus,
             ];
             if ($finalStatus === 'graded') {
                 $updateData['sGraded_time'] = now();
@@ -1104,9 +1119,9 @@ class StudentTestController extends Controller
 
             $responseData = [
                 'submissionId' => $submissionId,
-                'sScore'       => $scorePercentage,
-                'sStatus'      => $finalStatus,
-                'message'      => $finalStatus === 'grading_subjective'
+                'sScore' => $scorePercentage,
+                'sStatus' => $finalStatus,
+                'message' => $finalStatus === 'grading_subjective'
                     ? 'Nộp bài thành công. Đang chấm Writing & Speaking...'
                     : "Nộp bài thành công. Điểm số: {$scorePercentage}%",
             ];
@@ -1125,16 +1140,16 @@ class StudentTestController extends Controller
             DB::rollBack();
             Log::error('Submit failed', [
                 'submission_id' => $submissionId,
-                'user_id'       => $user->uId ?? null,
-                'error'         => $e->getMessage(),
-                'trace'         => $e->getTraceAsString(),
-                'file'          => $e->getFile(),
-                'line'          => $e->getLine(),
+                'user_id' => $user->uId ?? null,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
             return response()->json([
                 'status' => 'error',
                 'message' => 'Lỗi hệ thống khi nộp bài.',
-                'debug'   => config('app.debug') ? $e->getMessage() : null,
+                'debug' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
     }
@@ -1186,9 +1201,13 @@ class StudentTestController extends Controller
         $sortBy = $request->input('sort_by', 'sSubmit_time');
         $sortOrder = $request->input('sort_order', 'desc');
 
-        $query = Submission::with(['exam' => function($q) {
-            $q->withCount('questions');
-        }, 'assignment', 'answers'])
+        $query = Submission::with([
+            'exam' => function ($q) {
+                $q->withCount('questions');
+            },
+            'assignment',
+            'answers'
+        ])
             ->where('user_id', $user->uId);
 
         if ($request->filled('status')) {
@@ -1293,14 +1312,14 @@ class StudentTestController extends Controller
         }
 
         $submission = Submission::with([
-            'exam.questions.answers', 
-            'exam.teacher', 
-            'answers.question', 
+            'exam.questions.answers',
+            'exam.teacher',
+            'answers.question',
             'user'
         ])
-        ->where('sId', $id)
-        ->where('user_id', $user->uId)
-        ->first();
+            ->where('sId', $id)
+            ->where('user_id', $user->uId)
+            ->first();
 
         if (!$submission) {
             return response()->json([
@@ -1314,7 +1333,7 @@ class StudentTestController extends Controller
         if (!$isVstep) {
             return response()->json([
                 'status' => 'success',
-                'data'   => $submission,
+                'data' => $submission,
             ]);
         }
 
@@ -1326,14 +1345,18 @@ class StudentTestController extends Controller
             : [];
 
         $vstepScores = $raw['vstep_scores'] ?? [
-            'listening' => null, 'reading' => null,
-            'writing'   => null, 'speaking' => null,
+            'listening' => null,
+            'reading' => null,
+            'writing' => null,
+            'speaking' => null,
         ];
 
         // Per-skill answer stats (MCQ only — L and R)
         // ⚠️ Dùng qSection ?? qSkill để chịu được data có 1 trong 2 cột.
-        $skillStats = ['listening' => ['correct' => 0, 'answered' => 0, 'total' => 0],
-                       'reading'   => ['correct' => 0, 'answered' => 0, 'total' => 0]];
+        $skillStats = [
+            'listening' => ['correct' => 0, 'answered' => 0, 'total' => 0],
+            'reading' => ['correct' => 0, 'answered' => 0, 'total' => 0]
+        ];
 
         // Count total questions per skill from exam
         foreach ($submission->exam->questions as $q) {
@@ -1355,7 +1378,7 @@ class StudentTestController extends Controller
         }
 
         // Writing/Speaking: check audio/text was submitted — qSection ?? qSkill fallback
-        $writingAnswers  = $submission->answers->filter(function ($a) {
+        $writingAnswers = $submission->answers->filter(function ($a) {
             $sec = strtolower($a->question->qSection ?? $a->question->qSkill ?? '');
             return $sec === 'writing'
                 && trim((string) ($a->saAnswer_text ?? '')) !== '';
@@ -1364,7 +1387,7 @@ class StudentTestController extends Controller
             $sec = strtolower($a->question->qSection ?? $a->question->qSkill ?? '');
             return $sec === 'speaking';
         })->count();
-        $speakingAudios  = isset($raw['speaking_audio']) ? count((array) $raw['speaking_audio']) : 0;
+        $speakingAudios = isset($raw['speaking_audio']) ? count((array) $raw['speaking_audio']) : 0;
 
         // Các skill thực sự có trong đề (IELTS thường chỉ 1 skill/đề)
         $examSections = $submission->exam->questions
@@ -1374,9 +1397,9 @@ class StudentTestController extends Controller
         // VSTEP band from available (non-null) scores
         $availableScores = array_filter([
             $vstepScores['listening'] ?? null,
-            $vstepScores['reading']   ?? null,
-            $vstepScores['writing']   ?? null,
-            $vstepScores['speaking']  ?? null,
+            $vstepScores['reading'] ?? null,
+            $vstepScores['writing'] ?? null,
+            $vstepScores['speaking'] ?? null,
         ], fn($v) => !is_null($v));
 
         // ⚠️ overall_avg chỉ tính khi MỌI skill có trong đề đã có điểm.
@@ -1399,20 +1422,24 @@ class StudentTestController extends Controller
 
         $vstepBand = null;
         if (!is_null($overallAvg)) {
-            if ($overallAvg >= 7.5)     $vstepBand = 'C1';
-            elseif ($overallAvg >= 6.0) $vstepBand = 'B2';
-            elseif ($overallAvg >= 4.0) $vstepBand = 'B1';
-            else                        $vstepBand = 'A2+';
+            if ($overallAvg >= 7.5)
+                $vstepBand = 'C1';
+            elseif ($overallAvg >= 6.0)
+                $vstepBand = 'B2';
+            elseif ($overallAvg >= 4.0)
+                $vstepBand = 'B1';
+            else
+                $vstepBand = 'A2+';
         }
 
         $vstepMeta = [
-            'is_vstep'       => true,
-            'vstep_scores'   => $vstepScores,
-            'vstep_band'     => $vstepBand,
-            'overall_avg'    => $overallAvg,
-            'skill_stats'    => $skillStats,
-            'exam_sections'  => $examSections,
-            'writing_submitted'  => $writingAnswers > 0,
+            'is_vstep' => true,
+            'vstep_scores' => $vstepScores,
+            'vstep_band' => $vstepBand,
+            'overall_avg' => $overallAvg,
+            'skill_stats' => $skillStats,
+            'exam_sections' => $examSections,
+            'writing_submitted' => $writingAnswers > 0,
             'speaking_submitted' => $speakingAudios > 0 || $speakingAnswers > 0,
             'pending_skills' => array_values(array_filter(['writing', 'speaking'], function ($s) use ($vstepScores, $examSections) {
                 // Chỉ pending nếu đề CÓ skill đó và chưa có điểm
@@ -1422,7 +1449,7 @@ class StudentTestController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data'   => array_merge($submission->toArray(), ['vstep_meta' => $vstepMeta]),
+            'data' => array_merge($submission->toArray(), ['vstep_meta' => $vstepMeta]),
         ]);
     }
 
@@ -1443,10 +1470,10 @@ class StudentTestController extends Controller
 
         // Tìm submission đang dở
         $submission = Submission::with(['exam.questions.answers', 'exam.contentBlocks', 'answers'])
-                               ->where('user_id', $user->uId)
-                               ->where('assignment_id', $id)
-                               ->where('sStatus', 'in_progress')
-                               ->first();
+            ->where('user_id', $user->uId)
+            ->where('assignment_id', $id)
+            ->where('sStatus', 'in_progress')
+            ->first();
 
         if (!$submission) {
             return response()->json([
@@ -1468,13 +1495,13 @@ class StudentTestController extends Controller
 
         // Ẩn đáp án đúng và thêm alias cho frontend
         $exam = $submission->exam;
-        $exam->questions->each(function($question) {
+        $exam->questions->each(function ($question) {
             // Add alias for frontend compatibility
             $question->qPassage = $question->qPassage_text;
             $question->qSkill = $question->qSkill ?? $question->qSection;
-            
+
             // Hide correct answers
-            $question->answers->each(function($answer) {
+            $question->answers->each(function ($answer) {
                 unset($answer->aIs_correct);
             });
         });
@@ -1484,12 +1511,12 @@ class StudentTestController extends Controller
             'message' => 'Khôi phục bài thi thành công. Bạn có thể tiếp tục làm bài.',
             'data' => [
                 'submissionId' => $submission->sId,
-                'sStart_time'  => $submission->sStart_time,
-                'started_at'   => $submission->sStart_time,
+                'sStart_time' => $submission->sStart_time,
+                'started_at' => $submission->sStart_time,
                 'timeRemaining' => $timer['remaining_minutes'],
                 'time_remaining_seconds' => $timer['remaining_seconds'],
                 'deadline_at' => $timer['deadline_at'],
-                'exam'         => $this->buildExamData($exam),
+                'exam' => $this->buildExamData($exam),
                 'savedAnswers' => $submission->answers,
             ]
         ]);
@@ -1508,15 +1535,15 @@ class StudentTestController extends Controller
 
         if (!$result['ok']) {
             return response()->json([
-                'status'  => 'error',
+                'status' => 'error',
                 'message' => $result['message'] ?? 'Lỗi khi tự động nộp bài.',
             ], 500);
         }
 
         return response()->json([
-            'status'  => 'warning',
+            'status' => 'warning',
             'message' => $result['message'] ?? 'Bài thi đã hết thời gian và được tự động nộp.',
-            'data'    => $result['data'] ?? [],
+            'data' => $result['data'] ?? [],
         ]);
     }
 
@@ -1552,16 +1579,16 @@ class StudentTestController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Không tìm thấy bài làm.'], 404);
         }
 
-        $raw         = $submission->sGemini_feedback
+        $raw = $submission->sGemini_feedback
             ? (json_decode($submission->sGemini_feedback, true) ?? [])
             : [];
         $vstepScores = $raw['vstep_scores'] ?? [];
 
         return response()->json([
             'status' => 'success',
-            'data'   => [
-                'sStatus'      => $submission->sStatus,
-                'sScore'       => $submission->sScore,
+            'data' => [
+                'sStatus' => $submission->sStatus,
+                'sScore' => $submission->sScore,
                 'sGraded_time' => $submission->sGraded_time,
                 'vstep_scores' => $vstepScores,
                 'is_fully_graded' => $submission->sStatus === 'graded',
@@ -1585,12 +1612,12 @@ class StudentTestController extends Controller
         }
 
         $submission = Submission::with([
-            'exam.questions.answers', 
+            'exam.questions.answers',
             'answers.question.answers'
         ])
-        ->where('sId', $id)
-        ->where('user_id', $user->uId)
-        ->first();
+            ->where('sId', $id)
+            ->where('user_id', $user->uId)
+            ->first();
 
         if (!$submission) {
             return response()->json([
@@ -1609,11 +1636,11 @@ class StudentTestController extends Controller
 
         // Tạo dữ liệu chi tiết với đáp án đúng và giải thích
         $detailedAnswers = [];
-        
+
         foreach ($submission->exam->questions as $question) {
             $studentAnswer = $submission->answers->where('question_id', $question->qId)->first();
             $correctAnswer = $question->answers->where('aIs_correct', true)->first();
-            
+
             $detailedAnswers[] = [
                 'question' => [
                     'qId' => $question->qId,
@@ -1634,7 +1661,7 @@ class StudentTestController extends Controller
                     'aContent' => $correctAnswer->aContent,
                     'aIs_correct' => $correctAnswer->aIs_correct,
                 ] : null,
-                'all_options' => $question->answers->map(function($answer) {
+                'all_options' => $question->answers->map(function ($answer) {
                     return [
                         'aId' => $answer->aId,
                         'aContent' => $answer->aContent,
@@ -1738,9 +1765,9 @@ class StudentTestController extends Controller
         }
 
         $currentSubmission = Submission::with(['exam', 'assignment'])
-                                      ->where('sId', $id)
-                                      ->where('user_id', $user->uId)
-                                      ->first();
+            ->where('sId', $id)
+            ->where('user_id', $user->uId)
+            ->first();
 
         if (!$currentSubmission) {
             return response()->json([
@@ -1751,19 +1778,19 @@ class StudentTestController extends Controller
 
         // Tìm các lần làm trước của cùng bài thi
         $previousSubmissions = Submission::where('user_id', $user->uId)
-                                        ->where('exam_id', $currentSubmission->exam_id)
-                                        ->where('sId', '!=', $id)
-                                        ->whereIn('sStatus', ['graded', 'auto_submitted'])
-                                        ->orderBy('sSubmit_time', 'desc')
-                                        ->get();
+            ->where('exam_id', $currentSubmission->exam_id)
+            ->where('sId', '!=', $id)
+            ->whereIn('sStatus', ['graded', 'auto_submitted'])
+            ->orderBy('sSubmit_time', 'desc')
+            ->get();
 
         // Lấy submission gần nhất trước đó
         $previousSubmission = $previousSubmissions->first();
 
         // Thống kê của tất cả học viên cùng bài thi
         $allSubmissions = Submission::where('exam_id', $currentSubmission->exam_id)
-                                   ->whereIn('sStatus', ['graded', 'auto_submitted'])
-                                   ->get();
+            ->whereIn('sStatus', ['graded', 'auto_submitted'])
+            ->get();
 
         $classStats = [
             'total_students' => $allSubmissions->unique('user_id')->count(),
@@ -1782,7 +1809,7 @@ class StudentTestController extends Controller
                 'previous_score' => $previousSubmission->sScore,
                 'current_score' => $currentSubmission->sScore,
                 'score_difference' => round($scoreDifference, 2),
-                'improvement_percentage' => $previousSubmission->sScore > 0 ? 
+                'improvement_percentage' => $previousSubmission->sScore > 0 ?
                     round(($scoreDifference / $previousSubmission->sScore) * 100, 2) : 0,
                 'previous_date' => $previousSubmission->sSubmit_time,
                 'current_date' => $currentSubmission->sSubmit_time,
@@ -1809,14 +1836,14 @@ class StudentTestController extends Controller
 
             foreach ($currentAnswers as $questionId => $currentAnswer) {
                 $previousAnswer = $previousAnswers->get($questionId);
-                
+
                 $questionAnalysis[] = [
                     'question_id' => $questionId,
                     'current_correct' => $currentAnswer->saIs_correct,
                     'previous_correct' => $previousAnswer ? $previousAnswer->saIs_correct : null,
                     'current_points' => $currentAnswer->saPoints_awarded,
                     'previous_points' => $previousAnswer ? $previousAnswer->saPoints_awarded : 0,
-                    'improvement' => $previousAnswer ? 
+                    'improvement' => $previousAnswer ?
                         ($currentAnswer->saPoints_awarded - $previousAnswer->saPoints_awarded) : null,
                 ];
             }
@@ -1840,7 +1867,7 @@ class StudentTestController extends Controller
                     'better_than_percent' => round(($betterThanCount / max($totalStudents, 1)) * 100, 1),
                 ],
                 'question_analysis' => $questionAnalysis,
-                'all_attempts' => $previousSubmissions->map(function($submission) {
+                'all_attempts' => $previousSubmissions->map(function ($submission) {
                     return [
                         'sId' => $submission->sId,
                         'sScore' => $submission->sScore,
@@ -1863,7 +1890,7 @@ class StudentTestController extends Controller
 
         $first = $submissions->first()->sScore;
         $last = $submissions->last()->sScore;
-        
+
         return [
             'first_score' => $first,
             'latest_score' => $last,
@@ -1881,24 +1908,24 @@ class StudentTestController extends Controller
 
         $scores = $submissions->pluck('sScore')->toArray();
         $mean = array_sum($scores) / count($scores);
-        $variance = array_sum(array_map(function($score) use ($mean) {
+        $variance = array_sum(array_map(function ($score) use ($mean) {
             return pow($score - $mean, 2);
         }, $scores)) / count($scores);
-        
+
         $standardDeviation = sqrt($variance);
         $coefficientOfVariation = $mean > 0 ? ($standardDeviation / $mean) * 100 : 0;
 
         return [
             'standard_deviation' => round($standardDeviation, 2),
             'coefficient_of_variation' => round($coefficientOfVariation, 2),
-            'consistency_level' => $coefficientOfVariation < 15 ? 'high' : 
-                                 ($coefficientOfVariation < 25 ? 'medium' : 'low'),
+            'consistency_level' => $coefficientOfVariation < 15 ? 'high' :
+                ($coefficientOfVariation < 25 ? 'medium' : 'low'),
         ];
     }
 
     private function getStrengthAreas($statsBySkill)
     {
-        return $statsBySkill->sortByDesc('average_score')->take(2)->map(function($stat) {
+        return $statsBySkill->sortByDesc('average_score')->take(2)->map(function ($stat) {
             return [
                 'skill' => $stat['skill'],
                 'average_score' => $stat['average_score'],
@@ -1908,7 +1935,7 @@ class StudentTestController extends Controller
 
     private function getImprovementAreas($statsBySkill)
     {
-        return $statsBySkill->sortBy('average_score')->take(2)->map(function($stat) {
+        return $statsBySkill->sortBy('average_score')->take(2)->map(function ($stat) {
             return [
                 'skill' => $stat['skill'],
                 'average_score' => $stat['average_score'],
@@ -1920,9 +1947,10 @@ class StudentTestController extends Controller
     {
         sort($scores);
         $count = count($scores);
-        
-        if ($count === 0) return 0;
-        
+
+        if ($count === 0)
+            return 0;
+
         if ($count % 2 === 0) {
             return ($scores[$count / 2 - 1] + $scores[$count / 2]) / 2;
         } else {
@@ -1974,10 +2002,10 @@ class StudentTestController extends Controller
     private function assignedOnlyBrowseEmptyResponse()
     {
         return response()->json([
-            'status'  => 'success',
+            'status' => 'success',
             'message' => 'Chỉ hiển thị đề đã được giao. Dùng GET /student/tests.',
-            'data'    => [],
-            'policy'  => 'assigned_only',
+            'data' => [],
+            'policy' => 'assigned_only',
         ]);
     }
 
@@ -2005,8 +2033,8 @@ class StudentTestController extends Controller
         return [
             'remaining_seconds' => $remainingSec,
             'remaining_minutes' => $remainingMin,
-            'deadline_at'       => $deadline->toIso8601String(),
-            'expired'           => $remainingSec <= 0,
+            'deadline_at' => $deadline->toIso8601String(),
+            'expired' => $remainingSec <= 0,
         ];
     }
 
@@ -2028,7 +2056,7 @@ class StudentTestController extends Controller
     public function inProgressTests(Request $request)
     {
         $studentId = $request->user()->uId;
-        $ageGroup  = $request->user()->age_group ?? null;
+        $ageGroup = $request->user()->age_group ?? null;
 
         // Get submissions that are in progress (not submitted yet)
         $inProgressSubmissions = Submission::where('user_id', $studentId)
@@ -2058,19 +2086,19 @@ class StudentTestController extends Controller
             $totalQuestions = $exam->getQuestionsCount();
 
             return [
-                'id'                 => $exam->eId,
-                'submission_id'      => $submission->sId,
-                'assignment_id'      => $submission->assignment_id,
-                'title'              => $exam->eTitle,
-                'type'               => $exam->eType,
-                'skill'              => $exam->eSkill,
-                'time_remaining'     => $timeRemaining,
+                'id' => $exam->eId,
+                'submission_id' => $submission->sId,
+                'assignment_id' => $submission->assignment_id,
+                'title' => $exam->eTitle,
+                'type' => $exam->eType,
+                'skill' => $exam->eSkill,
+                'time_remaining' => $timeRemaining,
                 'time_remaining_seconds' => $timeRemainingSeconds,
-                'deadline_at'        => $timerDash['deadline_at'],
-                'total_duration'     => $duration,
-                'started_at'         => $submission->sStart_time,
+                'deadline_at' => $timerDash['deadline_at'],
+                'total_duration' => $duration,
+                'started_at' => $submission->sStart_time,
                 'answered_questions' => $answeredQuestions,
-                'total_questions'    => $totalQuestions,
+                'total_questions' => $totalQuestions,
             ];
         });
 
@@ -2089,20 +2117,20 @@ class StudentTestController extends Controller
         $days = $request->input('days', 7);
 
         // Get class IDs where student is enrolled (now stored on users.class_id directly)
-        $student  = $request->user();
+        $student = $request->user();
         $classIds = $student && $student->class_id ? [$student->class_id] : [];
         $ageGroup = $student->age_group ?? null;
 
         // Get assignments that are upcoming (deadline within next X days, not yet expired)
         $upcomingAssignments = TestAssignment::where(function ($query) use ($studentId, $classIds) {
-                $query->where(function ($q) use ($studentId) {
-                    $q->where('taTarget_type', 'student')
-                      ->where('taTarget_id', $studentId);
-                })->orWhere(function ($q) use ($classIds) {
-                    $q->where('taTarget_type', 'class')
-                      ->whereIn('taTarget_id', $classIds);
-                });
-            })
+            $query->where(function ($q) use ($studentId) {
+                $q->where('taTarget_type', 'student')
+                    ->where('taTarget_id', $studentId);
+            })->orWhere(function ($q) use ($classIds) {
+                $q->where('taTarget_type', 'class')
+                    ->whereIn('taTarget_id', $classIds);
+            });
+        })
             ->whereHas('exam', function ($q) use ($ageGroup) {
                 $this->applyAgeGroupExamFilter($q, $ageGroup);
             })
@@ -2118,9 +2146,9 @@ class StudentTestController extends Controller
             if (!$exam) {
                 return null;
             }
-            $deadline  = \Carbon\Carbon::parse($assignment->taDeadline);
+            $deadline = \Carbon\Carbon::parse($assignment->taDeadline);
             $daysUntil = now()->diffInDays($deadline, false);
-            $isUrgent  = $daysUntil <= 1;
+            $isUrgent = $daysUntil <= 1;
 
             // Skip if student has any active submission for this assignment
             // (in_progress belongs to /tests/in-progress; finished belongs to /tests completed)
@@ -2134,15 +2162,15 @@ class StudentTestController extends Controller
             }
 
             return [
-                'id'            => $exam->eId,
+                'id' => $exam->eId,
                 'assignment_id' => $assignment->taId,
-                'title'         => $exam->eTitle,
-                'type'          => $exam->eType,
-                'skill'         => $exam->eSkill,
-                'deadline'      => $assignment->taDeadline,
-                'duration'      => $exam->eDuration_minutes ?? $exam->eDuration,
-                'is_urgent'     => $isUrgent,
-                'days_until'    => max(0, $daysUntil),
+                'title' => $exam->eTitle,
+                'type' => $exam->eType,
+                'skill' => $exam->eSkill,
+                'deadline' => $assignment->taDeadline,
+                'duration' => $exam->eDuration_minutes ?? $exam->eDuration,
+                'is_urgent' => $isUrgent,
+                'days_until' => max(0, $daysUntil),
             ];
         })->filter()->values();
 
@@ -2169,7 +2197,8 @@ class StudentTestController extends Controller
 
         $skillStats = [];
         foreach ($recentSubmissions as $submission) {
-            if (!$submission->exam || $submission->sScore === null) continue;
+            if (!$submission->exam || $submission->sScore === null)
+                continue;
             $skill = $submission->exam->eSkill ?? 'mixed';
             if (!isset($skillStats[$skill])) {
                 $skillStats[$skill] = [
@@ -2188,7 +2217,7 @@ class StudentTestController extends Controller
         foreach ($skillStats as $skill => $stats) {
             $avgScore = $stats['total_score'] / $stats['count'];
             $maxScore = max($stats['scores']);
-            
+
             // Recommend practice if average is below 70 or needs improvement
             if ($avgScore < 70) {
                 $recommendations[] = [
@@ -2278,21 +2307,21 @@ class StudentTestController extends Controller
     public function getNotifications(Request $request)
     {
         $studentId = $request->user()->uId;
-        $student   = $request->user();
-        $classIds  = $student && $student->class_id ? [$student->class_id] : [];
-        $urgent    = $request->boolean('urgent', false);
-        $limit     = (int) $request->input('limit', 20);
+        $student = $request->user();
+        $classIds = $student && $student->class_id ? [$student->class_id] : [];
+        $urgent = $request->boolean('urgent', false);
+        $limit = (int) $request->input('limit', 20);
 
         $notifications = [];
 
         // Assignments with deadline within 24 hours
         $urgentAssignments = TestAssignment::where(function ($q) use ($studentId, $classIds) {
-                $q->where(function ($s) use ($studentId) {
-                    $s->where('taTarget_type', 'student')->where('taTarget_id', $studentId);
-                })->orWhere(function ($s) use ($classIds) {
-                    $s->where('taTarget_type', 'class')->whereIn('taTarget_id', $classIds);
-                });
-            })
+            $q->where(function ($s) use ($studentId) {
+                $s->where('taTarget_type', 'student')->where('taTarget_id', $studentId);
+            })->orWhere(function ($s) use ($classIds) {
+                $s->where('taTarget_type', 'class')->whereIn('taTarget_id', $classIds);
+            });
+        })
             ->whereNotNull('taDeadline')
             ->where('taDeadline', '>=', now())
             ->where('taDeadline', '<=', now()->addDay())
@@ -2300,17 +2329,18 @@ class StudentTestController extends Controller
             ->get();
 
         foreach ($urgentAssignments as $assignment) {
-            if (!$assignment->exam) continue;
+            if (!$assignment->exam)
+                continue;
             $hoursLeft = (int) now()->diffInHours($assignment->taDeadline, false);
             $notifications[] = [
-                'id'           => 'assignment_' . $assignment->taId,
-                'title'        => 'Bài thi sắp hết hạn',
-                'message'      => $assignment->exam->eTitle . ' sẽ hết hạn trong ' . $hoursLeft . ' giờ nữa. Hãy hoàn thành ngay!',
-                'type'         => 'deadline',
-                'color'        => '#EF4444',
-                'is_read'      => false,
-                'created_at'   => $assignment->taDeadline,
-                'action_url'   => '/bai-tap',
+                'id' => 'assignment_' . $assignment->taId,
+                'title' => 'Bài thi sắp hết hạn',
+                'message' => $assignment->exam->eTitle . ' sẽ hết hạn trong ' . $hoursLeft . ' giờ nữa. Hãy hoàn thành ngay!',
+                'type' => 'deadline',
+                'color' => '#EF4444',
+                'is_read' => false,
+                'created_at' => $assignment->taDeadline,
+                'action_url' => '/bai-tap',
                 'action_label' => 'Làm bài ngay',
             ];
         }
@@ -2335,7 +2365,8 @@ class StudentTestController extends Controller
             ->get();
 
         foreach ($recentGraded as $submission) {
-            if (!$submission->exam) continue;
+            if (!$submission->exam)
+                continue;
 
             // Compute display score on 0–10 scale (match frontend gradeHelpers.getSubmissionDisplayScore)
             // - VSTEP: average of 4 AI skill scores (hệ 10), fallback sScore/10
@@ -2368,29 +2399,42 @@ class StudentTestController extends Controller
                 ? number_format(round($displayScore, 1), 1, '.', '') . '/10'
                 : '—';
 
+            // Trỏ tới đúng trang kết quả theo LOẠI ĐỀ của phiên này. Trước đây luôn
+            // dùng '/ket-qua/<sId>' → với THPT/VSTEP/IELTS trang chung này chỉ tải
+            // rồi tự redirect sang trang chuyên biệt, nên khi mở trong modal sẽ
+            // "nháy rồi biến mất". Nay điều hướng thẳng để tránh xung đột đó.
+            $examType = strtoupper($submission->exam->eType ?? '');
+            if ($examType === 'THPT') {
+                $actionUrl = '/ket-qua-thpt/' . $submission->sId;
+            } elseif ($isVstep || $examType === 'VSTEP') {
+                $actionUrl = '/ket-qua-vstep/' . $submission->sId;
+            } elseif ($examType === 'IELTS') {
+                $actionUrl = '/ket-qua-ielts/' . $submission->sId;
+            } else {
+                $actionUrl = '/ket-qua/' . $submission->sId;
+            }
+
             $notifications[] = [
-                'id'           => 'graded_' . $submission->sId,
-                'title'        => 'Kết quả bài thi đã có',
-                'message'      => 'Phiên làm bài "' . $submission->exam->eTitle . '" đã được chấm. Điểm: ' . $scoreLabel,
-                'type'         => 'graded',
-                'color'        => '#10B981',
-                'is_read'      => false,
-                'created_at'   => $submission->sGraded_time,
-                // Trỏ tới đúng phiên (submission) được chấm gần nhất của đề này →
-                // click sẽ mở trang kết quả/chấm điểm của chính phiên đó.
-                'action_url'   => '/ket-qua/' . $submission->sId,
+                'id' => 'graded_' . $submission->sId,
+                'title' => 'Kết quả bài thi đã có',
+                'message' => 'Phiên làm bài "' . $submission->exam->eTitle . '" đã được chấm. Điểm: ' . $scoreLabel,
+                'type' => 'graded',
+                'color' => '#10B981',
+                'is_read' => false,
+                'created_at' => $submission->sGraded_time,
+                'action_url' => $actionUrl,
                 'action_label' => 'Xem kết quả',
             ];
         }
 
         // Newly assigned tests (last 7 days, not yet started)
         $newAssignments = TestAssignment::where(function ($q) use ($studentId, $classIds) {
-                $q->where(function ($s) use ($studentId) {
-                    $s->where('taTarget_type', 'student')->where('taTarget_id', $studentId);
-                })->orWhere(function ($s) use ($classIds) {
-                    $s->where('taTarget_type', 'class')->whereIn('taTarget_id', $classIds);
-                });
-            })
+            $q->where(function ($s) use ($studentId) {
+                $s->where('taTarget_type', 'student')->where('taTarget_id', $studentId);
+            })->orWhere(function ($s) use ($classIds) {
+                $s->where('taTarget_type', 'class')->whereIn('taTarget_id', $classIds);
+            });
+        })
             ->where('taCreated_at', '>=', now()->subDays(7))
             // Không thông báo bài đã quá hạn (khớp với tab đề luyện: đề hết hạn bị ẩn)
             ->where(function ($q) {
@@ -2407,17 +2451,19 @@ class StudentTestController extends Controller
             ->flip();
 
         foreach ($newAssignments as $assignment) {
-            if (!$assignment->exam) continue;
-            if ($startedAssignmentIds->has($assignment->taId)) continue;
+            if (!$assignment->exam)
+                continue;
+            if ($startedAssignmentIds->has($assignment->taId))
+                continue;
             $notifications[] = [
-                'id'           => 'new_' . $assignment->taId,
-                'title'        => 'Bài thi mới được giao',
-                'message'      => 'Bạn có bài thi mới: ' . $assignment->exam->eTitle . '. Hãy chuẩn bị và làm bài!',
-                'type'         => 'assignment',
-                'color'        => '#2563EB',
-                'is_read'      => false,
-                'created_at'   => $assignment->taCreated_at,
-                'action_url'   => '/bai-tap',
+                'id' => 'new_' . $assignment->taId,
+                'title' => 'Bài thi mới được giao',
+                'message' => 'Bạn có bài thi mới: ' . $assignment->exam->eTitle . '. Hãy chuẩn bị và làm bài!',
+                'type' => 'assignment',
+                'color' => '#2563EB',
+                'is_read' => false,
+                'created_at' => $assignment->taCreated_at,
+                'action_url' => '/bai-tap',
                 'action_label' => 'Xem bài thi',
             ];
         }
@@ -2439,11 +2485,12 @@ class StudentTestController extends Controller
                 ->get();
 
             foreach ($replies as $reply) {
-                if (!$reply->exam || !$reply->user) continue;
+                if (!$reply->exam || !$reply->user)
+                    continue;
 
                 $replierName = $reply->user->uName ?: 'Một người dùng';
-                $examTitle   = $reply->exam->eTitle ?: 'đề thi';
-                $preview     = mb_substr(preg_replace('/\s+/', ' ', (string) $reply->content), 0, 80);
+                $examTitle = $reply->exam->eTitle ?: 'đề thi';
+                $preview = mb_substr(preg_replace('/\s+/', ' ', (string) $reply->content), 0, 80);
                 if (mb_strlen((string) $reply->content) > 80) {
                     $preview .= '…';
                 }
@@ -2460,14 +2507,14 @@ class StudentTestController extends Controller
                 }
 
                 $notifications[] = [
-                    'id'           => 'comment_reply_' . $reply->id,
-                    'title'        => $replierName . ' đã trả lời bình luận của bạn',
-                    'message'      => '"' . $preview . '" — trong đề "' . $examTitle . '"',
-                    'type'         => 'message',
-                    'color'        => '#7C3AED',
-                    'is_read'      => false,
-                    'created_at'   => $reply->created_at,
-                    'action_url'   => $actionUrl,
+                    'id' => 'comment_reply_' . $reply->id,
+                    'title' => $replierName . ' đã trả lời bình luận của bạn',
+                    'message' => '"' . $preview . '" — trong đề "' . $examTitle . '"',
+                    'type' => 'message',
+                    'color' => '#7C3AED',
+                    'is_read' => false,
+                    'created_at' => $reply->created_at,
+                    'action_url' => $actionUrl,
                     'action_label' => 'Xem bình luận',
                 ];
             }
@@ -2488,14 +2535,14 @@ class StudentTestController extends Controller
                     $preview .= '…';
                 }
                 $notifications[] = [
-                    'id'           => 'announcement_' . $ann->id,
-                    'title'        => ($ann->priority === 'urgent' ? '🚨 ' : '📢 ') . $ann->title,
-                    'message'      => $preview,
-                    'type'         => 'message',
-                    'color'        => $ann->priority === 'urgent' ? '#EF4444' : '#F59E0B',
-                    'is_read'      => false,
-                    'created_at'   => $ann->created_at,
-                    'action_url'   => '/thong-bao',
+                    'id' => 'announcement_' . $ann->id,
+                    'title' => ($ann->priority === 'urgent' ? '🚨 ' : '📢 ') . $ann->title,
+                    'message' => $preview,
+                    'type' => 'message',
+                    'color' => $ann->priority === 'urgent' ? '#EF4444' : '#F59E0B',
+                    'is_read' => false,
+                    'created_at' => $ann->created_at,
+                    'action_url' => '/thong-bao',
                     'action_label' => 'Xem thông báo',
                 ];
             }
@@ -2512,14 +2559,14 @@ class StudentTestController extends Controller
             if ($goal) {
                 $daysLeft = (int) \Carbon\Carbon::today()->diffInDays(\Carbon\Carbon::parse($goal->target_date), false);
                 $notifications[] = [
-                    'id'           => 'goal_' . $goal->id . '_' . now()->toDateString(),
-                    'title'        => '🎯 Mục tiêu sắp tới',
-                    'message'      => "Còn {$daysLeft} ngày đến {$goal->goal_title}. Cố gắng lên nhé!",
-                    'type'         => 'reminder',
-                    'color'        => '#7C3AED',
-                    'is_read'      => false,
-                    'created_at'   => now(),
-                    'action_url'   => '/',
+                    'id' => 'goal_' . $goal->id . '_' . now()->toDateString(),
+                    'title' => '🎯 Mục tiêu sắp tới',
+                    'message' => "Còn {$daysLeft} ngày đến {$goal->goal_title}. Cố gắng lên nhé!",
+                    'type' => 'reminder',
+                    'color' => '#7C3AED',
+                    'is_read' => false,
+                    'created_at' => now(),
+                    'action_url' => '/',
                     'action_label' => 'Bắt đầu học',
                 ];
             }
@@ -2539,22 +2586,22 @@ class StudentTestController extends Controller
             $timeText = $sch->exam_time ? (' lúc ' . substr($sch->exam_time, 0, 5)) : '';
             $isUrgent = $daysLeft >= 0 && $daysLeft <= 3;
             $notifications[] = [
-                'id'           => 'exam_schedule_' . $sch->id,
-                'title'        => '📅 Lịch thi: ' . $sch->title,
-                'message'      => 'Ngày thi ' . $examDate->format('d/m/Y') . $timeText . ' (' . $whenText . ')'
+                'id' => 'exam_schedule_' . $sch->id,
+                'title' => '📅 Lịch thi: ' . $sch->title,
+                'message' => 'Ngày thi ' . $examDate->format('d/m/Y') . $timeText . ' (' . $whenText . ')'
                     . ($sch->location ? ' · Tại: ' . $sch->location : ''),
-                'type'         => 'reminder',
-                'color'        => $isUrgent ? '#EF4444' : '#0EA5E9',
-                'is_read'      => false,
-                'created_at'   => $sch->created_at,
-                'action_url'   => '/',
+                'type' => 'reminder',
+                'color' => $isUrgent ? '#EF4444' : '#0EA5E9',
+                'is_read' => false,
+                'created_at' => $sch->created_at,
+                'action_url' => '/',
                 'action_label' => 'Xem lịch thi',
             ];
         }
 
         // Sort newest first
         usort($notifications, function ($a, $b) {
-            return strtotime((string)$b['created_at']) - strtotime((string)$a['created_at']);
+            return strtotime((string) $b['created_at']) - strtotime((string) $a['created_at']);
         });
 
         if ($urgent) {
@@ -2574,7 +2621,7 @@ class StudentTestController extends Controller
         ));
 
         foreach ($notifications as &$notif) {
-            $notif['is_read'] = $readAt && strtotime((string)$notif['created_at']) <= $readAt->timestamp;
+            $notif['is_read'] = $readAt && strtotime((string) $notif['created_at']) <= $readAt->timestamp;
         }
         unset($notif);
 
@@ -2582,9 +2629,9 @@ class StudentTestController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data'   => [
+            'data' => [
                 'notifications' => array_values($notifications),
-                'unread_count'  => $unreadCount,
+                'unread_count' => $unreadCount,
             ],
         ]);
     }
@@ -2647,12 +2694,12 @@ class StudentTestController extends Controller
     public function getReminders(Request $request)
     {
         $studentId = $request->user()->uId;
-        $ageGroup  = $request->user()->age_group ?? null;
+        $ageGroup = $request->user()->age_group ?? null;
 
         $reminders = \App\Models\AssignmentReminder::with([
-                'assignment.exam:eId,eTitle,eType,eSkill,eDuration_minutes',
-                'teacher:uId,uName',
-            ])
+            'assignment.exam:eId,eTitle,eType,eSkill,eDuration_minutes',
+            'teacher:uId,uName',
+        ])
             ->where('student_id', $studentId)
             ->whereNull('dismissed_at')
             ->whereHas('assignment.exam', function ($q) use ($ageGroup) {
@@ -2669,7 +2716,8 @@ class StudentTestController extends Controller
             ->flip();
 
         $items = $reminders->filter(function ($r) use ($finishedAssignmentIds) {
-            if (!$r->assignment || !$r->assignment->exam) return false;
+            if (!$r->assignment || !$r->assignment->exam)
+                return false;
             return !$finishedAssignmentIds->has($r->assignment_id);
         })->map(function ($r) {
             $a = $r->assignment;
@@ -2679,27 +2727,27 @@ class StudentTestController extends Controller
             $isUrgent = $deadline ? $deadline->lte(now()->addDay()) : false;
 
             return [
-                'id'            => $r->id,
+                'id' => $r->id,
                 'assignment_id' => $a->taId,
-                'exam_id'       => $exam->eId,
-                'title'         => $exam->eTitle,
-                'type'          => $exam->eType,
-                'skill'         => $exam->eSkill,
-                'duration'      => $exam->eDuration_minutes,
-                'deadline'      => $a->taDeadline,
-                'days_until'    => $daysUntil,
-                'is_urgent'     => $isUrgent,
-                'message'       => $r->message,
-                'teacher_name'  => $r->teacher->uName ?? null,
-                'sent_at'       => $r->updated_at,
-                'read_at'       => $r->read_at,
+                'exam_id' => $exam->eId,
+                'title' => $exam->eTitle,
+                'type' => $exam->eType,
+                'skill' => $exam->eSkill,
+                'duration' => $exam->eDuration_minutes,
+                'deadline' => $a->taDeadline,
+                'days_until' => $daysUntil,
+                'is_urgent' => $isUrgent,
+                'message' => $r->message,
+                'teacher_name' => $r->teacher->uName ?? null,
+                'sent_at' => $r->updated_at,
+                'read_at' => $r->read_at,
             ];
         })->values();
 
         return response()->json([
             'status' => 'success',
-            'data'   => [
-                'reminders'    => $items,
+            'data' => [
+                'reminders' => $items,
                 'unread_count' => $items->whereNull('read_at')->count(),
             ],
         ]);
@@ -2759,7 +2807,8 @@ class StudentTestController extends Controller
     private function answerSet($value): array
     {
         $norm = $this->normalizeAnswer($value);
-        if ($norm === '') return [];
+        if ($norm === '')
+            return [];
         // Hỗ trợ "a,c" | "a c" | "a;c" | "ac" (chuỗi chữ cái liền)
         if (preg_match('/^[a-h]{2,}$/', $norm)) {
             $parts = str_split($norm);
@@ -2807,9 +2856,9 @@ class StudentTestController extends Controller
      */
     private function gradeKidsTask($question, $rawAnswer): array
     {
-        $config   = $question->kids_task_config ?? [];
+        $config = $question->kids_task_config ?? [];
         $taskType = $config['task_type'] ?? '';
-        $data     = $config['task_data'] ?? [];
+        $data = $config['task_data'] ?? [];
 
         // Parse JSON map đáp án học viên
         $map = [];
@@ -2849,21 +2898,25 @@ class StudentTestController extends Controller
             case 'word_definition_matching': {
                 $words = $data['words'] ?? [];
                 $n = count($words);
-                if ($n === 0) return ['manual' => false, 'ratio' => 0.0];
+                if ($n === 0)
+                    return ['manual' => false, 'ratio' => 0.0];
                 $correct = 0;
                 for ($i = 0; $i < $n; $i++) {
                     // Player lưu nhãn chữ (A,B,C…); định nghĩa đúng của từ i mang nhãn chr(65+i)
-                    if (($map[(string) $i] ?? '') === chr(65 + $i)) $correct++;
+                    if (($map[(string) $i] ?? '') === chr(65 + $i))
+                        $correct++;
                 }
                 return ['manual' => false, 'ratio' => $correct / $n];
             }
             case 'dialogue_matching': {
                 $dialogues = $data['dialogues'] ?? [];
                 $n = count($dialogues);
-                if ($n === 0) return ['manual' => false, 'ratio' => 0.0];
+                if ($n === 0)
+                    return ['manual' => false, 'ratio' => 0.0];
                 $correct = 0;
                 foreach ($dialogues as $i => $d) {
-                    if (($map[(string) $i] ?? '') === (string) ($d['correct_answer'] ?? '')) $correct++;
+                    if (($map[(string) $i] ?? '') === (string) ($d['correct_answer'] ?? ''))
+                        $correct++;
                 }
                 return ['manual' => false, 'ratio' => $correct / $n];
             }
@@ -2874,39 +2927,49 @@ class StudentTestController extends Controller
                     fn($s) => empty($s['is_example']) && empty($s['isExample'])
                 ));
                 $n = count($subjects);
-                if ($n === 0) return ['manual' => false, 'ratio' => 0.0];
+                if ($n === 0)
+                    return ['manual' => false, 'ratio' => 0.0];
                 $correct = 0;
                 foreach ($subjects as $i => $s) {
                     $expected = (string) ($s['correct_letter'] ?? $s['correctLetter'] ?? '');
-                    if (($map[(string) $i] ?? '') === $expected && $expected !== '') $correct++;
+                    if (($map[(string) $i] ?? '') === $expected && $expected !== '')
+                        $correct++;
                 }
                 return ['manual' => false, 'ratio' => $correct / $n];
             }
             case 'cloze_test': {
                 $gaps = $data['gaps'] ?? [];
-                $items = 0; $correct = 0;
+                $items = 0;
+                $correct = 0;
                 foreach ($gaps as $g) {
                     $items++;
                     $key = (string) ($g['gap_id'] ?? '');
-                    if ($eq($map[$key] ?? '', $g['correct_answer'] ?? '')) $correct++;
+                    if ($eq($map[$key] ?? '', $g['correct_answer'] ?? ''))
+                        $correct++;
                 }
                 if (!empty($data['story_title_question'])) {
                     $items++;
-                    if ($eq($map['title'] ?? '', $data['story_title_question']['correct_answer'] ?? '')) $correct++;
+                    if ($eq($map['title'] ?? '', $data['story_title_question']['correct_answer'] ?? ''))
+                        $correct++;
                 }
-                if ($items === 0) return ['manual' => false, 'ratio' => 0.0];
+                if ($items === 0)
+                    return ['manual' => false, 'ratio' => 0.0];
                 return ['manual' => false, 'ratio' => $correct / $items];
             }
             case 'open_cloze': {
                 $gaps = $data['gaps'] ?? [];
                 $n = count($gaps);
-                if ($n === 0) return ['manual' => false, 'ratio' => 0.0];
+                if ($n === 0)
+                    return ['manual' => false, 'ratio' => 0.0];
                 $correct = 0;
                 foreach ($gaps as $g) {
                     $key = (string) ($g['gap_id'] ?? '');
                     $studentN = $this->normalizeAnswer($map[$key] ?? '');
                     foreach (($g['correct_answers'] ?? []) as $acc) {
-                        if ($studentN !== '' && $this->normalizeAnswer($acc) === $studentN) { $correct++; break; }
+                        if ($studentN !== '' && $this->normalizeAnswer($acc) === $studentN) {
+                            $correct++;
+                            break;
+                        }
                     }
                 }
                 return ['manual' => false, 'ratio' => $correct / $n];
@@ -2914,41 +2977,49 @@ class StudentTestController extends Controller
             case 'story_completion': {
                 $sentences = $data['completion_sentences'] ?? [];
                 $n = count($sentences);
-                if ($n === 0) return ['manual' => false, 'ratio' => 0.0];
+                if ($n === 0)
+                    return ['manual' => false, 'ratio' => 0.0];
                 $correct = 0;
                 foreach ($sentences as $i => $s) {
-                    if ($eq($map[(string) $i] ?? '', $s['correct_answer'] ?? '')) $correct++;
+                    if ($eq($map[(string) $i] ?? '', $s['correct_answer'] ?? ''))
+                        $correct++;
                 }
                 return ['manual' => false, 'ratio' => $correct / $n];
             }
             case 'unscramble_words': {
                 $items = array_values(array_filter($data['items'] ?? [], fn($it) => empty($it['isExample'])));
                 $n = count($items);
-                if ($n === 0) return ['manual' => false, 'ratio' => 0.0];
+                if ($n === 0)
+                    return ['manual' => false, 'ratio' => 0.0];
                 $correct = 0;
                 foreach ($items as $i => $it) {
-                    if ($eq($map[(string) $i] ?? '', $it['correct_answer'] ?? '')) $correct++;
+                    if ($eq($map[(string) $i] ?? '', $it['correct_answer'] ?? ''))
+                        $correct++;
                 }
                 return ['manual' => false, 'ratio' => $correct / $n];
             }
             case 'word_bank_fill': {
                 $gaps = array_values(array_filter($data['gaps'] ?? [], fn($g) => empty($g['isExample'])));
                 $n = count($gaps);
-                if ($n === 0) return ['manual' => false, 'ratio' => 0.0];
+                if ($n === 0)
+                    return ['manual' => false, 'ratio' => 0.0];
                 $correct = 0;
                 foreach ($gaps as $g) {
                     $key = (string) ($g['gap_number'] ?? '');
-                    if ($eq($map[$key] ?? '', $g['correct_word'] ?? '')) $correct++;
+                    if ($eq($map[$key] ?? '', $g['correct_word'] ?? ''))
+                        $correct++;
                 }
                 return ['manual' => false, 'ratio' => $correct / $n];
             }
             case 'reading_comprehension': {
                 $questions = $data['questions'] ?? [];
                 $n = count($questions);
-                if ($n === 0) return ['manual' => false, 'ratio' => 0.0];
+                if ($n === 0)
+                    return ['manual' => false, 'ratio' => 0.0];
                 $correct = 0;
                 foreach ($questions as $i => $qq) {
-                    if ($eq($map[(string) $i] ?? '', $qq['answer'] ?? '')) $correct++;
+                    if ($eq($map[(string) $i] ?? '', $qq['answer'] ?? ''))
+                        $correct++;
                 }
                 return ['manual' => false, 'ratio' => $correct / $n];
             }
@@ -2956,85 +3027,106 @@ class StudentTestController extends Controller
                 // Nối tên (label) vào đúng hotspot trên tranh.
                 // Player lưu { [labelIndex]: hotspotIndex }. Đúng khi label i nối vào hotspot i.
                 $items = $data['items'] ?? [];
-                $gradable = 0; $correct = 0;
+                $gradable = 0;
+                $correct = 0;
                 foreach ($items as $i => $it) {
-                    if (!empty($it['isExample']) || !empty($it['is_example'])) continue; // ví dụ
+                    if (!empty($it['isExample']) || !empty($it['is_example']))
+                        continue; // ví dụ
                     $gradable++;
                     $got = $map[(string) $i] ?? '';
-                    if ($got !== '' && (int) $got === (int) $i) $correct++;
+                    if ($got !== '' && (int) $got === (int) $i)
+                        $correct++;
                 }
-                if ($gradable === 0) return ['manual' => false, 'ratio' => 0.0];
+                if ($gradable === 0)
+                    return ['manual' => false, 'ratio' => 0.0];
                 return ['manual' => false, 'ratio' => $correct / $gradable];
             }
             case 'listen_and_tick': {
                 $items = $data['items'] ?? ($cfg['items'] ?? []);
-                $gradable = 0; $correct = 0;
+                $gradable = 0;
+                $correct = 0;
                 foreach ($items as $i => $it) {
-                    if (!empty($it['isExample']) || !empty($it['is_example'])) continue;
+                    if (!empty($it['isExample']) || !empty($it['is_example']))
+                        continue;
                     $gradable++;
                     $corr = strtoupper((string) ($it['correctAnswer'] ?? $it['correct_answer'] ?? ''));
                     $got = strtoupper((string) ($map[(string) $i] ?? ''));
-                    if ($got !== '' && $got === $corr) $correct++;
+                    if ($got !== '' && $got === $corr)
+                        $correct++;
                 }
-                if ($gradable === 0) return ['manual' => false, 'ratio' => 0.0];
+                if ($gradable === 0)
+                    return ['manual' => false, 'ratio' => 0.0];
                 return ['manual' => false, 'ratio' => $correct / $gradable];
             }
             case 'listen_and_write': {
                 $list = !empty($data['questions']) ? $data['questions']
-                      : ($data['items'] ?? ($cfg['questions'] ?? $cfg['items'] ?? []));
-                $gradable = 0; $correct = 0;
+                    : ($data['items'] ?? ($cfg['questions'] ?? $cfg['items'] ?? []));
+                $gradable = 0;
+                $correct = 0;
                 foreach ($list as $i => $q) {
-                    if (!empty($q['isExample']) || !empty($q['is_example'])) continue;
+                    if (!empty($q['isExample']) || !empty($q['is_example']))
+                        continue;
                     $gradable++;
                     $corr = $q['answer'] ?? $q['correct_answer'] ?? $q['correctAnswer'] ?? '';
-                    if ($eq($map[(string) $i] ?? '', $corr)) $correct++;
+                    if ($eq($map[(string) $i] ?? '', $corr))
+                        $correct++;
                 }
-                if ($gradable === 0) return ['manual' => false, 'ratio' => 0.0];
+                if ($gradable === 0)
+                    return ['manual' => false, 'ratio' => 0.0];
                 return ['manual' => false, 'ratio' => $correct / $gradable];
             }
             case 'look_and_read': {
                 $list = !empty($data['questions']) ? $data['questions']
-                      : ($data['items'] ?? ($cfg['questions'] ?? $cfg['items'] ?? []));
-                $gradable = 0; $correct = 0;
+                    : ($data['items'] ?? ($cfg['questions'] ?? $cfg['items'] ?? []));
+                $gradable = 0;
+                $correct = 0;
                 foreach ($list as $i => $q) {
-                    if (!empty($q['isExample']) || !empty($q['is_example'])) continue;
+                    if (!empty($q['isExample']) || !empty($q['is_example']))
+                        continue;
                     $gradable++;
                     $corrRaw = strtolower((string) ($q['correctAnswer'] ?? $q['correct_answer'] ?? ''));
                     $corrTrue = in_array($corrRaw, ['tick', 'true', 'yes', '1'], true);
                     $rawVal = strtolower((string) ($map[(string) $i] ?? ''));
                     $answered = $rawVal !== '';
                     $studentTrue = in_array($rawVal, ['true', 'tick', 'yes', '1'], true);
-                    if ($answered && $studentTrue === $corrTrue) $correct++;
+                    if ($answered && $studentTrue === $corrTrue)
+                        $correct++;
                 }
-                if ($gradable === 0) return ['manual' => false, 'ratio' => 0.0];
+                if ($gradable === 0)
+                    return ['manual' => false, 'ratio' => 0.0];
                 return ['manual' => false, 'ratio' => $correct / $gradable];
             }
             case 'look_read_write': {
                 $list = !empty($data['questions']) ? $data['questions']
-                      : ($data['items'] ?? ($cfg['questions'] ?? $cfg['items'] ?? []));
-                $gradable = 0; $correct = 0;
+                    : ($data['items'] ?? ($cfg['questions'] ?? $cfg['items'] ?? []));
+                $gradable = 0;
+                $correct = 0;
                 foreach ($list as $i => $q) {
-                    if (!empty($q['isExample']) || !empty($q['is_example'])) continue;
+                    if (!empty($q['isExample']) || !empty($q['is_example']))
+                        continue;
                     $qType = $q['question_type'] ?? $q['questionType'] ?? '';
-                    if ($qType === 'free_write') continue; // tự luận → giáo viên chấm
+                    if ($qType === 'free_write')
+                        continue; // tự luận → giáo viên chấm
                     $gradable++;
                     $corr = $q['correct_answer'] ?? $q['correctAnswer'] ?? '';
-                    if ($eq($map[(string) $i] ?? '', $corr)) $correct++;
+                    if ($eq($map[(string) $i] ?? '', $corr))
+                        $correct++;
                 }
                 // Toàn câu tự luận → để giáo viên chấm tay
-                if ($gradable === 0) return ['manual' => true, 'ratio' => 0.0];
+                if ($gradable === 0)
+                    return ['manual' => true, 'ratio' => 0.0];
                 return ['manual' => false, 'ratio' => $correct / $gradable];
             }
             case 'listen_colour_write':
             case 'listen_colour': {
                 // Tô màu / viết từ: kiểm tra colour hoặc writeText/write_text đúng
                 $instructions = $data['instructions'] ?? [];
-                
+
                 // DEBUG: Log để kiểm tra
                 Log::info('🎨 Grading listen_colour_write', [
                     'instructions_count' => count($instructions),
                     'student_answer_map' => $map,
-                    'instructions' => array_map(function($inst, $idx) {
+                    'instructions' => array_map(function ($inst, $idx) {
                         return [
                             'index' => $idx,
                             'objectName' => $inst['objectName'] ?? $inst['object_name'] ?? 'N/A',
@@ -3043,24 +3135,26 @@ class StudentTestController extends Controller
                         ];
                     }, $instructions, array_keys($instructions))
                 ]);
-                
-                $gradable = 0; $correct = 0;
+
+                $gradable = 0;
+                $correct = 0;
                 foreach ($instructions as $i => $inst) {
                     // Bỏ qua câu ví dụ
-                    if (!empty($inst['isExample']) || !empty($inst['is_example'])) continue;
-                    
+                    if (!empty($inst['isExample']) || !empty($inst['is_example']))
+                        continue;
+
                     // Lấy đáp án đúng (ưu tiên colour, nếu không có thì dùng writeText/write_text)
                     $correctAnswer = $inst['colour'] ?? $inst['writeText'] ?? $inst['write_text'] ?? null;
-                    
+
                     // ⚠️ BỎ QUA DISTRACTORS (không có đáp án đúng)
                     if (empty($correctAnswer)) {
                         Log::info("🎨 Skipping distractor at index $i (no correct answer)");
                         continue;
                     }
-                    
+
                     $gradable++;
                     $studentAnswer = $map[(string) $i] ?? '';
-                    
+
                     // DEBUG
                     Log::info("🎨 Checking index $i", [
                         'objectName' => $inst['objectName'] ?? $inst['object_name'] ?? 'N/A',
@@ -3068,14 +3162,15 @@ class StudentTestController extends Controller
                         'student' => $studentAnswer,
                         'match' => $eq($studentAnswer, $correctAnswer)
                     ]);
-                    
+
                     // So sánh (normalize để không phân biệt hoa thường, khoảng trắng)
                     if ($eq($studentAnswer, $correctAnswer)) {
                         $correct++;
                     }
                 }
-                if ($gradable === 0) return ['manual' => false, 'ratio' => 0.0];
-                
+                if ($gradable === 0)
+                    return ['manual' => false, 'ratio' => 0.0];
+
                 Log::info("🎨 Final score: $correct / $gradable");
                 return ['manual' => false, 'ratio' => $correct / $gradable];
             }
@@ -3098,8 +3193,8 @@ class StudentTestController extends Controller
      */
     public function gradeAnswers($answers, $examId, bool $isVstep, array $subjectiveTypes): array
     {
-        $totalScore   = 0;
-        $maxScore     = 0;
+        $totalScore = 0;
+        $maxScore = 0;
         $skillBuckets = []; // ['listening' => ['correct'=>0,'total'=>0], ...]
 
         // Pre-load all questions in this grading run
@@ -3114,7 +3209,7 @@ class StudentTestController extends Controller
         // Group swappable MCQ questions (same section, same type = multiple_choice, identical non-empty options)
         $optionsHashToGroup = [];
         $precomputedResults = []; // saId -> ['is_correct' => bool, 'points' => float]
-        
+
         foreach ($loadedQuestions as $qId => $q) {
             $qType = strtolower($q->qType ?? '');
             if ($qType === 'multiple_choice_group' || $qType === 'multiple-choice-group') {
@@ -3141,7 +3236,8 @@ class StudentTestController extends Controller
             $correctLetters = [];
             foreach ($qIds as $qId) {
                 $q = $loadedQuestions[$qId] ?? null;
-                if (!$q) continue;
+                if (!$q)
+                    continue;
                 $sorted = $q->answers->sortBy(fn($a) => $a->aOrder !== null ? $a->aOrder : $a->aId)->values();
                 $letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
                 foreach ($sorted as $idx => $ans) {
@@ -3150,7 +3246,7 @@ class StudentTestController extends Controller
                     }
                 }
             }
-            
+
             // 2. Gather normalized student answers in this group
             $groupSas = []; // saId -> normalized_student_letter
             $saIdToQPoints = [];
@@ -3162,7 +3258,7 @@ class StudentTestController extends Controller
                     $saIdToQPoints[$sa->saId] = $q ? ($q->qPoints ?? 1) : 1;
                 }
             }
-            
+
             // 3. Match student answers to correct letters (order independent)
             $remainingCorrect = $correctLetters;
             foreach ($groupSas as $saId => $studentLetter) {
@@ -3175,7 +3271,7 @@ class StudentTestController extends Controller
                         $remainingCorrect = array_values($remainingCorrect);
                     }
                 }
-                
+
                 $points = $isCorrect ? $saIdToQPoints[$saId] : 0;
                 $precomputedResults[$saId] = [
                     'is_correct' => $isCorrect,
@@ -3190,7 +3286,7 @@ class StudentTestController extends Controller
                 return ['error' => 'Dữ liệu câu hỏi không hợp lệ cho bài thi này.', 'scorePercentage' => 0, 'vstepMeta' => null];
             }
 
-            $qType    = strtolower($question->qType    ?? '');
+            $qType = strtolower($question->qType ?? '');
             // Resolve skill section (listening/reading/writing/speaking) — chấp nhận
             // cả qSection lẫn qSkill (có exam set chỉ 1 trong 2 cột).
             $qSection = strtolower($question->qSection ?? $question->qSkill ?? '');
@@ -3198,8 +3294,8 @@ class StudentTestController extends Controller
             // Subjective check: skip grading for writing/speaking
             $qSkill = strtolower($question->qSkill ?? '');
             $isSubjective = in_array($qType, $subjectiveTypes)
-                         || in_array($qSkill,    ['writing', 'speaking'])
-                         || ($isVstep && in_array($qSection, ['writing', 'speaking']));
+                || in_array($qSkill, ['writing', 'speaking'])
+                || ($isVstep && in_array($qSection, ['writing', 'speaking']));
 
             if ($isSubjective) {
                 // Mark as pending manual grading — no points, no wrong
@@ -3220,7 +3316,7 @@ class StudentTestController extends Controller
 
                 $awarded = round($question->qPoints * $kidsResult['ratio'], 2);
                 $submissionAnswer->update([
-                    'saIs_correct'     => $kidsResult['ratio'] >= 0.999,
+                    'saIs_correct' => $kidsResult['ratio'] >= 0.999,
                     'saPoints_awarded' => $awarded,
                 ]);
                 $totalScore += $awarded;
@@ -3234,22 +3330,22 @@ class StudentTestController extends Controller
                 $res = $precomputedResults[$submissionAnswer->saId];
                 $isCorrect = $res['is_correct'];
                 $pointsAwarded = $res['points'];
-                
+
                 $submissionAnswer->update([
-                    'saIs_correct'     => $isCorrect,
+                    'saIs_correct' => $isCorrect,
                     'saPoints_awarded' => $pointsAwarded,
                 ]);
-                
+
                 if ($isCorrect) {
                     $totalScore += $pointsAwarded;
                     if ($isVstep && $qSection) {
                         $skillBuckets[$qSection]['correct'] = ($skillBuckets[$qSection]['correct'] ?? 0) + 1;
-                        $skillBuckets[$qSection]['total']   = ($skillBuckets[$qSection]['total']   ?? 0) + 1;
+                        $skillBuckets[$qSection]['total'] = ($skillBuckets[$qSection]['total'] ?? 0) + 1;
                     }
                 } else {
                     if ($isVstep && $qSection) {
                         $skillBuckets[$qSection]['correct'] = ($skillBuckets[$qSection]['correct'] ?? 0);
-                        $skillBuckets[$qSection]['total']   = ($skillBuckets[$qSection]['total']   ?? 0) + 1;
+                        $skillBuckets[$qSection]['total'] = ($skillBuckets[$qSection]['total'] ?? 0) + 1;
                     }
                 }
                 continue;
@@ -3261,15 +3357,15 @@ class StudentTestController extends Controller
             // 1. Direct text match (e.g., student sends full answer text)
             // 2. Letter-based MCQ (student sends "A"/"B"/"C"/"D" → map to nth answer by creation order)
             $studentText = trim($submissionAnswer->saAnswer_text ?? '');
-            $isCorrect   = false;
+            $isCorrect = false;
 
             if ($correctAnswer && $this->isCorrectAnswer($studentText, $correctAnswer->aContent)) {
                 $isCorrect = true;
             } elseif (preg_match('/^[A-Ha-h]$/', $studentText)) {
                 $letterIdx = ord(strtoupper($studentText)) - ord('A'); // A=0,B=1,…,H=7
                 // Prefer aOrder column if present, else fallback to insertion order (aId)
-                $firstAnswer    = $question->answers->first();
-                $hasOrder       = $firstAnswer && $firstAnswer->aOrder !== null;
+                $firstAnswer = $question->answers->first();
+                $hasOrder = $firstAnswer && $firstAnswer->aOrder !== null;
                 $orderedAnswers = $hasOrder
                     ? $question->answers->sortBy('aOrder')->values()
                     : $question->answers->sortBy('aId')->values();
@@ -3284,13 +3380,13 @@ class StudentTestController extends Controller
                 $totalScore += $question->qPoints;
                 if ($isVstep && $qSection) {
                     $skillBuckets[$qSection]['correct'] = ($skillBuckets[$qSection]['correct'] ?? 0) + 1;
-                    $skillBuckets[$qSection]['total']   = ($skillBuckets[$qSection]['total']   ?? 0) + 1;
+                    $skillBuckets[$qSection]['total'] = ($skillBuckets[$qSection]['total'] ?? 0) + 1;
                 }
             } else {
                 $submissionAnswer->update(['saIs_correct' => false, 'saPoints_awarded' => 0]);
                 if ($isVstep && $qSection) {
                     $skillBuckets[$qSection]['correct'] = ($skillBuckets[$qSection]['correct'] ?? 0);
-                    $skillBuckets[$qSection]['total']   = ($skillBuckets[$qSection]['total']   ?? 0) + 1;
+                    $skillBuckets[$qSection]['total'] = ($skillBuckets[$qSection]['total'] ?? 0) + 1;
                 }
             }
         }
@@ -3324,9 +3420,9 @@ class StudentTestController extends Controller
             // Only set to null if skill doesn't exist in exam at all
             $vstepMeta = [
                 'listening' => null,
-                'reading'   => null,
-                'writing'   => null,
-                'speaking'  => null,
+                'reading' => null,
+                'writing' => null,
+                'speaking' => null,
                 'raw_mcq_pct' => $scorePercentage,
             ];
 
@@ -3346,7 +3442,7 @@ class StudentTestController extends Controller
             // They will be updated when AI grading completes
 
             // Overall score = average of available skill scores (L + R only for now)
-            $availableScores = array_filter([$vstepMeta['listening'], $vstepMeta['reading']], function($v) {
+            $availableScores = array_filter([$vstepMeta['listening'], $vstepMeta['reading']], function ($v) {
                 return $v !== null;
             });
             if (count($availableScores) > 0) {
@@ -3364,7 +3460,7 @@ class StudentTestController extends Controller
     {
         $exam->questions->each(function ($question) {
             $question->qPassage = $question->qPassage_text;
-            $question->qSkill   = $question->qSkill ?? $question->qSection;
+            $question->qSkill = $question->qSkill ?? $question->qSection;
             $question->answers->each(function ($answer) {
                 unset($answer->aIs_correct);
             });
@@ -3382,16 +3478,16 @@ class StudentTestController extends Controller
     private function buildExamData($exam): array
     {
         $base = [
-            'eId'               => $exam->eId,
-            'eTitle'            => $exam->eTitle,
-            'eDescription'      => $exam->eDescription,
-            'eType'             => $exam->eType,
-            'eSkill'            => $exam->eSkill,
+            'eId' => $exam->eId,
+            'eTitle' => $exam->eTitle,
+            'eDescription' => $exam->eDescription,
+            'eType' => $exam->eType,
+            'eSkill' => $exam->eSkill,
             'eDuration_minutes' => $exam->eDuration_minutes,
         ];
 
         if ($exam->eType !== 'VSTEP') {
-            $base['questions']     = $exam->questions->values();
+            $base['questions'] = $exam->questions->values();
             $base['contentBlocks'] = $exam->contentBlocks->sortBy('display_order')->values();
             return $base;
         }
@@ -3413,7 +3509,7 @@ class StudentTestController extends Controller
     private function buildSkillVstepStructure($exam, string $skill): array
     {
         $contentBlocks = $exam->contentBlocks->sortBy('display_order');
-        $questions     = $exam->questions->sortBy(['qPart', 'qOrder', 'qId']);
+        $questions = $exam->questions->sortBy(['qPart', 'qOrder', 'qId']);
 
         $partNumbers = $questions->pluck('qPart')->unique()->sort()->values();
         $parts = [];
@@ -3428,35 +3524,35 @@ class StudentTestController extends Controller
 
             $partData = [
                 'partNumber' => $partNum,
-                'partName'   => $partBlock ? ($partBlock->metadata['part_name'] ?? "Part $partNum") : "Part $partNum",
+                'partName' => $partBlock ? ($partBlock->metadata['part_name'] ?? "Part $partNum") : "Part $partNum",
             ];
 
             if ($skill === 'reading') {
-                $partData['passage']   = $partBlock ? $partBlock->content : null;
+                $partData['passage'] = $partBlock ? $partBlock->content : null;
                 $partData['wordCount'] = $partBlock ? ($partBlock->metadata['word_count'] ?? null) : null;
             } elseif ($skill === 'listening') {
-                $partData['audioUrl']       = $partBlock ? $partBlock->content : null;
-                $partData['audioDuration']  = $partBlock ? ($partBlock->metadata['audio_duration'] ?? null) : null;
-                $partData['transcript']     = $partBlock ? ($partBlock->metadata['transcript'] ?? null) : null;
+                $partData['audioUrl'] = $partBlock ? $partBlock->content : null;
+                $partData['audioDuration'] = $partBlock ? ($partBlock->metadata['audio_duration'] ?? null) : null;
+                $partData['transcript'] = $partBlock ? ($partBlock->metadata['transcript'] ?? null) : null;
             } elseif ($skill === 'speaking') {
                 $partData['instruction'] = $partBlock ? $partBlock->content : null;
-                $partData['timeLimit']   = $partBlock ? ($partBlock->metadata['time_limit'] ?? null) : null;
+                $partData['timeLimit'] = $partBlock ? ($partBlock->metadata['time_limit'] ?? null) : null;
             } elseif ($skill === 'writing') {
-                $partData['prompt']    = $partBlock ? $partBlock->content : null;
+                $partData['prompt'] = $partBlock ? $partBlock->content : null;
                 $partData['wordCount'] = $partBlock ? ($partBlock->metadata['min_words'] ?? null) : null;
             }
 
             $partData['questions'] = $partQuestions->map(function ($q) {
                 return [
-                    'qId'       => $q->qId,
-                    'qContent'  => $q->qContent,
-                    'qType'     => $q->qType,
-                    'qPart'     => $q->qPart,
-                    'qOrder'    => $q->qOrder,
-                    'qPoints'   => $q->qPoints,
-                    'qWord_count'  => $q->qWord_count,
-                    'qTime_limit'  => $q->qTime_limit,
-                    'answers'   => $q->answers->values(),
+                    'qId' => $q->qId,
+                    'qContent' => $q->qContent,
+                    'qType' => $q->qType,
+                    'qPart' => $q->qPart,
+                    'qOrder' => $q->qOrder,
+                    'qPoints' => $q->qPoints,
+                    'qWord_count' => $q->qWord_count,
+                    'qTime_limit' => $q->qTime_limit,
+                    'answers' => $q->answers->values(),
                 ];
             })->values();
 
@@ -3472,7 +3568,7 @@ class StudentTestController extends Controller
     private function buildMixedVstepStructure($exam): array
     {
         $contentBlocks = $exam->contentBlocks->sortBy('display_order');
-        $questions     = $exam->questions->sortBy(['qSkillSection', 'qPart', 'qOrder', 'qId']);
+        $questions = $exam->questions->sortBy(['qSkillSection', 'qPart', 'qOrder', 'qId']);
 
         $skillGroups = $questions->groupBy('qSkillSection');
         $skills = [];
@@ -3492,19 +3588,19 @@ class StudentTestController extends Controller
 
                 $partData = [
                     'partNumber' => $partNum,
-                    'partName'   => $partBlock ? ($partBlock->metadata['part_name'] ?? "Part $partNum") : "Part $partNum",
-                    'blockType'  => $partBlock ? $partBlock->block_type : null,
-                    'content'    => $partBlock ? $partBlock->content : null,
-                    'metadata'   => $partBlock ? $partBlock->metadata : null,
-                    'questions'  => $partQuestions->map(function ($q) {
+                    'partName' => $partBlock ? ($partBlock->metadata['part_name'] ?? "Part $partNum") : "Part $partNum",
+                    'blockType' => $partBlock ? $partBlock->block_type : null,
+                    'content' => $partBlock ? $partBlock->content : null,
+                    'metadata' => $partBlock ? $partBlock->metadata : null,
+                    'questions' => $partQuestions->map(function ($q) {
                         return [
-                            'qId'      => $q->qId,
+                            'qId' => $q->qId,
                             'qContent' => $q->qContent,
-                            'qType'    => $q->qType,
-                            'qPart'    => $q->qPart,
-                            'qOrder'   => $q->qOrder,
-                            'qPoints'  => $q->qPoints,
-                            'answers'  => $q->answers->values(),
+                            'qType' => $q->qType,
+                            'qPart' => $q->qPart,
+                            'qOrder' => $q->qOrder,
+                            'qPoints' => $q->qPoints,
+                            'answers' => $q->answers->values(),
                         ];
                     })->values(),
                 ];
@@ -3523,9 +3619,9 @@ class StudentTestController extends Controller
      * ===================================================================== */
 
     private const LISTENING_LAYOUT = [
-        1 => ['sectionCount' => 1, 'questionsPerSection' => 8,  'questionStart' => 1,  'sectionLabel' => 'Announcements'],
-        2 => ['sectionCount' => 3, 'questionsPerSection' => 4,  'questionStart' => 9,  'sectionLabel' => 'Conversation'],
-        3 => ['sectionCount' => 3, 'questionsPerSection' => 5,  'questionStart' => 21, 'sectionLabel' => 'Talk'],
+        1 => ['sectionCount' => 1, 'questionsPerSection' => 8, 'questionStart' => 1, 'sectionLabel' => 'Announcements'],
+        2 => ['sectionCount' => 3, 'questionsPerSection' => 4, 'questionStart' => 9, 'sectionLabel' => 'Conversation'],
+        3 => ['sectionCount' => 3, 'questionsPerSection' => 5, 'questionStart' => 21, 'sectionLabel' => 'Talk'],
     ];
 
     /**
@@ -3542,9 +3638,9 @@ class StudentTestController extends Controller
         // Policy: chỉ cho start-direct khi exam đã được giao cho học viên này.
         if (!$this->studentHasActiveAssignmentForExam($user, (int) $examId)) {
             return response()->json([
-                'status'  => 'error',
+                'status' => 'error',
                 'message' => 'Bạn chỉ có thể làm đề đã được giáo viên giao.',
-                'policy'  => 'assigned_only',
+                'policy' => 'assigned_only',
             ], 403);
         }
 
@@ -3582,7 +3678,7 @@ class StudentTestController extends Controller
         if ($existing) {
             // Resume existing submission (F5/reload case)
             $startTime = $existing->sStart_time ?? now();
-            $elapsed   = max(0, \Carbon\Carbon::parse($startTime)->diffInSeconds(now(), false));
+            $elapsed = max(0, \Carbon\Carbon::parse($startTime)->diffInSeconds(now(), false));
             $remaining = max(0, $totalSeconds - $elapsed);
 
             if ($remaining <= 0) {
@@ -3590,15 +3686,15 @@ class StudentTestController extends Controller
                     ->autoSubmit($existing, \App\Services\ExamAutoSubmitService::REASON_TIMEOUT);
 
                 return response()->json([
-                    'status'  => $result['ok'] ? 'finalized' : 'error',
+                    'status' => $result['ok'] ? 'finalized' : 'error',
                     'message' => $result['message'] ?? 'Bài thi đã hết thời gian.',
-                    'data'    => $result['data'] ?? [
+                    'data' => $result['data'] ?? [
                         'submissionId' => $existing->sId,
                         'sStatus' => $existing->sStatus,
                     ],
                 ], $result['ok'] ? 200 : 500);
             }
-            
+
             // ✅ Load saved answers so frontend can restore them after F5
             $savedAnswers = SubmissionAnswer::where('submission_id', $existing->sId)
                 ->get()
@@ -3621,17 +3717,17 @@ class StudentTestController extends Controller
             $deadlineAt = \Carbon\Carbon::parse($startTime)->addSeconds($totalSeconds)->toIso8601String();
             return response()->json([
                 'status' => 'success',
-                'data'   => [
-                    'submissionId'   => $existing->sId,
-                    'started_at'     => $startTime,
+                'data' => [
+                    'submissionId' => $existing->sId,
+                    'started_at' => $startTime,
                     'total_duration' => $totalSeconds,
                     'time_remaining' => $remaining,
                     'time_remaining_seconds' => $remaining,
-                    'deadline_at'    => $deadlineAt,
-                    'savedAnswers'   => $savedAnswers, // ← NEW: return saved answers
+                    'deadline_at' => $deadlineAt,
+                    'savedAnswers' => $savedAnswers, // ← NEW: return saved answers
                     'practice_scope' => $existing->submission_payload['practice_scope'] ?? null,
                     // backward-compat (phút)
-                    'timeRemaining'  => round($remaining / 60),
+                    'timeRemaining' => round($remaining / 60),
                 ],
             ]);
         }
@@ -3639,10 +3735,10 @@ class StudentTestController extends Controller
         // Fresh start: No existing in_progress submission found
 
         $createPayload = [
-            'exam_id'      => $examId,
-            'user_id'      => $user->uId,
-            'sStart_time'  => now(),
-            'sStatus'      => 'in_progress',
+            'exam_id' => $examId,
+            'user_id' => $user->uId,
+            'sStart_time' => now(),
+            'sStatus' => 'in_progress',
             'last_activity_at' => now(),
         ];
 
@@ -3656,16 +3752,16 @@ class StudentTestController extends Controller
         $deadlineAtNew = \Carbon\Carbon::parse($submission->sStart_time)->addSeconds($totalSeconds)->toIso8601String();
         return response()->json([
             'status' => 'success',
-            'data'   => [
-                'submissionId'   => $submission->sId,
-                'started_at'     => $submission->sStart_time,
+            'data' => [
+                'submissionId' => $submission->sId,
+                'started_at' => $submission->sStart_time,
                 'total_duration' => $totalSeconds,
                 'time_remaining' => $totalSeconds,
                 'time_remaining_seconds' => $totalSeconds,
-                'deadline_at'    => $deadlineAtNew,
+                'deadline_at' => $deadlineAtNew,
                 'practice_scope' => $practiceScopeReq,
                 // backward-compat (phút)
-                'timeRemaining'  => $exam->eDuration_minutes ?? 179,
+                'timeRemaining' => $exam->eDuration_minutes ?? 179,
             ],
         ]);
     }
@@ -3677,27 +3773,31 @@ class StudentTestController extends Controller
     private function extractPracticeScopeFromRequest(Request $request): ?array
     {
         $scope = $request->input('practice_scope');
-        if (!is_array($scope)) return null;
+        if (!is_array($scope))
+            return null;
 
         $skill = is_string($scope['skill'] ?? null) ? strtolower($scope['skill']) : null;
-        if (!in_array($skill, ['listening', 'reading', 'writing', 'speaking'], true)) return null;
+        if (!in_array($skill, ['listening', 'reading', 'writing', 'speaking'], true))
+            return null;
 
         $sections = $scope['sections'] ?? null;
-        if (!is_array($sections)) return null;
+        if (!is_array($sections))
+            return null;
         $sections = array_values(array_unique(array_filter(array_map(
             fn($v) => is_numeric($v) ? (int) $v : null,
             $sections,
         ), fn($v) => $v !== null && $v > 0)));
         sort($sections);
-        if (empty($sections)) return null;
+        if (empty($sections))
+            return null;
 
         $time = $scope['time'] ?? null;
         $time = is_numeric($time) && (int) $time > 0 ? (int) $time : null;
 
         return [
-            'skill'    => $skill,
+            'skill' => $skill,
             'sections' => $sections,
-            'time'     => $time,
+            'time' => $time,
         ];
     }
 
@@ -3760,10 +3860,13 @@ class StudentTestController extends Controller
         }
 
         $exam = Exam::where('eId', $examId)
-            ->where(function ($q) { $q->whereNull('eIs_private')->orWhere('eIs_private', false); })
-            ->with(['contentBlocks' => fn($q) => $q->orderBy('display_order'),
-                    'questions'     => fn($q) => $q->orderBy('qPart')->orderBy('qSection_order'),
-                    'questions.answers'])
+            ->where(function ($q) {
+                $q->whereNull('eIs_private')->orWhere('eIs_private', false); })
+            ->with([
+                'contentBlocks' => fn($q) => $q->orderBy('display_order'),
+                'questions' => fn($q) => $q->orderBy('qPart')->orderBy('qSection_order'),
+                'questions.answers'
+            ])
             ->first();
 
         if (!$exam) {
@@ -3781,7 +3884,7 @@ class StudentTestController extends Controller
 
         foreach (self::LISTENING_LAYOUT as $partNumber => $layout) {
             $sectionCount = $layout['sectionCount'];
-            $qPerSection  = $layout['questionsPerSection'];
+            $qPerSection = $layout['questionsPerSection'];
 
             $partBlocks = $exam->contentBlocks->filter(function ($block) use ($partNumber) {
                 $meta = $block->metadata ?? [];
@@ -3800,9 +3903,10 @@ class StudentTestController extends Controller
                     ->where('qPart', $partNumber)
                     ->filter(function ($q) use ($s, $qStart, $qPerSection) {
                         $qSec = $q->qData['section_number'] ?? null;
-                        if ($qSec !== null) return $qSec == $s;
-                        $qNum    = $q->qData['question_number'] ?? $q->qSection_order ?? 0;
-                        $relIdx  = max(0, $qNum - $qStart);
+                        if ($qSec !== null)
+                            return $qSec == $s;
+                        $qNum = $q->qData['question_number'] ?? $q->qSection_order ?? 0;
+                        $relIdx = max(0, $qNum - $qStart);
                         $computed = intdiv($relIdx, max(1, $qPerSection)) + 1;
                         return $computed == $s;
                     })
@@ -3815,19 +3919,19 @@ class StudentTestController extends Controller
                 $freshAudioUrl = $audioFilename ? url('files/audio/' . $audioFilename) : '';
 
                 $sections[] = [
-                    'sectionNumber'       => $s,
-                    'sectionName'         => $block->metadata['section_title'] ?? $block->metadata['section_name'] ?? "{$layout['sectionLabel']} {$s}",
-                    'instructions'        => $block->metadata['instructions'] ?? '',
-                    'audioUrl'            => $freshAudioUrl,
-                    'audioDuration'       => $block->metadata['audio_duration'] ?? 0,
-                    'transcript'          => $block->metadata['transcript'] ?? '',
-                    'questionStart'       => $qStart + ($s - 1) * $qPerSection,
+                    'sectionNumber' => $s,
+                    'sectionName' => $block->metadata['section_title'] ?? $block->metadata['section_name'] ?? "{$layout['sectionLabel']} {$s}",
+                    'instructions' => $block->metadata['instructions'] ?? '',
+                    'audioUrl' => $freshAudioUrl,
+                    'audioDuration' => $block->metadata['audio_duration'] ?? 0,
+                    'transcript' => $block->metadata['transcript'] ?? '',
+                    'questionStart' => $qStart + ($s - 1) * $qPerSection,
                     'questionsPerSection' => $qPerSection,
-                    'questions'           => $sectionQuestions->map(fn($q) => [
-                        'qId'            => $q->qId,
+                    'questions' => $sectionQuestions->map(fn($q) => [
+                        'qId' => $q->qId,
                         'questionNumber' => $q->qData['question_number'] ?? $q->qSection_order,
-                        'questionText'   => $q->qContent,
-                        'options'        => $q->qData['options'] ?? (function() use ($q) {
+                        'questionText' => $q->qContent,
+                        'options' => $q->qData['options'] ?? (function () use ($q) {
                             $sorted = ($q->answers ?? collect())->sortBy(fn($ans) => $ans->aOrder !== null ? $ans->aOrder : $ans->aId)->values();
                             return [
                                 'A' => $sorted[0]->aContent ?? '',
@@ -3841,11 +3945,11 @@ class StudentTestController extends Controller
             }
 
             $parts[] = [
-                'partNumber'          => $partNumber,
-                'partName'            => "Part {$partNumber}",
-                'sectionCount'        => $sectionCount,
+                'partNumber' => $partNumber,
+                'partName' => "Part {$partNumber}",
+                'sectionCount' => $sectionCount,
                 'questionsPerSection' => $qPerSection,
-                'sections'            => $sections,
+                'sections' => $sections,
             ];
         }
 
@@ -3878,9 +3982,9 @@ class StudentTestController extends Controller
             $meta = $block->metadata ?? [];
 
             $storedAudio = $block->content ?? '';
-            $audioFile   = ($storedAudio ? basename(parse_url($storedAudio, PHP_URL_PATH)) : '')
+            $audioFile = ($storedAudio ? basename(parse_url($storedAudio, PHP_URL_PATH)) : '')
                 ?: ($meta['audio_filename'] ?? '');
-            $freshAudio  = $audioFile ? url('files/audio/' . $audioFile) : '';
+            $freshAudio = $audioFile ? url('files/audio/' . $audioFile) : '';
 
             $sectionQuestions = $questionsByPart->get($partNumber, collect())
                 ->sortBy('qSection_order')
@@ -3890,37 +3994,39 @@ class StudentTestController extends Controller
                 ?: ($sectionQuestions->first()->qData['section_title'] ?? '')
                 ?: "Part {$partNumber}";
 
-            $sections = [[
-                'sectionNumber' => (int) $partNumber,
-                'sectionName'   => $sectionTitle,
-                'instructions'  => $meta['instructions'] ?? '',
-                'audioUrl'      => $freshAudio,
-                'audioDuration' => $meta['audio_duration'] ?? 0,
-                'transcript'    => $meta['transcript'] ?? '',
-                'questions'     => $sectionQuestions->map(fn($q) => [
-                    'qId'             => $q->qId,
-                    'questionNumber'  => $q->qData['question_number'] ?? $q->qSection_order,
-                    'questionText'    => $q->qContent,
-                    'taskTitle'       => $q->qData['task_title'] ?? null,
-                    'taskInstruction' => $q->qData['task_instruction'] ?? null,
-                    'options'         => $q->qData['options'] ?? (function () use ($q) {
-                        $sorted = ($q->answers ?? collect())->sortBy(fn($a) => $a->aOrder !== null ? $a->aOrder : $a->aId)->values();
-                        return [
-                            'A' => $sorted[0]->aContent ?? '',
-                            'B' => $sorted[1]->aContent ?? '',
-                            'C' => $sorted[2]->aContent ?? '',
-                            'D' => $sorted[3]->aContent ?? '',
-                        ];
-                    })(),
-                ])->values()->toArray(),
-            ]];
+            $sections = [
+                [
+                    'sectionNumber' => (int) $partNumber,
+                    'sectionName' => $sectionTitle,
+                    'instructions' => $meta['instructions'] ?? '',
+                    'audioUrl' => $freshAudio,
+                    'audioDuration' => $meta['audio_duration'] ?? 0,
+                    'transcript' => $meta['transcript'] ?? '',
+                    'questions' => $sectionQuestions->map(fn($q) => [
+                        'qId' => $q->qId,
+                        'questionNumber' => $q->qData['question_number'] ?? $q->qSection_order,
+                        'questionText' => $q->qContent,
+                        'taskTitle' => $q->qData['task_title'] ?? null,
+                        'taskInstruction' => $q->qData['task_instruction'] ?? null,
+                        'options' => $q->qData['options'] ?? (function () use ($q) {
+                            $sorted = ($q->answers ?? collect())->sortBy(fn($a) => $a->aOrder !== null ? $a->aOrder : $a->aId)->values();
+                            return [
+                                'A' => $sorted[0]->aContent ?? '',
+                                'B' => $sorted[1]->aContent ?? '',
+                                'C' => $sorted[2]->aContent ?? '',
+                                'D' => $sorted[3]->aContent ?? '',
+                            ];
+                        })(),
+                    ])->values()->toArray(),
+                ]
+            ];
 
             $parts[] = [
-                'partNumber'          => (int) $partNumber,
-                'partName'            => $sectionTitle,
-                'sectionCount'        => 1,
+                'partNumber' => (int) $partNumber,
+                'partName' => $sectionTitle,
+                'sectionCount' => 1,
                 'questionsPerSection' => $sectionQuestions->count(),
-                'sections'            => $sections,
+                'sections' => $sections,
             ];
         }
 
@@ -3938,10 +4044,13 @@ class StudentTestController extends Controller
         }
 
         $exam = Exam::where('eId', $examId)
-            ->where(function ($q) { $q->whereNull('eIs_private')->orWhere('eIs_private', false); })
-            ->with(['contentBlocks' => fn($q) => $q->orderBy('display_order'),
-                    'questions'     => fn($q) => $q->orderBy('qPart')->orderBy('qSection_order'),
-                    'questions.answers'])
+            ->where(function ($q) {
+                $q->whereNull('eIs_private')->orWhere('eIs_private', false); })
+            ->with([
+                'contentBlocks' => fn($q) => $q->orderBy('display_order'),
+                'questions' => fn($q) => $q->orderBy('qPart')->orderBy('qSection_order'),
+                'questions.answers'
+            ])
             ->first();
 
         if (!$exam) {
@@ -3951,21 +4060,21 @@ class StudentTestController extends Controller
         $parts = [];
         for ($i = 1; $i <= 4; $i++) {
             $partQuestions = $exam->questions->where('qPart', $i)->where('qSkill', 'reading')->values();
-            $contentBlock  = $exam->contentBlocks->first(function ($block) use ($i) {
+            $contentBlock = $exam->contentBlocks->first(function ($block) use ($i) {
                 $metadata = $block->metadata ?? [];
                 return isset($metadata['part_number']) && $metadata['part_number'] == $i && isset($metadata['word_count']);
             });
 
             $parts[] = [
                 'partNumber' => $i,
-                'partName'   => $contentBlock->metadata['part_name'] ?? "Part $i",
-                'passage'    => $contentBlock->content ?? '',
-                'wordCount'  => $contentBlock->metadata['word_count'] ?? 0,
-                'questions'  => $partQuestions->map(fn($q) => [
-                    'qId'            => $q->qId,
+                'partName' => $contentBlock->metadata['part_name'] ?? "Part $i",
+                'passage' => $contentBlock->content ?? '',
+                'wordCount' => $contentBlock->metadata['word_count'] ?? 0,
+                'questions' => $partQuestions->map(fn($q) => [
+                    'qId' => $q->qId,
                     'questionNumber' => $q->qData['question_number'] ?? $q->qSection_order,
-                    'questionText'   => $q->qContent,
-                    'options'        => $q->qData['options'] ?? (function() use ($q) {
+                    'questionText' => $q->qContent,
+                    'options' => $q->qData['options'] ?? (function () use ($q) {
                         $sorted = ($q->answers ?? collect())->sortBy(fn($ans) => $ans->aOrder !== null ? $ans->aOrder : $ans->aId)->values();
                         return [
                             'A' => $sorted[0]->aContent ?? '',
@@ -3992,9 +4101,12 @@ class StudentTestController extends Controller
         }
 
         $exam = Exam::where('eId', $examId)
-            ->where(function ($q) { $q->whereNull('eIs_private')->orWhere('eIs_private', false); })
-            ->with(['contentBlocks' => fn($q) => $q->orderBy('display_order'),
-                    'questions'     => fn($q) => $q->orderBy('qPart')])
+            ->where(function ($q) {
+                $q->whereNull('eIs_private')->orWhere('eIs_private', false); })
+            ->with([
+                'contentBlocks' => fn($q) => $q->orderBy('display_order'),
+                'questions' => fn($q) => $q->orderBy('qPart')
+            ])
             ->first();
 
         if (!$exam) {
@@ -4010,10 +4122,10 @@ class StudentTestController extends Controller
             if ($taskQuestion && $contentBlock) {
                 $tasks[] = [
                     'taskNumber' => $i,
-                    'taskName'   => $contentBlock->metadata['task_name'] ?? "Task $i",
-                    'prompt'     => $contentBlock->content ?? '',
-                    'wordCount'  => $contentBlock->metadata['word_count'] ?? [150, 250],
-                    'timeLimit'  => $contentBlock->metadata['time_limit'] ?? 20,
+                    'taskName' => $contentBlock->metadata['task_name'] ?? "Task $i",
+                    'prompt' => $contentBlock->content ?? '',
+                    'wordCount' => $contentBlock->metadata['word_count'] ?? [150, 250],
+                    'timeLimit' => $contentBlock->metadata['time_limit'] ?? 20,
                     'questionId' => $taskQuestion->qId,
                 ];
             }
@@ -4033,9 +4145,12 @@ class StudentTestController extends Controller
         }
 
         $exam = Exam::where('eId', $examId)
-            ->where(function ($q) { $q->whereNull('eIs_private')->orWhere('eIs_private', false); })
-            ->with(['contentBlocks' => fn($q) => $q->orderBy('display_order'),
-                    'questions'     => fn($q) => $q->where('qSkill', 'speaking')->orderBy('qPart')->orderBy('qSection_order')])
+            ->where(function ($q) {
+                $q->whereNull('eIs_private')->orWhere('eIs_private', false); })
+            ->with([
+                'contentBlocks' => fn($q) => $q->orderBy('display_order'),
+                'questions' => fn($q) => $q->where('qSkill', 'speaking')->orderBy('qPart')->orderBy('qSection_order')
+            ])
             ->first();
 
         if (!$exam) {
@@ -4057,13 +4172,16 @@ class StudentTestController extends Controller
 
             $partData = [
                 'partNumber' => $i,
-                'partName'   => $contentBlock->metadata['part_name'] ?? "Part $i",
-                'timeLimit'  => $contentBlock->metadata['time_limit'] ?? 3,
+                'partName' => $contentBlock->metadata['part_name'] ?? "Part $i",
+                'timeLimit' => $contentBlock->metadata['time_limit'] ?? 3,
             ];
 
-            if (isset($contentBlock->metadata['part1Data']))      $partData['part1Data'] = $contentBlock->metadata['part1Data'];
-            elseif (isset($contentBlock->metadata['part2Data']))  $partData['part2Data'] = $contentBlock->metadata['part2Data'];
-            elseif (isset($contentBlock->metadata['part3Data']))  $partData['part3Data'] = $contentBlock->metadata['part3Data'];
+            if (isset($contentBlock->metadata['part1Data']))
+                $partData['part1Data'] = $contentBlock->metadata['part1Data'];
+            elseif (isset($contentBlock->metadata['part2Data']))
+                $partData['part2Data'] = $contentBlock->metadata['part2Data'];
+            elseif (isset($contentBlock->metadata['part3Data']))
+                $partData['part3Data'] = $contentBlock->metadata['part3Data'];
 
             $parts[] = $partData;
         }
@@ -4104,7 +4222,7 @@ class StudentTestController extends Controller
         return $query
             ->with([
                 'contentBlocks' => fn($q) => $q->orderBy('display_order'),
-                'questions'     => fn($q) => $q->orderBy('qPart')->orderBy('qSection_order'),
+                'questions' => fn($q) => $q->orderBy('qPart')->orderBy('qSection_order'),
                 'questions.answers',
             ])
             ->first();
@@ -4141,7 +4259,7 @@ class StudentTestController extends Controller
             // Regenerate audio URL from real stored URL (not metadata.audio_filename
             // which holds the user's original upload name — file thực trên disk dùng
             // tên hashed do server tạo). Chỉ fallback sang metadata khi block.content rỗng.
-            $storedAudio   = $block ? ($block->content ?? '') : '';
+            $storedAudio = $block ? ($block->content ?? '') : '';
             $audioFilename = ($storedAudio ? basename(parse_url($storedAudio, PHP_URL_PATH)) : '')
                 ?: ($blockMeta['audio_filename'] ?? '');
             $freshAudioUrl = $audioFilename ? url('files/audio/' . $audioFilename) : '';
@@ -4154,28 +4272,28 @@ class StudentTestController extends Controller
 
             $sections[] = [
                 'sectionNumber' => $sectionNumber,
-                'sectionName'   => $blockMeta['section_title'] ?? $blockMeta['section_name'] ?? "Section {$sectionNumber}",
-                'audioUrl'      => $freshAudioUrl,
+                'sectionName' => $blockMeta['section_title'] ?? $blockMeta['section_name'] ?? "Section {$sectionNumber}",
+                'audioUrl' => $freshAudioUrl,
                 'audioDuration' => $blockMeta['audio_duration'] ?? 0,
                 'questionStart' => ($sectionNumber - 1) * 10 + 1,
                 'questionsPerSection' => 10,
-                'instructions'  => $blockMeta['instructions'] ?? '',
-                'context'       => $blockMeta['context'] ?? '',
-                'transcript'    => $isTeacher ? ($blockMeta['transcript'] ?? '') : null,
-                'questionType'  => $blockMeta['question_type'] ?? 'multiple_choice',
-                'questions'     => $sectionQuestions->map(fn($q) => $this->serializeIeltsQuestion($q, $isTeacher))->values()->toArray(),
+                'instructions' => $blockMeta['instructions'] ?? '',
+                'context' => $blockMeta['context'] ?? '',
+                'transcript' => $isTeacher ? ($blockMeta['transcript'] ?? '') : null,
+                'questionType' => $blockMeta['question_type'] ?? 'multiple_choice',
+                'questions' => $sectionQuestions->map(fn($q) => $this->serializeIeltsQuestion($q, $isTeacher))->values()->toArray(),
             ];
         }
 
         return response()->json([
             'status' => 'success',
-            'data'   => [
-                'exam_id'      => $exam->eId,
-                'title'        => $exam->eTitle,
-                'testType'     => $exam->ielts_test_type ?? 'Academic',
+            'data' => [
+                'exam_id' => $exam->eId,
+                'title' => $exam->eTitle,
+                'testType' => $exam->ielts_test_type ?? 'Academic',
                 'totalQuestions' => 40,
-                'duration'     => $exam->eDuration_minutes ?? 40,
-                'sections'     => $sections,
+                'duration' => $exam->eDuration_minutes ?? 40,
+                'sections' => $sections,
             ],
         ]);
     }
@@ -4217,13 +4335,13 @@ class StudentTestController extends Controller
 
             $passages[] = [
                 'passageNumber' => $passageNumber,
-                'passageName'   => "Passage {$passageNumber}",
-                'title'         => $block->metadata['passage_title'] ?? '',
-                'body'          => $block->content ?? '',
-                'wordCount'     => $block->metadata['word_count'] ?? 0,
+                'passageName' => "Passage {$passageNumber}",
+                'title' => $block->metadata['passage_title'] ?? '',
+                'body' => $block->content ?? '',
+                'wordCount' => $block->metadata['word_count'] ?? 0,
                 'questionStart' => $questionStart,
-                'questionEnd'   => $questionStart + max(0, $count - 1),
-                'questions'     => $passageQuestions->map(fn($q) => $this->serializeIeltsQuestion($q, $isTeacher))->values()->toArray(),
+                'questionEnd' => $questionStart + max(0, $count - 1),
+                'questions' => $passageQuestions->map(fn($q) => $this->serializeIeltsQuestion($q, $isTeacher))->values()->toArray(),
             ];
 
             $runningQNumber += $count;
@@ -4231,13 +4349,13 @@ class StudentTestController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data'   => [
-                'exam_id'        => $exam->eId,
-                'title'          => $exam->eTitle,
-                'testType'       => $exam->ielts_test_type ?? 'Academic',
+            'data' => [
+                'exam_id' => $exam->eId,
+                'title' => $exam->eTitle,
+                'testType' => $exam->ielts_test_type ?? 'Academic',
                 'totalQuestions' => 40,
-                'duration'       => 60,
-                'passages'       => $passages,
+                'duration' => 60,
+                'passages' => $passages,
             ],
         ]);
     }
@@ -4271,17 +4389,18 @@ class StudentTestController extends Controller
                 ->where('qPart', $taskNumber)
                 ->first();
 
-            if (!$question) continue;
+            if (!$question)
+                continue;
 
             $tasks[] = [
                 'taskNumber' => $taskNumber,
-                'taskName'   => "Task {$taskNumber}",
-                'prompt'     => $block->content ?? '',
-                'imageUrl'   => $block->metadata['image_url'] ?? null,
-                'tone'       => $block->metadata['tone'] ?? null,
-                'chartType'  => $block->metadata['chart_type'] ?? null,
-                'essayType'  => $block->metadata['essay_type'] ?? null,
-                'minWords'   => $taskNumber === 1 ? 150 : 250,
+                'taskName' => "Task {$taskNumber}",
+                'prompt' => $block->content ?? '',
+                'imageUrl' => $block->metadata['image_url'] ?? null,
+                'tone' => $block->metadata['tone'] ?? null,
+                'chartType' => $block->metadata['chart_type'] ?? null,
+                'essayType' => $block->metadata['essay_type'] ?? null,
+                'minWords' => $taskNumber === 1 ? 150 : 250,
                 'recommendedMinutes' => $taskNumber === 1 ? 20 : 40,
                 'questionId' => $question->qId,
             ];
@@ -4289,12 +4408,12 @@ class StudentTestController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data'   => [
-                'exam_id'  => $exam->eId,
-                'title'    => $exam->eTitle,
+            'data' => [
+                'exam_id' => $exam->eId,
+                'title' => $exam->eTitle,
                 'testType' => $exam->ielts_test_type ?? 'Academic',
                 'duration' => 60,
-                'tasks'    => $tasks,
+                'tasks' => $tasks,
             ],
         ]);
     }
@@ -4332,14 +4451,14 @@ class StudentTestController extends Controller
 
             $partData = [
                 'partNumber' => $partNumber,
-                'partName'   => "Part {$partNumber}",
+                'partName' => "Part {$partNumber}",
                 'recommendedMinutes' => $partNumber === 1 ? 5 : ($partNumber === 2 ? 4 : 5),
             ];
 
             if ($partNumber === 2) {
                 $cueCard = $block->metadata['cue_card'] ?? null;
                 $partData['cueCard'] = $cueCard ?: [
-                    'topic'   => $partQuestions->first()->qContent ?? '',
+                    'topic' => $partQuestions->first()->qContent ?? '',
                     'bullets' => [],
                 ];
                 $partData['questionId'] = $partQuestions->first()->qId ?? null;
@@ -4347,10 +4466,10 @@ class StudentTestController extends Controller
                 $partData['speakSeconds'] = 120; // 1-2 min speak
             } else {
                 $partData['questions'] = $partQuestions->map(fn($q) => [
-                    'qId'      => $q->qId,
-                    'order'    => $q->qSection_order,
-                    'topic'    => $q->qData['topic'] ?? null,
-                    'text'     => $q->qContent,
+                    'qId' => $q->qId,
+                    'order' => $q->qSection_order,
+                    'topic' => $q->qData['topic'] ?? null,
+                    'text' => $q->qContent,
                 ])->values()->toArray();
             }
 
@@ -4359,12 +4478,12 @@ class StudentTestController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data'   => [
-                'exam_id'  => $exam->eId,
-                'title'    => $exam->eTitle,
+            'data' => [
+                'exam_id' => $exam->eId,
+                'title' => $exam->eTitle,
                 'testType' => $exam->ielts_test_type ?? 'Academic',
                 'duration' => 14, // upper bound 11-14 min
-                'parts'    => $parts,
+                'parts' => $parts,
             ],
         ]);
     }
@@ -4379,7 +4498,7 @@ class StudentTestController extends Controller
     private function serializeIeltsQuestion($q, bool $includeAnswer = false): array
     {
         $qData = $q->qData ?? [];
-        $type  = (string) ($q->qType ?? 'multiple_choice');
+        $type = (string) ($q->qType ?? 'multiple_choice');
 
         // Chỉ MCQ-style mới có options. Các dạng "completion" / "short answer" /
         // "labelling" dùng input text — KHÔNG được build options A/B/C/D từ
@@ -4415,7 +4534,8 @@ class StudentTestController extends Controller
                 $options = [];
                 $letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
                 foreach ($sorted as $idx => $ans) {
-                    if (!isset($letters[$idx])) break;
+                    if (!isset($letters[$idx]))
+                        break;
                     $options[$letters[$idx]] = $ans->aContent;
                 }
             }
@@ -4433,12 +4553,12 @@ class StudentTestController extends Controller
             : array_diff_key($qData, ['correct_answer' => 1]);
 
         return [
-            'qId'            => $q->qId,
+            'qId' => $q->qId,
             'questionNumber' => $qData['question_number'] ?? $q->qSection_order,
-            'questionType'   => $type,
-            'questionText'   => $q->qContent,
-            'options'        => $options,
-            'data'           => $extraData,
+            'questionType' => $type,
+            'questionText' => $q->qContent,
+            'options' => $options,
+            'data' => $extraData,
         ];
     }
 
@@ -4472,27 +4592,30 @@ class StudentTestController extends Controller
             return response()->json(['status' => 'error', 'message' => 'File âm thanh không hợp lệ.', 'errors' => $validator->errors()], 400);
         }
 
-        $file      = $request->file('audio');
-        $ext       = $file->getClientOriginalExtension() ?: 'webm';
-        $filename  = "speaking_{$submissionId}_part{$partNumber}." . $ext;
-        $path      = $file->storeAs('speaking-recordings', $filename, 'public');
+        $file = $request->file('audio');
+        $ext = $file->getClientOriginalExtension() ?: 'webm';
+        $filename = "speaking_{$submissionId}_part{$partNumber}." . $ext;
+        $path = $file->storeAs('speaking-recordings', $filename, 'public');
         $publicUrl = \Storage::disk('public')->url($path);
 
         // Merge audio URL into sGemini_feedback JSON (no schema change needed)
         $feedback = [];
-        try { $feedback = json_decode($submission->sGemini_feedback ?? '{}', true) ?: []; } catch (\Exception $e) {}
+        try {
+            $feedback = json_decode($submission->sGemini_feedback ?? '{}', true) ?: [];
+        } catch (\Exception $e) {
+        }
         $feedback['speaking_audio'][(int) $partNumber] = $publicUrl;
         $submission->update(['sGemini_feedback' => json_encode($feedback)]);
 
         // Also create/update SubmissionAnswer placeholder row for this speaking question
         $question = Question::where('exam_id', $submission->exam_id)
-            ->where(function($query) {
+            ->where(function ($query) {
                 $query->whereRaw('LOWER(qSkill) = ?', ['speaking'])
-                      ->orWhereRaw('LOWER(qSection) = ?', ['speaking']);
+                    ->orWhereRaw('LOWER(qSection) = ?', ['speaking']);
             })
             ->where('qPart', (int) $partNumber)
             ->first();
-            
+
         if ($question) {
             SubmissionAnswer::updateOrCreate(
                 [
@@ -4508,7 +4631,7 @@ class StudentTestController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data'   => ['url' => $publicUrl, 'submissionId' => $submissionId, 'partNumber' => $partNumber],
+            'data' => ['url' => $publicUrl, 'submissionId' => $submissionId, 'partNumber' => $partNumber],
         ]);
     }
 
@@ -4531,15 +4654,15 @@ class StudentTestController extends Controller
             return response()->json(['status' => 'error', 'message' => 'File ảnh không hợp lệ.', 'errors' => $validator->errors()], 400);
         }
 
-        $file     = $request->file('photo');
-        $ext      = $file->getClientOriginalExtension() ?: 'jpg';
+        $file = $request->file('photo');
+        $ext = $file->getClientOriginalExtension() ?: 'jpg';
         $filename = "checkin_{$user->uId}_{$examId}_" . time() . ".{$ext}";
-        $path     = $file->storeAs('checkin-photos', $filename, 'public');
-        $url      = \Storage::disk('public')->url($path);
+        $path = $file->storeAs('checkin-photos', $filename, 'public');
+        $url = \Storage::disk('public')->url($path);
 
         return response()->json([
             'status' => 'success',
-            'data'   => ['url' => $url, 'examId' => $examId],
+            'data' => ['url' => $url, 'examId' => $examId],
         ]);
     }
 
@@ -4568,7 +4691,7 @@ class StudentTestController extends Controller
             ->where('eStatus', 'published')
             ->where(function ($q) {
                 $q->whereNull('age_group')
-                  ->orWhereIn('age_group', ['adults', 'all']);
+                    ->orWhereIn('age_group', ['adults', 'all']);
             })
             ->where(function ($q) {
                 $q->whereNull('eIs_private')->orWhere('eIs_private', false);
@@ -4596,20 +4719,20 @@ class StudentTestController extends Controller
 
         $exams = $query->get()->map(function ($exam) {
             return [
-                'id'              => $exam->eId,
-                'title'           => $exam->eTitle,
-                'type'            => $exam->eType,
-                'skill'           => $exam->eSkill,
-                'ielts_skill'     => $exam->ielts_skill,
+                'id' => $exam->eId,
+                'title' => $exam->eTitle,
+                'type' => $exam->eType,
+                'skill' => $exam->eSkill,
+                'ielts_skill' => $exam->ielts_skill,
                 'ielts_test_type' => $exam->ielts_test_type,
-                'scope'           => $exam->eScope ?: ($exam->eSkill === 'mixed' ? 'full' : 'skill'),
-                'part_type'       => $exam->ePart_type,
-                'part_number'     => $exam->ePart_number,
-                'duration'        => $exam->eDuration_minutes,
-                'description'     => $exam->eDescription,
-                'age_group'       => $exam->age_group,
+                'scope' => $exam->eScope ?: ($exam->eSkill === 'mixed' ? 'full' : 'skill'),
+                'part_type' => $exam->ePart_type,
+                'part_number' => $exam->ePart_number,
+                'duration' => $exam->eDuration_minutes,
+                'description' => $exam->eDescription,
+                'age_group' => $exam->age_group,
                 'questions_count' => $exam->getQuestionsCount(),
-                'created_at'      => $exam->eCreated_at,
+                'created_at' => $exam->eCreated_at,
             ];
         });
 
@@ -4645,12 +4768,12 @@ class StudentTestController extends Controller
         // Assignments của học viên (cá nhân + lớp) → map theo exam_id
         $classIds = $user->class_id ? [$user->class_id] : [];
         $assignments = TestAssignment::where(function ($q) use ($user, $classIds) {
-                $q->where(function ($qq) use ($user) {
-                    $qq->where('taTarget_type', 'student')->where('taTarget_id', $user->uId);
-                })->orWhere(function ($qq) use ($classIds) {
-                    $qq->where('taTarget_type', 'class')->whereIn('taTarget_id', $classIds);
-                });
-            })
+            $q->where(function ($qq) use ($user) {
+                $qq->where('taTarget_type', 'student')->where('taTarget_id', $user->uId);
+            })->orWhere(function ($qq) use ($classIds) {
+                $qq->where('taTarget_type', 'class')->whereIn('taTarget_id', $classIds);
+            });
+        })
             ->orderByDesc('taId')
             ->get()
             ->keyBy('exam_id');
@@ -4665,9 +4788,9 @@ class StudentTestController extends Controller
 
         $data = $exams->map(function ($exam) use ($assignments, $submissions) {
             $assignment = $assignments->get($exam->eId);
-            $subs       = $submissions->get($exam->eId, collect());
+            $subs = $submissions->get($exam->eId, collect());
             $inProgress = $subs->firstWhere('sStatus', 'in_progress');
-            $finished   = $subs->first(fn($s) => in_array($s->sStatus, ['submitted', 'graded', 'auto_submitted']));
+            $finished = $subs->first(fn($s) => in_array($s->sStatus, ['submitted', 'graded', 'auto_submitted']));
 
             if ($inProgress) {
                 $subStatus = 'in_progress';
@@ -4685,27 +4808,27 @@ class StudentTestController extends Controller
                 : null;
 
             return [
-                'id'                => $exam->eId,
-                'title'             => $exam->eTitle,
-                'type'              => $exam->eType,
-                'skill'             => $exam->eSkill,
-                'scope'             => $exam->eScope ?: ($exam->eSkill === 'mixed' ? 'full' : 'skill'),
-                'part_type'         => $exam->ePart_type,
-                'part_number'       => $exam->ePart_number,
-                'duration'          => $exam->eDuration_minutes,
-                'description'       => $exam->eDescription,
-                'age_group'         => $exam->age_group,
-                'questions_count'   => $exam->getQuestionsCount(),
-                'created_at'        => $exam->eCreated_at,
-                'is_assigned'       => (bool) $assignment,
-                'assignment_id'     => $assignment ? $assignment->taId : null,
-                'deadline'          => $assignment ? $assignment->taDeadline : null,
-                'attempts_used'     => $attemptsUsed,
-                'attempts_allowed'  => $assignment ? $assignment->taMax_attempt : null,
+                'id' => $exam->eId,
+                'title' => $exam->eTitle,
+                'type' => $exam->eType,
+                'skill' => $exam->eSkill,
+                'scope' => $exam->eScope ?: ($exam->eSkill === 'mixed' ? 'full' : 'skill'),
+                'part_type' => $exam->ePart_type,
+                'part_number' => $exam->ePart_number,
+                'duration' => $exam->eDuration_minutes,
+                'description' => $exam->eDescription,
+                'age_group' => $exam->age_group,
+                'questions_count' => $exam->getQuestionsCount(),
+                'created_at' => $exam->eCreated_at,
+                'is_assigned' => (bool) $assignment,
+                'assignment_id' => $assignment ? $assignment->taId : null,
+                'deadline' => $assignment ? $assignment->taDeadline : null,
+                'attempts_used' => $attemptsUsed,
+                'attempts_allowed' => $assignment ? $assignment->taMax_attempt : null,
                 'submission_status' => $subStatus,
-                'submission_id'     => $relevant ? $relevant->sId : null,
-                'submitted_at'      => $relevant ? ($relevant->sSubmit_time ?? $relevant->sStart_time) : null,
-                'score'             => $finished ? (float) $finished->sScore : null,
+                'submission_id' => $relevant ? $relevant->sId : null,
+                'submitted_at' => $relevant ? ($relevant->sSubmit_time ?? $relevant->sStart_time) : null,
+                'score' => $finished ? (float) $finished->sScore : null,
             ];
         });
 
@@ -4727,9 +4850,9 @@ class StudentTestController extends Controller
         // Policy: chỉ cho start-direct khi exam đã được giao cho học viên này.
         if (!$this->studentHasActiveAssignmentForExam($user, (int) $examId)) {
             return response()->json([
-                'status'  => 'error',
+                'status' => 'error',
                 'message' => 'Bạn chỉ có thể làm đề đã được giáo viên giao.',
-                'policy'  => 'assigned_only',
+                'policy' => 'assigned_only',
             ], 403);
         }
 
@@ -4770,39 +4893,39 @@ class StudentTestController extends Controller
                     'message' => 'Bài thi đã hết thời gian làm bài và đã được tự động nộp.'
                 ], 403);
             }
-            $submission    = $existing;
-            $savedAnswers  = $existing->answers;
+            $submission = $existing;
+            $savedAnswers = $existing->answers;
         } else {
             $attemptsUsed = Submission::where('user_id', $user->uId)
                 ->where('exam_id', $examId)
                 ->whereNull('assignment_id')
                 ->count();
             $submission = Submission::create([
-                'user_id'     => $user->uId,
-                'exam_id'     => $exam->eId,
-                'sAttempt'    => $attemptsUsed + 1,
+                'user_id' => $user->uId,
+                'exam_id' => $exam->eId,
+                'sAttempt' => $attemptsUsed + 1,
                 'sStart_time' => now(),
-                'sStatus'     => 'in_progress',
+                'sStatus' => 'in_progress',
                 'last_activity_at' => now(),
             ]);
             $timerState = $this->computeTimerState($submission->sStart_time, (int) $duration);
-            $savedAnswers  = collect();
+            $savedAnswers = collect();
         }
 
         $exam = $this->prepareExamForFrontend($exam);
 
         return response()->json([
             'status' => 'success',
-            'data'   => [
-                'submissionId'  => $submission->sId,
-                'sStart_time'   => $submission->sStart_time,
-                'started_at'    => $submission->sStart_time,
+            'data' => [
+                'submissionId' => $submission->sId,
+                'sStart_time' => $submission->sStart_time,
+                'started_at' => $submission->sStart_time,
                 'timeRemaining' => $timerState['remaining_minutes'],
                 'time_remaining_seconds' => $timerState['remaining_seconds'],
                 'deadline_at' => $timerState['deadline_at'],
-                'exam'          => $this->buildExamData($exam),
-                'savedAnswers'  => $savedAnswers,
-                'resumed'       => !empty($existing),
+                'exam' => $this->buildExamData($exam),
+                'savedAnswers' => $savedAnswers,
+                'resumed' => !empty($existing),
             ],
         ]);
     }
@@ -4844,12 +4967,12 @@ class StudentTestController extends Controller
         // Assignments của học viên (cá nhân + lớp) → map theo exam_id
         $classIds = $user->class_id ? [$user->class_id] : [];
         $assignments = TestAssignment::where(function ($q) use ($user, $classIds) {
-                $q->where(function ($qq) use ($user) {
-                    $qq->where('taTarget_type', 'student')->where('taTarget_id', $user->uId);
-                })->orWhere(function ($qq) use ($classIds) {
-                    $qq->where('taTarget_type', 'class')->whereIn('taTarget_id', $classIds);
-                });
-            })
+            $q->where(function ($qq) use ($user) {
+                $qq->where('taTarget_type', 'student')->where('taTarget_id', $user->uId);
+            })->orWhere(function ($qq) use ($classIds) {
+                $qq->where('taTarget_type', 'class')->whereIn('taTarget_id', $classIds);
+            });
+        })
             ->orderByDesc('taId')
             ->get()
             ->keyBy('exam_id');
@@ -4864,9 +4987,9 @@ class StudentTestController extends Controller
 
         $data = $exams->map(function ($exam) use ($assignments, $submissions) {
             $assignment = $assignments->get($exam->eId);
-            $subs       = $submissions->get($exam->eId, collect());
+            $subs = $submissions->get($exam->eId, collect());
             $inProgress = $subs->firstWhere('sStatus', 'in_progress');
-            $finished   = $subs->first(fn($s) => in_array($s->sStatus, ['submitted', 'graded', 'auto_submitted']));
+            $finished = $subs->first(fn($s) => in_array($s->sStatus, ['submitted', 'graded', 'auto_submitted']));
 
             if ($inProgress) {
                 $subStatus = 'in_progress';
@@ -4878,24 +5001,24 @@ class StudentTestController extends Controller
             $relevant = $inProgress ?? $finished;
 
             return [
-                'id'                => $exam->eId,
-                'title'             => $exam->eTitle,
-                'type'              => $exam->eType,
-                'skill'             => $exam->eSkill,
-                'scope'             => $exam->eScope ?: ($exam->eSkill === 'mixed' ? 'full' : 'skill'),
-                'part_type'         => $exam->ePart_type,
-                'part_number'       => $exam->ePart_number,
-                'duration'          => $exam->eDuration_minutes,
-                'description'       => $exam->eDescription,
-                'age_group'         => $exam->age_group,
-                'questions_count'   => $exam->getQuestionsCount(),
-                'created_at'        => $exam->eCreated_at,
-                'is_assigned'       => (bool) $assignment,
-                'assignment_id'     => $assignment ? $assignment->taId : null,
-                'deadline'          => $assignment ? $assignment->taDeadline : null,
+                'id' => $exam->eId,
+                'title' => $exam->eTitle,
+                'type' => $exam->eType,
+                'skill' => $exam->eSkill,
+                'scope' => $exam->eScope ?: ($exam->eSkill === 'mixed' ? 'full' : 'skill'),
+                'part_type' => $exam->ePart_type,
+                'part_number' => $exam->ePart_number,
+                'duration' => $exam->eDuration_minutes,
+                'description' => $exam->eDescription,
+                'age_group' => $exam->age_group,
+                'questions_count' => $exam->getQuestionsCount(),
+                'created_at' => $exam->eCreated_at,
+                'is_assigned' => (bool) $assignment,
+                'assignment_id' => $assignment ? $assignment->taId : null,
+                'deadline' => $assignment ? $assignment->taDeadline : null,
                 'submission_status' => $subStatus,
-                'submission_id'     => $relevant ? $relevant->sId : null,
-                'score'             => $finished ? (float) $finished->sScore : null,
+                'submission_id' => $relevant ? $relevant->sId : null,
+                'score' => $finished ? (float) $finished->sScore : null,
             ];
         });
 
@@ -4917,9 +5040,9 @@ class StudentTestController extends Controller
         // Policy: chỉ cho start-direct khi exam đã được giao cho học viên này.
         if (!$this->studentHasActiveAssignmentForExam($user, (int) $examId)) {
             return response()->json([
-                'status'  => 'error',
+                'status' => 'error',
                 'message' => 'Bạn chỉ có thể làm đề đã được giáo viên giao.',
-                'policy'  => 'assigned_only',
+                'policy' => 'assigned_only',
             ], 403);
         }
 
@@ -4961,39 +5084,39 @@ class StudentTestController extends Controller
                     'message' => 'Bài thi đã hết thời gian làm bài và đã được tự động nộp.'
                 ], 403);
             }
-            $submission    = $existing;
-            $savedAnswers  = $existing->answers;
+            $submission = $existing;
+            $savedAnswers = $existing->answers;
         } else {
             $attemptsUsed = Submission::where('user_id', $user->uId)
                 ->where('exam_id', $examId)
                 ->whereNull('assignment_id')
                 ->count();
             $submission = Submission::create([
-                'user_id'     => $user->uId,
-                'exam_id'     => $exam->eId,
-                'sAttempt'    => $attemptsUsed + 1,
+                'user_id' => $user->uId,
+                'exam_id' => $exam->eId,
+                'sAttempt' => $attemptsUsed + 1,
                 'sStart_time' => now(),
-                'sStatus'     => 'in_progress',
+                'sStatus' => 'in_progress',
                 'last_activity_at' => now(),
             ]);
             $timerState = $this->computeTimerState($submission->sStart_time, (int) $duration);
-            $savedAnswers  = collect();
+            $savedAnswers = collect();
         }
 
         $exam = $this->prepareExamForFrontend($exam);
 
         return response()->json([
             'status' => 'success',
-            'data'   => [
-                'submissionId'  => $submission->sId,
-                'sStart_time'   => $submission->sStart_time,
-                'started_at'    => $submission->sStart_time,
+            'data' => [
+                'submissionId' => $submission->sId,
+                'sStart_time' => $submission->sStart_time,
+                'started_at' => $submission->sStart_time,
                 'timeRemaining' => $timerState['remaining_minutes'],
                 'time_remaining_seconds' => $timerState['remaining_seconds'],
                 'deadline_at' => $timerState['deadline_at'],
-                'exam'          => $this->buildExamData($exam),
-                'savedAnswers'  => $savedAnswers,
-                'resumed'       => !empty($existing),
+                'exam' => $this->buildExamData($exam),
+                'savedAnswers' => $savedAnswers,
+                'resumed' => !empty($existing),
             ],
         ]);
     }
