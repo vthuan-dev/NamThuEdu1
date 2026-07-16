@@ -166,9 +166,24 @@ export function ThptResultPage() {
     };
 
     void fetchResult();
+
+    // Refetch khi học viên quay lại tab (focus / tab hiện lại). Giáo viên có thể
+    // chấm/cập nhật điểm phiên này trong lúc học viên đang mở sẵn trang kết quả →
+    // backend luôn trả điểm mới nhất, nên chỉ cần gọi lại là điểm tự cập nhật,
+    // không cần F5. Bỏ qua khi đang có poll AI chạy (tránh gọi chồng).
+    const refetchOnFocus = () => {
+      if (document.visibilityState === 'visible' && !pollTimer) {
+        void fetchResult();
+      }
+    };
+    window.addEventListener('focus', refetchOnFocus);
+    document.addEventListener('visibilitychange', refetchOnFocus);
+
     return () => {
       mounted = false;
       if (pollTimer) window.clearTimeout(pollTimer);
+      window.removeEventListener('focus', refetchOnFocus);
+      document.removeEventListener('visibilitychange', refetchOnFocus);
     };
   }, [submissionId]);
 
