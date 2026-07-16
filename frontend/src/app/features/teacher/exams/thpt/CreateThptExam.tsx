@@ -13,7 +13,7 @@ import {
   History,
 } from 'lucide-react';
 import { api } from '../../../../../services/api';
-import { useToast } from '../../../../../hooks/useToast';
+import { useToastContext } from '../../../../../contexts/ToastContext';
 import type { ThptConfig, ThptSection, SectionType } from '../../../../../types/thpt';
 import {
   THPT_THEME,
@@ -40,7 +40,11 @@ const LEVELS: { value: Level; label: string }[] = [
 export function CreateThptExam() {
   const params = useParams();
   const navigate = useNavigate();
-  const toast = useToast();
+  // Dung toast context TOAN CUC (co ToastContainer render san o app root) thay vi
+  // useToast() local — truoc day mang toasts local khong duoc render nen moi
+  // canh bao publish (thieu audio/dap an, loi 422) deu VO HINH -> nguoi dung
+  // tuong "bam Xuat ban khong duoc, khong phan hoi gi".
+  const toast = useToastContext();
 
   const [examId, setExamId] = useState<string | undefined>(params.examId);
   const [examTitle, setExamTitle] = useState('Đề Tiếng Anh THPT');
