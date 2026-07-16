@@ -542,14 +542,20 @@ class TestAssignmentController extends Controller
         // Get target students
         $targetStudents = $this->getTargetStudents($assignment);
         
-        // Get submissions for this assignment
+        // Get submissions for this assignment.
+        // Sap xep theo sId giam dan de khi hoc vien nop NHIEU LAN, keyBy('user_id')
+        // ben duoi giu lai PHIEN MOI NHAT mot cach xac dinh (deterministic) — tranh
+        // truong hop diem/trang thai hien ra ngau nhien giua cac lan nop.
         $submissions = \App\Models\Submission::where('assignment_id', $id)
                                             ->with('user')
+                                            ->orderByDesc('sId')
                                             ->get();
 
         // Build progress data
         $completed = [];
         $notCompleted = [];
+        // keyBy giu ban ghi DAU TIEN cho moi user_id -> vi da orderByDesc(sId),
+        // day chinh la phien nop moi nhat cua hoc vien do.
         $submissionMap = $submissions->keyBy('user_id');
 
         foreach ($targetStudents as $student) {
