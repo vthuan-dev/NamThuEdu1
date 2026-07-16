@@ -101,6 +101,7 @@ export function GradingQueue() {
   }), [t]);
 
   const [searchQuery, setSearchQuery]   = useState("");
+  const [selectedStudentName, setSelectedStudentName] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState("");
   const [filterExam, setFilterExam]     = useState("");   // theo đề thi (examId)
   const [filterClass, setFilterClass]   = useState("");   // theo lớp (classId)
@@ -287,12 +288,58 @@ export function GradingQueue() {
     return list;
   }, [filtered, sortField, sortDirection]);
 
+    // Group submissions by student
+  const studentList = useMemo(() => {
+    const map = new Map<string, {
+      studentName: string;
+      studentAvatar: string;
+      studentAvatarUrl: string | null;
+      ageGroup: string;
+      submissions: Submission[];
+    }>();
+    
+    sortedAndFiltered.forEach((sub) => {
+      const key = sub.studentName;
+      if (!map.has(key)) {
+        map.set(key, {
+          studentName: sub.studentName,
+          studentAvatar: sub.studentAvatar,
+          studentAvatarUrl: sub.studentAvatarUrl || null,
+          ageGroup: sub.ageGroup,
+          submissions: [],
+        });
+      }
+      map.get(key)!.submissions.push(sub);
+    });
+    
+    return Array.from(map.values());
+  }, [sortedAndFiltered]);
+
+  // Automatically select the first student or update active selection
+  useEffect(() => {
+    if (studentList.length > 0) {
+      if (!selectedStudentName || !studentList.some((s) => s.studentName === selectedStudentName)) {
+        setSelectedStudentName(studentList[0].studentName);
+      }
+    } else {
+      setSelectedStudentName(null);
+    }
+  }, [studentList, selectedStudentName]);
+
+  const selectedStudentData = useMemo(() => {
+    return studentList.find((s) => s.studentName === selectedStudentName) || null;
+  }, [studentList, selectedStudentName]);
+
+  const selectedStudentSubmissions = useMemo(() => {
+    return selectedStudentData?.submissions || [];
+  }, [selectedStudentData]);
+
   // Multi-select: chọn NHIỀU bài cùng lúc trên tab giao bài.
   // Ưu tiên bài chờ duyệt; vẫn cho chọn bài đã duyệt nếu giáo viên muốn phê duyệt lại.
   const selectableSubs = useMemo(() => {
     if (sourceTab !== "assigned") return [] as Submission[];
-    return sortedAndFiltered;
-  }, [sortedAndFiltered, sourceTab]);
+    return selectedStudentSubmissions;
+  }, [selectedStudentSubmissions, sourceTab]);
 
   const pendingSelectableSubs = useMemo(
     () => selectableSubs.filter((s) => !s.teacher_reviewed_at),
@@ -782,329 +829,306 @@ export function GradingQueue() {
             </div>
           )}
 
-          {/* ── Table ── */}
+          {/* ── Split Layout: Students List (Left) & Submissions List (Right) ── */}
           {!loading && !error && (
-            <div className="bg-white rounded-2xl border border-slate-100">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100 select-none">
-                    {sourceTab === "assigned" && (
-                      <th className="px-4 py-3.5 w-12 rounded-tl-2xl">
-                        <input
-                          type="checkbox"
-                          className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed accent-violet-600"
-                          checked={allVisibleSelected}
-                          ref={(el) => {
-                            if (el) el.indeterminate = someVisibleSelected;
-                          }}
-                          disabled={selectableSubs.length === 0 || bulkApproving}
-                          onChange={(e) => toggleSelectAll(e.target.checked)}
-                          title={
-                            allVisibleSelected
-                              ? "Bỏ chọn tất cả trên trang này"
-                              : `Chọn tất cả ${selectableSubs.length} bài đang hiển thị`
-                          }
-                          aria-label="Chọn nhiều bài"
-                        />
-                      </th>
-                    )}
-                    <th className={`px-5 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider ${sourceTab !== "assigned" ? "rounded-tl-2xl" : ""}`}>
-                      {t("teacher.grading.table.student")}
-                    </th>
-                    <th className="px-5 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                      {t("teacher.grading.table.exam")}
-                    </th>
-                    <th 
-                      onClick={() => handleSort("time")}
-                      className="px-5 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group"
-                    >
-                      <div className="flex items-center gap-1">
-                        <span>{t("teacher.grading.table.submissionTime")}</span>
-                        {sortField === "time" ? (
-                          <span className="text-violet-600 font-bold">{sortDirection === "asc" ? "▲" : "▼"}</span>
-                        ) : (
-                          <span className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity">↕</span>
-                        )}
-                      </div>
-                    </th>
-                    <th className="px-5 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                      {t("teacher.grading.table.status")}
-                    </th>
-                    <th 
-                      onClick={() => handleSort("score")}
-                      className="px-5 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group"
-                    >
-                      <div className="flex items-center gap-1">
-                        <span>{t("teacher.grading.table.aiScore")}</span>
-                        {sortField === "score" ? (
-                          <span className="text-violet-600 font-bold">{sortDirection === "asc" ? "▲" : "▼"}</span>
-                        ) : (
-                          <span className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity">↕</span>
-                        )}
-                      </div>
-                    </th>
-                    <th 
-                      onClick={() => handleSort("gradedTime")}
-                      className="px-5 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group"
-                    >
-                      <div className="flex items-center gap-1">
-                        <span>{t("teacher.grading.table.gradedAt")}</span>
-                        {sortField === "gradedTime" ? (
-                          <span className="text-violet-600 font-bold">{sortDirection === "asc" ? "▲" : "▼"}</span>
-                        ) : (
-                          <span className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity">↕</span>
-                        )}
-                      </div>
-                    </th>
-                    {sourceTab === 'assigned' && (
-                    <th className="px-5 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                      {t("teacher.grading.table.review")}
-                    </th>
-                    )}
-                    <th className="px-5 py-3.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider rounded-tr-2xl">
-                      {t("teacher.grading.table.actions")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {sortedAndFiltered.map((sub) => {
-                    const cfg = STATUS_CONFIG[sub.status] ?? STATUS_CONFIG.submitted;
-                    const isReviewed = !!sub.teacher_reviewed_at;
-                    const isChanged = changedIds.has(sub.id);
-                    const isSelected = selectedIds.has(sub.id);
+            <div className="flex flex-col lg:flex-row gap-6 items-start">
+              {/* Left Panel: Student List Sidebar (320px) */}
+              <div className="w-full lg:w-[320px] lg:flex-shrink-0 flex flex-col gap-2.5">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
+                  Danh sách học sinh ({studentList.length})
+                </p>
+                <div className="flex flex-col gap-2 max-h-[600px] overflow-y-auto pr-1 scrollbar-thin">
+                  {studentList.map((stu) => {
+                    const isSelected = stu.studentName === selectedStudentName;
+                    const pendingCount = sourceTab === 'assigned'
+                      ? stu.submissions.filter((s) => !s.teacher_reviewed_at).length
+                      : 0;
                     return (
-                      <tr
-                        key={sub.id}
-                        className={`transition-all duration-700 group ${
+                      <button
+                        key={stu.studentName}
+                        type="button"
+                        onClick={() => setSelectedStudentName(stu.studentName)}
+                        className={`group flex items-center gap-3 text-left p-3 rounded-xl border transition-all cursor-pointer ${
                           isSelected
-                            ? "bg-violet-50/70"
-                            : isChanged
-                            ? "bg-amber-50 ring-1 ring-inset ring-amber-200"
-                            : "hover:bg-slate-50/70"
+                            ? "bg-violet-50/70 border-violet-200 shadow-sm"
+                            : "bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/40"
                         }`}
                       >
-                        {sourceTab === "assigned" && (
-                          <td className="px-4 py-4">
-                            <input
-                              type="checkbox"
-                              className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500 cursor-pointer disabled:opacity-40 accent-violet-600"
-                              checked={isSelected}
-                              disabled={bulkApproving}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                toggleSelect(sub.id, e.target.checked);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              title={
-                                isSelected
-                                  ? "Bỏ chọn bài này"
-                                  : isReviewed
-                                    ? "Chọn để phê duyệt lại"
-                                    : "Chọn để phê duyệt"
-                              }
-                              aria-label={`Chọn bài của ${sub.studentName}`}
-                            />
-                          </td>
-                        )}
-                        {/* Student */}
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-3">
+                        {/* Student avatar */}
+                        <div className="relative flex-shrink-0">
+                          {stu.studentAvatarUrl ? (
                             <img
-                              src={sub.studentAvatarUrl ? getAssetUrl(sub.studentAvatarUrl) : "/images/default-avatar.png"}
-                              alt={sub.studentName}
-                              className="w-9 h-9 rounded-full object-cover bg-slate-100 border border-slate-200 flex-shrink-0"
+                              src={getAssetUrl(stu.studentAvatarUrl)}
+                              alt={stu.studentName}
+                              className="w-10 h-10 rounded-full object-cover border border-slate-100 bg-slate-50"
                               onError={(e) => {
-                                // Fallback to bundled default avatar if remote image fails
                                 const target = e.currentTarget;
                                 if (!target.src.endsWith("/images/default-avatar.png")) {
                                   target.src = "/images/default-avatar.png";
                                 }
                               }}
                             />
-                            <div>
-                              <p className="text-sm font-semibold text-slate-800">{sub.studentName}</p>
-                              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                <span className="text-xs text-slate-400">{t("teacher.grading.queuePage.attempt")} {sub.attemptNumber}</span>
-                                {sub.className && (
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-600">{sub.className}</span>
-                                )}
-                                {sub.ageGroup && (
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-teal-50 text-teal-600">
-                                    {sub.ageGroup === "kids" ? "Trẻ em" : sub.ageGroup === "teens" ? "Thiếu niên" : sub.ageGroup === "adults" ? "Người lớn" : sub.ageGroup}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        {/* Exam */}
-                        <td className="px-5 py-4 max-w-[200px]">
-                          <p className="text-sm font-semibold text-slate-800 truncate">{sub.examTitle}</p>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-700">{sub.examType}</span>
-                            {sub.questionsCount > 0 && (
-                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600">
-                                {sub.questionsCount} câu
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        {/* Time */}
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          <p className="text-sm text-slate-600">{formatTime(sub.submissionTime)}</p>
-                        </td>
-                        {/* Status */}
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <span
-                              className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                                sub.status === "submitted" ? "animate-pulse" : ""
-                              }`}
-                              style={{ background: cfg.dot }}
-                            />
-                            <span className={`px-2.5 py-1 rounded-lg text-xs font-bold border ${cfg.color}`}>
-                              {cfg.label}
-                            </span>
-                            {isChanged && (
-                              <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-white text-[9px] font-bold uppercase tracking-wide">
-                                {t("teacher.grading.table.new")}
-                              </span>
-                            )}
-                          </div>
-                          {sub.status === "grading_subjective" && (
-                            <div className="flex items-center gap-1 mt-1">
-                              <Bot className="w-3 h-3 text-amber-500" />
-                              <span className="text-[10px] text-amber-600 flex items-center animate-pulse">
-                                {t("teacher.grading.queuePage.aiProcessing")}
-                              </span>
-                            </div>
-                          )}
-                        </td>
-                        {/* AI score */}
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          {(() => {
-                            const ds = getSubmissionDisplayScore(sub);
-                            return ds ? (
-                              <span className="text-sm font-bold text-slate-800">
-                                {ds.value.toFixed(2)}<span className="text-slate-400 font-normal text-xs">/{ds.max}</span>
-                              </span>
-                            ) : (
-                              <span className="text-slate-300 text-sm">—</span>
-                            );
-                          })()}
-                        </td>
-                        {/* Graded time */}
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          {sub.gradedTime ? (
-                            <p className="text-sm text-slate-600">{formatTime(sub.gradedTime)}</p>
                           ) : (
-                            <span className="text-slate-300 text-sm">—</span>
-                          )}
-                        </td>
-                        {/* Review status — only for assigned */}
-                        {sourceTab === 'assigned' && (
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          {isReviewed ? (
-                            <div className="flex items-center gap-1.5">
-                              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                              <span className="text-xs font-semibold text-emerald-600">{t("teacher.grading.queuePage.reviewed")}</span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1.5">
-                              <Clock className="w-4 h-4 text-amber-400" />
-                              <span className="text-xs font-semibold text-amber-600">{t("teacher.grading.queuePage.pendingReview")}</span>
+                            <div className="w-10 h-10 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center font-bold text-sm">
+                              {stu.studentAvatar}
                             </div>
                           )}
-                        </td>
+                          <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${
+                            stu.ageGroup === 'kids' ? 'bg-rose-500' : stu.ageGroup === 'teens' ? 'bg-sky-500' : 'bg-violet-500'
+                          }`} title={stu.ageGroup} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-slate-800 truncate">{stu.studentName}</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            {stu.submissions.length} bài thi · <span className="capitalize">{stu.ageGroup === "kids" ? "Trẻ em" : stu.ageGroup === "teens" ? "Thiếu niên" : stu.ageGroup === "adults" ? "Người lớn" : stu.ageGroup}</span>
+                          </p>
+                        </div>
+                        {pendingCount > 0 ? (
+                          <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-extrabold text-[10px] flex-shrink-0 animate-pulse">
+                            {pendingCount}
+                          </span>
+                        ) : (
+                          <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[10px] flex-shrink-0">
+                            ✓
+                          </span>
                         )}
-                        {/* Actions */}
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            {/* Eye: view detail */}
-                            <div className="relative group/tip">
-                              <Link
-                                to={
-                                  sub.examType?.toLowerCase().includes("vstep") && sub.examId
-                                    ? `/giao-vien/xem-vstep/${sub.examId}?review=${sub.id}&teacher=1`
-                                    : `/giao-vien/cham-diem/${sub.id}`
-                                }
-                                className="p-2 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition-colors block"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </Link>
-                              <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tip:flex flex-col items-center z-50">
-                                <div className="bg-slate-800 text-white text-[11px] rounded-lg px-3 py-2 whitespace-nowrap shadow-xl text-center leading-snug">
-                                  <p className="font-semibold">Xem chi tiết bài làm</p>
-                                  <p className="text-slate-300 mt-0.5">Kiểm tra đáp án, điểm AI chấm</p>
-                                </div>
-                                <div className="border-4 border-transparent border-t-slate-800" />
-                              </div>
-                            </div>
-                            {/* Review button */}
-                            {sourceTab === 'assigned' && (
-                            <div className="relative group/rev">
-                              <button
-                                onClick={() => setReviewTarget(sub)}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                  isReviewed
-                                    ? "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                                    : "bg-violet-600 text-white hover:bg-violet-700 shadow-sm shadow-violet-200"
-                                }`}
-                              >
-                                <UserCheck className="w-3.5 h-3.5" />
-                                {isReviewed ? t("teacher.grading.queuePage.reviewAgain") : t("teacher.grading.queuePage.review")}
-                              </button>
-                              <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/rev:flex flex-col items-center z-50">
-                                <div className="bg-slate-800 text-white text-[11px] rounded-lg px-3 py-2 shadow-xl text-center leading-snug max-w-[180px]">
-                                  {isReviewed ? (
-                                    <>
-                                      <p className="font-semibold text-emerald-300">Đã xét duyệt ✓</p>
-                                      <p className="text-slate-300 mt-0.5">Nhấn để xem lại hoặc<br/>chỉnh sửa nhận xét</p>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <p className="font-semibold text-violet-300">Xét duyệt kết quả</p>
-                                      <p className="text-slate-300 mt-0.5">Xem lại điểm AI, thêm<br/>nhận xét & xác nhận</p>
-                                    </>
-                                  )}
-                                </div>
-                                <div className="border-4 border-transparent border-t-slate-800" />
-                              </div>
-                            </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
+                      </button>
                     );
                   })}
-                </tbody>
-              </table>
-
-              {/* Empty state */}
-              {filtered.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-20 gap-3">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
-                    <Inbox className="w-8 h-8 text-slate-300" />
-                  </div>
-                  {sourceTab === 'practice' ? (
-                    <>
-                      <p className="text-slate-500 font-semibold">Chưa có bài tự luyện nào</p>
-                      <p className="text-slate-400 text-sm">Học viên chưa tự luyện bài nào trong hệ thống</p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-slate-500 font-semibold">{t("teacher.grading.queuePage.empty.title")}</p>
-                      <p className="text-slate-400 text-sm">{t("teacher.grading.queuePage.empty.subtitle")}</p>
-                    </>
+                  {studentList.length === 0 && (
+                    <div className="text-center py-10 bg-white border border-slate-100 rounded-xl">
+                      <p className="text-sm text-slate-400 font-medium">Không tìm thấy học sinh</p>
+                    </div>
                   )}
                 </div>
-              )}
+              </div>
+
+              {/* Right Panel: Student Submissions Detail (flex-1) */}
+              <div className="flex-1 w-full bg-white rounded-2xl border border-slate-100 p-5 lg:p-6 overflow-hidden">
+                {selectedStudentData ? (
+                  <div className="flex flex-col gap-5">
+                    {/* Header: Student Info */}
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                      <div>
+                        <h2 className="text-lg font-bold text-slate-800">{selectedStudentData.studentName}</h2>
+                        <p className="text-xs text-slate-500 mt-1">
+                          Nhóm tuổi: <span className="capitalize font-semibold text-slate-600">{selectedStudentData.ageGroup === "kids" ? "Trẻ em" : selectedStudentData.ageGroup === "teens" ? "Thiếu niên" : selectedStudentData.ageGroup === "adults" ? "Người lớn" : selectedStudentData.ageGroup}</span> · 
+                          Tổng bài nộp: <span className="font-semibold text-slate-600">{selectedStudentData.submissions.length}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Table of Submissions */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[600px]">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-100 select-none">
+                            {sourceTab === "assigned" && (
+                              <th className="px-4 py-3 w-12 rounded-tl-2xl">
+                                <input
+                                  type="checkbox"
+                                  className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed accent-violet-600"
+                                  checked={allVisibleSelected}
+                                  ref={(el) => {
+                                    if (el) el.indeterminate = someVisibleSelected;
+                                  }}
+                                  disabled={selectableSubs.length === 0 || bulkApproving}
+                                  onChange={(e) => toggleSelectAll(e.target.checked)}
+                                  aria-label="Chọn nhiều bài"
+                                />
+                              </th>
+                            )}
+                            <th className={`px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider ${sourceTab !== "assigned" ? "rounded-tl-2xl" : ""}`}>
+                              {t("teacher.grading.table.exam")}
+                            </th>
+                            <th 
+                              onClick={() => handleSort("time")}
+                              className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>{t("teacher.grading.table.submissionTime")}</span>
+                                {sortField === "time" ? (
+                                  <span className="text-violet-600 font-bold">{sortDirection === "asc" ? "▲" : "▼"}</span>
+                                ) : (
+                                  <span className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity">↕</span>
+                                )}
+                              </div>
+                            </th>
+                            <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                              {t("teacher.grading.table.status")}
+                            </th>
+                            <th 
+                              onClick={() => handleSort("score")}
+                              className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>{t("teacher.grading.table.aiScore")}</span>
+                                {sortField === "score" ? (
+                                  <span className="text-violet-600 font-bold">{sortDirection === "asc" ? "▲" : "▼"}</span>
+                                ) : (
+                                  <span className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity">↕</span>
+                                )}
+                              </div>
+                            </th>
+                            <th 
+                              onClick={() => handleSort("gradedTime")}
+                              className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>{t("teacher.grading.table.gradedAt")}</span>
+                                {sortField === "gradedTime" ? (
+                                  <span className="text-violet-600 font-bold">{sortDirection === "asc" ? "▲" : "▼"}</span>
+                                ) : (
+                                  <span className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity">↕</span>
+                                )}
+                              </div>
+                            </th>
+                            {sourceTab === 'assigned' && (
+                              <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                {t("teacher.grading.table.review")}
+                              </th>
+                            )}
+                            <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider rounded-tr-2xl">
+                              {t("teacher.grading.table.actions")}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {selectedStudentSubmissions.map((sub) => {
+                            const cfg = STATUS_CONFIG[sub.status] ?? STATUS_CONFIG.submitted;
+                            const isReviewed = !!sub.teacher_reviewed_at;
+                            const isChanged = changedIds.has(sub.id);
+                            const isSelected = selectedIds.has(sub.id);
+                            return (
+                              <tr
+                                key={sub.id}
+                                className={`transition-all duration-700 group ${
+                                  isSelected
+                                    ? "bg-violet-50/70"
+                                    : isChanged
+                                    ? "bg-amber-50 ring-1 ring-inset ring-amber-200"
+                                    : "hover:bg-slate-50/70"
+                                }`}
+                              >
+                                {sourceTab === "assigned" && (
+                                  <td className="px-4 py-3.5">
+                                    <input
+                                      type="checkbox"
+                                      className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500 cursor-pointer disabled:opacity-40 accent-violet-600"
+                                      checked={isSelected}
+                                      disabled={bulkApproving}
+                                      onChange={(e) => {
+                                        e.stopPropagation();
+                                        toggleSelect(sub.id, e.target.checked);
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                      title={
+                                        isSelected
+                                          ? "Bỏ chọn bài này"
+                                          : isReviewed
+                                            ? "Chọn để phê duyệt lại"
+                                            : "Chọn để phê duyệt"
+                                      }
+                                      aria-label={`Chọn bài của ${sub.studentName}`}
+                                    />
+                                  </td>
+                                )}
+                                <td className="px-4 py-3.5">
+                                  <div className="font-semibold text-slate-800 line-clamp-2 max-w-[200px]" title={sub.examTitle}>
+                                    {sub.examTitle}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 mt-1">
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-bold uppercase">
+                                      {sub.examType}
+                                    </span>
+                                    {sub.className && (
+                                      <span className="text-[10px] text-slate-400">
+                                        Lớp: {sub.className}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3.5 text-xs text-slate-500 font-medium whitespace-nowrap">
+                                  {formatTime(sub.submissionTime)}
+                                </td>
+                                <td className="px-4 py-3.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${cfg.color}`}>
+                                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: cfg.dot }} />
+                                      {cfg.label}
+                                      {sub.status === "grading_subjective" && <AnimatedDots />}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3.5">
+                                  {(() => {
+                                    const ds = getSubmissionDisplayScore(sub);
+                                    return ds ? (
+                                      <span className="text-sm font-bold text-slate-800">
+                                        {ds.value.toFixed(2)}<span className="text-slate-400 font-normal text-xs">/{ds.max}</span>
+                                      </span>
+                                    ) : (
+                                      <span className="text-slate-300 text-sm">—</span>
+                                    );
+                                  })()}
+                                </td>
+                                <td className="px-4 py-3.5 text-xs text-slate-500 font-medium whitespace-nowrap">
+                                  {sub.gradedTime ? formatTime(sub.gradedTime) : "—"}
+                                </td>
+                                {sourceTab === 'assigned' && (
+                                  <td className="px-4 py-3.5">
+                                    {isReviewed ? (
+                                      <span className="inline-flex items-center gap-1 text-emerald-600 font-bold text-xs bg-emerald-50 px-2 py-1 rounded-lg">
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        Đã duyệt
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 text-amber-600 font-bold text-xs bg-amber-50 px-2 py-1 rounded-lg">
+                                        <Clock className="w-3.5 h-3.5" />
+                                        Chờ duyệt
+                                      </span>
+                                    )}
+                                  </td>
+                                )}
+                                <td className="px-4 py-3.5">
+                                  <div className="relative group/rev inline-block">
+                                    <button
+                                      type="button"
+                                      onClick={() => setReviewTarget(sub)}
+                                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                        sourceTab !== 'assigned'
+                                          ? "bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100"
+                                          : isReviewed
+                                          ? "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                          : "bg-violet-600 text-white hover:bg-violet-700 shadow-sm shadow-violet-200"
+                                      }`}
+                                    >
+                                      <UserCheck className="w-3.5 h-3.5" />
+                                      {isReviewed ? t("teacher.grading.queuePage.reviewAgain") : t("teacher.grading.queuePage.review")}
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-20 text-center">
+                    <Inbox className="w-12 h-12 text-slate-300 mb-3" />
+                    <p className="text-sm font-semibold text-slate-500">Chưa chọn học sinh</p>
+                    <p className="text-xs text-slate-400 mt-1">Chọn một học sinh từ danh sách bên trái để xem bài làm</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Review Modal */}
+            {/* Review Modal */}
       <TeacherReviewModal
         submission={reviewTarget}
         open={!!reviewTarget}
