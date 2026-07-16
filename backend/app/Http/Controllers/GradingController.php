@@ -68,6 +68,12 @@ class GradingController extends Controller
         // Filter by status
         if ($request->has('status')) {
             $query->where('sStatus', $request->status);
+        } else {
+            // Mặc định: chỉ hiện bài ĐÃ NỘP để chấm. Loại bài nháp/đang làm dở
+            // (draft/in_progress) — trước đây dedup ->first() vô tình giấu bớt các
+            // phiên này; sau khi bỏ dedup phải lọc tường minh để chúng không lòi
+            // vào danh sách chấm điểm của giáo viên.
+            $query->whereNotIn('sStatus', ['draft', 'in_progress']);
         }
 
         // Filter by teacher review state: reviewed=0 (pending), reviewed=1 (done)
