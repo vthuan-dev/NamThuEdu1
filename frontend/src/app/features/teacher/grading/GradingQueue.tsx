@@ -764,7 +764,7 @@ export function GradingQueue() {
           </div>
 
           {/* ── Loading / Error ── */}
-          
+
 
           {loading && (
             <div className="flex items-center justify-center py-20">
@@ -1040,10 +1040,18 @@ export function GradingQueue() {
                                     />
                                   </td>
                                 )}
-                                <td className="px-4 py-3.5">
-                                  <div className="font-semibold text-slate-800 line-clamp-2 max-w-[200px]" title={sub.examTitle}>
+                                                                <td className="px-4 py-3.5">
+                                  <Link
+                                    to={
+                                      sub.examType?.toLowerCase().includes("vstep") && sub.examId
+                                        ? `/giao-vien/xem-vstep/${sub.examId}?review=${sub.id}&teacher=1`
+                                        : `/giao-vien/cham-diem/${sub.id}`
+                                    }
+                                    className="font-semibold text-slate-800 line-clamp-2 max-w-[200px] hover:text-violet-600 hover:underline transition-colors block cursor-pointer"
+                                    title="Click để xem chi tiết bài làm & sửa điểm"
+                                  >
                                     {sub.examTitle}
-                                  </div>
+                                  </Link>
                                   <div className="flex items-center gap-1.5 mt-1">
                                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-bold uppercase">
                                       {sub.examType}
@@ -1097,22 +1105,46 @@ export function GradingQueue() {
                                     )}
                                   </td>
                                 )}
-                                <td className="px-4 py-3.5">
-                                  <div className="relative group/rev inline-block">
-                                    <button
-                                      type="button"
-                                      onClick={() => setReviewTarget(sub)}
-                                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                        sourceTab !== 'assigned'
-                                          ? "bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100"
-                                          : isReviewed
-                                          ? "bg-slate-100 text-slate-500 hover:bg-slate-200"
-                                          : "bg-violet-600 text-white hover:bg-violet-700 shadow-sm shadow-violet-200"
-                                      }`}
-                                    >
-                                      <UserCheck className="w-3.5 h-3.5" />
-                                      {isReviewed ? t("teacher.grading.queuePage.reviewAgain") : t("teacher.grading.queuePage.review")}
-                                    </button>
+                                                                <td className="px-4 py-3.5">
+                                  <div className="flex items-center gap-2">
+                                    {/* Eye: view detail */}
+                                    <div className="relative group/tip">
+                                      <Link
+                                        to={
+                                          sub.examType?.toLowerCase().includes("vstep") && sub.examId
+                                            ? `/giao-vien/xem-vstep/${sub.examId}?review=${sub.id}&teacher=1`
+                                            : `/giao-vien/cham-diem/${sub.id}`
+                                        }
+                                        className="p-2 rounded-xl bg-sky-50 text-sky-600 hover:bg-sky-100 transition-all active:scale-95 block cursor-pointer"
+                                      >
+                                        <Eye className="w-4 h-4" />
+                                      </Link>
+                                      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tip:flex flex-col items-center z-50">
+                                        <div className="bg-slate-800 text-white text-[11px] rounded-lg px-3 py-2 whitespace-nowrap shadow-xl text-center leading-snug">
+                                          <p className="font-semibold">Xem chi tiết bài làm</p>
+                                          <p className="text-slate-300 mt-0.5">Kiểm tra đáp án, chấm và sửa điểm</p>
+                                        </div>
+                                        <div className="border-4 border-transparent border-t-slate-800" />
+                                      </div>
+                                    </div>
+
+                                    {/* Review button */}
+                                    <div className="relative group/rev">
+                                      <button
+                                        type="button"
+                                        onClick={() => setReviewTarget(sub)}
+                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                          sourceTab !== 'assigned'
+                                            ? "bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100"
+                                            : isReviewed
+                                            ? "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                                            : "bg-violet-600 text-white hover:bg-violet-700 shadow-sm shadow-violet-200"
+                                        }`}
+                                      >
+                                        <UserCheck className="w-3.5 h-3.5" />
+                                        {isReviewed ? t("teacher.grading.queuePage.reviewAgain") : t("teacher.grading.queuePage.review")}
+                                      </button>
+                                    </div>
                                   </div>
                                 </td>
                               </tr>
