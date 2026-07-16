@@ -19,6 +19,7 @@ import {
   BookOpenCheck,
   CheckSquare,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { Header } from "../../../components/shared/Header";
 import { useHideTeacherHeader } from "../../../../contexts/TeacherHeaderContext";
@@ -486,8 +487,43 @@ export function GradingQueue() {
       }
     } catch (err: any) {
       setBulkMessage(err?.response?.data?.message || "Lỗi khi phê duyệt hàng loạt.");
-    } finally {
+        } finally {
       setBulkApproving(false);
+    }
+  };
+
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDeleteSubmission = async (id: string, examTitle: string, studentName: string) => {
+    const msg = `Bạn có chắc chắn muốn xóa vĩnh viễn kết quả bài làm "${examTitle}" của học sinh "${studentName}"?\n\n` +
+                `LƯU Ý:\n` +
+                `1. Kết quả này sẽ biến mất hoàn toàn trên cả tài khoản của Giáo viên và Học sinh.\n` +
+                `2. Số lượt làm bài của học sinh sẽ giảm đi (giúp học sinh có thể làm lại đề nếu có giới hạn lượt).\n` +
+                `3. Hành động này KHÔNG THỂ HOÀN TÁC.`;
+                
+    if (!window.confirm(msg)) return;
+
+    try {
+      setDeletingId(id);
+      const res = await api.delete(`/teacher/submissions/${id}`);
+      if (res.data?.status === "success") {
+        // Cập nhật state local
+        setSubmissions((prev) => prev.filter((s) => s.id !== id));
+        // Bỏ chọn nếu đang chọn trong danh sách bulk approve
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        alert("Đã xóa kết quả bài làm của học sinh thành công.");
+      } else {
+        alert(res.data?.message || "Đã xảy ra lỗi khi xóa bài làm.");
+      }
+    } catch (err: any) {
+      console.error("Delete submission error:", err);
+      alert(err.response?.data?.message || "Lỗi hệ thống khi xóa bài làm.");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -1128,7 +1164,7 @@ export function GradingQueue() {
                                       </div>
                                     </div>
 
-                                    {/* Review button */}
+                                                                        {/* Review button */}
                                     <div className="relative group/rev">
                                       <button
                                         type="button"
@@ -1144,6 +1180,30 @@ export function GradingQueue() {
                                         <UserCheck className="w-3.5 h-3.5" />
                                         {isReviewed ? t("teacher.grading.queuePage.reviewAgain") : t("teacher.grading.queuePage.review")}
                                       </button>
+                                    </div>
+
+                                    {/* Delete button */}
+                                    <div className="relative group/del">
+                                      <button
+                                        type="button"
+                                        disabled={deletingId === sub.id}
+                                        onClick={() => handleDeleteSubmission(sub.id, sub.examTitle, sub.studentName)}
+                                        className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                                        title="Xóa vĩnh viễn kết quả bài làm"
+                                      >
+                                        {deletingId === sub.id ? (
+                                          <Loader2 className="w-4.5 h-4.5 animate-spin" />
+                                        ) : (
+                                          <Trash2 className="w-4 h-4" />
+                                        )}
+                                      </button>
+                                      <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/del:flex flex-col items-center z-50">
+                                        <div className="bg-slate-800 text-white text-[11px] rounded-lg px-3 py-2 whitespace-nowrap shadow-xl text-center leading-snug">
+                                          <p className="font-semibold text-rose-400">Xóa kết quả bài làm</p>
+                                          <p className="text-slate-300 mt-0.5">Xóa vĩnh viễn khỏi tài khoản HS & GV</p>
+                                        </div>
+                                        <div className="border-4 border-transparent border-t-slate-800" />
+                                      </div>
                                     </div>
                                   </div>
                                 </td>

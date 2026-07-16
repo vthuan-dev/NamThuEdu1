@@ -1735,4 +1735,60 @@ class GradingController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * DELETE /api/teacher/submissions/{id}
+     * Xóa kết quả làm bài của học viên (bao gồm câu trả lời và lịch sử chấm điểm liên quan)
+     */
+    public function destroy(Request $request, $id)
+    {
+        $user = $request->user();
+
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Bạn không có quyền truy cập.'
+            ], 401);
+        }
+
+        $submission = Submission::where('sId', $id)
+                                ->whereHas('exam', function($q) use ($user) {
+                                    $q->where('eTeacher_id', $user->uId);
+                                })
+                                ->first();
+
+        if (!$submission) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Không tìm thấy bài làm hoặc bài làm không thuộc quyền quản lý của bạn.'
+            ], 404);
+        }
+
+        try {
+            \Illuminate\Support\Facades\DB::beginTransaction();
+
+            // Xóa lịch sử chấm điểm (grading history)
+            \Illuminate\Support\Facades\DB::table('grading_history')->where('submission_id', $submission->sId)->delete();
+
+            // Xóa các câu trả lời chi tiết (submission answers)
+            \Illuminate\Support\Facades\DB::table('submission_answers')->where('submission_id', $submission->sId)->delete();
+
+            // Xóa chính bài làm (submission)
+            $submission->delete();
+
+            \Illuminate\Support\Facades\DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Đã xóa bài làm của học sinh thành công.'
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Lỗi hệ thống khi xóa bài làm.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }
