@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { Header } from "../../../components/shared/Header";
 import { useHideTeacherHeader } from "../../../../contexts/TeacherHeaderContext";
+import { useToastContext } from "../../../../contexts/ToastContext";
 import { api } from "../../../../services/api";
 import { getAssetUrl } from "../../../../utils/apiConfig";
 import { TeacherReviewModal } from "./TeacherReviewModal";
@@ -82,12 +83,26 @@ function AnimatedDots() {
           0%, 80%, 100% { opacity: 0.2; transform: translateY(0); }
           40% { opacity: 1; transform: translateY(-3px); }
         }
-        @keyframes fadeInUp {
+                @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(8px); }
           to { opacity: 1; transform: translateY(0); }
         }
         .animate-fade-in-up {
           animation: fadeInUp 300ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .animate-fade-in {
+          animation: fadeIn 200ms ease-out forwards;
+        }
+        .animate-scale-in {
+          animation: scaleIn 250ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
         }
       `}</style>
     </span>
@@ -97,8 +112,9 @@ function AnimatedDots() {
 // ─── Main Component ──────────────────────────────────────────────────────────
 export function GradingQueue() {
   usePageTitle(PAGE_TITLES.TEACHER_GRADING);
-  useHideTeacherHeader();
+    useHideTeacherHeader();
   const { t } = useTranslation();
+  const toast = useToastContext();
 
   const STATUS_CONFIG = useMemo<Record<string, { label: string; color: string; dot: string }>>(() => ({
     submitted:           { label: t("teacher.grading.status.submitted"),        ...STATUS_COLORS.submitted },
@@ -493,16 +509,9 @@ export function GradingQueue() {
   };
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Submission | null>(null);
 
-  const handleDeleteSubmission = async (id: string, examTitle: string, studentName: string) => {
-    const msg = `Bạn có chắc chắn muốn xóa vĩnh viễn kết quả bài làm "${examTitle}" của học sinh "${studentName}"?\n\n` +
-                `LƯU Ý:\n` +
-                `1. Kết quả này sẽ biến mất hoàn toàn trên cả tài khoản của Giáo viên và Học sinh.\n` +
-                `2. Số lượt làm bài của học sinh sẽ giảm đi (giúp học sinh có thể làm lại đề nếu có giới hạn lượt).\n` +
-                `3. Hành động này KHÔNG THỂ HOÀN TÁC.`;
-                
-    if (!window.confirm(msg)) return;
-
+    const handleDeleteSubmission = async (id: string) => {
     try {
       setDeletingId(id);
       const res = await api.delete(`/teacher/submissions/${id}`);
@@ -515,13 +524,13 @@ export function GradingQueue() {
           next.delete(id);
           return next;
         });
-        alert("Đã xóa kết quả bài làm của học sinh thành công.");
+        toast.success("Đã xóa kết quả bài làm của học sinh thành công.");
       } else {
-        alert(res.data?.message || "Đã xảy ra lỗi khi xóa bài làm.");
+        toast.error(res.data?.message || "Đã xảy ra lỗi khi xóa bài làm.");
       }
     } catch (err: any) {
       console.error("Delete submission error:", err);
-      alert(err.response?.data?.message || "Lỗi hệ thống khi xóa bài làm.");
+      toast.error(err.response?.data?.message || "Lỗi hệ thống khi xóa bài làm.");
     } finally {
       setDeletingId(null);
     }
@@ -1182,12 +1191,12 @@ export function GradingQueue() {
                                       </button>
                                     </div>
 
-                                    {/* Delete button */}
+                                                                        {/* Delete button */}
                                     <div className="relative group/del">
                                       <button
                                         type="button"
                                         disabled={deletingId === sub.id}
-                                        onClick={() => handleDeleteSubmission(sub.id, sub.examTitle, sub.studentName)}
+                                        onClick={() => setDeleteTarget(sub)}
                                         className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
                                         title="Xóa vĩnh viễn kết quả bài làm"
                                       >
@@ -1272,6 +1281,72 @@ export function GradingQueue() {
       </div>
 
             {/* Review Modal */}
+            {/* Custom Delete Confirmation Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl border border-slate-100 max-w-md w-full shadow-2xl p-6 flex flex-col gap-4 animate-scale-in">
+            {/* Header Red Circle Warning Icon */}
+            <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center flex-shrink-0 mx-auto">
+              <AlertCircle className="w-6 h-6 animate-pulse" />
+            </div>
+
+            {/* Modal Content */}
+            <div className="text-center">
+              <h3 className="text-md font-bold text-slate-800">Xác nhận xóa bài làm</h3>
+              <p className="text-xs text-slate-500 mt-2">
+                Bạn có chắc chắn muốn xóa vĩnh viễn kết quả bài làm:
+              </p>
+              <p className="text-sm font-bold text-violet-600 mt-1.5 line-clamp-2" title={deleteTarget.examTitle}>
+                "{deleteTarget.examTitle}"
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                Học sinh: <span className="font-semibold text-slate-600">{deleteTarget.studentName}</span>
+              </p>
+
+              {/* Warning box */}
+              <div className="bg-rose-50/50 border border-rose-100 rounded-xl p-3.5 text-left mt-4 text-[11px] leading-relaxed text-rose-800 space-y-1">
+                <p className="font-bold text-rose-700 uppercase tracking-wider mb-1">Cảnh báo quan trọng:</p>
+                <p>• Kết quả sẽ biến mất hoàn toàn trên cả tài khoản của Giáo viên và Học sinh.</p>
+                <p>• Lượt làm bài sẽ được hoàn trả, cho phép học sinh làm lại đề.</p>
+                <p className="font-bold">• Hành động này KHÔNG THỂ HOÀN TÁC.</p>
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex items-center gap-3 mt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={deletingId === deleteTarget.id}
+                onClick={async () => {
+                  await handleDeleteSubmission(deleteTarget.id);
+                  setDeleteTarget(null);
+                }}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white text-xs font-bold shadow-sm shadow-rose-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                {deletingId === deleteTarget.id ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Đang xóa...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Xác nhận xóa
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <TeacherReviewModal
         submission={reviewTarget}
         open={!!reviewTarget}
