@@ -53,7 +53,7 @@ class ThptGradingController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data'   => $this->buildShowData($sub),
+            'data' => $this->buildShowData($sub),
         ]);
     }
 
@@ -76,44 +76,41 @@ class ThptGradingController extends Controller
         }
 
         $validated = $request->validate([
-            'questions'                       => 'nullable|array',
-            'questions.*.question_number'     => 'required|integer',
-            'questions.*.teacher_score'       => 'required|numeric|min:0|max:10',
-            'questions.*.teacher_criteria'    => 'nullable|array',
-            'questions.*.teacher_criteria.*'  => 'nullable|numeric|min:0|max:10',
-            'questions.*.teacher_feedback'    => 'nullable|string|max:5000',
-            'overall_teacher_feedback'        => 'nullable|string|max:5000',
+            'questions' => 'nullable|array',
+            'questions.*.question_number' => 'required|integer',
+            'questions.*.teacher_score' => 'required|numeric|min:0|max:10',
+            'questions.*.teacher_criteria' => 'nullable|array',
+            'questions.*.teacher_criteria.*' => 'nullable|numeric|min:0|max:10',
+            'questions.*.teacher_feedback' => 'nullable|string|max:5000',
+            'overall_teacher_feedback' => 'nullable|string|max:5000',
             // Điểm tổng ghi đè của giáo viên (0–10). Áp dụng cho mọi đề THPT,
             // kể cả đề toàn trắc nghiệm khách quan (không có phần Nói/Viết).
-            'teacher_override_score'          => 'nullable|numeric|min:0|max:10',
-            'publish'                         => 'nullable|boolean',
-            'answer_overrides'                => 'nullable|array',
-            'correct_overrides'               => 'nullable|array',
-            'objective_raw_score'             => 'nullable|numeric',
-            'objective_raw_max'               => 'nullable|numeric',
-            'objective_scaled_score'          => 'nullable|numeric',
+            'teacher_override_score' => 'nullable|numeric|min:0|max:10',
+            'publish' => 'nullable|boolean',
+            'answer_overrides' => 'nullable|array',
+            'correct_overrides' => 'nullable|array',
+            'objective_raw_score' => 'nullable|numeric',
+            'objective_raw_max' => 'nullable|numeric',
+            'objective_scaled_score' => 'nullable|numeric',
         ]);
 
-        $user      = $request->user();
-        $publish   = (bool) ($validated['publish'] ?? false);
+        $user = $request->user();
+        $publish = (bool) ($validated['publish'] ?? false);
         $questions = $validated['questions'] ?? [];
-        $overall   = $validated['overall_teacher_feedback'] ?? null;
+        $overall = $validated['overall_teacher_feedback'] ?? null;
         $overrideScore = array_key_exists('teacher_override_score', $validated)
             ? $validated['teacher_override_score']
             : null;
 
         $answerOverrides = $validated['answer_overrides'] ?? null;
         $correctOverrides = $validated['correct_overrides'] ?? null;
-        $objRawScore = isset($validated['objective_raw_score']) ? (float)$validated['objective_raw_score'] : null;
-        $objRawMax = isset($validated['objective_raw_max']) ? (float)$validated['objective_raw_max'] : null;
-        $objScaledScore = isset($validated['objective_scaled_score']) ? (float)$validated['objective_scaled_score'] : null;
+        $objRawScore = isset($validated['objective_raw_score']) ? (float) $validated['objective_raw_score'] : null;
+        $objRawMax = isset($validated['objective_raw_max']) ? (float) $validated['objective_raw_max'] : null;
+        $objScaledScore = isset($validated['objective_scaled_score']) ? (float) $validated['objective_scaled_score'] : null;
 
-        DB::transaction(function () use (
-            $sub, $user, $publish, $questions, $overall, $overrideScore,
-            $answerOverrides, $correctOverrides, $objRawScore, $objRawMax, $objScaledScore
-        ) {
+        DB::transaction(function () use ($sub, $user, $publish, $questions, $overall, $overrideScore, $answerOverrides, $correctOverrides, $objRawScore, $objRawMax, $objScaledScore) {
             $payload = $sub->submission_payload ?? [];
-            $result  = $payload['result'] ?? [];
+            $result = $payload['result'] ?? [];
 
             if ($answerOverrides !== null) {
                 $payload['answer_overrides'] = $answerOverrides;
@@ -136,37 +133,39 @@ class ThptGradingController extends Controller
             $skillByQn = [];
             foreach (($config['sections'] ?? []) as $s) {
                 $type = $s['type'] ?? '';
-                if (!in_array($type, ['speaking', 'writing'], true)) continue;
+                if (!in_array($type, ['speaking', 'writing'], true))
+                    continue;
                 foreach (($s['items'] ?? []) as $it) {
                     $qn = $it['question_number'] ?? null;
-                    if ($qn === null) continue;
+                    if ($qn === null)
+                        continue;
                     $skillByQn[(int) $qn] = $type === 'writing' ? 'writing' : 'speaking';
                 }
             }
 
             $speaking = is_array($result['speaking'] ?? null) ? $result['speaking'] : [];
-            $writing  = is_array($result['writing'] ?? null) ? $result['writing'] : [];
+            $writing = is_array($result['writing'] ?? null) ? $result['writing'] : [];
             $speakingParts = is_array($speaking['parts'] ?? null) ? $speaking['parts'] : [];
-            $writingParts  = is_array($writing['parts'] ?? null) ? $writing['parts'] : [];
+            $writingParts = is_array($writing['parts'] ?? null) ? $writing['parts'] : [];
 
             $now = now()->toIso8601String();
             foreach ($questions as $q) {
-                $qn  = (int) $q['question_number'];
+                $qn = (int) $q['question_number'];
                 $key = "q{$qn}";
                 $skill = $skillByQn[$qn] ?? 'speaking';
                 $bucket = $skill === 'writing' ? $writingParts : $speakingParts;
                 $node = is_array($bucket[$key] ?? null) ? $bucket[$key] : [];
 
                 // KHÔNG ghi đè field AI — chỉ thêm/cập nhật teacher_*.
-                $node['teacher_score']               = round((float) $q['teacher_score'], 2);
-                $criteria                            = $q['teacher_criteria'] ?? [];
+                $node['teacher_score'] = round((float) $q['teacher_score'], 2);
+                $criteria = $q['teacher_criteria'] ?? [];
                 $node['teacher_pronunciation_score'] = isset($criteria['pronunciation'])
                     ? (float) $criteria['pronunciation'] : null;
-                $node['teacher_content_score']       = isset($criteria['content'])
+                $node['teacher_content_score'] = isset($criteria['content'])
                     ? (float) $criteria['content'] : null;
-                $node['teacher_feedback']            = $q['teacher_feedback'] ?? null;
-                $node['teacher_reviewed_at']         = $now;
-                $node['teacher_reviewed_by']         = (int) $user->uId;
+                $node['teacher_feedback'] = $q['teacher_feedback'] ?? null;
+                $node['teacher_reviewed_at'] = $now;
+                $node['teacher_reviewed_by'] = (int) $user->uId;
 
                 if ($skill === 'writing') {
                     $writingParts[$key] = $node;
@@ -176,7 +175,7 @@ class ThptGradingController extends Controller
             }
 
             $speakingAvg = $this->avgEffectiveScore($speakingParts);
-            $writingAvg  = $this->avgEffectiveScore($writingParts);
+            $writingAvg = $this->avgEffectiveScore($writingParts);
 
             if (!empty($speakingParts)) {
                 $speaking['parts'] = $speakingParts;
@@ -232,10 +231,10 @@ class ThptGradingController extends Controller
                 if ($finalScore !== null) {
                     $updates['sScore'] = $finalScore;
                 }
-                $updates['sStatus']             = 'graded';
-                $updates['sGraded_time']        = now();
+                $updates['sStatus'] = 'graded';
+                $updates['sGraded_time'] = now();
                 $updates['teacher_reviewed_at'] = now();
-                $updates['sTeacher_feedback']   = $overall;
+                $updates['sTeacher_feedback'] = $overall;
             } else {
                 // Lưu nháp: ghi teacher_* + nhận xét, KHÔNG đổi sStatus.
                 $updates['sTeacher_feedback'] = $overall;
@@ -262,16 +261,16 @@ class ThptGradingController extends Controller
         }
 
         $data = $this->buildShowData($sub);
-        $payload  = $sub->submission_payload ?? [];
-        $result   = $payload['result'] ?? [];
-        $data['sStatus']        = $sub->sStatus;
-        $data['sScore']        = $sub->sScore !== null ? (float) $sub->sScore : null;
+        $payload = $sub->submission_payload ?? [];
+        $result = $payload['result'] ?? [];
+        $data['sStatus'] = $sub->sStatus;
+        $data['sScore'] = $sub->sScore !== null ? (float) $sub->sScore : null;
         $data['speaking_score'] = $result['speaking']['score'] ?? null;
-        $data['scaled_score']   = $result['scaled_score'] ?? null;
+        $data['scaled_score'] = $result['scaled_score'] ?? null;
 
         return response()->json([
             'status' => 'success',
-            'data'   => $data,
+            'data' => $data,
         ]);
     }
 
@@ -303,9 +302,9 @@ class ThptGradingController extends Controller
      */
     private function buildShowData(Submission $sub): array
     {
-        $payload  = $sub->submission_payload ?? [];
-        $result   = $payload['result'] ?? [];
-        $config   = $payload['exam_snapshot']['config']
+        $payload = $sub->submission_payload ?? [];
+        $result = $payload['result'] ?? [];
+        $config = $payload['exam_snapshot']['config']
             ?? optional($sub->exam)->thpt_config
             ?? ['sections' => []];
 
@@ -314,42 +313,46 @@ class ThptGradingController extends Controller
             : [];
         $audioMap = $rawFeedback['speaking_audio'] ?? [];
         $speakingParts = is_array($result['speaking']['parts'] ?? null) ? $result['speaking']['parts'] : [];
-        $writingParts  = is_array($result['writing']['parts'] ?? null) ? $result['writing']['parts'] : [];
+        $writingParts = is_array($result['writing']['parts'] ?? null) ? $result['writing']['parts'] : [];
 
         // prompt theo question_number (speaking + writing).
         $promptByQn = [];
-        $skillByQn  = []; // qn => 'speaking'|'writing'
+        $skillByQn = []; // qn => 'speaking'|'writing'
         foreach (($config['sections'] ?? []) as $s) {
             $type = $s['type'] ?? '';
-            if (!in_array($type, ['speaking', 'writing'], true)) continue;
+            if (!in_array($type, ['speaking', 'writing'], true))
+                continue;
             foreach (($s['items'] ?? []) as $it) {
                 $qn = (string) ($it['question_number'] ?? '');
-                if ($qn === '') continue;
+                if ($qn === '')
+                    continue;
                 $promptByQn[$qn] = $it['prompt'] ?? '';
-                $skillByQn[$qn]  = $type === 'writing' ? 'writing' : 'speaking';
+                $skillByQn[$qn] = $type === 'writing' ? 'writing' : 'speaking';
             }
         }
 
         // Câu trả lời học viên + đáp án đúng (đã chấm khách quan) — dùng để
         // dựng review từng câu, đồng bộ shape với ThptResultPage/SectionView.
-        $answers        = $payload['answers'] ?? [];
+        $answers = $payload['answers'] ?? [];
         $correctAnswers = $result['correct_answers'] ?? [];
 
         // Map thống kê điểm theo section (theo index — gradeSubmission duyệt
         // config.sections đúng thứ tự).
         $resultSections = is_array($result['sections'] ?? null) ? array_values($result['sections']) : [];
 
-        $subjective    = [];
+        $subjective = [];
         $subjectiveByQn = [];
         $anyPending = false;
         foreach (($config['sections'] ?? []) as $s) {
             $type = $s['type'] ?? '';
-            if (!in_array($type, ['speaking', 'writing'], true)) continue;
+            if (!in_array($type, ['speaking', 'writing'], true))
+                continue;
 
             foreach (($s['items'] ?? []) as $it) {
-                $qn   = $it['question_number'] ?? null;
-                if ($qn === null) continue;
-                $key  = "q{$qn}";
+                $qn = $it['question_number'] ?? null;
+                if ($qn === null)
+                    continue;
+                $key = "q{$qn}";
                 $skill = $type === 'writing' ? 'writing' : 'speaking';
                 $bucket = $skill === 'writing' ? $writingParts : $speakingParts;
                 $node = is_array($bucket[$key] ?? null) ? $bucket[$key] : null;
@@ -358,28 +361,28 @@ class ThptGradingController extends Controller
 
                 $hasAi = is_array($node) && isset($node['score']);
                 $aiBlock = $hasAi ? [
-                    'score'       => isset($node['score']) ? (float) $node['score'] : null,
-                    'criteria'    => [
+                    'score' => isset($node['score']) ? (float) $node['score'] : null,
+                    'criteria' => [
                         'pronunciation' => isset($node['pronunciation_score']) ? (float) $node['pronunciation_score'] : null,
-                        'content'       => isset($node['content_score']) ? (float) $node['content_score'] : null,
+                        'content' => isset($node['content_score']) ? (float) $node['content_score'] : null,
                     ],
                     // Writing AI có criteria_detail (4 tiêu chí IELTS-style) — FE dùng nếu có
                     'criteria_detail' => is_array($node['criteria_detail'] ?? null) ? $node['criteria_detail'] : null,
                     'criterion_comments' => is_array($node['criterion_comments'] ?? null) ? $node['criterion_comments'] : null,
-                    'feedback'    => $node['feedback'] ?? null,
+                    'feedback' => $node['feedback'] ?? null,
                     'suggestions' => is_array($node['suggestions'] ?? null) ? array_values($node['suggestions']) : [],
-                    'transcript'  => $node['transcript'] ?? null,
-                    'word_count'  => isset($node['word_count']) ? (int) $node['word_count'] : null,
+                    'transcript' => $node['transcript'] ?? null,
+                    'word_count' => isset($node['word_count']) ? (int) $node['word_count'] : null,
                 ] : null;
 
                 $hasTeacher = is_array($node) && isset($node['teacher_score']);
                 $teacherBlock = $hasTeacher ? [
-                    'score'       => (float) $node['teacher_score'],
-                    'criteria'    => [
+                    'score' => (float) $node['teacher_score'],
+                    'criteria' => [
                         'pronunciation' => isset($node['teacher_pronunciation_score']) ? (float) $node['teacher_pronunciation_score'] : null,
-                        'content'       => isset($node['teacher_content_score']) ? (float) $node['teacher_content_score'] : null,
+                        'content' => isset($node['teacher_content_score']) ? (float) $node['teacher_content_score'] : null,
                     ],
-                    'feedback'    => $node['teacher_feedback'] ?? null,
+                    'feedback' => $node['teacher_feedback'] ?? null,
                     'reviewed_at' => $node['teacher_reviewed_at'] ?? null,
                 ] : null;
 
@@ -403,13 +406,13 @@ class ThptGradingController extends Controller
 
                 $sq = [
                     'question_number' => (int) $qn,
-                    'skill'           => $skill,
-                    'prompt'          => $promptByQn[(string) $qn] ?? ($it['prompt'] ?? ''),
-                    'audio_url'       => $audio,
-                    'student_answer'  => $studentText,
-                    'status'          => $status,
-                    'ai'              => $aiBlock,
-                    'teacher'         => $teacherBlock,
+                    'skill' => $skill,
+                    'prompt' => $promptByQn[(string) $qn] ?? ($it['prompt'] ?? ''),
+                    'audio_url' => $audio,
+                    'student_answer' => $studentText,
+                    'status' => $status,
+                    'ai' => $aiBlock,
+                    'teacher' => $teacherBlock,
                 ];
                 $subjective[] = $sq;
                 $subjectiveByQn[(int) $qn] = $sq;
@@ -426,13 +429,13 @@ class ThptGradingController extends Controller
 
         return [
             'submission_id' => $sub->sId,
-            'exam'    => [
-                'id'    => optional($sub->exam)->eId,
+            'exam' => [
+                'id' => optional($sub->exam)->eId,
                 'title' => optional($sub->exam)->eTitle,
-                'type'  => optional($sub->exam)->eType,
+                'type' => optional($sub->exam)->eType,
             ],
             'student' => [
-                'id'   => optional($sub->user)->uId,
+                'id' => optional($sub->user)->uId,
                 'name' => optional($sub->user)->uName,
                 'phone' => optional($sub->user)->uPhone,
                 'email' => optional($sub->user)->uEmail,
@@ -442,29 +445,29 @@ class ThptGradingController extends Controller
                 'class_name' => optional(optional($sub->user)->class)->cName,
                 'age_group' => optional($sub->user)->age_group,
             ],
-            'submitted_at'             => optional($sub->sSubmit_time)->toIso8601String(),
-            'status'                   => $sub->sStatus,
-            'ai_speaking_pending'      => $anyPending,
-            'objective'                => [
-                'raw_score'     => $result['raw_score'] ?? null,
+            'submitted_at' => optional($sub->sSubmit_time)->toIso8601String(),
+            'status' => $sub->sStatus,
+            'ai_speaking_pending' => $anyPending,
+            'objective' => [
+                'raw_score' => $result['raw_score'] ?? null,
                 'raw_score_max' => $result['raw_score_max'] ?? null,
-                'scaled_score'  => $objectiveScaled,
-                'scale_max'     => $scaleMax,
+                'scaled_score' => $objectiveScaled,
+                'scale_max' => $scaleMax,
             ],
             'overall_teacher_feedback' => $sub->sTeacher_feedback,
-            'current_total'            => $sub->sScore !== null ? (float) $sub->sScore : null,
+            'current_total' => $sub->sScore !== null ? (float) $sub->sScore : null,
             // Điểm tổng ghi đè của giáo viên (nếu đã lưu) — cho UI prefill ô nhập.
-            'teacher_override_score'   => isset($result['teacher_override_score'])
+            'teacher_override_score' => isset($result['teacher_override_score'])
                 ? (float) $result['teacher_override_score'] : null,
             // Raw maps — cho phép frontend tái dùng SectionView (review mode) y hệt trang học viên.
-            'answers'                  => (object) $answers,
-            'correct_answers'          => (object) $correctAnswers,
-            'answer_overrides'         => $payload['answer_overrides'] ?? (object) [],
-            'correct_overrides'        => $payload['correct_overrides'] ?? (object) [],
+            'answers' => (object) $answers,
+            'correct_answers' => (object) $correctAnswers,
+            'answer_overrides' => $payload['answer_overrides'] ?? (object) [],
+            'correct_overrides' => $payload['correct_overrides'] ?? (object) [],
             // Câu chủ quan (Nói/Viết) — giữ nguyên cho UI override hiện có.
-            'subjective_questions'     => $subjective,
+            'subjective_questions' => $subjective,
             // Toàn bộ cấu trúc đề học viên đã làm, từng phần một (ADDED SCOPE).
-            'sections'                 => $sectionsReview,
+            'sections' => $sectionsReview,
         ];
     }
 
@@ -490,8 +493,10 @@ class ThptGradingController extends Controller
             foreach ((array) $opts as $o) {
                 if (is_array($o)) {
                     $entry = ['id' => $o['id'] ?? null, 'text' => $o['text'] ?? ''];
-                    if (isset($o['underline'])) $entry['underline'] = $o['underline'];
-                    if (isset($o['underlineStart'])) $entry['underlineStart'] = $o['underlineStart'];
+                    if (isset($o['underline']))
+                        $entry['underline'] = $o['underline'];
+                    if (isset($o['underlineStart']))
+                        $entry['underlineStart'] = $o['underlineStart'];
                     $out[] = $entry;
                 }
             }
@@ -499,12 +504,15 @@ class ThptGradingController extends Controller
         };
 
         $matchText = function (?string $userVal, $accepted, bool $cs): bool {
-            if ($userVal === null) return false;
+            if ($userVal === null)
+                return false;
             $u = $cs ? trim($userVal) : mb_strtolower(trim($userVal));
-            if ($u === '') return false;
+            if ($u === '')
+                return false;
             foreach ((array) $accepted as $a) {
                 $an = $cs ? trim((string) $a) : mb_strtolower(trim((string) $a));
-                if ($u === $an) return true;
+                if ($u === $an)
+                    return true;
             }
             return false;
         };
@@ -515,13 +523,13 @@ class ThptGradingController extends Controller
             $student = $answers[$key] ?? null;
             return [
                 'question_number' => (int) $qn,
-                'key'             => $key,
-                'kind'            => 'mcq',
-                'prompt'          => $prompt,
-                'options'         => $normOptions($options),
-                'student_answer'  => $student,
-                'correct_answer'  => $correctId,
-                'is_correct'      => $correctId !== null && $correctId !== '' && (string) $student === (string) $correctId,
+                'key' => $key,
+                'kind' => 'mcq',
+                'prompt' => $prompt,
+                'options' => $normOptions($options),
+                'student_answer' => $student,
+                'correct_answer' => $correctId,
+                'is_correct' => $correctId !== null && $correctId !== '' && (string) $student === (string) $correctId,
             ];
         };
 
@@ -531,15 +539,15 @@ class ThptGradingController extends Controller
             $student = $answers[$key] ?? null;
             $acceptedArr = array_values((array) $accepted);
             return array_merge([
-                'question_number'  => (int) $qn,
-                'key'              => $key,
-                'kind'             => 'text',
-                'prompt'           => $prompt,
-                'options'          => [],
-                'student_answer'   => $student,
-                'correct_answer'   => $acceptedArr[0] ?? '',
+                'question_number' => (int) $qn,
+                'key' => $key,
+                'kind' => 'text',
+                'prompt' => $prompt,
+                'options' => [],
+                'student_answer' => $student,
+                'correct_answer' => $acceptedArr[0] ?? '',
                 'accepted_answers' => $acceptedArr,
-                'is_correct'       => $matchText($student !== null ? (string) $student : null, $acceptedArr, $cs),
+                'is_correct' => $matchText($student !== null ? (string) $student : null, $acceptedArr, $cs),
             ], $extra);
         };
 
@@ -552,11 +560,11 @@ class ThptGradingController extends Controller
                 $hasAns = array_key_exists($key, $answers);
                 $studentBool = $hasAns ? (bool) $answers[$key] : null;
                 $out[] = [
-                    'key'            => $key,
-                    'text'           => $st['text'] ?? '',
+                    'key' => $key,
+                    'text' => $st['text'] ?? '',
                     'student_answer' => $studentBool,
                     'correct_answer' => $expected,
-                    'is_correct'     => $hasAns && $studentBool === $expected,
+                    'is_correct' => $hasAns && $studentBool === $expected,
                 ];
             }
             return $out;
@@ -568,9 +576,9 @@ class ThptGradingController extends Controller
             $stat = $resultSections[$idx] ?? null;
 
             $base = [
-                'section_id'   => $s['id'] ?? ($stat['section_id'] ?? null),
-                'type'         => $type,
-                'title'        => $s['title'] ?? ($stat['title'] ?? ''),
+                'section_id' => $s['id'] ?? ($stat['section_id'] ?? null),
+                'type' => $type,
+                'title' => $s['title'] ?? ($stat['title'] ?? ''),
                 'instructions' => $s['instructions'] ?? null,
             ];
 
@@ -579,21 +587,22 @@ class ThptGradingController extends Controller
                 $qs = [];
                 foreach (($s['items'] ?? []) as $it) {
                     $qn = $it['question_number'] ?? null;
-                    if ($qn === null) continue;
+                    if ($qn === null)
+                        continue;
                     $qs[] = $subjectiveByQn[(int) $qn] ?? [
                         'question_number' => (int) $qn,
-                        'skill'           => $type === 'writing' ? 'writing' : 'speaking',
-                        'prompt'          => $it['prompt'] ?? '',
-                        'audio_url'       => null,
-                        'student_answer'  => isset($answers["q{$qn}"]) ? (string) $answers["q{$qn}"] : null,
-                        'status'          => 'no_ai',
-                        'ai'              => null,
-                        'teacher'         => null,
+                        'skill' => $type === 'writing' ? 'writing' : 'speaking',
+                        'prompt' => $it['prompt'] ?? '',
+                        'audio_url' => null,
+                        'student_answer' => isset($answers["q{$qn}"]) ? (string) $answers["q{$qn}"] : null,
+                        'status' => 'no_ai',
+                        'ai' => null,
+                        'teacher' => null,
                     ];
                 }
                 $sectionsOut[] = array_merge($base, [
-                    'kind'      => 'subjective',
-                    'score'     => null,
+                    'kind' => 'subjective',
+                    'score' => null,
                     'questions' => $qs,
                 ]);
                 continue;
@@ -634,7 +643,7 @@ class ThptGradingController extends Controller
                         }
                     }
                     break;
-                
+
 
                 case 'error_identification':
                     foreach (($s['items'] ?? []) as $it) {
@@ -652,7 +661,7 @@ class ThptGradingController extends Controller
                 case 'sentence_transformation':
                     foreach (($s['items'] ?? []) as $it) {
                         $questions[] = $textQ($it['question_number'] ?? '?', $it['original'] ?? '', $it['accepted_answers'] ?? [], false, [
-                            'lead_in'     => $it['lead_in'] ?? null,
+                            'lead_in' => $it['lead_in'] ?? null,
                             'prompt_word' => $it['prompt_word'] ?? null,
                         ]);
                     }
@@ -663,10 +672,10 @@ class ThptGradingController extends Controller
                         $qn = $it['question_number'] ?? '?';
                         $questions[] = [
                             'question_number' => (int) $qn,
-                            'kind'            => 'tf_group',
-                            'context'         => $it['context'] ?? '',
-                            'context_style'   => $it['context_style'] ?? null,
-                            'statements'      => $tfStatements($qn, $it['statements'] ?? []),
+                            'kind' => 'tf_group',
+                            'context' => $it['context'] ?? '',
+                            'context_style' => $it['context_style'] ?? null,
+                            'statements' => $tfStatements($qn, $it['statements'] ?? []),
                         ];
                     }
                     break;
@@ -681,20 +690,20 @@ class ThptGradingController extends Controller
                             $student = $answers[$key] ?? null;
                             $correctLetter = $it['answers'][$pos] ?? ($it['answers'][(string) $pos] ?? null);
                             $rows[] = [
-                                'key'            => $key,
-                                'index'          => $pos,
-                                'text'           => $line,
+                                'key' => $key,
+                                'index' => $pos,
+                                'text' => $line,
                                 'student_answer' => $student,
                                 'correct_answer' => $correctLetter,
-                                'is_correct'     => $student !== null && (string) $student === (string) $correctLetter,
+                                'is_correct' => $student !== null && (string) $student === (string) $correctLetter,
                             ];
                         }
                         $questions[] = [
                             'question_number' => (int) $qn,
-                            'kind'            => 'matching',
-                            'list_1'          => array_values($it['list_1'] ?? []),
-                            'list_2'          => array_values($it['list_2'] ?? []),
-                            'rows'            => $rows,
+                            'kind' => 'matching',
+                            'list_1' => array_values($it['list_1'] ?? []),
+                            'list_2' => array_values($it['list_2'] ?? []),
+                            'rows' => $rows,
                         ];
                     }
                     break;
@@ -729,25 +738,25 @@ class ThptGradingController extends Controller
                         $kind = $it['kind'] ?? 'mc';
                         if ($kind === 'tf_group') {
                             $questions[] = [
-                                'question_number'       => (int) $qn,
-                                'kind'                  => 'tf_group',
+                                'question_number' => (int) $qn,
+                                'kind' => 'tf_group',
                                 'context_paragraph_ref' => $it['context_paragraph_ref'] ?? null,
-                                'statements'            => $tfStatements($qn, $it['statements'] ?? []),
+                                'statements' => $tfStatements($qn, $it['statements'] ?? []),
                             ];
                         } elseif ($kind === 'sentence_insertion') {
                             $key = "q{$qn}";
                             $student = $answers[$key] ?? null;
                             $correctMarker = $it['correct_marker'] ?? ($it['correct'] ?? ($it['correct_id'] ?? null));
                             $questions[] = [
-                                'question_number'   => (int) $qn,
-                                'key'               => $key,
-                                'kind'              => 'sentence_insertion',
-                                'prompt'            => $it['prompt'] ?? '',
-                                'sentence_to_insert'=> $it['sentence_to_insert'] ?? '',
-                                'markers'           => ['A', 'B', 'C', 'D'],
-                                'student_answer'    => $student,
-                                'correct_answer'    => $correctMarker,
-                                'is_correct'        => $student !== null && (string) $student === (string) $correctMarker,
+                                'question_number' => (int) $qn,
+                                'key' => $key,
+                                'kind' => 'sentence_insertion',
+                                'prompt' => $it['prompt'] ?? '',
+                                'sentence_to_insert' => $it['sentence_to_insert'] ?? '',
+                                'markers' => ['A', 'B', 'C', 'D'],
+                                'student_answer' => $student,
+                                'correct_answer' => $correctMarker,
+                                'is_correct' => $student !== null && (string) $student === (string) $correctMarker,
                             ];
                         } else { // mc
                             $questions[] = $mcq($qn, $it['prompt'] ?? null, $it['options'] ?? [], $it['correct_id'] ?? null);
@@ -761,12 +770,12 @@ class ThptGradingController extends Controller
             }
 
             $sectionsOut[] = array_merge($base, [
-                'kind'      => 'objective',
-                'score'     => $stat ? [
+                'kind' => 'objective',
+                'score' => $stat ? [
                     'correct_count' => $stat['correct_count'] ?? 0,
-                    'total_count'   => $stat['total_count'] ?? 0,
-                    'raw_score'     => $stat['raw_score'] ?? 0,
-                    'raw_max'       => $stat['raw_max'] ?? 0,
+                    'total_count' => $stat['total_count'] ?? 0,
+                    'raw_score' => $stat['raw_score'] ?? 0,
+                    'raw_max' => $stat['raw_max'] ?? 0,
                 ] : null,
                 'questions' => $questions,
             ]);
@@ -778,7 +787,7 @@ class ThptGradingController extends Controller
     /**
      * Suy ra điểm khách quan THUẦN (trước khi blend Nói) từ result.sections,
      * loại trừ section type 'speaking'. Dùng cho submission cũ chưa có
-     * `scaled_score_objective`. Mirror công thức của ThptExamController@gradeSubmission.
+     * `scaled_score_objective`. Mirror công thức của ThptExamController@gradeSubmission. ok
      */
     private function recomputeObjectiveScaled(array $result): ?float
     {
@@ -787,11 +796,12 @@ class ThptGradingController extends Controller
             return null;
         }
         $rawScore = 0.0;
-        $rawMax   = 0.0;
+        $rawMax = 0.0;
         foreach ($sections as $st) {
-            if (($st['type'] ?? '') === 'speaking') continue;
+            if (($st['type'] ?? '') === 'speaking')
+                continue;
             $rawScore += (float) ($st['raw_score'] ?? 0);
-            $rawMax   += (float) ($st['raw_max'] ?? 0);
+            $rawMax += (float) ($st['raw_max'] ?? 0);
         }
         if ($rawMax <= 0) {
             return null;
@@ -815,11 +825,14 @@ class ThptGradingController extends Controller
     {
         $eff = [];
         foreach ($parts as $node) {
-            if (!is_array($node)) continue;
+            if (!is_array($node))
+                continue;
             $e = $node['teacher_score'] ?? ($node['score'] ?? null);
-            if ($e !== null) $eff[] = (float) $e;
+            if ($e !== null)
+                $eff[] = (float) $e;
         }
-        if (empty($eff)) return null;
+        if (empty($eff))
+            return null;
         return round(array_sum($eff) / count($eff), 2);
     }
 
@@ -842,10 +855,14 @@ class ThptGradingController extends Controller
         if (!$hasObj && $objective !== null && empty($result['sections'])) {
             $hasObj = true;
         }
-        if ($hasObj && $objective !== null) $vals[] = $objective;
-        if ($speaking !== null) $vals[] = $speaking;
-        if ($writing !== null) $vals[] = $writing;
-        if (empty($vals)) return $objective ?? $speaking ?? $writing;
+        if ($hasObj && $objective !== null)
+            $vals[] = $objective;
+        if ($speaking !== null)
+            $vals[] = $speaking;
+        if ($writing !== null)
+            $vals[] = $writing;
+        if (empty($vals))
+            return $objective ?? $speaking ?? $writing;
         return round(array_sum($vals) / count($vals), 2);
     }
 
