@@ -16,7 +16,7 @@ import {
   ArrowLeft, Save, Plus, Trash2, Headphones, Mic, Upload, Loader2,
   CheckCircle2, Volume2, AlertTriangle, Image as ImageIcon, PenLine, ListChecks,
 } from "lucide-react";
-import { useToast } from "../../../../../hooks/useToast";
+import { useToastContext } from "../../../../../contexts/ToastContext";
 import { api } from "../../../../../services/api";
 import { RichTextInput } from "../../../../../components/ui/RichTextInput";
 
@@ -75,7 +75,7 @@ export function CreateTeensExam() {
   const { skill: skillParam } = useParams<{ skill: string }>();
   const skill: "listening" | "speaking" = skillParam === "speaking" ? "speaking" : "listening";
   const navigate = useNavigate();
-  const { success, error } = useToast();
+  const { success, error } = useToastContext();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");

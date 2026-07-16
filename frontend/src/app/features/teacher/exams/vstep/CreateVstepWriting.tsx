@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router";
 import { ArrowLeft, Save, PenTool, FileText, CheckCircle2 } from "lucide-react";
-import { useToast } from "../../../../../hooks/useToast";
+import { useToastContext } from "../../../../../contexts/ToastContext";
 import { useTranslation } from "react-i18next";
 import { QuillEditor } from "../../../../../components/ui/QuillEditor";
 import { saveVstepWritingTask, publishVstepWritingExam, loadVstepWritingExam } from "../../../../../services/vstepApi";
@@ -27,7 +27,7 @@ interface CreateVstepWritingProps {
 
 export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest = false }: CreateVstepWritingProps = {}) => {
   const navigate = useNavigate();
-  const { success, error } = useToast();
+  const { success, error } = useToastContext();
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const params = useParams();

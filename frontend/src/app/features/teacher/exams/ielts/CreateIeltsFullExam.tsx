@@ -30,7 +30,7 @@ import {
   FileText,
   AlertTriangle,
 } from "lucide-react";
-import { useToast } from "../../../../../hooks/useToast";
+import { useToastContext } from "../../../../../contexts/ToastContext";
 import { api } from "../../../../../services/api";
 import { IELTS_STRUCTURE, type IeltsTestType } from "./structure";
 import { IeltsListeningEditor } from "./editors/IeltsListeningEditor";
@@ -118,7 +118,7 @@ export function CreateIeltsFullExam() {
   const navigate = useNavigate();
   const location = useLocation();
   const { examId: routeExamId } = useParams<{ examId: string }>();
-  const { success, error } = useToast();
+  const { success, error } = useToastContext();
 
   // Pre-fill từ navigation state nếu có (từ CreateExamSetup)
   const navState = (location.state as { title?: string; description?: string } | null) ?? {};

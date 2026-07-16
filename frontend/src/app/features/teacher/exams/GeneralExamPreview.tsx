@@ -10,7 +10,7 @@ import { useParams, useNavigate } from "react-router";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Clock, FileText, CheckCircle2, Pencil } from "lucide-react";
 import { api } from "../../../../services/api";
-import { useToast } from "../../../../hooks/useToast";
+import { useToastContext } from "../../../../contexts/ToastContext";
 
 interface Answer {
   aId: number;
@@ -56,7 +56,7 @@ const TYPE_LABEL: Record<string, string> = {
 export function GeneralExamPreview() {
   const { examId } = useParams();
   const navigate = useNavigate();
-  const { error } = useToast();
+  const { error } = useToastContext();
   const [loading, setLoading] = useState(true);
   const [exam, setExam] = useState<ExamData | null>(null);
 

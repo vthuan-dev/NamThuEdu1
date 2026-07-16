@@ -35,7 +35,7 @@ import {
   AlertCircle,
   ChevronRight,
 } from "lucide-react";
-import { useToast } from "../../../../../hooks/useToast";
+import { useToastContext } from "../../../../../contexts/ToastContext";
 import { api } from "../../../../../services/api";
 import {
   IELTS_STRUCTURE,
@@ -81,7 +81,7 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
-  const { success, error } = useToast();
+  const { success, error } = useToastContext();
 
   // Skill is FIXED for this exam — không cho switch trong UI
   const skill: IeltsSkill = initialSkill;

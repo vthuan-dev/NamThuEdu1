@@ -13,7 +13,7 @@ import {
   ChevronRight,
   AlertTriangle,
 } from "lucide-react";
-import { useToast } from "../../../../../hooks/useToast";
+import { useToastContext } from "../../../../../contexts/ToastContext";
 import { useTranslation } from "react-i18next";
 import {
   saveVstepListeningSection,
@@ -114,7 +114,7 @@ export const CreateVstepListening = ({
   isFullTest = false,
 }: CreateVstepListeningProps = {}) => {
   const navigate = useNavigate();
-  const { success, error } = useToast();
+  const { success, error } = useToastContext();
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const params = useParams();

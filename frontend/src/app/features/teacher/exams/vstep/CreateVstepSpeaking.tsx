@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router";
 import { ArrowLeft, Save, Plus, Trash2, MessageSquare, Lightbulb, Users, Sparkles, X, Eraser } from "lucide-react";
-import { useToast } from "../../../../../hooks/useToast";
+import { useToastContext } from "../../../../../contexts/ToastContext";
 import { useTranslation } from "react-i18next";
 import { 
   saveVstepSpeakingPart, 
@@ -69,7 +69,7 @@ interface CreateVstepSpeakingProps {
 
 export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest = false }: CreateVstepSpeakingProps = {}) => {
   const navigate = useNavigate();
-  const { success, error } = useToast();
+  const { success, error } = useToastContext();
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const params = useParams();

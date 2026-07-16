@@ -3,7 +3,7 @@ import { getAuthToken } from '../../../../utils/authStorage';
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { TemplateGuide } from "./TemplateGuide";
 import { useSidebar } from "../../../../contexts/SidebarContext";
-import { useToast } from "../../../../hooks/useToast";
+import { useToastContext } from "../../../../contexts/ToastContext";
 import { api } from "../../../../services/api";
 import {
   ArrowLeft,
@@ -326,7 +326,7 @@ export function CreateExam() {
   const { examId } = useParams();
   const [searchParams] = useSearchParams();
   const { isCollapsed: isSidebarCollapsed } = useSidebar();
-  const toast = useToast();
+  const toast = useToastContext();
   const [currentExamId, setCurrentExamId] = useState<string | null>(examId || null);
   const [currentStep, setCurrentStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);

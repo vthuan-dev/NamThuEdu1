@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router";
 import { ArrowLeft, Save, BookOpen, FileText, CheckCircle2, Sparkles } from "lucide-react";
-import { useToast } from "../../../../../hooks/useToast";
+import { useToastContext } from "../../../../../contexts/ToastContext";
 import { useTranslation } from "react-i18next";
 import { QuillEditor } from "../../../../../components/ui/QuillEditor";
 import { RichTextInput } from "../../../../../components/ui/RichTextInput";
@@ -46,7 +46,7 @@ interface CreateVstepReadingProps {
 
 export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest = false }: CreateVstepReadingProps = {}) => {
   const navigate = useNavigate();
-  const { success, error } = useToast();
+  const { success, error } = useToastContext();
   const { t } = useTranslation();
   const quillRef = useRef<any>(null);
   const [searchParams, setSearchParams] = useSearchParams();
