@@ -739,17 +739,8 @@ class TestAssignmentController extends Controller
                         }
                     }
 
-                    // Check duplicate
-                    $existingAssignment = TestAssignment::where('exam_id', $request->exam_id)
-                                                       ->where('taTarget_type', $target['type'])
-                                                       ->where('taTarget_id', $target['id'])
-                                                       ->first();
-
-                    if ($existingAssignment) {
-                        $results['errors'][] = "Đã giao bài cho {$target['type']} ID {$target['id']}.";
-                        continue;
-                    }
-
+                    // Cho phép giao lại cùng đề + cùng target: mỗi lần giao = pool lượt mới.
+                    // Submission cũ vẫn gắn assignment cũ → không "hết lượt" giả.
                     $assignment = TestAssignment::create([
                         'exam_id'        => $request->exam_id,
                         'taTarget_type'  => $target['type'],

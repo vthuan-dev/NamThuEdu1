@@ -873,9 +873,15 @@ class StudentTestController extends Controller
 
         // Backfill assignment_id nếu submission tạo trước khi fix (null) —
         // để bài nộp Teens/Kids/VSTEP vào đúng tab "Bài giao" của giáo viên.
-        // includeExpired=true: bài đã nộp trước deadline vẫn gắn được dù assignment hết hạn.
+        // QUAN TRỌNG: resolve theo sStart_time — chỉ gắn assignment đã tồn tại
+        // tại thời điểm làm bài. Tránh gán nhầm lượt giao MỚI → "hết lượt" giả.
         if (empty($submission->assignment_id) && $submission->exam_id) {
-            $resolvedAid = $this->resolveActiveAssignmentIdForExam($user, (int) $submission->exam_id, true);
+            $resolvedAid = $this->resolveActiveAssignmentIdForExam(
+                $user,
+                (int) $submission->exam_id,
+                true,
+                $submission->sStart_time ?? $submission->sSubmit_time ?? null
+            );
             if ($resolvedAid) {
                 $submission->assignment_id = $resolvedAid;
                 $submission->save();
@@ -2014,8 +2020,11 @@ class StudentTestController extends Controller
      * Ưu tiên: assignment theo student → assignment theo class.
      * $includeExpired=false (default): chỉ assignment còn hạn (cho start).
      * $includeExpired=true: kể cả quá hạn (cho backfill bài đã nộp).
+     * $at: nếu truyền (sStart_time), CHỈ chọn assignment đã tồn tại tại thời
+     *      điểm đó (taCreated_at <= $at). Chặn bug gán lượt giao CŨ vào
+     *      assignment MỚI → "hết số lần" ngay khi GV giao lại cùng đề.
      */
-    private function resolveActiveAssignmentIdForExam($user, int $examId, bool $includeExpired = false): ?int
+    private function resolveActiveAssignmentIdForExam($user, int $examId, bool $includeExpired = false, $at = null): ?int
     {
         if (!$user) {
             return null;
@@ -2042,6 +2051,20 @@ class StudentTestController extends Controller
             $query->where(function ($q) {
                 $q->whereNull('taDeadline')->orWhere('taDeadline', '>=', now());
             });
+        }
+
+        // Historical backfill: never attach a submission to an assignment that
+        // was created AFTER the student started that attempt.
+        if ($at !== null) {
+            try {
+                $atCarbon = \Carbon\Carbon::parse($at);
+                $query->where(function ($q) use ($atCarbon) {
+                    $q->whereNull('taCreated_at')
+                        ->orWhere('taCreated_at', '<=', $atCarbon);
+                });
+            } catch (\Throwable $e) {
+                // Ignore invalid timestamps and fall through without time filter.
+            }
         }
 
         // student-target ưu tiên hơn class-target
@@ -4966,9 +4989,18 @@ class StudentTestController extends Controller
 
         $timerState = null;
         if ($existing) {
-            if ($assignmentId && empty($existing->assignment_id)) {
-                $existing->assignment_id = $assignmentId;
-                $existing->save();
+            // Chỉ backfill assignment đã tồn tại lúc bắt đầu bài — không dính lượt giao mới.
+            if (empty($existing->assignment_id)) {
+                $safeAid = $this->resolveActiveAssignmentIdForExam(
+                    $user,
+                    (int) $examId,
+                    true,
+                    $existing->sStart_time
+                );
+                if ($safeAid) {
+                    $existing->assignment_id = $safeAid;
+                    $existing->save();
+                }
             }
             $timerState = $this->computeTimerState($existing->sStart_time, (int) $duration);
             if ($timerState['expired']) {
@@ -4989,6 +5021,17 @@ class StudentTestController extends Controller
                 $attemptsUsedQuery->whereNull('assignment_id');
             }
             $attemptsUsed = $attemptsUsedQuery->count();
+
+            // Gate lượt theo assignment hiện tại (mỗi lần giao = pool lượt riêng).
+            if ($assignmentId) {
+                $maxAttempt = (int) (TestAssignment::where('taId', $assignmentId)->value('taMax_attempt') ?? 0);
+                if ($maxAttempt > 0 && $attemptsUsed >= $maxAttempt) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Bạn đã hết số lần làm bài cho bài thi này.'
+                    ], 403);
+                }
+            }
 
             $submission = Submission::create([
                 'user_id' => $user->uId,
@@ -5178,10 +5221,18 @@ class StudentTestController extends Controller
 
         $timerState = null;
         if ($existing) {
-            // Backfill assignment_id nếu submission cũ bị null
-            if ($assignmentId && empty($existing->assignment_id)) {
-                $existing->assignment_id = $assignmentId;
-                $existing->save();
+            // Chỉ backfill assignment đã tồn tại lúc bắt đầu bài — không dính lượt giao mới.
+            if (empty($existing->assignment_id)) {
+                $safeAid = $this->resolveActiveAssignmentIdForExam(
+                    $user,
+                    (int) $examId,
+                    true,
+                    $existing->sStart_time
+                );
+                if ($safeAid) {
+                    $existing->assignment_id = $safeAid;
+                    $existing->save();
+                }
             }
             $timerState = $this->computeTimerState($existing->sStart_time, (int) $duration);
             if ($timerState['expired']) {
@@ -5202,6 +5253,17 @@ class StudentTestController extends Controller
                 $attemptsUsedQuery->whereNull('assignment_id');
             }
             $attemptsUsed = $attemptsUsedQuery->count();
+
+            // Gate lượt theo assignment hiện tại (mỗi lần giao = pool lượt riêng).
+            if ($assignmentId) {
+                $maxAttempt = (int) (TestAssignment::where('taId', $assignmentId)->value('taMax_attempt') ?? 0);
+                if ($maxAttempt > 0 && $attemptsUsed >= $maxAttempt) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Bạn đã hết số lần làm bài cho bài thi này.'
+                    ], 403);
+                }
+            }
 
             $submission = Submission::create([
                 'user_id' => $user->uId,

@@ -2025,6 +2025,10 @@ class GradingController extends Controller
      *
      * Không lọc theo eTeacher_id: GV có thể giao đề ngân hàng của người khác.
      * Không chặn assignment đã quá hạn: học viên có thể đã nộp trước deadline.
+     *
+     * QUAN TRỌNG: chỉ gắn assignment đã tồn tại tại thời điểm học viên bắt
+     * đầu làm (taCreated_at <= sStart_time). Tránh "nhiễm" lượt giao mới
+     * bằng submission cũ → hiện tượng "hết lượt" ngay khi GV giao lại cùng đề.
      */
     private function backfillMissingAssignmentIds(int $teacherId): void
     {
@@ -2049,7 +2053,7 @@ class GradingController extends Controller
             })
             ->with(['user:uId,class_id'])
             ->limit(300)
-            ->get(['sId', 'user_id', 'exam_id', 'assignment_id']);
+            ->get(['sId', 'user_id', 'exam_id', 'assignment_id', 'sStart_time', 'sSubmit_time']);
 
         if ($orphans->isEmpty()) {
             return;
@@ -2061,6 +2065,16 @@ class GradingController extends Controller
             }
             $student = $sub->user;
             $classIds = $student->class_id ? [(int) $student->class_id] : [];
+
+            $at = $sub->sStart_time ?? $sub->sSubmit_time ?? null;
+            $atCarbon = null;
+            if ($at !== null) {
+                try {
+                    $atCarbon = \Carbon\Carbon::parse($at);
+                } catch (\Throwable $e) {
+                    $atCarbon = null;
+                }
+            }
 
             $candidates = TestAssignment::where('exam_id', $sub->exam_id)
                 ->where(function ($q) use ($student, $classIds) {
@@ -2074,6 +2088,13 @@ class GradingController extends Controller
                         }
                         $qq->where('taTarget_type', 'class')
                             ->whereIn('taTarget_id', $classIds);
+                    });
+                })
+                // Chỉ assignment đã tồn tại lúc HV bắt đầu làm bài.
+                ->when($atCarbon, function ($q) use ($atCarbon) {
+                    $q->where(function ($qq) use ($atCarbon) {
+                        $qq->whereNull('taCreated_at')
+                            ->orWhere('taCreated_at', '<=', $atCarbon);
                     });
                 })
                 // KHÔNG lọc deadline: bài đã nộp trước hạn vẫn cần gắn lại.
