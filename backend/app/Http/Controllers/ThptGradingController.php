@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\TeacherSubmissionAccess;
 use App\Models\Submission;
 use App\Services\PushNotificationService;
 use Illuminate\Http\JsonResponse;
@@ -30,6 +31,8 @@ use Illuminate\Support\Facades\Log;
  */
 class ThptGradingController extends Controller
 {
+    use TeacherSubmissionAccess;
+
     private const DEFAULT_SCALE_MAX = 10;
 
     /* ============================================================
@@ -280,7 +283,8 @@ class ThptGradingController extends Controller
 
     /**
      * Kiểm tra quyền: phải là giáo viên đã đăng nhập (401), submission tồn tại
-     * (404), và giáo viên là chủ của đề thi (403). Trả Submission hoặc JsonResponse.
+     * (404), và GV có quyền chấm (chủ đề / chủ lớp / co-teacher / assignment lớp).
+     * Trả Submission hoặc JsonResponse.
      */
     private function ensureOwnership(int $id, $user)
     {
@@ -291,8 +295,9 @@ class ThptGradingController extends Controller
         if (!$sub) {
             return $this->error('Không tìm thấy bài làm.', 404);
         }
-        if (!$sub->exam || (int) $sub->exam->eTeacher_id !== (int) $user->uId) {
-            return $this->error('Bạn không phải giáo viên của đề thi này.', 403); // Req 7.1
+        // Không chỉ eTeacher_id: GV giao đề ngân hàng / chủ lớp / co-teacher cũng được chấm.
+        if (!$this->teacherCanAccessSubmission($user, $sub)) {
+            return $this->error('Bạn không có quyền chấm bài làm này.', 403); // Req 7.1 (mở rộng)
         }
         return $sub;
     }

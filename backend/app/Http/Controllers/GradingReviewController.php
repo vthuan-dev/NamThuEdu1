@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\TeacherSubmissionAccess;
 use App\Jobs\GradeVstepSubjectiveJob;
 use App\Models\GradingHistory;
 use App\Models\Submission;
@@ -23,6 +24,8 @@ use Illuminate\Http\Request;
  */
 class GradingReviewController extends Controller
 {
+    use TeacherSubmissionAccess;
+
     private GradingReviewService $service;
 
     public function __construct(GradingReviewService $service)
@@ -316,12 +319,13 @@ class GradingReviewController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
         }
 
-        $submission = Submission::with(['exam', 'answers.question'])->find($id);
+        $submission = Submission::with(['exam', 'answers.question', 'user'])->find($id);
         if (!$submission) {
             return response()->json(['status' => 'error', 'message' => 'Không tìm thấy bài làm.'], 404);
         }
-        if ($submission->exam && (int) $submission->exam->eTeacher_id !== (int) $teacher->uId) {
-            return response()->json(['status' => 'error', 'message' => 'Bạn không phải giáo viên của đề thi này.'], 403);
+        // Không chỉ eTeacher_id: GV giao đề ngân hàng / chủ lớp / co-teacher cũng được chấm.
+        if (!$this->teacherCanAccessSubmission($teacher, $submission)) {
+            return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền chấm bài làm này.'], 403);
         }
         return $submission;
     }
