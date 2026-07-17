@@ -4,13 +4,19 @@
  * Tông teal/cyan đồng bộ TeensLayout (khác bản Adults tông tím).
  * Hiển thị toàn bộ bài đã làm: lọc theo kết quả + tìm kiếm + sắp xếp,
  * gom theo tháng, mỗi thẻ mở thẳng trang kết quả.
+ *
+ * State visual system:
+ *   - Đạt      → teal accent + emerald chip
+ *   - Chưa đạt → rose accent + rose chip (nổi bật, không dùng slate mờ)
+ *   - Đang chấm → amber pulse
+ *   - Đang làm → slate neutral
  */
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import {
   Clock, Search, CalendarDays, ChevronRight, Loader2, PenLine,
-  CheckCircle2, TrendingUp, Star, BarChart2, Trophy, Target,
+  CheckCircle2, TrendingUp, Star, BarChart2, Trophy, Target, XCircle,
 } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
 import { formatDate } from '../../../../utils/formatters';
@@ -166,16 +172,22 @@ export function TeensHistory() {
         </div>
         <div className="flex gap-2">
           <div className="flex items-center gap-1 p-1 rounded-xl bg-white border border-slate-200">
-            {(['all', 'pass', 'fail'] as ResultFilter[]).map(key => (
-              <button key={key} onClick={() => setResultFilter(key)}
-                className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors"
-                style={{
-                  background: resultFilter === key ? TEAL : 'transparent',
-                  color: resultFilter === key ? '#fff' : '#64748B',
-                }}>
-                {key === 'all' ? 'Tất cả' : key === 'pass' ? 'Đạt' : 'Chưa đạt'}
-              </button>
-            ))}
+            {(['all', 'pass', 'fail'] as ResultFilter[]).map(key => {
+              const active = resultFilter === key;
+              const activeStyle =
+                key === 'pass'
+                  ? { background: '#059669', color: '#fff' }
+                  : key === 'fail'
+                  ? { background: '#E11D48', color: '#fff' }
+                  : { background: TEAL, color: '#fff' };
+              return (
+                <button key={key} onClick={() => setResultFilter(key)}
+                  className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors"
+                  style={active ? activeStyle : { background: 'transparent', color: '#64748B' }}>
+                  {key === 'all' ? 'Tất cả' : key === 'pass' ? 'Đạt' : 'Chưa đạt'}
+                </button>
+              );
+            })}
           </div>
           <select
             value={sortMode}
@@ -247,6 +259,7 @@ export function TeensHistory() {
                     const isPending = s.sStatus === 'grading_subjective';
                     const isInProg = s.sStatus === 'in_progress';
                     const isPass = !isInProg && !isPending && max > 0 && score / max >= PASS_THRESHOLD;
+                    const isFail = !isInProg && !isPending && !isPass;
                     const took = timeTaken(s.sStart_time, s.sSubmit_time);
 
                     const onClick = () => {
@@ -271,66 +284,149 @@ export function TeensHistory() {
                       );
                     };
 
-                    const badgeBg = isInProg ? '#F1F5F9'
-                      : isPending ? '#FEF3C7'
-                      : isPass ? 'linear-gradient(135deg,#0D9488,#14B8A6)'
-                      : '#F8FAFC';
-                    const dotColor = isInProg ? '#94A3B8' : isPending ? '#F59E0B' : isPass ? '#10B981' : '#94A3B8';
+                    // ── Visual tokens theo state ──────────────────────────────
+                    const accentBar = isInProg
+                      ? '#94A3B8'
+                      : isPending
+                      ? '#F59E0B'
+                      : isPass
+                      ? TEAL
+                      : '#E11D48';
+
+                    const cardSurface = isFail
+                      ? 'bg-gradient-to-r from-rose-50/80 via-white to-white border-rose-200/70 hover:border-rose-300 hover:shadow-[0_6px_20px_rgba(225,29,72,0.10)]'
+                      : isPass
+                      ? 'bg-gradient-to-r from-teal-50/50 via-white to-white border-teal-100 hover:border-teal-300 hover:shadow-[0_6px_20px_rgba(13,148,136,0.10)]'
+                      : isPending
+                      ? 'bg-gradient-to-r from-amber-50/60 via-white to-white border-amber-100 hover:border-amber-300 hover:shadow-[0_6px_20px_rgba(245,158,11,0.10)]'
+                      : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-[0_4px_14px_rgba(15,23,42,0.06)]';
+
+                    const badgeBg = isInProg
+                      ? '#F1F5F9'
+                      : isPending
+                      ? '#FEF3C7'
+                      : isPass
+                      ? `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})`
+                      : 'linear-gradient(135deg, #E11D48, #FB7185)';
+
+                    const badgeRing = isPass
+                      ? 'ring-teal-200/60'
+                      : isFail
+                      ? 'ring-rose-200/70'
+                      : isPending
+                      ? 'ring-amber-200/60'
+                      : 'ring-slate-100';
 
                     return (
-                      <button key={s.sId} onClick={onClick}
-                        className="group w-full text-left rounded-2xl bg-white overflow-hidden border border-slate-200 hover:border-teal-300 hover:shadow-[0_4px_16px_rgba(13,148,136,0.10)] transition-all">
-                        <div className="flex items-center gap-3.5 p-3.5">
+                      <button
+                        key={s.sId}
+                        onClick={onClick}
+                        className={`group relative w-full text-left rounded-2xl overflow-hidden border transition-all duration-200 hover:translate-x-0.5 active:scale-[0.99] cursor-pointer ${cardSurface}`}
+                      >
+                        {/* Left accent bar — state signal mạnh nhất */}
+                        <span
+                          aria-hidden
+                          className="absolute left-0 top-0 bottom-0 w-[4px]"
+                          style={{ background: accentBar }}
+                        />
+
+                        <div className="flex items-center gap-3.5 p-3.5 pl-4">
                           {/* Score badge */}
-                          <div className="w-[54px] h-[54px] rounded-xl flex-shrink-0 flex flex-col items-center justify-center ring-1 ring-slate-100"
-                            style={{ background: badgeBg }}>
+                          <div
+                            className={`w-[56px] h-[56px] rounded-xl flex-shrink-0 flex flex-col items-center justify-center ring-1 shadow-sm ${badgeRing}`}
+                            style={{ background: badgeBg }}
+                          >
                             {isPending ? (
                               <Loader2 className="w-5 h-5 animate-spin" style={{ color: '#D97706' }} />
                             ) : isInProg ? (
                               <PenLine className="w-5 h-5 text-slate-400" />
-                            ) : isPass ? (
-                              <>
-                                <span className="text-[17px] font-extrabold text-white leading-none">{score.toFixed(0)}</span>
-                                <span className="text-[8px] font-bold text-white/85 mt-0.5">{pct}%</span>
-                              </>
                             ) : (
                               <>
-                                <span className="text-[17px] font-extrabold text-slate-700 leading-none">{score.toFixed(0)}</span>
-                                <span className="text-[8px] font-bold text-slate-400 mt-0.5">{pct}%</span>
+                                <span className="text-[17px] font-extrabold text-white leading-none tabular-nums">
+                                  {score.toFixed(0)}
+                                </span>
+                                <span className="text-[8px] font-bold text-white/90 mt-0.5 tabular-nums">
+                                  {pct}%
+                                </span>
                               </>
                             )}
                           </div>
 
                           {/* Info */}
                           <div className="flex-1 min-w-0">
-                            <p className="font-bold truncate text-[14px] text-slate-900 leading-tight">
-                              {s.exam?.eTitle ?? 'Bài thi'}
-                            </p>
-                            <div className="flex items-center gap-x-3 gap-y-1 mt-1.5 flex-wrap text-[12px] text-slate-400">
-                              <span className="inline-flex items-center gap-1.5 font-medium text-slate-500">
-                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: dotColor }} />
-                                {isInProg ? 'Đang làm' : isPending ? 'Đang chấm…' : isPass ? 'Đạt' : 'Chưa đạt'}
-                              </span>
+                            <div className="flex items-start justify-between gap-2">
+                              <p className={`font-bold truncate text-[14px] leading-tight transition-colors ${
+                                isFail
+                                  ? 'text-rose-950 group-hover:text-rose-800'
+                                  : isPass
+                                  ? 'text-slate-900 group-hover:text-teal-900'
+                                  : 'text-slate-900'
+                              }`}>
+                                {s.exam?.eTitle ?? 'Bài thi'}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-x-2.5 gap-y-1.5 mt-2 flex-wrap text-[11px]">
+                              {isInProg ? (
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200/80">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                  Đang làm
+                                </span>
+                              ) : isPending ? (
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/70">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                  Đang chấm…
+                                </span>
+                              ) : isPass ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold tracking-wide uppercase bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                                  <CheckCircle2 className="w-3 h-3" strokeWidth={2.5} />
+                                  Đạt
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold tracking-wide uppercase bg-rose-100 text-rose-700 border border-rose-300/70 shadow-[0_0_0_1px_rgba(225,29,72,0.06)]">
+                                  <XCircle className="w-3 h-3" strokeWidth={2.5} />
+                                  Chưa đạt
+                                </span>
+                              )}
+
                               {took && (
-                                <span className="inline-flex items-center gap-1">
-                                  <Clock className="w-3 h-3" />{took}
+                                <span className="inline-flex items-center gap-1 text-slate-400 font-medium">
+                                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                  {took}
                                 </span>
                               )}
                               {(s.sSubmit_time || s.sStart_time) && (
-                                <span>{formatDate(s.sSubmit_time ?? s.sStart_time)}</span>
+                                <span className="text-slate-400 font-medium">
+                                  {formatDate(s.sSubmit_time ?? s.sStart_time)}
+                                </span>
                               )}
                             </div>
 
-                            {/* Progress bar */}
+                            {/* Progress bar — rose khi fail, teal khi pass */}
                             {!isInProg && !isPending && max > 0 && (
-                              <div className="mt-2 h-1.5 rounded-full overflow-hidden bg-slate-100">
-                                <div className="h-full rounded-full transition-all duration-700"
-                                  style={{ width: `${pct}%`, background: isPass ? `linear-gradient(90deg,${TEAL},${TEAL_MID})` : '#CBD5E1' }} />
+                              <div className={`mt-2.5 h-1.5 rounded-full overflow-hidden ${isFail ? 'bg-rose-100' : 'bg-teal-100/70'}`}>
+                                <div
+                                  className="h-full rounded-full transition-all duration-700 ease-out"
+                                  style={{
+                                    width: `${Math.max(pct, 3)}%`,
+                                    background: isPass
+                                      ? `linear-gradient(90deg, ${TEAL}, ${TEAL_MID})`
+                                      : 'linear-gradient(90deg, #E11D48, #FB7185)',
+                                  }}
+                                />
                               </div>
                             )}
                           </div>
 
-                          <ChevronRight className="w-5 h-5 text-slate-300 flex-shrink-0 group-hover:text-teal-500 transition-colors" />
+                          <ChevronRight
+                            className={`w-5 h-5 flex-shrink-0 transition-all group-hover:translate-x-0.5 ${
+                              isFail
+                                ? 'text-rose-300 group-hover:text-rose-500'
+                                : isPass
+                                ? 'text-teal-300 group-hover:text-teal-500'
+                                : 'text-slate-300 group-hover:text-slate-500'
+                            }`}
+                          />
                         </div>
                       </button>
                     );
