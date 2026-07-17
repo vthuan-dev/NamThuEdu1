@@ -1358,7 +1358,20 @@ export function GradingQueue() {
                                 </td>
                                 <td className="px-4 py-3.5">
                                   <div className="flex items-center gap-2">
-                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${cfg.color}`}>
+                                    <span
+                                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap cursor-help ${cfg.color}`}
+                                      title={
+                                        sub.status === "graded"
+                                          ? "Đã chấm: Hệ thống/AI đã chấm xong bài làm. Với đề giao, giáo viên vẫn cần xét duyệt để chốt điểm."
+                                          : sub.status === "partially_graded"
+                                          ? "Chấm một phần: Một số câu đã có điểm, phần còn lại (thường Writing/Speaking) đang chờ chấm hoặc xét duyệt."
+                                          : sub.status === "grading_subjective"
+                                          ? "Đang chấm AI: Hệ thống đang chấm phần tự luận (Writing/Speaking). Vui lòng đợi hoàn tất."
+                                          : sub.status === "in_progress"
+                                          ? "Đang làm: Học viên chưa nộp bài, vẫn đang làm dở."
+                                          : "Chờ chấm: Bài đã nộp, đang chờ hệ thống/AI chấm điểm."
+                                      }
+                                    >
                                       <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.dot }} />
                                       {cfg.label}
                                       {sub.status === "grading_subjective" && <AnimatedDots />}
