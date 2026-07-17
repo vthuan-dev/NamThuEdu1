@@ -443,6 +443,11 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         Route::get('/classes/{classId}/report', [GradingController::class, 'classReport']);
         Route::get('/grading/statistics', [GradingController::class, 'gradingStatistics']);
 
+        // Ghim học viên trong danh sách chấm điểm (theo teacher account)
+        Route::get('/pinned-students', [GradingController::class, 'pinnedStudents']);
+        Route::post('/pinned-students', [GradingController::class, 'pinStudent']);
+        Route::delete('/pinned-students/{studentId}', [GradingController::class, 'unpinStudent']);
+
         // AI-Assisted Grading Review
         Route::post('/submissions/{id}/ai-grade',                     [App\Http\Controllers\GradingReviewController::class, 'triggerAiGrade']);
         Route::get ('/submissions/{id}/ai-status',                    [App\Http\Controllers\GradingReviewController::class, 'aiStatus']);

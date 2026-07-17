@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\DB;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
 use App\Models\Exam;
+use App\Models\TeacherPinnedStudent;
+use App\Models\User;
 
 class GradingController extends Controller
 {
@@ -1865,5 +1867,139 @@ class GradingController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * GET /api/teacher/pinned-students
+     * Lấy danh sách student_id đã ghim của giáo viên hiện tại.
+     */
+    public function pinnedStudents(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Bạn không có quyền truy cập.'
+            ], 401);
+        }
+
+        $studentIds = TeacherPinnedStudent::where('teacher_id', $user->uId)
+            ->orderBy('created_at', 'desc')
+            ->pluck('student_id')
+            ->map(fn ($id) => (string) $id)
+            ->values()
+            ->all();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'student_ids' => $studentIds,
+            ],
+        ]);
+    }
+
+    /**
+     * POST /api/teacher/pinned-students
+     * Ghim một học viên (theo student_id).
+     */
+    public function pinStudent(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Bạn không có quyền truy cập.'
+            ], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'student_id' => 'required|integer|min:1',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Dữ liệu không hợp lệ.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $studentId = (int) $request->input('student_id');
+
+        $student = User::where('uId', $studentId)
+            ->where('uRole', 'student')
+            ->first();
+
+        if (!$student) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Không tìm thấy học viên.',
+            ], 404);
+        }
+
+        TeacherPinnedStudent::firstOrCreate([
+            'teacher_id' => $user->uId,
+            'student_id' => $studentId,
+        ]);
+
+        $studentIds = TeacherPinnedStudent::where('teacher_id', $user->uId)
+            ->orderBy('created_at', 'desc')
+            ->pluck('student_id')
+            ->map(fn ($id) => (string) $id)
+            ->values()
+            ->all();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Đã ghim học viên.',
+            'data' => [
+                'student_ids' => $studentIds,
+            ],
+        ]);
+    }
+
+    /**
+     * DELETE /api/teacher/pinned-students/{studentId}
+     * Bỏ ghim một học viên.
+     */
+    public function unpinStudent(Request $request, $studentId)
+    {
+        $user = $request->user();
+
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Bạn không có quyền truy cập.'
+            ], 401);
+        }
+
+        $studentId = (int) $studentId;
+        if ($studentId <= 0) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'student_id không hợp lệ.',
+            ], 422);
+        }
+
+        TeacherPinnedStudent::where('teacher_id', $user->uId)
+            ->where('student_id', $studentId)
+            ->delete();
+
+        $studentIds = TeacherPinnedStudent::where('teacher_id', $user->uId)
+            ->orderBy('created_at', 'desc')
+            ->pluck('student_id')
+            ->map(fn ($id) => (string) $id)
+            ->values()
+            ->all();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Đã bỏ ghim học viên.',
+            'data' => [
+                'student_ids' => $studentIds,
+            ],
+        ]);
     }
 }

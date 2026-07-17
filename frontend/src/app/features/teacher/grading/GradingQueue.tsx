@@ -33,6 +33,7 @@ import { getSubmissionDisplayScore, type SubmissionScoreUpdate } from "../../../
 // ─── Types ──────────────────────────────────────────────────────────────────
 interface Submission {
   id: string;
+  studentId: string;
   studentName: string;
   studentAvatar: string;
   studentAvatarUrl?: string | null;
@@ -127,15 +128,9 @@ export function GradingQueue() {
 
   const [searchQuery, setSearchQuery]   = useState("");
   const [selectedStudentName, setSelectedStudentName] = useState<string | null>(null);
-  // Học viên được ghim — lưu localStorage để giáo viên dễ tìm ở lần sau
-  const [pinnedStudents, setPinnedStudents] = useState<Set<string>>(() => {
-    try {
-      const raw = localStorage.getItem("grading_pinned_students");
-      return raw ? new Set<string>(JSON.parse(raw)) : new Set<string>();
-    } catch {
-      return new Set<string>();
-    }
-  });
+  // Học viên được ghim — lưu theo tài khoản GV trong DB (đồng bộ mọi thiết bị).
+  // Set chứa student_id (string) đã ghim.
+  const [pinnedStudents, setPinnedStudents] = useState<Set<string>>(new Set<string>());
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
   const [filterStatus, setFilterStatus] = useState("");
@@ -172,6 +167,7 @@ export function GradingQueue() {
 
   const mapRaw = (sub: any): Submission => ({
     id: String(sub.sId),
+    studentId: String(sub.user?.uId ?? sub.user_id ?? ""),
     studentName: sub.user?.uName || "Unknown",
     studentAvatar: (sub.user?.uName ?? "?").split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase(),
     studentAvatarUrl: sub.user?.avatar_url ?? null,
@@ -327,6 +323,7 @@ export function GradingQueue() {
     // Group submissions by student
   const studentList = useMemo(() => {
     const map = new Map<string, {
+      studentId: string;
       studentName: string;
       studentAvatar: string;
       studentAvatarUrl: string | null;
@@ -338,6 +335,7 @@ export function GradingQueue() {
       const key = sub.studentName;
       if (!map.has(key)) {
         map.set(key, {
+          studentId: sub.studentId,
           studentName: sub.studentName,
           studentAvatar: sub.studentAvatar,
           studentAvatarUrl: sub.studentAvatarUrl || null,
@@ -351,23 +349,60 @@ export function GradingQueue() {
     const list = Array.from(map.values());
     // Ghim: học viên được ghim luôn nổi lên đầu (giữ nguyên thứ tự tương đối bên trong)
     return list.sort((a, b) => {
-      const pa = pinnedStudents.has(a.studentName) ? 1 : 0;
-      const pb = pinnedStudents.has(b.studentName) ? 1 : 0;
+      const pa = pinnedStudents.has(a.studentId) ? 1 : 0;
+      const pb = pinnedStudents.has(b.studentId) ? 1 : 0;
       return pb - pa;
     });
   }, [sortedAndFiltered, pinnedStudents]);
 
-  // Ghim / bỏ ghim học viên — lưu vào localStorage để giữ giữa các phiên
-  const togglePin = useCallback((studentName: string) => {
+  // Ghim / bỏ ghim học viên — lưu theo tài khoản GV trong DB (đồng bộ mọi thiết bị).
+  // Cập nhật lạc quan (optimistic) rồi gọi API; nếu lỗi thì rollback.
+  const togglePin = useCallback((studentId: string) => {
+    if (!studentId) return;
     setPinnedStudents((prev) => {
+      const willPin = !prev.has(studentId);
       const next = new Set(prev);
-      if (next.has(studentName)) next.delete(studentName);
-      else next.add(studentName);
-      try {
-        localStorage.setItem("grading_pinned_students", JSON.stringify(Array.from(next)));
-      } catch { /* ignore quota errors */ }
+      if (willPin) next.add(studentId);
+      else next.delete(studentId);
+
+      const request = willPin
+        ? api.post("/teacher/pinned-students", { student_id: Number(studentId) })
+        : api.delete(`/teacher/pinned-students/${studentId}`);
+
+      request
+        .then(({ data }) => {
+          const ids: string[] | undefined = data?.data?.student_ids;
+          if (Array.isArray(ids)) {
+            setPinnedStudents(new Set(ids.map(String)));
+          }
+        })
+        .catch(() => {
+          // Rollback nếu API lỗi
+          setPinnedStudents((cur) => {
+            const rolled = new Set(cur);
+            if (willPin) rolled.delete(studentId);
+            else rolled.add(studentId);
+            return rolled;
+          });
+          toast.error("Không thể cập nhật ghim học viên. Vui lòng thử lại.");
+        });
+
       return next;
     });
+  }, [toast]);
+
+  // Tải danh sách học viên đã ghim (theo tài khoản GV) từ DB khi vào trang
+  useEffect(() => {
+    let cancelled = false;
+    api.get("/teacher/pinned-students")
+      .then(({ data }) => {
+        const ids: string[] | undefined = data?.data?.student_ids;
+        if (!cancelled && Array.isArray(ids)) {
+          setPinnedStudents(new Set(ids.map(String)));
+        }
+      })
+      .catch(() => { /* im lặng — ghim là tính năng phụ trợ */ });
+    return () => { cancelled = true; };
   }, []);
 
   // Automatically select the first student or update active selection
@@ -910,7 +945,7 @@ export function GradingQueue() {
                 <div className="flex flex-col gap-2 max-h-[600px] overflow-y-auto pr-1 scrollbar-thin">
                   {studentList.map((stu) => {
                     const isSelected = stu.studentName === selectedStudentName;
-                    const isPinned = pinnedStudents.has(stu.studentName);
+                    const isPinned = pinnedStudents.has(stu.studentId);
                     const pendingCount = sourceTab === 'assigned'
                       ? stu.submissions.filter((s) => !s.teacher_reviewed_at).length
                       : 0;
@@ -981,7 +1016,7 @@ export function GradingQueue() {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              togglePin(stu.studentName);
+                              togglePin(stu.studentId);
                             }}
                             className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
                               isPinned
