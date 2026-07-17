@@ -1304,13 +1304,19 @@ export function GradingQueue() {
                                 {sourceTab === 'assigned' && (
                                   <td className="px-4 py-3.5">
                                     {isReviewed ? (
-                                      <span className="inline-flex items-center gap-1 text-emerald-600 font-bold text-xs bg-emerald-50 px-2 py-1 rounded-lg">
-                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                      <span
+                                        className="inline-flex items-center gap-1 text-emerald-600 font-bold text-xs bg-emerald-50 px-2 py-1 rounded-lg whitespace-nowrap cursor-help"
+                                        title="Đã duyệt: Giáo viên đã kiểm tra và xác nhận điểm của bài làm này. Kết quả đã chính thức, học viên có thể xem điểm."
+                                      >
+                                        <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
                                         Đã duyệt
                                       </span>
                                     ) : (
-                                      <span className="inline-flex items-center gap-1 text-amber-600 font-bold text-xs bg-amber-50 px-2 py-1 rounded-lg">
-                                        <Clock className="w-3.5 h-3.5" />
+                                      <span
+                                        className="inline-flex items-center gap-1 text-amber-600 font-bold text-xs bg-amber-50 px-2 py-1 rounded-lg whitespace-nowrap cursor-help"
+                                        title="Chờ duyệt: Bài đã được chấm nhưng giáo viên chưa xác nhận. Cần xét duyệt để chốt điểm cho học viên."
+                                      >
+                                        <Clock className="w-3.5 h-3.5 flex-shrink-0" />
                                         Chờ duyệt
                                       </span>
                                     )}
