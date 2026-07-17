@@ -1279,8 +1279,8 @@ export function GradingQueue() {
                                 </td>
                                 <td className="px-4 py-3.5">
                                   <div className="flex items-center gap-2">
-                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${cfg.color}`}>
-                                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: cfg.dot }} />
+                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap ${cfg.color}`}>
+                                      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: cfg.dot }} />
                                       {cfg.label}
                                       {sub.status === "grading_subjective" && <AnimatedDots />}
                                     </span>
