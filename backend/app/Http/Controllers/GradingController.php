@@ -204,8 +204,24 @@ class GradingController extends Controller
                 $createdAny = false;
                 foreach ($speakingAudio as $part => $audioUrl) {
                     if (empty($audioUrl)) continue;
-                    if (isset($existingByPart[$part])) continue; // already has a row for this part
                     if (!isset($firstQuestionByPart[$part])) continue; // no question matches this part
+
+                    // Row already exists for this part → backfill URL if missing
+                    if (isset($existingByPart[$part])) {
+                        $existing = $existingByPart[$part];
+                        $currentText = trim((string) ($existing->saAnswer_text ?? ''));
+                        $looksLikeAudio = $currentText !== '' && (
+                            str_starts_with($currentText, 'http://')
+                            || str_starts_with($currentText, 'https://')
+                            || str_contains($currentText, '/storage/')
+                            || (bool) preg_match('/\.(webm|ogg|mp3|wav|m4a|aac|mp4)(\?|$)/i', $currentText)
+                        );
+                        if (!$looksLikeAudio) {
+                            $existing->update(['saAnswer_text' => $audioUrl]);
+                            $createdAny = true;
+                        }
+                        continue;
+                    }
 
                     $question = $firstQuestionByPart[$part];
                     $saAiScore = null;
@@ -228,7 +244,7 @@ class GradingController extends Controller
                 }
 
                 if ($createdAny) {
-                    // Reload submission with answers to include the newly created placeholder rows
+                    // Reload submission with answers to include the newly created/updated rows
                     $submission = Submission::where('sId', $id)
                                             ->with(['user', 'exam.questions.answers', 'answers.question'])
                                             ->first();

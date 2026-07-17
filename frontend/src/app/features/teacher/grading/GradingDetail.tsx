@@ -1,6 +1,7 @@
 import { Fragment, useState, useMemo, useEffect, useRef, useLayoutEffect, Suspense } from "react";
 import { lazyWithReload } from "../../../../utils/lazyWithReload";
 import { api } from "../../../../services/api";
+import { getFullMediaUrl } from "../../../../utils/mediaUtils";
 
 // Lazy-load các khung chấm điểm theo loại đề. Bọc lazyWithReload để tự reload
 // 1 lần khi chunk 404 (deploy mới đổi hash). Khai báo ở module scope để không
@@ -257,10 +258,27 @@ function VstepGradingDetailInternal() {
           let audioUrl: string | undefined = undefined;
 
           if (skill === "speaking") {
-            audioUrl = sa.saAnswer_text ?? "";
             const part = q.qPart ?? 1;
-            const transcript = geminiFeedback.speaking_results?.[`part_${part}`]?.transcript ?? "";
-            studentAns = transcript ? `[Transcript] ${transcript}` : "";
+            const rawAnswer = String(sa.saAnswer_text ?? "").trim();
+            // Ưu tiên saAnswer_text nếu là URL audio; fallback speaking_audio[part]
+            const looksLikeAudio =
+              /^https?:\/\//i.test(rawAnswer) ||
+              /\/storage\//i.test(rawAnswer) ||
+              /\.(webm|ogg|mp3|wav|m4a|aac|mp4)(\?|$)/i.test(rawAnswer);
+            const fromFeedback =
+              geminiFeedback?.speaking_audio?.[part] ??
+              geminiFeedback?.speaking_audio?.[String(part)] ??
+              null;
+            const resolved = looksLikeAudio ? rawAnswer : (fromFeedback ? String(fromFeedback) : "");
+            audioUrl = resolved ? (getFullMediaUrl(resolved) ?? resolved) : undefined;
+
+            const transcript =
+              geminiFeedback.speaking_results?.[`part_${part}`]?.transcript ??
+              geminiFeedback.ielts_speaking_results?.[`part_${part}`]?.transcript ??
+              "";
+            studentAns = transcript
+              ? `[Transcript] ${transcript}`
+              : (looksLikeAudio ? "" : rawAnswer);
           }
 
           // Retrieve full options (A, B, C, D) from the exam question
@@ -1333,25 +1351,42 @@ function VstepGradingDetailInternal() {
                         </div>
 
                         {/* Audio Player for Speaking */}
-                        {isSpeaking && q.audioUrl && (
-                          <div className="px-5 py-4 bg-slate-50/50 border-b border-slate-100 flex items-center gap-3">
-                            <audio
-                              controls
-                              src={q.audioUrl}
-                              className="flex-1 rounded-lg min-w-0"
-                              style={{ accentColor: '#EC4899' }}
-                            />
-                            <a
-                              href={q.audioUrl}
-                              download={`speaking-task-${q.number}-${student.name.replace(/\s+/g, "_")}.mp3`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-[12px] font-semibold hover:bg-slate-50 hover:border-slate-300 transition-colors"
-                              title="Tải file ghi âm về máy"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                              Tải về
-                            </a>
+                        {isSpeaking && (
+                          <div className="px-5 py-4 bg-slate-50/50 border-b border-slate-100">
+                            {q.audioUrl ? (
+                              <div className="flex items-center gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[11px] font-semibold text-pink-600 uppercase tracking-wider mb-2">
+                                    Bản ghi âm của học viên
+                                  </p>
+                                  <audio
+                                    controls
+                                    preload="metadata"
+                                    src={q.audioUrl}
+                                    className="w-full rounded-lg min-w-0"
+                                    style={{ accentColor: "#EC4899" }}
+                                  >
+                                    Trình duyệt không hỗ trợ phát audio.
+                                  </audio>
+                                </div>
+                                <a
+                                  href={q.audioUrl}
+                                  download={`speaking-task-${q.number}-${student.name.replace(/\s+/g, "_")}.webm`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-[12px] font-semibold hover:bg-slate-50 hover:border-slate-300 transition-colors self-end"
+                                  title="Tải file ghi âm về máy"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                  Tải về
+                                </a>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 text-slate-400">
+                                <Mic className="w-4 h-4" />
+                                <p className="text-[13px] italic">Chưa có file ghi âm speaking cho phần này.</p>
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -1360,8 +1395,8 @@ function VstepGradingDetailInternal() {
                           <div className="px-5 py-8 text-center">
                             <AlertCircle className="w-5 h-5 text-slate-300 mx-auto mb-2" />
                             <p className="text-[13px] text-slate-400 italic">
-                              {q.audioUrl 
-                                ? "Chưa có bản ghi văn bản (Transcript) từ AI." 
+                              {q.audioUrl
+                                ? "Chưa có bản ghi văn bản (Transcript) từ AI."
                                 : "Học viên không nộp bài."}
                             </p>
                           </div>

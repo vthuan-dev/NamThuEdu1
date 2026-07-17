@@ -190,18 +190,32 @@ export function IeltsGradingDetail() {
           else if (fromData) correctByQid[q.qId] = String(fromData);
         });
 
-        // Map answers → questions
+          // Map answers → questions
+        const speakingAudioMap = raw?.speaking_audio ?? {};
         const qs: Question[] = (d.answers ?? []).map((sa: any, idx: number): Question => {
           const q = sa.question ?? {};
           // ✅ FIX: fallback qSection → đảm bảo câu hỏi không mất khi qSkill null
           const skill = ((q.qSkill ?? q.qSection ?? "").toLowerCase()) as IeltsSkill;
           const isSubjective = skill === "writing" || skill === "speaking";
+          const part = q.qPart ?? 1;
+          const rawAnswer = String(sa.saAnswer_text ?? "").trim();
+          const looksLikeAudio =
+            skill === "speaking" &&
+            (/^https?:\/\//i.test(rawAnswer) ||
+              /\/storage\//i.test(rawAnswer) ||
+              /\.(webm|ogg|mp3|wav|m4a|aac|mp4)(\?|$)/i.test(rawAnswer));
+          const fromFeedback =
+            speakingAudioMap?.[part] ?? speakingAudioMap?.[String(part)] ?? null;
+          const resolvedAudio =
+            skill === "speaking"
+              ? (looksLikeAudio ? rawAnswer : fromFeedback ? String(fromFeedback) : "")
+              : "";
 
           return {
             id: `q-${q.qId ?? idx}`,
             answerId: sa.saId,
             number: idx + 1,
-            part: q.qPart ?? 1,
+            part,
             type: q.qType ?? "multiple_choice",
             skill,
             text: q.qContent ?? "",
@@ -217,11 +231,11 @@ export function IeltsGradingDetail() {
             aiCriteria: sa.saAi_criteria?.criteria ?? null,
             aiCriterionComments: sa.saAi_criteria?.criterion_comments ?? null,
             reviewStatus: sa.saReview_status ?? null,
-            audioUrl: skill === "speaking" && /^https?:\/\/|\/storage\//.test(String(sa.saAnswer_text ?? ""))
-              ? String(sa.saAnswer_text)
+            audioUrl: resolvedAudio
+              ? (getFullMediaUrl(resolvedAudio) ?? resolvedAudio)
               : undefined,
             transcript: skill === "speaking"
-              ? (speakingResults?.[`part_${q.qPart ?? 1}`]?.transcript ?? undefined)
+              ? (speakingResults?.[`part_${part}`]?.transcript ?? undefined)
               : undefined,
           };
         });
