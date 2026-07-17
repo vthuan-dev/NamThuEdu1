@@ -581,6 +581,34 @@ class ThptExamController extends Controller
                 $assignmentId = null; // ignore invalid
             }
         }
+        // Fallback: nếu FE không gửi assignment_id (hoặc invalid) nhưng học viên
+        // đã được giao đề → tự gắn assignment active để bài vào tab "Bài giao".
+        if (!$assignmentId) {
+            $classIds = $user->class_id ? [$user->class_id] : [];
+            $resolved = TestAssignment::where('exam_id', $examId)
+                ->where(function ($q) use ($user, $classIds) {
+                    $q->where(function ($qq) use ($user) {
+                        $qq->where('taTarget_type', 'student')
+                            ->where('taTarget_id', $user->uId);
+                    })->orWhere(function ($qq) use ($classIds) {
+                        if (empty($classIds)) {
+                            $qq->whereRaw('1 = 0');
+                            return;
+                        }
+                        $qq->where('taTarget_type', 'class')
+                            ->whereIn('taTarget_id', $classIds);
+                    });
+                })
+                ->where(function ($q) {
+                    $q->whereNull('taDeadline')->orWhere('taDeadline', '>=', now());
+                })
+                ->orderByRaw("CASE WHEN taTarget_type = 'student' THEN 0 ELSE 1 END")
+                ->orderByDesc('taId')
+                ->first();
+            if ($resolved) {
+                $assignmentId = (int) $resolved->taId;
+            }
+        }
 
         $submission = Submission::create([
             'user_id' => $user->uId,

@@ -868,6 +868,16 @@ class StudentTestController extends Controller
             ], 400);
         }
 
+        // Backfill assignment_id nếu submission tạo trước khi fix (null) —
+        // để bài nộp Teens/Kids/VSTEP vào đúng tab "Bài giao" của giáo viên.
+        if (empty($submission->assignment_id) && $submission->exam_id) {
+            $resolvedAid = $this->resolveActiveAssignmentIdForExam($user, (int) $submission->exam_id);
+            if ($resolvedAid) {
+                $submission->assignment_id = $resolvedAid;
+                $submission->save();
+            }
+        }
+
         // For VSTEP/IELTS exams: only gate on MCQ questions (writing/speaking are manually graded)
         // Kids (STARTERS/MOVERS/FLYERS): cũng dùng cổng mềm vì có phần nói/viết chấm tay
         $isVstep = in_array(strtoupper($submission->exam->eType ?? ''), ['VSTEP', 'IELTS']);
@@ -1993,6 +2003,47 @@ class StudentTestController extends Controller
                 $q->whereNull('taDeadline')->orWhere('taDeadline', '>=', now());
             })
             ->exists();
+    }
+
+    /**
+     * Lấy taId assignment active mới nhất của học viên cho exam.
+     * Dùng khi start-direct (teens/kids/VSTEP/IELTS) để gắn assignment_id
+     * vào submission — nếu không gắn, tab "Bài giao" của giáo viên
+     * (source=assigned → whereNotNull assignment_id) sẽ không thấy bài nộp.
+     *
+     * Ưu tiên: assignment theo student → assignment theo class; deadline còn hạn.
+     */
+    private function resolveActiveAssignmentIdForExam($user, int $examId): ?int
+    {
+        if (!$user) {
+            return null;
+        }
+
+        $classIds = $user->class_id ? [$user->class_id] : [];
+
+        $query = TestAssignment::where('exam_id', $examId)
+            ->where(function ($q) use ($user, $classIds) {
+                $q->where(function ($qq) use ($user) {
+                    $qq->where('taTarget_type', 'student')
+                        ->where('taTarget_id', $user->uId);
+                })->orWhere(function ($qq) use ($classIds) {
+                    if (empty($classIds)) {
+                        $qq->whereRaw('1 = 0');
+                        return;
+                    }
+                    $qq->where('taTarget_type', 'class')
+                        ->whereIn('taTarget_id', $classIds);
+                });
+            })
+            ->where(function ($q) {
+                $q->whereNull('taDeadline')->orWhere('taDeadline', '>=', now());
+            })
+            // student-target ưu tiên hơn class-target
+            ->orderByRaw("CASE WHEN taTarget_type = 'student' THEN 0 ELSE 1 END")
+            ->orderByDesc('taId');
+
+        $assignment = $query->first();
+        return $assignment ? (int) $assignment->taId : null;
     }
 
     /**
@@ -3733,10 +3784,24 @@ class StudentTestController extends Controller
         }
 
         // Fresh start: No existing in_progress submission found
+        // Gắn assignment_id active (nếu có) để bài nộp vào tab "Bài giao"
+        // của giáo viên — tránh rơi vào tab "Tự luyện" (assignment_id null).
+        $resolvedAssignmentId = $this->resolveActiveAssignmentIdForExam($user, (int) $examId);
+        // Cho phép FE truyền assignment_id tường minh (override resolve)
+        $reqAssignmentId = $request->input('assignment_id');
+        if ($reqAssignmentId) {
+            $validReq = TestAssignment::where('taId', $reqAssignmentId)
+                ->where('exam_id', $examId)
+                ->first();
+            if ($validReq) {
+                $resolvedAssignmentId = (int) $validReq->taId;
+            }
+        }
 
         $createPayload = [
             'exam_id' => $examId,
             'user_id' => $user->uId,
+            'assignment_id' => $resolvedAssignmentId,
             'sStart_time' => now(),
             'sStatus' => 'in_progress',
             'last_activity_at' => now(),
@@ -4837,7 +4902,8 @@ class StudentTestController extends Controller
 
     /**
      * POST /api/student/exams/{examId}/start-kids
-     * Bắt đầu (hoặc resume) đề Cambridge YL trực tiếp từ examId — KHÔNG cần assignment.
+     * Bắt đầu (hoặc resume) đề Cambridge YL. Gắn assignment_id active để bài
+     * nộp xuất hiện ở tab "Bài giao" của giáo viên (source=assigned).
      * Trả về cùng shape với start(): { submissionId, exam, savedAnswers, timeRemaining }.
      */
     public function startKidsExamDirect(Request $request, $examId)
@@ -4856,7 +4922,6 @@ class StudentTestController extends Controller
             ], 403);
         }
 
-
         $exam = Exam::with(['questions.answers', 'contentBlocks'])
             ->where('eId', $examId)
             ->where('age_group', 'kids')
@@ -4868,12 +4933,21 @@ class StudentTestController extends Controller
         }
 
         $duration = $exam->eDuration_minutes ?? 30;
+        $assignmentId = $this->resolveActiveAssignmentIdForExam($user, (int) $examId);
 
         $existing = Submission::with('answers')
             ->where('user_id', $user->uId)
             ->where('exam_id', $examId)
-            ->whereNull('assignment_id')
             ->where('sStatus', 'in_progress')
+            ->when($assignmentId, function ($q) use ($assignmentId) {
+                $q->where(function ($qq) use ($assignmentId) {
+                    $qq->where('assignment_id', $assignmentId)
+                        ->orWhereNull('assignment_id');
+                });
+            }, function ($q) {
+                $q->whereNull('assignment_id');
+            })
+            ->orderByRaw('CASE WHEN assignment_id IS NULL THEN 1 ELSE 0 END')
             ->orderByDesc('sId')
             ->first();
 
@@ -4885,6 +4959,10 @@ class StudentTestController extends Controller
 
         $timerState = null;
         if ($existing) {
+            if ($assignmentId && empty($existing->assignment_id)) {
+                $existing->assignment_id = $assignmentId;
+                $existing->save();
+            }
             $timerState = $this->computeTimerState($existing->sStart_time, (int) $duration);
             if ($timerState['expired']) {
                 $this->autoSubmit($existing);
@@ -4896,13 +4974,19 @@ class StudentTestController extends Controller
             $submission = $existing;
             $savedAnswers = $existing->answers;
         } else {
-            $attemptsUsed = Submission::where('user_id', $user->uId)
-                ->where('exam_id', $examId)
-                ->whereNull('assignment_id')
-                ->count();
+            $attemptsUsedQuery = Submission::where('user_id', $user->uId)
+                ->where('exam_id', $examId);
+            if ($assignmentId) {
+                $attemptsUsedQuery->where('assignment_id', $assignmentId);
+            } else {
+                $attemptsUsedQuery->whereNull('assignment_id');
+            }
+            $attemptsUsed = $attemptsUsedQuery->count();
+
             $submission = Submission::create([
                 'user_id' => $user->uId,
                 'exam_id' => $exam->eId,
+                'assignment_id' => $assignmentId,
                 'sAttempt' => $attemptsUsed + 1,
                 'sStart_time' => now(),
                 'sStatus' => 'in_progress',
@@ -5027,7 +5111,8 @@ class StudentTestController extends Controller
 
     /**
      * POST /api/student/exams/{examId}/start-teens
-     * Bắt đầu (hoặc resume) đề teens trực tiếp từ examId — KHÔNG cần assignment.
+     * Bắt đầu (hoặc resume) đề teens. Gắn assignment_id active để bài nộp
+     * xuất hiện ở tab "Bài giao" của giáo viên (source=assigned).
      * Trả về cùng shape với start(): { submissionId, exam, savedAnswers, timeRemaining }.
      */
     public function startTeensExamDirect(Request $request, $examId)
@@ -5046,7 +5131,6 @@ class StudentTestController extends Controller
             ], 403);
         }
 
-
         $exam = Exam::with(['questions.answers', 'contentBlocks'])
             ->where('eId', $examId)
             ->where('age_group', 'teens')
@@ -5059,12 +5143,23 @@ class StudentTestController extends Controller
         }
 
         $duration = $exam->eDuration_minutes ?? 30;
+        $assignmentId = $this->resolveActiveAssignmentIdForExam($user, (int) $examId);
 
+        // Resume: ưu tiên submission cùng assignment_id; fallback submission null
+        // (bài cũ tạo trước khi fix) rồi backfill assignment_id.
         $existing = Submission::with('answers')
             ->where('user_id', $user->uId)
             ->where('exam_id', $examId)
-            ->whereNull('assignment_id')
             ->where('sStatus', 'in_progress')
+            ->when($assignmentId, function ($q) use ($assignmentId) {
+                $q->where(function ($qq) use ($assignmentId) {
+                    $qq->where('assignment_id', $assignmentId)
+                        ->orWhereNull('assignment_id');
+                });
+            }, function ($q) {
+                $q->whereNull('assignment_id');
+            })
+            ->orderByRaw('CASE WHEN assignment_id IS NULL THEN 1 ELSE 0 END')
             ->orderByDesc('sId')
             ->first();
 
@@ -5076,6 +5171,11 @@ class StudentTestController extends Controller
 
         $timerState = null;
         if ($existing) {
+            // Backfill assignment_id nếu submission cũ bị null
+            if ($assignmentId && empty($existing->assignment_id)) {
+                $existing->assignment_id = $assignmentId;
+                $existing->save();
+            }
             $timerState = $this->computeTimerState($existing->sStart_time, (int) $duration);
             if ($timerState['expired']) {
                 $this->autoSubmit($existing);
@@ -5087,13 +5187,19 @@ class StudentTestController extends Controller
             $submission = $existing;
             $savedAnswers = $existing->answers;
         } else {
-            $attemptsUsed = Submission::where('user_id', $user->uId)
-                ->where('exam_id', $examId)
-                ->whereNull('assignment_id')
-                ->count();
+            $attemptsUsedQuery = Submission::where('user_id', $user->uId)
+                ->where('exam_id', $examId);
+            if ($assignmentId) {
+                $attemptsUsedQuery->where('assignment_id', $assignmentId);
+            } else {
+                $attemptsUsedQuery->whereNull('assignment_id');
+            }
+            $attemptsUsed = $attemptsUsedQuery->count();
+
             $submission = Submission::create([
                 'user_id' => $user->uId,
                 'exam_id' => $exam->eId,
+                'assignment_id' => $assignmentId,
                 'sAttempt' => $attemptsUsed + 1,
                 'sStart_time' => now(),
                 'sStatus' => 'in_progress',

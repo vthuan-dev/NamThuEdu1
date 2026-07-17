@@ -9,6 +9,7 @@ use App\Models\Submission;
 use App\Models\SubmissionAnswer;
 use App\Models\Exam;
 use App\Models\TeacherPinnedStudent;
+use App\Models\TestAssignment;
 use App\Models\User;
 
 class GradingController extends Controller
@@ -85,6 +86,13 @@ class GradingController extends Controller
             } else {
                 $query->whereNotNull('teacher_reviewed_at');
             }
+        }
+
+        // Backfill: submission đã nộp nhưng thiếu assignment_id (bug start-direct
+        // teens/kids/VSTEP cũ) → gắn assignment active để vào tab "Bài giao".
+        // Chạy trước filter source=assigned, giới hạn theo đề của giáo viên này.
+        if ($request->get('source', 'assigned') !== 'practice') {
+            $this->backfillMissingAssignmentIds($user->uId);
         }
 
         // Filter by source: assigned (default) or practice (self-study)
@@ -2017,5 +2025,64 @@ class GradingController extends Controller
                 'student_ids' => $studentIds,
             ],
         ]);
+    }
+
+    /**
+     * Gắn assignment_id cho các submission đã nộp nhưng bị null.
+     * Bug gốc: start-teens/start-kids/start-direct tạo submission không
+     * set assignment_id → tab "Bài giao" (source=assigned) của giáo viên
+     * không thấy bài. Chỉ backfill khi học viên có đúng 1 assignment active
+     * khớp exam (tránh gán nhầm nếu có nhiều lần giao).
+     */
+    private function backfillMissingAssignmentIds(int $teacherId): void
+    {
+        $orphans = Submission::query()
+            ->whereNull('assignment_id')
+            ->whereNotIn('sStatus', ['draft', 'in_progress'])
+            ->whereHas('exam', function ($q) use ($teacherId) {
+                $q->where('eTeacher_id', $teacherId);
+            })
+            ->with(['user:uId,class_id'])
+            ->limit(200)
+            ->get(['sId', 'user_id', 'exam_id', 'assignment_id']);
+
+        if ($orphans->isEmpty()) {
+            return;
+        }
+
+        foreach ($orphans as $sub) {
+            if (!$sub->user || !$sub->exam_id) {
+                continue;
+            }
+            $student = $sub->user;
+            $classIds = $student->class_id ? [$student->class_id] : [];
+
+            $candidates = TestAssignment::where('exam_id', $sub->exam_id)
+                ->where(function ($q) use ($student, $classIds) {
+                    $q->where(function ($qq) use ($student) {
+                        $qq->where('taTarget_type', 'student')
+                            ->where('taTarget_id', $student->uId);
+                    })->orWhere(function ($qq) use ($classIds) {
+                        if (empty($classIds)) {
+                            $qq->whereRaw('1 = 0');
+                            return;
+                        }
+                        $qq->where('taTarget_type', 'class')
+                            ->whereIn('taTarget_id', $classIds);
+                    });
+                })
+                ->orderByRaw("CASE WHEN taTarget_type = 'student' THEN 0 ELSE 1 END")
+                ->orderByDesc('taId')
+                ->limit(2)
+                ->get(['taId']);
+
+            // Chỉ gán khi có đúng 1 candidate (hoặc lấy newest nếu >1 nhưng
+            // student-target ưu tiên — vẫn an toàn lấy newest sau sort).
+            if ($candidates->isEmpty()) {
+                continue;
+            }
+            $sub->assignment_id = (int) $candidates->first()->taId;
+            $sub->save();
+        }
     }
 }
