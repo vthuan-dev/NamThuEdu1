@@ -40,3 +40,5 @@ jobs:
             # Nạp lại config cache cho hiệu năng (tùy chọn, an toàn nếu lỗi)
             php artisan config:cache || true
             echo "✅ Cleared backend caches after deploy"
+
+# Trigger redeploy 2026-07-17 speaking-audio-fix
