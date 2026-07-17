@@ -21,6 +21,9 @@ import {
   Loader2,
   Trash2,
   Pin,
+  FileText,
+  Target,
+  GraduationCap,
 } from "lucide-react";
 import { Header } from "../../../components/shared/Header";
 import { useHideTeacherHeader } from "../../../../contexts/TeacherHeaderContext";
@@ -328,6 +331,7 @@ export function GradingQueue() {
       studentAvatar: string;
       studentAvatarUrl: string | null;
       ageGroup: string;
+      className: string;
       submissions: Submission[];
     }>();
 
@@ -340,6 +344,7 @@ export function GradingQueue() {
           studentAvatar: sub.studentAvatar,
           studentAvatarUrl: sub.studentAvatarUrl || null,
           ageGroup: sub.ageGroup,
+          className: sub.className || "",
           submissions: [],
         });
       }
@@ -1050,12 +1055,86 @@ export function GradingQueue() {
                   <div key={selectedStudentName} className="flex flex-col gap-5 animate-fade-in-up">
                                         {/* Header: Student Info */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-3">
-                      <div>
-                        <h2 className="text-lg font-bold text-slate-800">{selectedStudentData.studentName}</h2>
-                        <p className="text-xs text-slate-500 mt-1">
-                          Nhóm tuổi: <span className="capitalize font-semibold text-slate-600">{selectedStudentData.ageGroup === "kids" ? "Trẻ em" : selectedStudentData.ageGroup === "teens" ? "Thiếu niên" : selectedStudentData.ageGroup === "adults" ? "Người lớn" : selectedStudentData.ageGroup}</span> ·
-                          Tổng bài nộp: <span className="font-semibold text-slate-600">{selectedStudentData.submissions.length}</span>
-                        </p>
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        {/* Avatar học viên */}
+                        <div className="relative flex-shrink-0">
+                          {selectedStudentData.studentAvatarUrl ? (
+                            <img
+                              src={getAssetUrl(selectedStudentData.studentAvatarUrl)}
+                              alt={selectedStudentData.studentName}
+                              className="w-12 h-12 rounded-full object-cover border border-slate-100 bg-slate-50"
+                              onError={(e) => {
+                                const target = e.currentTarget;
+                                if (!target.src.endsWith("/images/default-avatar.png")) {
+                                  target.src = "/images/default-avatar.png";
+                                }
+                              }}
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center font-bold text-base">
+                              {selectedStudentData.studentAvatar}
+                            </div>
+                          )}
+                          <span
+                            className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white ${
+                              selectedStudentData.ageGroup === "kids" ? "bg-rose-500" : selectedStudentData.ageGroup === "teens" ? "bg-sky-500" : "bg-violet-500"
+                            }`}
+                            title={selectedStudentData.ageGroup}
+                          />
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h2 className="text-lg font-bold text-slate-800 truncate">{selectedStudentData.studentName}</h2>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold capitalize whitespace-nowrap">
+                              {selectedStudentData.ageGroup === "kids" ? "Trẻ em" : selectedStudentData.ageGroup === "teens" ? "Thiếu niên" : selectedStudentData.ageGroup === "adults" ? "Người lớn" : selectedStudentData.ageGroup}
+                            </span>
+                          </div>
+                          {/* Chỉ số nhanh của học viên */}
+                          <div className="flex items-center gap-x-3 gap-y-1 mt-1.5 flex-wrap text-xs">
+                            {selectedStudentData.className && (
+                              <span className="inline-flex items-center gap-1 text-slate-500 whitespace-nowrap">
+                                <GraduationCap className="w-3.5 h-3.5 text-slate-400" />
+                                Lớp: <span className="font-semibold text-slate-700">{selectedStudentData.className}</span>
+                              </span>
+                            )}
+                            <span className="inline-flex items-center gap-1 text-slate-500 whitespace-nowrap">
+                              <FileText className="w-3.5 h-3.5 text-slate-400" />
+                              <span className="font-semibold text-slate-700">{selectedStudentData.submissions.length}</span> bài nộp
+                            </span>
+                            {(() => {
+                              const subs = selectedStudentData.submissions;
+                              const pending = subs.filter((s) => !s.teacher_reviewed_at).length;
+                              const reviewed = subs.length - pending;
+                              const scored = subs.filter((s) => typeof s.score === "number");
+                              const avg = scored.length > 0
+                                ? scored.reduce((sum, s) => sum + (s.score as number), 0) / scored.length
+                                : null;
+                              return (
+                                <>
+                                  {sourceTab === "assigned" && pending > 0 && (
+                                    <span className="inline-flex items-center gap-1 text-amber-600 font-semibold whitespace-nowrap">
+                                      <Clock className="w-3.5 h-3.5" />
+                                      {pending} chờ duyệt
+                                    </span>
+                                  )}
+                                  {sourceTab === "assigned" && reviewed > 0 && (
+                                    <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold whitespace-nowrap">
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      {reviewed} đã duyệt
+                                    </span>
+                                  )}
+                                  {avg !== null && (
+                                    <span className="inline-flex items-center gap-1 text-violet-600 font-semibold whitespace-nowrap">
+                                      <Target className="w-3.5 h-3.5" />
+                                      TB: {avg.toFixed(2)}
+                                    </span>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </div>
                       </div>
 
                       {/* Compact Bulk approval actions */}
