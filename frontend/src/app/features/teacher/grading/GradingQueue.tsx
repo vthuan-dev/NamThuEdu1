@@ -24,6 +24,10 @@ import {
   FileText,
   Target,
   GraduationCap,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  X,
 } from "lucide-react";
 import { Header } from "../../../components/shared/Header";
 import { useHideTeacherHeader } from "../../../../contexts/TeacherHeaderContext";
@@ -130,6 +134,7 @@ export function GradingQueue() {
   }), [t]);
 
   const [searchQuery, setSearchQuery]   = useState("");
+  const [tableSearch, setTableSearch]   = useState(""); // tìm trong bảng bài làm của học viên đang chọn
   const [selectedStudentName, setSelectedStudentName] = useState<string | null>(null);
   // Học viên được ghim — lưu theo tài khoản GV trong DB (đồng bộ mọi thiết bị).
   // Set chứa student_id (string) đã ghim.
@@ -142,8 +147,9 @@ export function GradingQueue() {
   const [filterRole, setFilterRole]     = useState("");   // theo role học viên (age_group)
   const [sourceTab, setSourceTab]       = useState<'assigned' | 'practice'>('assigned');
   const [reviewTab, setReviewTab]       = useState<ReviewTab>("all");
-  const [sortField, setSortField] = useState<'score' | 'time' | 'gradedTime' | null>(null);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  type SortField = "exam" | "time" | "status" | "score" | "gradedTime";
+  const [sortField, setSortField] = useState<SortField | null>("time");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [submissions, setSubmissions]   = useState<Submission[]>([]);
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState<string | null>(null);
@@ -286,40 +292,53 @@ export function GradingQueue() {
     return s.studentName.toLowerCase().includes(q) || s.examTitle.toLowerCase().includes(q);
   }), [baseList, searchQuery, filterExam, filterClass, filterRole]);
 
-  const handleSort = (field: 'score' | 'time' | 'gradedTime') => {
+  const handleSort = (field: SortField) => {
     if (sortField === field) {
-      if (sortDirection === 'desc') {
-        setSortDirection('asc');
-      } else {
-        setSortField(null);
+      // Toggle asc ↔ desc; click lần 3 reset về default (time desc)
+      if (sortDirection === "desc") {
+        setSortDirection("asc");
+      } else if (sortDirection === "asc") {
+        setSortField("time");
+        setSortDirection("desc");
       }
     } else {
       setSortField(field);
-      setSortDirection('desc');
+      // Mặc định: tên đề A→Z; còn lại mới nhất / cao nhất trước
+      setSortDirection(field === "exam" ? "asc" : "desc");
     }
   };
 
   const sortedAndFiltered = useMemo(() => {
     let list = [...filtered];
-    if (sortField === "score") {
-      list.sort((a, b) => {
+    if (!sortField) return list;
+
+    const statusRank: Record<string, number> = {
+      submitted: 1,
+      grading_subjective: 2,
+      partially_graded: 3,
+      graded: 4,
+      in_progress: 0,
+    };
+
+    list.sort((a, b) => {
+      let cmp = 0;
+      if (sortField === "exam") {
+        cmp = a.examTitle.localeCompare(b.examTitle, "vi", { sensitivity: "base" });
+      } else if (sortField === "score") {
         const scoreA = a.score !== undefined ? a.score / (a.maxScore / 10) : -1;
         const scoreB = b.score !== undefined ? b.score / (b.maxScore / 10) : -1;
-        return sortDirection === "asc" ? scoreA - scoreB : scoreB - scoreA;
-      });
-    } else if (sortField === "time") {
-      list.sort((a, b) => {
-        const timeA = a.submissionTime.getTime();
-        const timeB = b.submissionTime.getTime();
-        return sortDirection === "asc" ? timeA - timeB : timeB - timeA;
-      });
-    } else if (sortField === "gradedTime") {
-      list.sort((a, b) => {
+        cmp = scoreA - scoreB;
+      } else if (sortField === "time") {
+        cmp = a.submissionTime.getTime() - b.submissionTime.getTime();
+      } else if (sortField === "gradedTime") {
         const timeA = a.gradedTime ? a.gradedTime.getTime() : 0;
         const timeB = b.gradedTime ? b.gradedTime.getTime() : 0;
-        return sortDirection === "asc" ? timeA - timeB : timeB - timeA;
-      });
-    }
+        cmp = timeA - timeB;
+      } else if (sortField === "status") {
+        cmp = (statusRank[a.status] ?? 99) - (statusRank[b.status] ?? 99);
+      }
+      return sortDirection === "asc" ? cmp : -cmp;
+    });
     return list;
   }, [filtered, sortField, sortDirection]);
 
@@ -425,14 +444,61 @@ export function GradingQueue() {
     return studentList.find((s) => s.studentName === selectedStudentName) || null;
   }, [studentList, selectedStudentName]);
 
-    const selectedStudentSubmissions = useMemo(() => {
-    return selectedStudentData?.submissions || [];
-  }, [selectedStudentData]);
+  const selectedStudentSubmissions = useMemo(() => {
+    let list = selectedStudentData?.submissions || [];
+    if (tableSearch.trim()) {
+      const q = tableSearch.toLowerCase().trim();
+      list = list.filter((s) =>
+        s.examTitle.toLowerCase().includes(q) ||
+        s.examType.toLowerCase().includes(q) ||
+        s.status.toLowerCase().includes(q) ||
+        (s.score !== undefined && String(s.score).includes(q)) ||
+        formatTime(s.submissionTime).toLowerCase().includes(q) ||
+        (s.gradedTime ? formatTime(s.gradedTime).toLowerCase().includes(q) : false)
+      );
+    }
+
+    // Sort lại trong bảng chi tiết (đảm bảo click thead luôn có hiệu lực)
+    if (sortField) {
+      const statusRank: Record<string, number> = {
+        submitted: 1,
+        grading_subjective: 2,
+        partially_graded: 3,
+        graded: 4,
+        in_progress: 0,
+      };
+      list = [...list].sort((a, b) => {
+        let cmp = 0;
+        if (sortField === "exam") {
+          cmp = a.examTitle.localeCompare(b.examTitle, "vi", { sensitivity: "base" });
+        } else if (sortField === "score") {
+          const scoreA = a.score !== undefined ? a.score / (a.maxScore / 10) : -1;
+          const scoreB = b.score !== undefined ? b.score / (b.maxScore / 10) : -1;
+          cmp = scoreA - scoreB;
+        } else if (sortField === "time") {
+          cmp = a.submissionTime.getTime() - b.submissionTime.getTime();
+        } else if (sortField === "gradedTime") {
+          const timeA = a.gradedTime ? a.gradedTime.getTime() : 0;
+          const timeB = b.gradedTime ? b.gradedTime.getTime() : 0;
+          cmp = timeA - timeB;
+        } else if (sortField === "status") {
+          cmp = (statusRank[a.status] ?? 99) - (statusRank[b.status] ?? 99);
+        }
+        return sortDirection === "asc" ? cmp : -cmp;
+      });
+    }
+    return list;
+  }, [selectedStudentData, tableSearch, sortField, sortDirection]);
 
   // Reset page when selection or filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedStudentName, sourceTab, searchQuery, filterExam, filterClass, filterRole]);
+  }, [selectedStudentName, sourceTab, searchQuery, filterExam, filterClass, filterRole, tableSearch, sortField, sortDirection]);
+
+  // Clear table search when đổi học viên
+  useEffect(() => {
+    setTableSearch("");
+  }, [selectedStudentName]);
 
   const totalItems = selectedStudentSubmissions.length;
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
@@ -1206,6 +1272,57 @@ export function GradingQueue() {
                       )}
                     </div>
 
+                    {/* Search trong bảng bài làm + sort hint */}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+                      <div className="relative flex-1 min-w-[200px] max-w-md">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input
+                          type="text"
+                          value={tableSearch}
+                          onChange={(e) => setTableSearch(e.target.value)}
+                          placeholder="Tìm đề thi, trạng thái, điểm..."
+                          className="w-full pl-9 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                          aria-label="Tìm kiếm trong bảng bài làm"
+                        />
+                        {tableSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setTableSearch("")}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-slate-200 text-slate-500 hover:bg-slate-300 flex items-center justify-center"
+                            aria-label="Xóa tìm kiếm"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                        {tableSearch.trim() && (
+                          <span className="px-2 py-1 rounded-lg bg-violet-50 text-violet-600 font-semibold">
+                            {selectedStudentSubmissions.length} kết quả
+                          </span>
+                        )}
+                        {sortField && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-50 border border-slate-100">
+                            Sắp xếp:{" "}
+                            <span className="font-semibold text-slate-600">
+                              {sortField === "exam"
+                                ? "Đề thi"
+                                : sortField === "time"
+                                  ? "Thời gian nộp"
+                                  : sortField === "status"
+                                    ? "Trạng thái"
+                                    : sortField === "score"
+                                      ? "Điểm"
+                                      : "Thời gian chấm"}
+                            </span>
+                            <span className="text-violet-600 font-bold">
+                              {sortDirection === "asc" ? "↑ ASC" : "↓ DESC"}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
                     {/* Table of Submissions */}
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-[600px]">
@@ -1226,52 +1343,97 @@ export function GradingQueue() {
                                 />
                               </th>
                             )}
-                            <th className={`px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider ${sourceTab !== "assigned" ? "rounded-tl-2xl" : ""}`}>
-                              {t("teacher.grading.table.exam")}
+                            <th
+                              onClick={() => handleSort("exam")}
+                              className={`px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group ${sourceTab !== "assigned" ? "rounded-tl-2xl" : ""}`}
+                              title="Sắp xếp theo tên đề thi"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>{t("teacher.grading.table.exam")}</span>
+                                {sortField === "exam" ? (
+                                  sortDirection === "asc" ? (
+                                    <ArrowUp className="w-3.5 h-3.5 text-violet-600" />
+                                  ) : (
+                                    <ArrowDown className="w-3.5 h-3.5 text-violet-600" />
+                                  )
+                                ) : (
+                                  <ArrowUpDown className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                )}
+                              </div>
                             </th>
                             <th
                               onClick={() => handleSort("time")}
                               className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group"
+                              title="Sắp xếp theo thời gian nộp"
                             >
                               <div className="flex items-center gap-1">
                                 <span>{t("teacher.grading.table.submissionTime")}</span>
                                 {sortField === "time" ? (
-                                  <span className="text-violet-600 font-bold">{sortDirection === "asc" ? "▲" : "▼"}</span>
+                                  sortDirection === "asc" ? (
+                                    <ArrowUp className="w-3.5 h-3.5 text-violet-600" />
+                                  ) : (
+                                    <ArrowDown className="w-3.5 h-3.5 text-violet-600" />
+                                  )
                                 ) : (
-                                  <span className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity">↕</span>
+                                  <ArrowUpDown className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                                 )}
                               </div>
                             </th>
-                            <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                              {t("teacher.grading.table.status")}
+                            <th
+                              onClick={() => handleSort("status")}
+                              className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group"
+                              title="Sắp xếp theo trạng thái"
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>{t("teacher.grading.table.status")}</span>
+                                {sortField === "status" ? (
+                                  sortDirection === "asc" ? (
+                                    <ArrowUp className="w-3.5 h-3.5 text-violet-600" />
+                                  ) : (
+                                    <ArrowDown className="w-3.5 h-3.5 text-violet-600" />
+                                  )
+                                ) : (
+                                  <ArrowUpDown className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                )}
+                              </div>
                             </th>
                             <th
                               onClick={() => handleSort("score")}
                               className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group"
+                              title="Sắp xếp theo điểm"
                             >
                               <div className="flex items-center gap-1">
                                 <span>{t("teacher.grading.table.aiScore")}</span>
                                 {sortField === "score" ? (
-                                  <span className="text-violet-600 font-bold">{sortDirection === "asc" ? "▲" : "▼"}</span>
+                                  sortDirection === "asc" ? (
+                                    <ArrowUp className="w-3.5 h-3.5 text-violet-600" />
+                                  ) : (
+                                    <ArrowDown className="w-3.5 h-3.5 text-violet-600" />
+                                  )
                                 ) : (
-                                  <span className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity">↕</span>
+                                  <ArrowUpDown className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                                 )}
                               </div>
                             </th>
                             <th
                               onClick={() => handleSort("gradedTime")}
                               className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group"
+                              title="Sắp xếp theo thời gian chấm"
                             >
                               <div className="flex items-center gap-1">
                                 <span>{t("teacher.grading.table.gradedAt")}</span>
                                 {sortField === "gradedTime" ? (
-                                  <span className="text-violet-600 font-bold">{sortDirection === "asc" ? "▲" : "▼"}</span>
+                                  sortDirection === "asc" ? (
+                                    <ArrowUp className="w-3.5 h-3.5 text-violet-600" />
+                                  ) : (
+                                    <ArrowDown className="w-3.5 h-3.5 text-violet-600" />
+                                  )
                                 ) : (
-                                  <span className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity">↕</span>
+                                  <ArrowUpDown className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                                 )}
                               </div>
                             </th>
-                            {sourceTab === 'assigned' && (
+                            {sourceTab === "assigned" && (
                               <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                                 {t("teacher.grading.table.review")}
                               </th>
@@ -1509,7 +1671,33 @@ export function GradingQueue() {
                               </tr>
                             );
                           })}
-                                                </tbody>
+                          {paginatedSubmissions.length === 0 && (
+                            <tr>
+                              <td
+                                colSpan={sourceTab === "assigned" ? 7 : 6}
+                                className="px-4 py-12 text-center"
+                              >
+                                <div className="flex flex-col items-center gap-2">
+                                  <Search className="w-8 h-8 text-slate-300" />
+                                  <p className="text-sm font-semibold text-slate-500">
+                                    {tableSearch.trim()
+                                      ? `Không tìm thấy bài phù hợp với “${tableSearch.trim()}”`
+                                      : "Chưa có bài làm"}
+                                  </p>
+                                  {tableSearch.trim() && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setTableSearch("")}
+                                      className="text-xs font-bold text-violet-600 hover:text-violet-700"
+                                    >
+                                      Xóa tìm kiếm
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
                       </table>
                     </div>
                     {/* Pagination Controls */}
