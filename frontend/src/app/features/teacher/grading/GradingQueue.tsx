@@ -20,6 +20,7 @@ import {
   CheckSquare,
   Loader2,
   Trash2,
+  Pin,
 } from "lucide-react";
 import { Header } from "../../../components/shared/Header";
 import { useHideTeacherHeader } from "../../../../contexts/TeacherHeaderContext";
@@ -126,6 +127,15 @@ export function GradingQueue() {
 
   const [searchQuery, setSearchQuery]   = useState("");
   const [selectedStudentName, setSelectedStudentName] = useState<string | null>(null);
+  // Học viên được ghim — lưu localStorage để giáo viên dễ tìm ở lần sau
+  const [pinnedStudents, setPinnedStudents] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem("grading_pinned_students");
+      return raw ? new Set<string>(JSON.parse(raw)) : new Set<string>();
+    } catch {
+      return new Set<string>();
+    }
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
   const [filterStatus, setFilterStatus] = useState("");
@@ -338,8 +348,27 @@ export function GradingQueue() {
       map.get(key)!.submissions.push(sub);
     });
 
-    return Array.from(map.values());
-  }, [sortedAndFiltered]);
+    const list = Array.from(map.values());
+    // Ghim: học viên được ghim luôn nổi lên đầu (giữ nguyên thứ tự tương đối bên trong)
+    return list.sort((a, b) => {
+      const pa = pinnedStudents.has(a.studentName) ? 1 : 0;
+      const pb = pinnedStudents.has(b.studentName) ? 1 : 0;
+      return pb - pa;
+    });
+  }, [sortedAndFiltered, pinnedStudents]);
+
+  // Ghim / bỏ ghim học viên — lưu vào localStorage để giữ giữa các phiên
+  const togglePin = useCallback((studentName: string) => {
+    setPinnedStudents((prev) => {
+      const next = new Set(prev);
+      if (next.has(studentName)) next.delete(studentName);
+      else next.add(studentName);
+      try {
+        localStorage.setItem("grading_pinned_students", JSON.stringify(Array.from(next)));
+      } catch { /* ignore quota errors */ }
+      return next;
+    });
+  }, []);
 
   // Automatically select the first student or update active selection
   useEffect(() => {
@@ -870,24 +899,39 @@ export function GradingQueue() {
             <div className="flex flex-col lg:flex-row gap-6 items-start">
                             {/* Left Panel: Student List Sidebar (320px) */}
               <div className="w-full lg:w-[320px] lg:flex-shrink-0 bg-white border border-slate-100 rounded-2xl p-4 flex flex-col gap-3 shadow-sm">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1 flex items-center gap-1.5">
                   Danh sách học sinh ({studentList.length})
+                  {pinnedStudents.size > 0 && (
+                    <span className="inline-flex items-center gap-0.5 text-amber-500 normal-case">
+                      <Pin className="w-3 h-3 fill-amber-500" /> {pinnedStudents.size}
+                    </span>
+                  )}
                 </p>
                 <div className="flex flex-col gap-2 max-h-[600px] overflow-y-auto pr-1 scrollbar-thin">
                   {studentList.map((stu) => {
                     const isSelected = stu.studentName === selectedStudentName;
+                    const isPinned = pinnedStudents.has(stu.studentName);
                     const pendingCount = sourceTab === 'assigned'
                       ? stu.submissions.filter((s) => !s.teacher_reviewed_at).length
                       : 0;
                     return (
-                      <button
+                      <div
                         key={stu.studentName}
-                        type="button"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => setSelectedStudentName(stu.studentName)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedStudentName(stu.studentName);
+                          }
+                        }}
                         className={`group relative flex items-center gap-3 text-left p-3.5 rounded-xl border transition-all duration-200 active:scale-[0.99] overflow-hidden cursor-pointer ${
                           isSelected
                             ? "bg-violet-50/60 border-violet-200 shadow-sm pl-4"
-                            : "bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/40 hover:translate-x-0.5"
+                            : isPinned
+                              ? "bg-amber-50/40 border-amber-200 hover:border-amber-300 hover:bg-amber-50/60"
+                              : "bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/40 hover:translate-x-0.5"
                         }`}
                       >
                         {isSelected && (
@@ -922,16 +966,39 @@ export function GradingQueue() {
                             {stu.submissions.length} bài thi · <span className="capitalize">{stu.ageGroup === "kids" ? "Trẻ em" : stu.ageGroup === "teens" ? "Thiếu niên" : stu.ageGroup === "adults" ? "Người lớn" : stu.ageGroup}</span>
                           </p>
                         </div>
-                        {pendingCount > 0 ? (
-                          <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-extrabold text-[10px] flex-shrink-0 animate-pulse">
-                            {pendingCount}
-                          </span>
-                        ) : (
-                          <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[10px] flex-shrink-0">
-                            ✓
-                          </span>
-                        )}
-                      </button>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {pendingCount > 0 ? (
+                            <span className="w-5 h-5 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center font-extrabold text-[10px] animate-pulse">
+                              {pendingCount}
+                            </span>
+                          ) : (
+                            <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-[10px]">
+                              ✓
+                            </span>
+                          )}
+                          {/* Ghim / bỏ ghim học viên */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              togglePin(stu.studentName);
+                            }}
+                            className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
+                              isPinned
+                                ? "text-amber-500 hover:bg-amber-100"
+                                : "text-slate-300 hover:text-amber-500 hover:bg-amber-50 opacity-0 group-hover:opacity-100"
+                            }`}
+                            title={isPinned ? "Bỏ ghim học viên" : "Ghim học viên lên đầu"}
+                            aria-label={isPinned ? "Bỏ ghim học viên" : "Ghim học viên"}
+                          >
+                            {isPinned ? (
+                              <Pin className="w-3.5 h-3.5 fill-amber-500" />
+                            ) : (
+                              <Pin className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
                     );
                   })}
                   {studentList.length === 0 && (
