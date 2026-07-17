@@ -1469,7 +1469,9 @@ export function GradingQueue() {
                                         }`}
                                       >
                                         <UserCheck className="w-3.5 h-3.5" />
-                                        {isReviewed ? t("teacher.grading.queuePage.reviewAgain") : t("teacher.grading.queuePage.review")}
+                                        {isReviewed
+                                          ? "Đã xét duyệt"
+                                          : t("teacher.grading.queuePage.review")}
                                       </button>
                                     </div>
 
