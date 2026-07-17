@@ -168,7 +168,10 @@ class StudentTestController extends Controller
             $attemptsUsed = $subs->count();
             $inProgressSub = $subs->firstWhere('sStatus', 'in_progress');
             $finishedSub = $subs->first(function ($s) {
-                return in_array($s->sStatus, ['submitted', 'graded']);
+                return in_array($s->sStatus, [
+                    'submitted', 'graded', 'auto_submitted',
+                    'grading_subjective', 'partially_graded', 'ai_graded',
+                ], true);
             });
 
             // Single-bucket classification: in_progress > completed > pending
@@ -870,8 +873,9 @@ class StudentTestController extends Controller
 
         // Backfill assignment_id nếu submission tạo trước khi fix (null) —
         // để bài nộp Teens/Kids/VSTEP vào đúng tab "Bài giao" của giáo viên.
+        // includeExpired=true: bài đã nộp trước deadline vẫn gắn được dù assignment hết hạn.
         if (empty($submission->assignment_id) && $submission->exam_id) {
-            $resolvedAid = $this->resolveActiveAssignmentIdForExam($user, (int) $submission->exam_id);
+            $resolvedAid = $this->resolveActiveAssignmentIdForExam($user, (int) $submission->exam_id, true);
             if ($resolvedAid) {
                 $submission->assignment_id = $resolvedAid;
                 $submission->save();
@@ -1969,10 +1973,6 @@ class StudentTestController extends Controller
     }
 
     /**
-     * Check if student is eligible for assignment
-     */
-
-    /**
      * Policy: học viên chỉ được xem/làm đề khi đã được giao (assignment).
      * Dùng cho browse + start-direct để chặn full bank / URL guess.
      */
@@ -2006,14 +2006,16 @@ class StudentTestController extends Controller
     }
 
     /**
-     * Lấy taId assignment active mới nhất của học viên cho exam.
+     * Lấy taId assignment mới nhất của học viên cho exam.
      * Dùng khi start-direct (teens/kids/VSTEP/IELTS) để gắn assignment_id
      * vào submission — nếu không gắn, tab "Bài giao" của giáo viên
      * (source=assigned → whereNotNull assignment_id) sẽ không thấy bài nộp.
      *
-     * Ưu tiên: assignment theo student → assignment theo class; deadline còn hạn.
+     * Ưu tiên: assignment theo student → assignment theo class.
+     * $includeExpired=false (default): chỉ assignment còn hạn (cho start).
+     * $includeExpired=true: kể cả quá hạn (cho backfill bài đã nộp).
      */
-    private function resolveActiveAssignmentIdForExam($user, int $examId): ?int
+    private function resolveActiveAssignmentIdForExam($user, int $examId, bool $includeExpired = false): ?int
     {
         if (!$user) {
             return null;
@@ -2034,15 +2036,20 @@ class StudentTestController extends Controller
                     $qq->where('taTarget_type', 'class')
                         ->whereIn('taTarget_id', $classIds);
                 });
-            })
-            ->where(function ($q) {
-                $q->whereNull('taDeadline')->orWhere('taDeadline', '>=', now());
-            })
-            // student-target ưu tiên hơn class-target
-            ->orderByRaw("CASE WHEN taTarget_type = 'student' THEN 0 ELSE 1 END")
-            ->orderByDesc('taId');
+            });
 
-        $assignment = $query->first();
+        if (!$includeExpired) {
+            $query->where(function ($q) {
+                $q->whereNull('taDeadline')->orWhere('taDeadline', '>=', now());
+            });
+        }
+
+        // student-target ưu tiên hơn class-target
+        $assignment = $query
+            ->orderByRaw("CASE WHEN taTarget_type = 'student' THEN 0 ELSE 1 END")
+            ->orderByDesc('taId')
+            ->first();
+
         return $assignment ? (int) $assignment->taId : null;
     }
 

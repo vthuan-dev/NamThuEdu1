@@ -11,6 +11,8 @@ use App\Models\Exam;
 use App\Models\TeacherPinnedStudent;
 use App\Models\TestAssignment;
 use App\Models\User;
+use App\Models\Classes;
+use App\Models\ClassCoTeacher;
 
 class GradingController extends Controller
 {
@@ -53,10 +55,11 @@ class GradingController extends Controller
             ], 401);
         }
 
-        $query = Submission::with(['user.class', 'exam'])
-                          ->whereHas('exam', function($q) use ($user) {
-                              $q->where('eTeacher_id', $user->uId);
-                          });
+        // Quyền xem: chủ đề HOẶC GV/co-GV của lớp học viên/assignment.
+        // Trước đây chỉ eTeacher_id → GV giao đề ngân hàng (eTeacher_id = người khác)
+        // sẽ không thấy bài học viên đã nộp.
+        $query = Submission::with(['user.class', 'exam']);
+        $this->applyTeacherSubmissionAccess($query, $user);
 
         // Filter by exam_id
         if ($request->has('exam_id')) {
@@ -153,13 +156,10 @@ class GradingController extends Controller
         }
 
         $submission = Submission::where('sId', $id)
-                                ->whereHas('exam', function($q) use ($user) {
-                                    $q->where('eTeacher_id', $user->uId);
-                                })
                                 ->with(['user', 'exam.questions.answers', 'answers.question'])
                                 ->first();
 
-        if (!$submission) {
+        if (!$submission || !$this->teacherCanAccessSubmission($user, $submission)) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Không tìm thấy bài làm.'
@@ -311,21 +311,21 @@ class GradingController extends Controller
             ], 401);
         }
 
-        $submission = Submission::with('exam')
+        $submission = Submission::with(['exam', 'user'])
                                 ->where('sId', $id)
-                                ->whereHas('exam', function($q) use ($user) {
-                                    $q->where('eTeacher_id', $user->uId);
-                                })
                                 ->first();
 
-        if (!$submission) {
+        if (!$submission || !$this->teacherCanAccessSubmission($user, $submission)) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Không tìm thấy bài làm.'
             ], 404);
         }
 
-        if (!in_array($submission->sStatus, ['submitted', 'graded', 'in_progress', 'partially_graded', 'ai_graded'])) {
+        if (!in_array($submission->sStatus, [
+            'submitted', 'graded', 'in_progress', 'partially_graded',
+            'ai_graded', 'grading_subjective', 'auto_submitted',
+        ])) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Bài làm chưa được nộp.'
@@ -682,13 +682,10 @@ class GradingController extends Controller
         }
 
         $submission = Submission::where('sId', $id)
-                                ->whereHas('exam', function($q) use ($user) {
-                                    $q->where('eTeacher_id', $user->uId);
-                                })
-                                ->with(['answers.question.answers'])
+                                ->with(['answers.question.answers', 'exam', 'user'])
                                 ->first();
 
-        if (!$submission) {
+        if (!$submission || !$this->teacherCanAccessSubmission($user, $submission)) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Không tìm thấy bài làm.'
@@ -799,13 +796,11 @@ class GradingController extends Controller
             ], 401);
         }
 
-        $submission = Submission::where('sId', $id)
-                                ->whereHas('exam', function($q) use ($user) {
-                                    $q->where('eTeacher_id', $user->uId);
-                                })
+        $submission = Submission::with(['exam', 'user'])
+                                ->where('sId', $id)
                                 ->first();
 
-        if (!$submission) {
+        if (!$submission || !$this->teacherCanAccessSubmission($user, $submission)) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Không tìm thấy bài làm.'
@@ -952,10 +947,8 @@ class GradingController extends Controller
         // Build query for submissions
         $submissionsQuery = Submission::with(['user', 'exam'])
                                      ->whereIn('user_id', $studentIds)
-                                     ->whereHas('exam', function($q) use ($user) {
-                                         $q->where('eTeacher_id', $user->uId);
-                                     })
                                      ->where('sStatus', 'graded');
+        $this->applyTeacherSubmissionAccess($submissionsQuery, $user);
 
         // Filter by exam if specified
         if ($request->has('exam_id')) {
@@ -1017,10 +1010,9 @@ class GradingController extends Controller
             ], 401);
         }
 
-        $submissions = Submission::whereHas('exam', function($q) use ($user) {
-                                    $q->where('eTeacher_id', $user->uId);
-                                 })
-                                 ->get();
+        $submissionsQuery = Submission::query();
+        $this->applyTeacherSubmissionAccess($submissionsQuery, $user);
+        $submissions = $submissionsQuery->get();
 
         $totalSubmissions = $submissions->count();
         // "Đã chấm" = đã có giáo viên xét duyệt (teacher_reviewed_at NOT NULL)
@@ -1688,11 +1680,11 @@ class GradingController extends Controller
         $feedback = $request->input('feedback');
 
         try {
-            $submissions = Submission::whereIn('sId', $ids)
-                ->whereHas('exam', function ($q) use ($user) {
-                    $q->where('eTeacher_id', $user->uId);
-                })
-                ->get();
+            $submissions = Submission::with(['exam', 'user'])
+                ->whereIn('sId', $ids)
+                ->get()
+                ->filter(fn ($s) => $this->teacherCanAccessSubmission($user, $s))
+                ->values();
 
             if ($submissions->isEmpty()) {
                 return response()->json([
@@ -1777,13 +1769,11 @@ class GradingController extends Controller
             ], 401);
         }
 
-        $submission = Submission::where('sId', $id)
-                                ->whereHas('exam', function($q) use ($user) {
-                                    $q->where('eTeacher_id', $user->uId);
-                                })
+        $submission = Submission::with(['exam', 'user'])
+                                ->where('sId', $id)
                                 ->first();
 
-        if (!$submission) {
+        if (!$submission || !$this->teacherCanAccessSubmission($user, $submission)) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Không tìm thấy bài làm hoặc bài làm không thuộc quyền quản lý của bạn.'
@@ -1842,11 +1832,11 @@ class GradingController extends Controller
         }
 
         // Lấy danh sách bài làm hợp lệ thuộc quyền của giáo viên
-        $submissions = Submission::whereIn('sId', $ids)
-                                 ->whereHas('exam', function($q) use ($user) {
-                                     $q->where('eTeacher_id', $user->uId);
-                                 })
-                                 ->get();
+        $submissions = Submission::with(['exam', 'user'])
+                                 ->whereIn('sId', $ids)
+                                 ->get()
+                                 ->filter(fn ($s) => $this->teacherCanAccessSubmission($user, $s))
+                                 ->values();
 
         if ($submissions->isEmpty()) {
             return response()->json([
@@ -2031,19 +2021,34 @@ class GradingController extends Controller
      * Gắn assignment_id cho các submission đã nộp nhưng bị null.
      * Bug gốc: start-teens/start-kids/start-direct tạo submission không
      * set assignment_id → tab "Bài giao" (source=assigned) của giáo viên
-     * không thấy bài. Chỉ backfill khi học viên có đúng 1 assignment active
-     * khớp exam (tránh gán nhầm nếu có nhiều lần giao).
+     * không thấy bài.
+     *
+     * Không lọc theo eTeacher_id: GV có thể giao đề ngân hàng của người khác.
+     * Không chặn assignment đã quá hạn: học viên có thể đã nộp trước deadline.
      */
     private function backfillMissingAssignmentIds(int $teacherId): void
     {
+        $managedClassIds = $this->teacherManagedClassIds($teacherId);
+        if (empty($managedClassIds)) {
+            // Vẫn cho phép backfill submission thuộc đề do chính GV tạo
+            // (học viên target=student, không có class).
+        }
+
         $orphans = Submission::query()
             ->whereNull('assignment_id')
             ->whereNotIn('sStatus', ['draft', 'in_progress'])
-            ->whereHas('exam', function ($q) use ($teacherId) {
-                $q->where('eTeacher_id', $teacherId);
+            ->where(function ($q) use ($teacherId, $managedClassIds) {
+                $q->whereHas('exam', function ($eq) use ($teacherId) {
+                    $eq->where('eTeacher_id', $teacherId);
+                });
+                if (!empty($managedClassIds)) {
+                    $q->orWhereHas('user', function ($uq) use ($managedClassIds) {
+                        $uq->whereIn('class_id', $managedClassIds);
+                    });
+                }
             })
             ->with(['user:uId,class_id'])
-            ->limit(200)
+            ->limit(300)
             ->get(['sId', 'user_id', 'exam_id', 'assignment_id']);
 
         if ($orphans->isEmpty()) {
@@ -2055,7 +2060,7 @@ class GradingController extends Controller
                 continue;
             }
             $student = $sub->user;
-            $classIds = $student->class_id ? [$student->class_id] : [];
+            $classIds = $student->class_id ? [(int) $student->class_id] : [];
 
             $candidates = TestAssignment::where('exam_id', $sub->exam_id)
                 ->where(function ($q) use ($student, $classIds) {
@@ -2071,18 +2076,113 @@ class GradingController extends Controller
                             ->whereIn('taTarget_id', $classIds);
                     });
                 })
+                // KHÔNG lọc deadline: bài đã nộp trước hạn vẫn cần gắn lại.
                 ->orderByRaw("CASE WHEN taTarget_type = 'student' THEN 0 ELSE 1 END")
                 ->orderByDesc('taId')
-                ->limit(2)
+                ->limit(1)
                 ->get(['taId']);
 
-            // Chỉ gán khi có đúng 1 candidate (hoặc lấy newest nếu >1 nhưng
-            // student-target ưu tiên — vẫn an toàn lấy newest sau sort).
             if ($candidates->isEmpty()) {
                 continue;
             }
             $sub->assignment_id = (int) $candidates->first()->taId;
             $sub->save();
         }
+    }
+
+    /**
+     * Các lớp mà GV là chủ hoặc co-teacher (accepted).
+     */
+    private function teacherManagedClassIds(int $teacherId): array
+    {
+        $owned = Classes::where('cTeacher_id', $teacherId)->pluck('cId')->all();
+        $co = ClassCoTeacher::acceptedClassIdsFor($teacherId);
+        return array_values(array_unique(array_map('intval', array_merge($owned, $co))));
+    }
+
+    /**
+     * Scope list submissions mà GV được xem/chấm:
+     * 1) Chủ đề (exam.eTeacher_id)
+     * 2) Chủ/co-GV lớp của học viên
+     * 3) Chủ/co-GV lớp được giao qua assignment (taTarget_type=class)
+     * 4) Assignment giao trực tiếp học viên thuộc lớp GV quản lý
+     */
+    private function applyTeacherSubmissionAccess($query, $user)
+    {
+        $teacherId = (int) $user->uId;
+        $classIds = $this->teacherManagedClassIds($teacherId);
+
+        $query->where(function ($outer) use ($teacherId, $classIds) {
+            // 1) Chủ đề
+            $outer->whereHas('exam', function ($q) use ($teacherId) {
+                $q->where('eTeacher_id', $teacherId);
+            });
+
+            if (!empty($classIds)) {
+                // 2) Học viên thuộc lớp GV quản lý
+                $outer->orWhereHas('user', function ($q) use ($classIds) {
+                    $q->whereIn('class_id', $classIds);
+                });
+
+                // 3) Assignment giao cho lớp GV quản lý
+                $outer->orWhereIn('assignment_id', function ($sub) use ($classIds) {
+                    $sub->select('taId')
+                        ->from('test_assignments')
+                        ->where('taTarget_type', 'class')
+                        ->whereIn('taTarget_id', $classIds);
+                });
+            }
+        });
+
+        return $query;
+    }
+
+    /**
+     * Kiểm tra 1 submission có thuộc quyền chấm của GV không.
+     */
+    private function teacherCanAccessSubmission($user, Submission $submission): bool
+    {
+        if (!$user || $user->uRole !== 'teacher') {
+            return false;
+        }
+        $teacherId = (int) $user->uId;
+
+        // 1) Chủ đề
+        $examTeacherId = $submission->exam->eTeacher_id
+            ?? Exam::where('eId', $submission->exam_id)->value('eTeacher_id');
+        if ((int) $examTeacherId === $teacherId) {
+            return true;
+        }
+
+        $classIds = $this->teacherManagedClassIds($teacherId);
+        if (empty($classIds)) {
+            return false;
+        }
+
+        // 2) Học viên thuộc lớp GV
+        $studentClassId = $submission->user->class_id
+            ?? User::where('uId', $submission->user_id)->value('class_id');
+        if ($studentClassId && in_array((int) $studentClassId, $classIds, true)) {
+            return true;
+        }
+
+        // 3) Assignment giao cho lớp GV
+        if ($submission->assignment_id) {
+            $assignment = TestAssignment::where('taId', $submission->assignment_id)->first(['taId', 'taTarget_type', 'taTarget_id']);
+            if ($assignment) {
+                if ($assignment->taTarget_type === 'class'
+                    && in_array((int) $assignment->taTarget_id, $classIds, true)) {
+                    return true;
+                }
+                if ($assignment->taTarget_type === 'student') {
+                    $targetClass = User::where('uId', $assignment->taTarget_id)->value('class_id');
+                    if ($targetClass && in_array((int) $targetClass, $classIds, true)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 }
