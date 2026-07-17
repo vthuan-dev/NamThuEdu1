@@ -27,8 +27,12 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           port: ${{ secrets.VPS_PORT }}
+          # Kết nối SSH: tăng timeout + retry khi VPS/network chập chờn
+          timeout: 60s
           command_timeout: 20m
+          script_stop: true
           script: |
+            set -euo pipefail
             bash /var/www/namthuedu/deploy.sh
             # ── Dọn sạch cache sau khi deploy để user thấy thay đổi ngay ──
             cd /var/www/namthuedu/backend
@@ -41,4 +45,30 @@ jobs:
             php artisan config:cache || true
             echo "✅ Cleared backend caches after deploy"
 
-# Trigger redeploy 2026-07-17 speaking-audio-fix
+      # Retry 1 lần nếu lần 1 bị timeout mạng (không fail do lỗi script)
+      - name: Retry deploy if previous step failed
+        if: failure()
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_PORT }}
+          timeout: 90s
+          command_timeout: 20m
+          script_stop: true
+          script: |
+            set -euo pipefail
+            echo "♻️ Retry deploy after previous SSH failure..."
+            sleep 10
+            bash /var/www/namthuedu/deploy.sh
+            cd /var/www/namthuedu/backend
+            php artisan optimize:clear || true
+            php artisan config:clear || true
+            php artisan cache:clear || true
+            php artisan route:clear || true
+            php artisan view:clear || true
+            php artisan config:cache || true
+            echo "✅ Cleared backend caches after retry deploy"
+
+# Trigger redeploy 2026-07-17 ssh-timeout-retry
