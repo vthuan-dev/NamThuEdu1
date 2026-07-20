@@ -53,6 +53,7 @@ interface Question {
   reviewStatus?: "pending" | "accepted" | "modified" | null;
   audioUrl?: string;
   transcript?: string;
+  explanation?: string;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -237,6 +238,7 @@ export function IeltsGradingDetail() {
             transcript: skill === "speaking"
               ? (speakingResults?.[`part_${part}`]?.transcript ?? undefined)
               : undefined,
+            explanation: q.qExplanation ?? "",
           };
         });
         setQuestions(qs);
@@ -1050,6 +1052,13 @@ function QuestionRow({
               {q.points} / {q.maxPoints}
             </span>
           </div>
+        </div>
+      )}
+
+      {q.explanation && (
+        <div className="mt-3 ml-10 p-3 bg-emerald-50/50 rounded-xl border border-emerald-100 text-xs text-slate-700 font-sans">
+          <span className="font-semibold block mb-1">Dàn ý / Giải thích đáp án:</span>
+          <div dangerouslySetInnerHTML={{ __html: q.explanation }} />
         </div>
       )}
     </div>

@@ -72,6 +72,7 @@ interface Question {
   isOverrideKey?: boolean;
   audioUrl?: string;
   kidsTaskConfig?: any;   // cấu hình kids task (task_type, task_data...) để hiển thị bài làm rõ ràng
+  explanation?: string;
 }
 
 // ─── Skill config ─────────────────────────────────────────────────────────────
@@ -327,6 +328,7 @@ function VstepGradingDetailInternal() {
             isOverrideKey:  false,
             audioUrl,
             kidsTaskConfig: kidsConfigMap[q.qId] ?? q.kids_task_config ?? undefined,
+            explanation:    q.qExplanation ?? "",
           } satisfies Question;
         });
         setQuestions(qs);
@@ -716,6 +718,13 @@ function VstepGradingDetailInternal() {
                 </div>
               )}
             </>
+          )}
+
+          {question.explanation && (
+            <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100 text-xs text-slate-700 font-sans mt-3">
+              <span className="font-semibold block mb-1">Dàn ý / Giải thích đáp án:</span>
+              <div dangerouslySetInnerHTML={{ __html: question.explanation }} />
+            </div>
           )}
 
           {question.autoGraded ? (

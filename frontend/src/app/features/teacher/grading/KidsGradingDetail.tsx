@@ -67,6 +67,7 @@ interface KidsTask {
   isManual: boolean;
   skill: string;           // listening | reading | writing | speaking | ""
   rawConfig?: any;         // toàn bộ kids_task_config (để render dạng nghe & tô màu)
+  explanation?: string;
 }
 
 interface ExamMeta {
@@ -193,6 +194,7 @@ export function KidsGradingDetail() {
             isManual: MANUAL_REVIEW_TYPES.has(taskType),
             skill: normalizeSkill(cfg.skill),
             rawConfig: cfg,
+            explanation: q.qExplanation ?? "",
           } satisfies KidsTask;
         });
         setTasks(mapped);
@@ -829,6 +831,13 @@ function KidsTaskCard({
             </button>
           )}
         </div>
+
+        {task.explanation && (
+          <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100 text-xs text-slate-700 font-sans mt-3">
+            <span className="font-semibold block mb-1">Dàn ý / Giải thích đáp án:</span>
+            <div dangerouslySetInnerHTML={{ __html: task.explanation }} />
+          </div>
+        )}
       </div>
     </div>
   );

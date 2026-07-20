@@ -418,6 +418,7 @@ class ThptGradingController extends Controller
                     'status' => $status,
                     'ai' => $aiBlock,
                     'teacher' => $teacherBlock,
+                    'explanation' => $it['explanation'] ?? null,
                 ];
                 $subjective[] = $sq;
                 $subjectiveByQn[(int) $qn] = $sq;
@@ -523,7 +524,7 @@ class ThptGradingController extends Controller
         };
 
         // Một câu trắc nghiệm chọn 1 (q{n} → id).
-        $mcq = function ($qn, $prompt, $options, $correctId) use ($answers, $normOptions): array {
+        $mcq = function ($qn, $prompt, $options, $correctId, $explanation = null) use ($answers, $normOptions): array {
             $key = "q{$qn}";
             $student = $answers[$key] ?? null;
             return [
@@ -535,11 +536,12 @@ class ThptGradingController extends Controller
                 'student_answer' => $student,
                 'correct_answer' => $correctId,
                 'is_correct' => $correctId !== null && $correctId !== '' && (string) $student === (string) $correctId,
+                'explanation' => $explanation,
             ];
         };
 
         // Một câu nhập đáp án (q{n} → text), so khớp accepted_answers.
-        $textQ = function ($qn, $prompt, $accepted, $cs, array $extra = []) use ($answers, $matchText): array {
+        $textQ = function ($qn, $prompt, $accepted, $cs, array $extra = [], $explanation = null) use ($answers, $matchText): array {
             $key = "q{$qn}";
             $student = $answers[$key] ?? null;
             $acceptedArr = array_values((array) $accepted);
@@ -553,6 +555,7 @@ class ThptGradingController extends Controller
                 'correct_answer' => $acceptedArr[0] ?? '',
                 'accepted_answers' => $acceptedArr,
                 'is_correct' => $matchText($student !== null ? (string) $student : null, $acceptedArr, $cs),
+                'explanation' => $explanation,
             ], $extra);
         };
 
@@ -570,6 +573,7 @@ class ThptGradingController extends Controller
                     'student_answer' => $studentBool,
                     'correct_answer' => $expected,
                     'is_correct' => $hasAns && $studentBool === $expected,
+                    'explanation' => $st['explanation'] ?? null,
                 ];
             }
             return $out;
@@ -603,6 +607,7 @@ class ThptGradingController extends Controller
                         'status' => 'no_ai',
                         'ai' => null,
                         'teacher' => null,
+                        'explanation' => $it['explanation'] ?? null,
                     ];
                 }
                 $sectionsOut[] = array_merge($base, [
@@ -621,7 +626,7 @@ class ThptGradingController extends Controller
                     $phoneticsVariant = $s['variant'] ?? 'pronunciation';
                     $base['variant'] = $phoneticsVariant;
                     foreach (($s['items'] ?? []) as $it) {
-                        $q = $mcq($it['question_number'] ?? '?', $it['prompt'] ?? null, $it['words'] ?? [], $it['correct_id'] ?? null);
+                        $q = $mcq($it['question_number'] ?? '?', $it['prompt'] ?? null, $it['words'] ?? [], $it['correct_id'] ?? null, $it['explanation'] ?? null);
                         $q['variant'] = $phoneticsVariant;
                         $questions[] = $q;
                     }
@@ -629,7 +634,7 @@ class ThptGradingController extends Controller
 
                 case 'mc_questions':
                     foreach (($s['items'] ?? []) as $it) {
-                        $questions[] = $mcq($it['question_number'] ?? '?', $it['prompt'] ?? null, $it['options'] ?? [], $it['correct_id'] ?? null);
+                        $questions[] = $mcq($it['question_number'] ?? '?', $it['prompt'] ?? null, $it['options'] ?? [], $it['correct_id'] ?? null, $it['explanation'] ?? null);
                     }
                     break;
                 case 'listening':
@@ -641,10 +646,12 @@ class ThptGradingController extends Controller
                                 $it['question_number'] ?? '?',
                                 $it['prompt'] ?? null,
                                 $it['accepted_answers'] ?? [],
-                                (bool) ($it['case_sensitive'] ?? false)
+                                (bool) ($it['case_sensitive'] ?? false),
+                                [],
+                                $it['explanation'] ?? null
                             );
                         } else {
-                            $questions[] = $mcq($it['question_number'] ?? '?', $it['prompt'] ?? null, $it['options'] ?? [], $it['correct_id'] ?? null);
+                            $questions[] = $mcq($it['question_number'] ?? '?', $it['prompt'] ?? null, $it['options'] ?? [], $it['correct_id'] ?? null, $it['explanation'] ?? null);
                         }
                     }
                     break;
@@ -652,14 +659,14 @@ class ThptGradingController extends Controller
 
                 case 'error_identification':
                     foreach (($s['items'] ?? []) as $it) {
-                        $questions[] = $mcq($it['question_number'] ?? '?', $it['sentence'] ?? ($it['prompt'] ?? null), $it['segments'] ?? [], $it['correct_id'] ?? null);
+                        $questions[] = $mcq($it['question_number'] ?? '?', $it['sentence'] ?? ($it['prompt'] ?? null), $it['segments'] ?? [], $it['correct_id'] ?? null, $it['explanation'] ?? null);
                     }
                     break;
 
                 case 'word_form':
                     foreach (($s['items'] ?? []) as $it) {
                         $prompt = trim(($it['sentence'] ?? '') . ($it['root_word'] ? " ({$it['root_word']})" : ''));
-                        $questions[] = $textQ($it['question_number'] ?? '?', $prompt, $it['accepted_answers'] ?? [], (bool) ($it['case_sensitive'] ?? false), ['root_word' => $it['root_word'] ?? null]);
+                        $questions[] = $textQ($it['question_number'] ?? '?', $prompt, $it['accepted_answers'] ?? [], (bool) ($it['case_sensitive'] ?? false), ['root_word' => $it['root_word'] ?? null], $it['explanation'] ?? null);
                     }
                     break;
 
@@ -668,7 +675,7 @@ class ThptGradingController extends Controller
                         $questions[] = $textQ($it['question_number'] ?? '?', $it['original'] ?? '', $it['accepted_answers'] ?? [], false, [
                             'lead_in' => $it['lead_in'] ?? null,
                             'prompt_word' => $it['prompt_word'] ?? null,
-                        ]);
+                        ], $it['explanation'] ?? null);
                     }
                     break;
 
@@ -709,6 +716,7 @@ class ThptGradingController extends Controller
                             'list_1' => array_values($it['list_1'] ?? []),
                             'list_2' => array_values($it['list_2'] ?? []),
                             'rows' => $rows,
+                            'explanation' => $it['explanation'] ?? null,
                         ];
                     }
                     break;
@@ -716,7 +724,7 @@ class ThptGradingController extends Controller
                 case 'mc_cloze':
                     $base['passage'] = $s['passage'] ?? null;
                     foreach (($s['blanks'] ?? []) as $b) {
-                        $questions[] = $mcq($b['question_number'] ?? '?', null, $b['options'] ?? [], $b['correct_id'] ?? null);
+                        $questions[] = $mcq($b['question_number'] ?? '?', null, $b['options'] ?? [], $b['correct_id'] ?? null, $b['explanation'] ?? null);
                     }
                     break;
 
@@ -725,14 +733,14 @@ class ThptGradingController extends Controller
                     // fallthrough behaviour for blanks
                     $base['passage'] = $s['passage'] ?? null;
                     foreach (($s['blanks'] ?? []) as $b) {
-                        $questions[] = $textQ($b['question_number'] ?? '?', null, $b['accepted_answers'] ?? [], (bool) ($b['case_sensitive'] ?? false));
+                        $questions[] = $textQ($b['question_number'] ?? '?', null, $b['accepted_answers'] ?? [], (bool) ($b['case_sensitive'] ?? false), [], $b['explanation'] ?? null);
                     }
                     break;
 
                 case 'open_cloze':
                     $base['passage'] = $s['passage'] ?? null;
                     foreach (($s['blanks'] ?? []) as $b) {
-                        $questions[] = $textQ($b['question_number'] ?? '?', null, $b['accepted_answers'] ?? [], (bool) ($b['case_sensitive'] ?? false));
+                        $questions[] = $textQ($b['question_number'] ?? '?', null, $b['accepted_answers'] ?? [], (bool) ($b['case_sensitive'] ?? false), [], $b['explanation'] ?? null);
                     }
                     break;
 
@@ -762,9 +770,10 @@ class ThptGradingController extends Controller
                                 'student_answer' => $student,
                                 'correct_answer' => $correctMarker,
                                 'is_correct' => $student !== null && (string) $student === (string) $correctMarker,
+                                'explanation' => $it['explanation'] ?? null,
                             ];
                         } else { // mc
-                            $questions[] = $mcq($qn, $it['prompt'] ?? null, $it['options'] ?? [], $it['correct_id'] ?? null);
+                            $questions[] = $mcq($qn, $it['prompt'] ?? null, $it['options'] ?? [], $it['correct_id'] ?? null, $it['explanation'] ?? null);
                         }
                     }
                     break;

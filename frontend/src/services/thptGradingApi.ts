@@ -49,6 +49,7 @@ export interface SubjectiveQuestion {
   status: SubjectiveStatus;
   ai: AiResult | null;
   teacher: TeacherResult | null;
+  explanation?: string | null;
 }
 
 // ─── Objective question kinds ───────────────────────────────────────────────
@@ -71,6 +72,7 @@ export interface McqQuestion {
   is_correct: boolean;
   /** Chỉ có với câu ngữ âm: 'pronunciation' | 'stress'. Dùng để quyết định tự dò đuôi. */
   variant?: string;
+  explanation?: string | null;
 }
 
 export interface TextQuestion {
@@ -86,6 +88,7 @@ export interface TextQuestion {
   root_word?: string | null;
   lead_in?: string | null;
   prompt_word?: string | null;
+  explanation?: string | null;
 }
 
 export interface TfStatement {
@@ -94,6 +97,7 @@ export interface TfStatement {
   student_answer: boolean | null;
   correct_answer: boolean;
   is_correct: boolean;
+  explanation?: string | null;
 }
 
 export interface TfGroupQuestion {
@@ -120,6 +124,7 @@ export interface MatchingQuestion {
   list_1: string[];
   list_2: string[];
   rows: MatchingRow[];
+  explanation?: string | null;
 }
 
 export interface SentenceInsertionQuestion {
@@ -132,6 +137,7 @@ export interface SentenceInsertionQuestion {
   student_answer: string | null;
   correct_answer: string | null;
   is_correct: boolean;
+  explanation?: string | null;
 }
 
 export type ObjectiveQuestion =

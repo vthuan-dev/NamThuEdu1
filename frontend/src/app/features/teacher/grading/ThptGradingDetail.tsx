@@ -1563,6 +1563,13 @@ function McqReview({
           onSet={(v) => onToggle(key, v, String(q.student_answer) === String(effectiveCorrectId))}
         />
       </div>
+
+      {q.explanation && (
+        <div className="mt-3 p-3 bg-emerald-50/50 rounded-xl border border-emerald-100 text-xs text-slate-700 font-sans">
+          <span className="font-semibold block mb-1">Giải thích đáp án:</span>
+          <div dangerouslySetInnerHTML={{ __html: q.explanation }} />
+        </div>
+      )}
     </QCardShell>
   );
 }
@@ -1625,6 +1632,13 @@ function TextReview({
           onSet={(v) => onToggle(key, v, q.is_correct)}
         />
       </div>
+
+      {q.explanation && (
+        <div className="mt-3 p-3 bg-emerald-50/50 rounded-xl border border-emerald-100 text-xs text-slate-700 font-sans">
+          <span className="font-semibold block mb-1">Giải thích đáp án:</span>
+          <div dangerouslySetInnerHTML={{ __html: q.explanation }} />
+        </div>
+      )}
     </QCardShell>
   );
 }
@@ -1690,6 +1704,13 @@ function TfGroupReview({
                     />
                   </div>
                 </div>
+
+                {s.explanation && (
+                  <div className="mt-2 p-2 bg-emerald-50/40 rounded-lg border border-emerald-100 text-[11px] text-slate-700 font-sans">
+                    <span className="font-semibold block mb-0.5">Giải thích:</span>
+                    <div dangerouslySetInnerHTML={{ __html: s.explanation }} />
+                  </div>
+                )}
               </div>
             );
           })}
@@ -1760,6 +1781,13 @@ function MatchingReview({
           ))}
         </div>
       </div>
+
+      {q.explanation && (
+        <div className="mt-3 p-3 bg-emerald-50/50 rounded-xl border border-emerald-100 text-xs text-slate-700 font-sans">
+          <span className="font-semibold block mb-1">Giải thích đáp án:</span>
+          <div dangerouslySetInnerHTML={{ __html: q.explanation }} />
+        </div>
+      )}
     </QCardShell>
   );
 }
@@ -1806,6 +1834,13 @@ function SentenceInsertionReview({
           onSet={(v) => onToggle(key, v, q.is_correct)}
         />
       </div>
+
+      {q.explanation && (
+        <div className="mt-3 p-3 bg-emerald-50/50 rounded-xl border border-emerald-100 text-xs text-slate-700 font-sans">
+          <span className="font-semibold block mb-1">Giải thích đáp án:</span>
+          <div dangerouslySetInnerHTML={{ __html: q.explanation }} />
+        </div>
+      )}
     </QCardShell>
   );
 }
@@ -1902,6 +1937,15 @@ function SubjectiveQuestionCard({
               {String(q.student_answer).trim().split(/\s+/).length} từ
             </p>
           )}
+        </div>
+      )}
+
+      {q.explanation && (
+        <div className="mx-5 mt-3 rounded-xl border border-emerald-200 bg-emerald-50/30 p-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 mb-2">
+            Dàn ý / Gợi ý đáp án
+          </p>
+          <div className="text-sm text-slate-700 leading-relaxed font-sans" dangerouslySetInnerHTML={{ __html: q.explanation }} />
         </div>
       )}
 
