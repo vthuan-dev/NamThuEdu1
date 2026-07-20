@@ -17,7 +17,7 @@ import {
   nextQuestionNumber,
   sectionMeta,
 } from '../sections';
-import { SectionHeader, QuestionBadge, DeleteBtn, AddButton, OptionRow, FormattedTextarea } from './shared';
+import { SectionHeader, QuestionBadge, DeleteBtn, AddButton, OptionRow, FormattedTextarea, ExplanationField } from './shared';
 import { THPT_THEME, LETTERS } from '../sections';
 import { splitPhoneticWord, formatErrorSentence } from '../../../../../../utils/examUtils';
 
@@ -633,6 +633,14 @@ function PhoneticsEditor({ section, all, onChange }: { section: Extract<ThptSect
               );
             })}
           </div>
+          <ExplanationField
+            value={item.explanation}
+            onChange={(v) => {
+              const items = [...section.items];
+              items[idx] = { ...item, explanation: v };
+              update(items);
+            }}
+          />
         </ItemCard>
       ))}
       <AddButton label="Thêm câu" onClick={() => update([...section.items, makePhoneticsItem(nextQuestionNumber(all))])} />
@@ -709,6 +717,14 @@ function McQuestionsEditor({ section, all, onChange }: { section: Extract<ThptSe
               />
             ))}
           </div>
+          <ExplanationField
+            value={item.explanation}
+            onChange={(v) => {
+              const items = [...section.items];
+              items[idx] = { ...item, explanation: v };
+              update(items);
+            }}
+          />
         </ItemCard>
       ))}
       <AddButton label="Thêm câu" onClick={() => update([...section.items, makeMcItem(nextQuestionNumber(all))])} />
@@ -1186,6 +1202,14 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
                     ))}
                   </div>
                 )}
+                <ExplanationField
+                  value={item.explanation}
+                  onChange={(v) => {
+                    const items = [...section.items];
+                    items[idx] = { ...item, explanation: v } as any;
+                    update(items);
+                  }}
+                />
               </ItemCard>
             );
           })}
@@ -1379,6 +1403,14 @@ function WordFormEditor({ section, all, onChange }: { section: Extract<ThptSecti
               />
             </div>
           </div>
+          <ExplanationField
+            value={item.explanation}
+            onChange={(v) => {
+              const items = [...section.items];
+              items[idx] = { ...item, explanation: v };
+              update(items);
+            }}
+          />
         </ItemCard>
       ))}
       <AddButton label="Thêm câu" onClick={() => update([...section.items, makeWordFormItem(nextQuestionNumber(all))])} />
@@ -1439,6 +1471,14 @@ function ErrorIdEditor({ section, all, onChange }: { section: Extract<ThptSectio
               />
             ))}
           </div>
+          <ExplanationField
+            value={item.explanation}
+            onChange={(v) => {
+              const items = [...section.items];
+              items[idx] = { ...item, explanation: v };
+              update(items);
+            }}
+          />
         </ItemCard>
       ))}
       <AddButton label="Thêm câu" onClick={() => update([...section.items, makeErrorItem(nextQuestionNumber(all))])} />
@@ -1511,6 +1551,14 @@ function McClozeEditor({ section, onChange }: { section: Extract<ThptSection, { 
                   />
                 ))}
               </div>
+              <ExplanationField
+                value={b.explanation}
+                onChange={(v) => {
+                  const blanks = [...section.blanks];
+                  blanks[idx] = { ...b, explanation: v };
+                  onChange({ ...section, blanks });
+                }}
+              />
             </div>
           ))
         )}
@@ -1838,73 +1886,93 @@ function ReadingMixedEditor({ section, all, onChange }: { section: Extract<ThptS
           )}
 
           {item.kind === 'mc' && (
-            <div className="space-y-2">
-              <FormattedTextarea
-                value={item.prompt}
+            <>
+              <div className="space-y-2">
+                <FormattedTextarea
+                  value={item.prompt}
+                  onChange={(v) => {
+                    const items = [...section.items];
+                    items[idx] = { ...item, prompt: v };
+                    update(items);
+                  }}
+                  rows={2}
+                  placeholder="Câu hỏi"
+                />
+                {item.options.map((opt, oi) => (
+                  <OptionRow
+                    key={opt.id}
+                    letter={opt.id}
+                    text={opt.text}
+                    isCorrect={item.correct_id === opt.id}
+                    onPick={() => {
+                      const items = [...section.items];
+                      items[idx] = { ...item, correct_id: opt.id };
+                      update(items);
+                    }}
+                    onTextChange={(v) => {
+                      const items = [...section.items];
+                      const options = [...item.options];
+                      options[oi] = { ...opt, text: v };
+                      items[idx] = { ...item, options };
+                      update(items);
+                    }}
+                  />
+                ))}
+              </div>
+              <ExplanationField
+                value={(item as any).explanation}
                 onChange={(v) => {
                   const items = [...section.items];
-                  items[idx] = { ...item, prompt: v };
+                  items[idx] = { ...item, explanation: v } as any;
                   update(items);
                 }}
-                rows={2}
-                placeholder="Câu hỏi"
               />
-              {item.options.map((opt, oi) => (
-                <OptionRow
-                  key={opt.id}
-                  letter={opt.id}
-                  text={opt.text}
-                  isCorrect={item.correct_id === opt.id}
-                  onPick={() => {
-                    const items = [...section.items];
-                    items[idx] = { ...item, correct_id: opt.id };
-                    update(items);
-                  }}
-                  onTextChange={(v) => {
-                    const items = [...section.items];
-                    const options = [...item.options];
-                    options[oi] = { ...opt, text: v };
-                    items[idx] = { ...item, options };
-                    update(items);
-                  }}
-                />
-              ))}
-            </div>
+            </>
           )}
 
           {item.kind === 'sentence_insertion' && (
-            <div className="space-y-2">
-              <FormattedTextarea
-                value={item.sentence_to_insert}
+            <>
+              <div className="space-y-2">
+                <FormattedTextarea
+                  value={item.sentence_to_insert}
+                  onChange={(v) => {
+                    const items = [...section.items];
+                    items[idx] = { ...item, sentence_to_insert: v };
+                    update(items);
+                  }}
+                  rows={2}
+                  placeholder="Câu cần chèn"
+                  className="italic"
+                />
+                <div className="flex items-center gap-2">
+                  {MARKERS.map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => {
+                        const items = [...section.items];
+                        items[idx] = { ...item, correct_marker: m };
+                        update(items);
+                      }}
+                      className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all cursor-pointer ${
+                        item.correct_marker === m ? 'text-white' : 'bg-white border border-slate-200 text-slate-500'
+                      }`}
+                      style={item.correct_marker === m ? { backgroundColor: THPT_THEME.success } : {}}
+                    >
+                      [{m}]
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <ExplanationField
+                value={(item as any).explanation}
                 onChange={(v) => {
                   const items = [...section.items];
-                  items[idx] = { ...item, sentence_to_insert: v };
+                  items[idx] = { ...item, explanation: v } as any;
                   update(items);
                 }}
-                rows={2}
-                placeholder="Câu cần chèn"
-                className="italic"
               />
-              <div className="flex items-center gap-2">
-                {MARKERS.map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => {
-                      const items = [...section.items];
-                      items[idx] = { ...item, correct_marker: m };
-                      update(items);
-                    }}
-                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all cursor-pointer ${
-                      item.correct_marker === m ? 'text-white' : 'bg-white border border-slate-200 text-slate-500'
-                    }`}
-                    style={item.correct_marker === m ? { backgroundColor: THPT_THEME.success } : {}}
-                  >
-                    [{m}]
-                  </button>
-                ))}
-              </div>
-            </div>
+            </>
           )}
         </div>
       ))}
@@ -1985,6 +2053,14 @@ function MatchingEditor({ section, all, onChange }: { section: Extract<ThptSecti
               ))}
             </div>
           </div>
+          <ExplanationField
+            value={item.explanation}
+            onChange={(v) => {
+              const items = [...section.items];
+              items[idx] = { ...item, explanation: v };
+              update(items);
+            }}
+          />
         </ItemCard>
       ))}
       <AddButton label="Thêm bảng" onClick={() => update([...section.items, makeMatchingItem(nextQuestionNumber(all))])} />
@@ -2051,6 +2127,14 @@ function TransformationEditor({ section, all, onChange }: { section: Extract<Thp
               />
             </div>
           </div>
+          <ExplanationField
+            value={item.explanation}
+            onChange={(v) => {
+              const items = [...section.items];
+              items[idx] = { ...item, explanation: v };
+              update(items);
+            }}
+          />
         </ItemCard>
       ))}
       <AddButton label="Thêm câu" onClick={() => update([...section.items, makeTransformItem(nextQuestionNumber(all))])} />
