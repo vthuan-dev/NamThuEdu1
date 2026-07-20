@@ -2450,7 +2450,7 @@ function WritingView({
 
   return (
     <div className="h-full overflow-y-auto bg-[#eef0f4]">
-      <div className={`mx-auto px-8 py-8 ${reviewScores ? "max-w-[1400px] flex gap-6 items-start" : "max-w-4xl"}`}>
+      <div className={`mx-auto px-8 py-8 ${reviewScores ? "max-w-[1400px] flex gap-6 items-start" : "max-w-6xl"}`}>
         <div className={`space-y-5 ${reviewScores ? "flex-1 min-w-0" : ""}`}>
           <div className="space-y-4">
             {promptIsHtml ? (

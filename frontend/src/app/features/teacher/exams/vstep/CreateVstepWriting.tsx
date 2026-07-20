@@ -285,7 +285,7 @@ export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest 
             </div>
           </div>
         ) : (
-          <div className="max-w-[1200px] mx-auto px-6 py-6 min-h-full">
+          <div className="max-w-[1600px] mx-auto px-6 py-6 min-h-full">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col overflow-hidden min-h-[600px]">
               <div className="p-4 border-b border-gray-200 flex-shrink-0">
                 <div className="flex items-center justify-between">
