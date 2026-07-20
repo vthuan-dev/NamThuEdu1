@@ -998,8 +998,27 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
           </div>
         </div>
 
+        {/* Main Topic Field */}
+        <div className="border border-purple-200 rounded-xl p-6 bg-purple-50/40">
+          <label className="block text-sm font-semibold text-purple-800 mb-2 flex items-center gap-2">
+            <span className="w-6 h-6 bg-purple-600 text-white rounded-lg flex items-center justify-center text-xs font-bold">T</span>
+            Main Topic <span className="text-purple-400 font-normal text-xs">(câu chủ đề – học viên phải phát triển)</span>
+          </label>
+          <textarea
+            value={data.mainTopic}
+            onChange={(e) => updatePart3Field("mainTopic", e.target.value)}
+            rows={2}
+            placeholder="e.g., The impact of social media on young people's communication skills"
+            className="w-full px-4 py-3 border-2 border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-400/30 focus:border-purple-500 text-gray-900 font-semibold placeholder:text-purple-300 transition-all resize-none bg-white"
+          />
+        </div>
+
         {/* Mind Map Editor */}
         <div className="border border-gray-200 rounded-xl p-7 bg-white">
+          <p className="text-xs text-gray-500 mb-4 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block" />
+            Nhập 4 ý tưởng gợi ý xung quanh. Ô giữa tự đồng bộ từ Main Topic bên trên.
+          </p>
           <MindMapEditor
             mainTopic={data.mainTopic}
             ideas={ideas}
