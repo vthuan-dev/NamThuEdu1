@@ -467,8 +467,21 @@ export function AllExams() {
     };
     if (examType && types[examType.toLowerCase()]) return types[examType.toLowerCase()];
 
-    // Fallback theo eType (VSTEP, IELTS, GENERAL...)
-    if (exam.eType === "VSTEP") {
+    // 1. Check by group (Teens / Kids)
+    const group = (exam as any)._group || "";
+    if (group === "teens") {
+      const skill = (exam.eSkill || "").toLowerCase();
+      if (skill === "listening") return { label: "Teens Listening", color: "#0EA5E9" };
+      if (skill === "speaking") return { label: "Teens Speaking", color: "#EC4899" };
+      return { label: "Teens", color: "#F59E0B" };
+    }
+    if (group === "kids") {
+      return { label: "Kids", color: "#EA580C" };
+    }
+
+    // 2. Fallback based on eType (VSTEP, IELTS, THPT, GENERAL...)
+    const eTypeUpper = (exam.eType || "").toUpperCase();
+    if (eTypeUpper === "VSTEP") {
       const skill = (exam.eSkill || "").toLowerCase();
       if (skill === "mixed") return { label: "VSTEP Full", color: "#7C3AED" };
       if (skill === "listening") return { label: "VSTEP Listening", color: "#0EA5E9" };
@@ -477,7 +490,10 @@ export function AllExams() {
       if (skill === "speaking") return { label: "VSTEP Speaking", color: "#EC4899" };
       return { label: "VSTEP", color: "#7C3AED" };
     }
-    if (exam.eType === "IELTS") return { label: "IELTS", color: "#3B82F6" };
+    if (eTypeUpper === "IELTS") return { label: "IELTS", color: "#3B82F6" };
+    if (eTypeUpper === "THPT" || group === "thpt") return { label: "THPT", color: "#3B82F6" };
+    if (eTypeUpper === "GENERAL") return { label: "Tổng hợp", color: "#6B7280" };
+
     if (examType) return { label: examType, color: "#6B7280" };
     return { label: "Chưa phân loại", color: "#6B7280" };
   };
