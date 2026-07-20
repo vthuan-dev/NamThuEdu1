@@ -715,6 +715,7 @@ class IELTSService
                 'qPart'            => $taskNumber,
                 'qSection_order'   => $taskNumber,
                 'qPoints'          => 9,
+                'qExplanation'     => $task['explanation'] ?? $task['modelAnswer'] ?? null,
                 'qData'            => [
                     'task_number'         => $taskNumber,
                     'min_words'           => $config['min_words'],
@@ -767,6 +768,7 @@ class IELTSService
                     'qPart'            => 2,
                     'qSection_order'   => 1,
                     'qPoints'          => 9,
+                    'qExplanation'     => $cueCard['explanation'] ?? $cueCard['followUp'] ?? null,
                     'qData'            => [
                         'part_number' => 2,
                         'cue_card'    => $cueCard,
@@ -792,6 +794,7 @@ class IELTSService
                     'qPart'            => $partNumber,
                     'qSection_order'   => $idx + 1,
                     'qPoints'          => 9,
+                    'qExplanation'     => $qVal['explanation'] ?? null,
                     'qData'            => [
                         'part_number' => $partNumber,
                         'topic'       => $qVal['topic'] ?? null,
@@ -849,6 +852,7 @@ class IELTSService
                 'qPart'            => $partNumber,
                 'qSection_order'   => $qNum,
                 'qPoints'          => 1,
+                'qExplanation'     => $qVal['explanation'] ?? null,
                 'qData'            => array_filter([
                     'question_number'     => $qNum,
                     'options'             => $options,

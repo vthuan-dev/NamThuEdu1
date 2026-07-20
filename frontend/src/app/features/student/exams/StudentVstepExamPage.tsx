@@ -37,16 +37,17 @@ import { RichText } from "../../../../components/ui/RichText";
  * ============================================================ */
 type SkillKey = "listening" | "reading" | "writing" | "speaking";
 interface Choice { A: string; B: string; C: string; D: string }
-interface Q { qId: number; questionNumber: number; questionText: string; options: Choice; correctAnswer?: string }
+interface Q { qId: number; questionNumber: number; questionText: string; options: Choice; correctAnswer?: string; qExplanation?: string }
 interface ListeningSection { sectionNumber: number; sectionName: string; instructions?: string; audioUrl: string; audioDuration?: number; transcript?: string; questions: Q[] }
 interface ListeningPart { partNumber: number; partName?: string; sections: ListeningSection[] }
 interface ReadingPart { partNumber: number; partName?: string; passage: string; questions: Q[] }
-interface WritingTask { taskNumber: number; taskName: string; prompt: string; wordCount?: [number, number] | number; timeLimit?: number; questionId?: number }
+interface WritingTask { taskNumber: number; taskName: string; prompt: string; wordCount?: [number, number] | number; timeLimit?: number; questionId?: number; qExplanation?: string }
 interface SpeakingPart {
   partNumber: number;
   part1Data?: Array<{ topicName: string; questions: string[] }>;
   part2Data?: { situation: string; solutions: string[]; question: string };
   part3Data?: { mainTopic: string; suggestedIdeas: string[]; followUpQuestions: string[] };
+  qExplanation?: string;
 }
 
 /* ============================================================
@@ -2176,7 +2177,7 @@ function ReadingView({
       mobileActiveTab={mobileTab}
       onMobileTabChange={setMobileTab}
       className="h-full p-4 overflow-hidden"
-      gridClassName="grid-cols-1 md:grid-cols-[45%_55%]"
+      gridClassName="grid-cols-1 md:grid-cols-[60%_40%]"
       heightClassName="h-full"
       tone="emerald"
       passageTitle={`Reading Passage - Part ${partNumber}`}
@@ -2459,6 +2460,17 @@ function WritingView({
               />
             ) : (
               renderBlocks.map((block, i) => renderBlock(block, i))
+            )}
+            {readOnly && task.qExplanation && (
+              <div className="mt-4 p-4 rounded-xl bg-violet-50/60 border border-violet-200">
+                <p className="text-sm font-bold text-violet-800 mb-1.5 flex items-center gap-1.5">
+                  <span>💡</span> Hướng dẫn trả lời / Dàn ý gợi ý
+                </p>
+                <div 
+                  className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ __html: sanitizePassageHtml(task.qExplanation) }}
+                />
+              </div>
             )}
           </div>
           <div className="bg-white border border-slate-300 rounded-sm overflow-hidden">
@@ -3033,6 +3045,17 @@ function SpeakingQuestionScreen({ part, partNumber, submissionId, onComplete, re
             </>
           )}
           <div className="text-slate-800">{formatPartContent(part, partNumber)}</div>
+          {reviewMode && part.qExplanation && (
+            <div className="mt-5 p-4 rounded-xl bg-pink-50/50 border border-pink-200">
+              <p className="text-sm font-bold text-pink-800 mb-1.5 flex items-center gap-1.5">
+                <span>💡</span> Hướng dẫn trả lời / Dàn ý gợi ý
+              </p>
+              <div 
+                className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: sanitizePassageHtml(part.qExplanation) }}
+              />
+            </div>
+          )}
           {!reviewMode && audioUrl && (
             <div className="mt-5">
               <p className="text-xs font-semibold text-slate-700 mb-2">Bài thu của bạn:</p>
@@ -3627,6 +3650,14 @@ function QuestionCard({ q, selected, onSelect, flagged, onToggleFlag, reviewMode
           );
         })}
       </div>
+      {reviewMode && q.qExplanation && (
+        <div className="mt-3 p-3 rounded-lg bg-emerald-50/50 border border-emerald-200 ml-10">
+          <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1">
+            <span>💡</span> Giải thích đáp án
+          </p>
+          <p className="text-xs text-slate-600 leading-relaxed">{q.qExplanation}</p>
+        </div>
+      )}
     </div>
   );
 }

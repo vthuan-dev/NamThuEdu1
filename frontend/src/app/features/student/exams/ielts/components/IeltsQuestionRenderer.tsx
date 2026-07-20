@@ -88,6 +88,17 @@ export function IeltsQuestionRenderer({
       <div className="pl-10">
         {renderInput(type, question, answer, onAnswer, reviewMode, correctAnswer)}
       </div>
+
+      {reviewMode && (question.explanation || (question as any).qExplanation) && (
+        <div className="mt-3 p-3 rounded-lg bg-emerald-50/50 border border-emerald-200 ml-10">
+          <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1">
+            <span>💡</span> Explanation
+          </p>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            {question.explanation || (question as any).qExplanation}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

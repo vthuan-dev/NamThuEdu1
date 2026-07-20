@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { X } from 'lucide-react';
+import { KidsExplanationContext } from '../steps/Step2AddQuestions';
 
 /**
  * EditorShell — khung chuẩn dùng chung cho mọi editor dạng bài Kids.
@@ -36,6 +37,8 @@ const EditorShell: React.FC<EditorShellProps> = ({
   onSave,
   onCancel,
 }) => {
+  const context = useContext(KidsExplanationContext);
+
   return (
     <div className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
       {/* Header */}
@@ -66,7 +69,23 @@ const EditorShell: React.FC<EditorShellProps> = ({
       )}
 
       {/* Body */}
-      <div className="px-5 py-4">{children}</div>
+      <div className="px-5 py-4">
+        {children}
+
+        {context && (
+          <div className="mt-6 pt-5 border-t border-slate-100">
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Giải thích đáp án (Tùy chọn)
+            </label>
+            <textarea
+              value={context.explanation}
+              onChange={(e) => context.setExplanation(e.target.value)}
+              placeholder="Giải thích tại sao đáp án của câu hỏi này đúng..."
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500 min-h-[80px]"
+            />
+          </div>
+        )}
+      </div>
 
       {/* Sticky footer */}
       <div className="sticky bottom-0 flex items-center justify-end gap-3 border-t border-slate-200 bg-white/95 px-5 py-3 backdrop-blur-sm">

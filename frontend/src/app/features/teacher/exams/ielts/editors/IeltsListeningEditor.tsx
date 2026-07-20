@@ -38,6 +38,7 @@ interface ListeningQuestion {
   /** Image-completion: URL ảnh đề thi (dùng chung cả nhóm). */
   taskImage?: string;
   taskImageFileName?: string;
+  explanation?: string;
 }
 
 const isImageCompletion = (t: string) => t === "image-completion";
@@ -232,6 +233,7 @@ const buildEmptySection = (n: 1 | 2 | 3 | 4): ListeningSection => {
       questionText: "",
       options: { A: "", B: "", C: "", D: "" },
       correctAnswer: "A",
+      explanation: "",
     })),
   };
 };
@@ -269,6 +271,7 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
             taskImageFileName: q.taskImageFileName ?? "",
             correctAnswer: isMcq && !correctAnswer.trim() ? "A" : correctAnswer,
             options: imgComp ? undefined : (q.options ?? { A: "", B: "", C: "", D: "" }),
+            explanation: q.explanation || q.qExplanation || "",
           };
         }),
       };
@@ -1716,6 +1719,17 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
               />
             </div>
           ) : null}
+
+          {/* Explanation (Optional) */}
+          <div className="mt-2 pt-2 border-t border-gray-100">
+            <input
+              type="text"
+              value={question.explanation || ""}
+              onChange={(e) => handleChange({ explanation: e.target.value })}
+              placeholder="Giải thích đáp án (Không bắt buộc)..."
+              className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
         </div>
       </div>
     </div>

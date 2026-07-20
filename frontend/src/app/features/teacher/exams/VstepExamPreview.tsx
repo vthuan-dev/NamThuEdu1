@@ -872,7 +872,7 @@ function ReadingView({
   if (!part || !part.questions?.length) return <EmptyState skill="reading" />;
 
   return (
-    <div className="h-full grid grid-cols-1 md:grid-cols-[45%_55%] gap-4 p-4 overflow-hidden">
+    <div className="h-full grid grid-cols-1 md:grid-cols-[60%_40%] gap-4 p-4 overflow-hidden">
       {/* LEFT - Passage */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden min-h-0">
         <div className="px-5 py-3 bg-emerald-50 border-b border-emerald-200 flex items-center justify-between flex-shrink-0">

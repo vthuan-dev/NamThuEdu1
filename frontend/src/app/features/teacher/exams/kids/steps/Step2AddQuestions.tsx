@@ -28,6 +28,11 @@ import ListeningLetterMatchEditor from '../editors/ListeningLetterMatchEditor';
 import TaskTypeSelectorModal from '../components/TaskTypeSelectorModal';
 import { addKidsQuestion, updateKidsQuestion } from '../../../../../../services/kidsExamApi';
 
+export const KidsExplanationContext = React.createContext<{
+  explanation: string;
+  setExplanation: (val: string) => void;
+} | null>(null);
+
 interface Step2AddQuestionsProps {
   examData: any;
   setExamData: (data: any) => void;
@@ -294,6 +299,7 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
   examId,
 }) => {
   const [selectedTaskType, setSelectedTaskType] = useState<string | null>(null);
+  const [kidsExplanation, setKidsExplanation] = useState('');
   const [showEditor, setShowEditor] = useState(false);
   const [showTaskTypeSelector, setShowTaskTypeSelector] = useState(false);
   const [showGuide, setShowGuide] = useState(true);
@@ -441,6 +447,15 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
     });
   };
 
+  React.useEffect(() => {
+    if (showEditor) {
+      const currentQ = getCurrentQuestion();
+      setKidsExplanation(currentQ?.explanation || currentQ?.qExplanation || '');
+    } else {
+      setKidsExplanation('');
+    }
+  }, [showEditor, selectedTaskType, selectedPart, selectedSubPart]);
+
   const handleSaveQuestion = async (questionData: any) => {
     if (!examId) {
       alert('Vui lòng tạo đề thi trước khi thêm câu hỏi!');
@@ -452,6 +467,7 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
         ...questionData,
         part: selectedPart,
         subPart: selectedSubPart,
+        explanation: kidsExplanation,
       };
 
       const apiQuestionData = {
@@ -461,6 +477,7 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
         qPoints: questionWithPart.points || 5,
         part: selectedPart,
         subPart: selectedSubPart,
+        qExplanation: kidsExplanation,
       };
 
       if (!apiQuestionData.task_data || Object.keys(apiQuestionData.task_data).length === 0) {
@@ -813,13 +830,15 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
           {/* Editor dạng bài */}
           {showEditor && selectedTaskType && (
             ActiveEditor ? (
-              <ActiveEditor
-                onSave={handleSaveQuestion}
-                onCancel={handleCancelEditor}
-                initialData={getCurrentQuestion()}
-                examId={examId}
-                questionId={getCurrentQuestion()?.id || null}
-              />
+              <KidsExplanationContext.Provider value={{ explanation: kidsExplanation, setExplanation: setKidsExplanation }}>
+                <ActiveEditor
+                  onSave={handleSaveQuestion}
+                  onCancel={handleCancelEditor}
+                  initialData={getCurrentQuestion()}
+                  examId={examId}
+                  questionId={getCurrentQuestion()?.id || null}
+                />
+              </KidsExplanationContext.Provider>
             ) : (
               <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-8 text-center">
                 <div className="mb-3 text-4xl">🚧</div>

@@ -80,6 +80,7 @@ class TeensExamController extends Controller
                 'groups.*.questions.*.options'    => 'nullable|array',
                 'groups.*.questions.*.options.*.content'   => 'required_with:groups.*.questions.*.options|string',
                 'groups.*.questions.*.options.*.isCorrect' => 'required_with:groups.*.questions.*.options|boolean',
+                'groups.*.questions.*.qExplanation' => 'nullable|string',
             ]);
         } else { // speaking
             $rules = array_merge($rules, [
@@ -87,6 +88,7 @@ class TeensExamController extends Controller
                 'parts.*.qContent'      => 'required|string',
                 'parts.*.prepSeconds'   => 'nullable|integer|min:0|max:600',
                 'parts.*.speakSeconds'  => 'nullable|integer|min:10|max:1200',
+                'parts.*.qExplanation'  => 'nullable|string',
             ]);
         }
 
@@ -212,6 +214,7 @@ class TeensExamController extends Controller
                                 'qPoints'        => 1,
                                 'qDifficulty'    => 'medium',
                                 'age_group'      => 'teens',
+                                'qExplanation'   => $q['qExplanation'] ?? null,
                                 'qData'          => $qData,
                             ]);
 
@@ -253,6 +256,7 @@ class TeensExamController extends Controller
                             'qTime_limit'    => $speakSeconds,
                             'qDifficulty'    => 'medium',
                             'age_group'      => 'teens',
+                            'qExplanation'   => $part['qExplanation'] ?? null,
                             'qData'          => [
                                 'prepSeconds'  => $prepSeconds,
                                 'speakSeconds' => $speakSeconds,

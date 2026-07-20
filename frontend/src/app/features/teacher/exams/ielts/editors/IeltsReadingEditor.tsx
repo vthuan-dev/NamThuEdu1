@@ -20,6 +20,7 @@ interface ReadingQuestion {
   correctAnswer: string;
   /** Chỉ dùng cho MCQ — mỗi câu có bộ A/B/C/D… riêng. */
   options?: Record<string, string>;
+  explanation?: string;
 }
 
 interface ReadingGroup {
@@ -166,6 +167,7 @@ function toQuestion(raw: any, type: string): ReadingQuestion {
           ? { A: "", B: "", C: "", D: "", ...raw.options }
           : { A: "", B: "", C: "", D: "" }
         : undefined,
+    explanation: raw.explanation || raw.qExplanation || "",
   };
 }
 
@@ -266,22 +268,23 @@ function flattenPassages(passages: ReadingPassage[]) {
     p.groups.forEach((g) => {
       const matching = isMatchingType(g.questionType);
       const wordBank = isCompletionType(g.questionType) && !!g.useWordBank;
-      g.questions.forEach((q) => {
-        n += 1;
-        questions.push({
-          id: q.id,
-          questionNumber: n,
-          questionType: g.questionType,
-          questionText: q.questionText,
-          taskInstruction: g.instruction || "",
-          // Matching + word-bank completion đều dùng choices dùng chung làm options.
-          options: matching || wordBank ? g.choices : q.options,
-          correctAnswer: q.correctAnswer,
-          wordLimit: g.wordLimit || "",
-          selectCount: g.selectCount || 1,
-          useWordBank: wordBank,
+        g.questions.forEach((q) => {
+          n += 1;
+          questions.push({
+            id: q.id,
+            questionNumber: n,
+            questionType: g.questionType,
+            questionText: q.questionText,
+            taskInstruction: g.instruction || "",
+            // Matching + word-bank completion đều dùng choices dùng chung làm options.
+            options: matching || wordBank ? g.choices : q.options,
+            correctAnswer: q.correctAnswer,
+            wordLimit: g.wordLimit || "",
+            selectCount: g.selectCount || 1,
+            useWordBank: wordBank,
+            explanation: q.explanation || "",
+          });
         });
-      });
     });
     return {
       passageNumber: p.passageNumber,
@@ -1030,6 +1033,17 @@ function QuestionRow({
               className="w-full px-3 py-2 text-sm border border-emerald-200 bg-emerald-50/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
             />
           )}
+
+          {/* Explanation (Optional) */}
+          <div className="mt-2 pt-2 border-t border-gray-100">
+            <input
+              type="text"
+              value={question.explanation || ""}
+              onChange={(e) => onChange({ explanation: e.target.value })}
+              placeholder="Giải thích đáp án (Không bắt buộc)..."
+              className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            />
+          </div>
         </div>
       </div>
     </div>

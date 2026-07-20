@@ -634,6 +634,17 @@ export function KidsResult() {
                             </div>
                           </div>
                         )}
+
+                      {/* Explanation (Optional) */}
+                      {q?.qExplanation && (
+                        <div className="mt-2 flex items-start gap-2.5 rounded-xl px-3 py-2 border border-rose-100 bg-rose-50/40">
+                          <span className="text-base leading-none mt-0.5">💡</span>
+                          <div className="min-w-0">
+                            <p className="text-[10px] font-extrabold text-rose-600 uppercase tracking-wider">Giải thích đáp án</p>
+                            <p className="text-xs font-semibold leading-relaxed text-slate-700 whitespace-pre-wrap">{q.qExplanation}</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

@@ -162,6 +162,17 @@ export function KidsAnswerReview() {
                   ))}
                 </div>
               )}
+
+              {/* Explanation (Optional) */}
+              {q?.qExplanation && (
+                <div className="ml-6 sm:ml-10 mt-4 rounded-2xl bg-rose-50/50 p-4 border border-rose-100 flex items-start gap-2.5">
+                  <span className="text-lg">💡</span>
+                  <div className="space-y-1">
+                    <p className="text-xs font-bold text-rose-600 uppercase tracking-wider">Giải thích đáp án</p>
+                    <p className="text-[14px] font-semibold text-slate-700 leading-relaxed">{q.qExplanation}</p>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}

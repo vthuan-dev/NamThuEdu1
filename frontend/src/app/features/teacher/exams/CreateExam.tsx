@@ -185,6 +185,7 @@ interface Question {
   content: string;
   points: number;
   answers?: { id: string; text: string; isCorrect: boolean }[];
+  explanation?: string;
   // VSTEP specific fields
   skill?: string;
   part?: number;
@@ -649,6 +650,7 @@ export function CreateExam() {
           qType: normalizeQuestionType(question.type),
           qPoints: Number.isFinite(question.points) && question.points > 0 ? question.points : 1,
           answers: buildAnswers(question),
+          qExplanation: question.explanation || "",
         }));
 
       console.log('📋 Questions to save:', questionPayload.length, questionPayload);
@@ -2472,6 +2474,24 @@ Your response will be evaluated in terms of Task Fulfillment, Organization, Voca
                       </div>
                     </div>
                   )}
+
+                  {/* Explanation (Optional) */}
+                  <div className="space-y-2 mt-4">
+                    <label className="block text-sm font-semibold text-gray-700">
+                      Giải thích đáp án (Tùy chọn)
+                    </label>
+                    <textarea
+                      value={selectedQuestion.explanation || ""}
+                      onChange={(e) =>
+                        updateQuestionInState(selectedQuestion.id, (question) => ({
+                          ...question,
+                          explanation: e.target.value,
+                        }))
+                      }
+                      placeholder="Giải thích tại sao đáp án này đúng..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 min-h-[80px] text-sm"
+                    />
+                  </div>
 
                   {/* Action Buttons */}
                   <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">

@@ -345,6 +345,7 @@ class KidsExamController extends Controller
             'qPoints' => 'nullable|integer',
             'part' => 'nullable|integer',      // Main part (1, 2, 3)
             'subPart' => 'nullable|integer',   // Cambridge sub-part
+            'qExplanation' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -370,6 +371,7 @@ class KidsExamController extends Controller
             'qType' => 'kids_task',
             'qPart' => $request->part ?? 1,           // Main part
             'qSubPart' => $request->subPart,          // Cambridge sub-part (nullable)
+            'qExplanation' => $request->qExplanation,
             'kids_task_config' => [
                 'task_type' => $request->task_type_code,
                 'task_name' => $taskDef->name,
@@ -410,6 +412,7 @@ class KidsExamController extends Controller
         $updateData = [];
         if ($request->has('qContent')) $updateData['qContent'] = $request->qContent;
         if ($request->has('qPoints')) $updateData['qPoints'] = $request->qPoints;
+        if ($request->has('qExplanation')) $updateData['qExplanation'] = $request->qExplanation;
         if ($request->has('task_data')) {
             $config = $question->kids_task_config ?? [];
             $config['task_data'] = $request->task_data;

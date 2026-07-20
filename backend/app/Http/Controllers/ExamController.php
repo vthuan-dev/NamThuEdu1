@@ -1232,6 +1232,7 @@ class ExamController extends Controller
             'questions.*.options.C' => 'required|string',
             'questions.*.options.D' => 'required|string',
             'questions.*.correctAnswer' => 'nullable|in:A,B,C,D',
+            'questions.*.explanation' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -1306,6 +1307,7 @@ class ExamController extends Controller
                     'qPart' => $partNumber,
                     'qSection_order' => $questionData['questionNumber'],
                     'qPoints' => 1,
+                    'qExplanation' => $questionData['explanation'] ?? null,
                     'qData' => [
                         'part_number' => $partNumber,
                         'part_name' => $request->partName,
@@ -2309,6 +2311,7 @@ class ExamController extends Controller
             'questions.*.options.C' => 'required|string',
             'questions.*.options.D' => 'required|string',
             'questions.*.correctAnswer' => 'nullable|in:A,B,C,D',
+            'questions.*.explanation' => 'nullable|string',
         ]);
         if ($validator->fails()) {
             return response()->json(['status' => 'error', 'message' => 'Dữ liệu không hợp lệ.', 'errors' => $validator->errors()], 400);
@@ -2399,6 +2402,7 @@ class ExamController extends Controller
                     'qPart' => $partNumber,
                     'qSection_order' => $qData['questionNumber'],
                     'qPoints' => 1,
+                    'qExplanation' => $qData['explanation'] ?? null,
                     'qData' => [
                         'part_number' => $partNumber,
                         'section_number' => $sectionNumber,
@@ -2942,6 +2946,7 @@ class ExamController extends Controller
             'wordCount.0' => 'required|integer|min:1',
             'wordCount.1' => 'required|integer|min:1',
             'timeLimit' => 'required|integer|min:1',
+            'explanation' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -3014,6 +3019,7 @@ class ExamController extends Controller
                 'qPart' => $taskNumber,
                 'qSection_order' => $taskNumber,
                 'qPoints' => $taskNumber === 1 ? 33 : 67, // Task 1: 33%, Task 2: 67%
+                'qExplanation' => $request->explanation ?? null,
                 'qData' => [
                     'task_number' => $taskNumber,
                     'task_name' => $request->taskName,
@@ -3246,14 +3252,18 @@ class ExamController extends Controller
             'part1Data' => 'nullable|array',
             'part1Data.*.topicName' => 'required_with:part1Data|string',
             'part1Data.*.questions' => 'required_with:part1Data|array|size:3',
+            'part1Data.*.explanations' => 'nullable|array',
             'part2Data' => 'nullable|array',
             'part2Data.situation' => 'required_with:part2Data|string',
             'part2Data.solutions' => 'required_with:part2Data|array|size:3',
             'part2Data.question' => 'required_with:part2Data|string',
+            'part2Data.explanation' => 'nullable|string',
             'part3Data' => 'nullable|array',
             'part3Data.mainTopic' => 'required_with:part3Data|string',
             'part3Data.suggestedIdeas' => 'required_with:part3Data|array|min:3',
             'part3Data.followUpQuestions' => 'required_with:part3Data|array|min:2',
+            'part3Data.explanation' => 'nullable|string',
+            'part3Data.followUpExplanations' => 'nullable|array',
         ]);
 
         if ($validator->fails()) {
@@ -3336,6 +3346,7 @@ class ExamController extends Controller
                                 'qPart' => $partNumber,
                                 'qSection_order' => ($topicIndex * 3) + $qIndex + 1,
                                 'qPoints' => 1,
+                                'qExplanation' => $topic['explanations'][$qIndex] ?? null,
                                 'qData' => [
                                     'part_number' => $partNumber,
                                     'topic_name' => $topic['topicName'],
@@ -3360,6 +3371,7 @@ class ExamController extends Controller
                     'qPart' => $partNumber,
                     'qSection_order' => 1,
                     'qPoints' => 1,
+                    'qExplanation' => $part2['explanation'] ?? null,
                     'qData' => [
                         'part_number' => $partNumber,
                         'situation' => $part2['situation'],
@@ -3383,6 +3395,7 @@ class ExamController extends Controller
                     'qPart' => $partNumber,
                     'qSection_order' => 1,
                     'qPoints' => 1,
+                    'qExplanation' => $part3['explanation'] ?? null,
                     'qData' => [
                         'part_number' => $partNumber,
                         'main_topic' => $part3['mainTopic'],
@@ -3405,6 +3418,7 @@ class ExamController extends Controller
                             'qPart' => $partNumber,
                             'qSection_order' => $qIndex + 2,
                             'qPoints' => 1,
+                            'qExplanation' => $part3['followUpExplanations'][$qIndex] ?? null,
                             'qData' => [
                                 'part_number' => $partNumber,
                                 'main_topic' => $part3['mainTopic'],

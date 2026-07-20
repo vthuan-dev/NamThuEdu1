@@ -682,6 +682,14 @@ function McqBody({
                 </div>
               );
             })()}
+            {reviewMode && q.explanation && (
+              <div className="mt-3 p-3 rounded-lg bg-emerald-50/50 border border-emerald-200 ml-10">
+                <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1">
+                  <span>💡</span> Explanation
+                </p>
+                <p className="text-xs text-slate-600 leading-relaxed">{q.explanation}</p>
+              </div>
+            )}
           </div>
         );
       })}
@@ -754,6 +762,7 @@ function CompletionListBody({
           (q.data?.taskInstruction as string) ||
           (q.data?.task_instruction as string) ||
           undefined,
+        explanation: q.explanation || (q as any).qExplanation || "",
       };
     });
   }, [section.questions]);
@@ -772,20 +781,20 @@ function CompletionListBody({
       prefix: string | null;
       title?: string;
       instruction?: string;
-      items: { qId: number; number: number; text: string }[];
+      items: { qId: number; number: number; text: string; explanation?: string }[];
     };
     const groups: Group[] = [];
     parsed.forEach((p) => {
       const last = groups[groups.length - 1];
       if (last && last.prefix === p.prefix && last.title === p.title && last.instruction === p.instruction && p.prefix !== null) {
-        last.items.push({ qId: p.qId, number: p.questionNumber, text: p.rest });
+        last.items.push({ qId: p.qId, number: p.questionNumber, text: p.rest, explanation: p.explanation });
       } else {
         groups.push({
           key: `g-${p.qId}`,
           prefix: p.prefix,
           title: p.title,
           instruction: p.instruction,
-          items: [{ qId: p.qId, number: p.questionNumber, text: p.rest }],
+          items: [{ qId: p.qId, number: p.questionNumber, text: p.rest, explanation: p.explanation }],
         });
       }
     });
@@ -834,6 +843,11 @@ function CompletionListBody({
                       isCorrectMap
                     )}
                   </div>
+                  {reviewMode && item.explanation && (
+                    <div className="mt-2 p-2 rounded bg-emerald-50/50 border border-emerald-200 text-xs text-slate-600 ml-10">
+                      <span className="font-bold text-emerald-700">💡 Explanation:</span> {item.explanation}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -874,6 +888,11 @@ function CompletionListBody({
               isCorrectMap
             )}
           </div>
+          {reviewMode && p.explanation && (
+            <div className="mt-2 p-2 rounded bg-emerald-50/50 border border-emerald-200 text-xs text-slate-600 ml-10">
+              <span className="font-bold text-emerald-700">💡 Explanation:</span> {p.explanation}
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -957,6 +976,11 @@ function FormCompletionTwoColumn({
                     )}
                   </div>
                 </label>
+                {reviewMode && q.explanation && (
+                  <div className="mt-2 p-2 rounded bg-emerald-50/50 border border-emerald-200 text-xs text-slate-600 ml-10">
+                    <span className="font-bold text-emerald-700">💡 Explanation:</span> {q.explanation}
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -41,6 +41,7 @@ export interface IeltsQuestion {
   options?: Record<string, string> | null;
   /** Extra metadata (without correct_answer): e.g. word_limit, choices for matching */
   data?: Record<string, any>;
+  explanation?: string;
 }
 
 // ─── Listening ─────────────────────────────────────────────────────────────
@@ -107,6 +108,7 @@ export interface IeltsWritingTask {
   minWords: number;
   recommendedMinutes: number;
   questionId: number;
+  explanation?: string;
 }
 
 export interface IeltsWritingPayload {
@@ -139,6 +141,7 @@ export interface IeltsSpeakingPart {
   questionId?: number;                     // Part 2 only
   prepSeconds?: number;                    // Part 2 only
   speakSeconds?: number;                   // Part 2 only
+  explanation?: string;
 }
 
 export interface IeltsSpeakingPayload {

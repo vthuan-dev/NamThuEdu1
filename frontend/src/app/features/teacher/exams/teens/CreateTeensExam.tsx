@@ -35,6 +35,7 @@ interface LQuestion {
   qType: QType;
   options: Option[];
   correctText: string;
+  qExplanation?: string;
 }
 interface LGroup {
   id: string;
@@ -44,7 +45,7 @@ interface LGroup {
   imageUploading: boolean;
   questions: LQuestion[];
 }
-interface SPart { id: string; qContent: string; prepSeconds: number; speakSeconds: number }
+interface SPart { id: string; qContent: string; prepSeconds: number; speakSeconds: number; qExplanation?: string }
 
 const newOption = (): Option => ({ id: uid(), content: "", isCorrect: false });
 const newLQuestion = (type: QType = "multiple_choice"): LQuestion => ({
@@ -217,6 +218,7 @@ export function CreateTeensExam() {
             const base: any = {
               qContent: stripHtml(q.qContent) ? q.qContent.trim() : `Câu ${qi + 1}`,
               qType: q.qType,
+              qExplanation: q.qExplanation || "",
             };
             if (q.qType === "fill_blank") {
               base.correctAnswer = q.correctText.trim();
@@ -234,6 +236,7 @@ export function CreateTeensExam() {
           qContent: p.qContent.trim(),
           prepSeconds: p.prepSeconds,
           speakSeconds: p.speakSeconds,
+          qExplanation: p.qExplanation || "",
         }));
       }
       const { data } = await api.post("/teacher/exams/teens", body);
@@ -521,6 +524,18 @@ export function CreateTeensExam() {
                           )}
                         </>
                       )}
+                      {/* Explanation (Optional) */}
+                      <div className="mt-3 pt-3 border-t border-slate-100">
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">
+                          Giải thích đáp án (Tuỳ chọn)
+                        </label>
+                        <input
+                          className={inputCls}
+                          value={q.qExplanation || ""}
+                          onChange={(e) => updateQuestion(g.id, q.id, (x) => ({ ...x, qExplanation: e.target.value }))}
+                          placeholder="Giải thích tại sao đáp án này đúng..."
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -572,6 +587,18 @@ export function CreateTeensExam() {
                     <input type="number" min={10} max={1200} className={inputCls} value={p.speakSeconds}
                       onChange={(e) => updatePart(p.id, (x) => ({ ...x, speakSeconds: Math.max(10, Number(e.target.value) || 10) }))} />
                   </div>
+                </div>
+                {/* Explanation (Optional) */}
+                <div className="mt-3">
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Giải thích / Hướng dẫn trả lời (Tuỳ chọn)
+                  </label>
+                  <input
+                    className={inputCls}
+                    value={p.qExplanation || ""}
+                    onChange={(e) => updatePart(p.id, (x) => ({ ...x, qExplanation: e.target.value }))}
+                    placeholder="VD: Sử dụng các từ vựng liên quan đến sở thích cá nhân, chia thì hiện tại đơn..."
+                  />
                 </div>
               </div>
             ))}
