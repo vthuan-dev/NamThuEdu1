@@ -184,6 +184,15 @@ export function IeltsWritingView({
                   <li>· Write in formal academic English</li>
                 </ul>
               </div>
+
+              {reviewMode && currentTask.explanation && (
+                <div className="mt-4 p-4 rounded-xl bg-emerald-50/70 border border-emerald-200">
+                  <p className="text-xs font-bold text-emerald-700 mb-1.5 flex items-center gap-1.5">
+                    <span>💡</span> Dàn ý / Giải thích đáp án:
+                  </p>
+                  <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">{currentTask.explanation}</p>
+                </div>
+              )}
             </div>
           </div>
 

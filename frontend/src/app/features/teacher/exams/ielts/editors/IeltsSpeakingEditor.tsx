@@ -9,11 +9,12 @@ import {
 interface SpeakingPart {
   partNumber: 1 | 2 | 3;
   /** Part 1 & 3 use questions array. Part 2 uses cueCard. */
-  questions?: { id: string; topic?: string; text: string }[];
+  questions?: { id: string; topic?: string; text: string; explanation?: string }[];
   cueCard?: {
     topic: string;
     bullets: string[];
     followUp: string;
+    explanation?: string;
   };
 }
 
@@ -28,9 +29,9 @@ const buildEmptyParts = (): SpeakingPart[] => [
   {
     partNumber: 1,
     questions: [
-      { id: "p1-t1-q1", topic: "Hometown", text: "Where are you from?" },
-      { id: "p1-t1-q2", topic: "Hometown", text: "What do you like about your hometown?" },
-      { id: "p1-t1-q3", topic: "Hometown", text: "Has your hometown changed recently?" },
+      { id: "p1-t1-q1", topic: "Hometown", text: "Where are you from?", explanation: "" },
+      { id: "p1-t1-q2", topic: "Hometown", text: "What do you like about your hometown?", explanation: "" },
+      { id: "p1-t1-q3", topic: "Hometown", text: "Has your hometown changed recently?", explanation: "" },
     ],
   },
   {
@@ -39,15 +40,16 @@ const buildEmptyParts = (): SpeakingPart[] => [
       topic: SPEAKING_CUE_CARD_TEMPLATE.topic,
       bullets: [...SPEAKING_CUE_CARD_TEMPLATE.bullets],
       followUp: "",
+      explanation: "",
     },
   },
   {
     partNumber: 3,
     questions: [
-      { id: "p3-q1", text: "" },
-      { id: "p3-q2", text: "" },
-      { id: "p3-q3", text: "" },
-      { id: "p3-q4", text: "" },
+      { id: "p3-q1", text: "", explanation: "" },
+      { id: "p3-q2", text: "", explanation: "" },
+      { id: "p3-q3", text: "", explanation: "" },
+      { id: "p3-q4", text: "", explanation: "" },
     ],
   },
 ];
@@ -178,17 +180,16 @@ export function IeltsSpeakingEditor({ initialData, onSave }: Props) {
   );
 }
 
-// ─── Part 1 & 3 editor ──────────────────────────────────────────────────────
 function Part1Or3Editor({
   partNumber,
   questions,
   onChange,
 }: {
   partNumber: 1 | 3;
-  questions: { id: string; topic?: string; text: string }[];
-  onChange: (qs: { id: string; topic?: string; text: string }[]) => void;
+  questions: { id: string; topic?: string; text: string; explanation?: string }[];
+  onChange: (qs: { id: string; topic?: string; text: string; explanation?: string }[]) => void;
 }) {
-  const updateQ = (idx: number, patch: Partial<{ topic: string; text: string }>) => {
+  const updateQ = (idx: number, patch: Partial<{ topic: string; text: string; explanation: string }>) => {
     const next = [...questions];
     next[idx] = { ...next[idx], ...patch };
     onChange(next);
@@ -197,7 +198,7 @@ function Part1Or3Editor({
   const addQ = () => {
     onChange([
       ...questions,
-      { id: `p${partNumber}-q${Date.now()}`, topic: "", text: "" },
+      { id: `p${partNumber}-q${Date.now()}`, topic: "", text: "", explanation: "" },
     ]);
   };
 
@@ -222,14 +223,14 @@ function Part1Or3Editor({
                   <input
                     type="text"
                     value={q.topic || ""}
-                    onChange={(e) => updateQ(idx, { topic: e.target.value })}
+                    onChange={(e) => updateQ(idx, { topic: e.target.value } as any)}
                     placeholder="Chủ đề (vd: Hometown, Hobbies, Work, Study)..."
                     className="w-full px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-purple-50/30"
                   />
                 )}
                 <textarea
                   value={q.text}
-                  onChange={(e) => updateQ(idx, { text: e.target.value })}
+                  onChange={(e) => updateQ(idx, { text: e.target.value } as any)}
                   placeholder={
                     partNumber === 1
                       ? "VD: What do you do for a living?"
@@ -237,6 +238,13 @@ function Part1Or3Editor({
                   }
                   rows={2}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
+                />
+                <input
+                  type="text"
+                  value={q.explanation || ""}
+                  onChange={(e) => updateQ(idx, { explanation: e.target.value } as any)}
+                  placeholder="Gợi ý trả lời / Từ vựng nên dùng (Giải thích) - Tuỳ chọn"
+                  className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-emerald-50/20 placeholder:text-gray-400"
                 />
               </div>
               <button
@@ -267,8 +275,8 @@ function CueCardEditor({
   cueCard,
   onChange,
 }: {
-  cueCard: { topic: string; bullets: string[]; followUp: string };
-  onChange: (c: { topic: string; bullets: string[]; followUp: string }) => void;
+  cueCard: { topic: string; bullets: string[]; followUp: string; explanation?: string };
+  onChange: (c: { topic: string; bullets: string[]; followUp: string; explanation?: string }) => void;
 }) {
   const updateBullet = (idx: number, val: string) => {
     const next = [...cueCard.bullets];
@@ -351,6 +359,20 @@ function CueCardEditor({
           onChange={(e) => onChange({ ...cueCard, followUp: e.target.value })}
           placeholder="VD: Do you think you will visit there again?"
           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+        />
+      </div>
+
+      {/* Explanation */}
+      <div>
+        <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wide">
+          Gợi ý trả lời / Từ vựng (Giải thích) - Tuỳ chọn
+        </label>
+        <textarea
+          value={cueCard.explanation || ""}
+          onChange={(e) => onChange({ ...cueCard, explanation: e.target.value })}
+          placeholder="VD: Nên sử dụng các tính từ miêu tả cảm xúc, chia thì quá khứ đơn, nói về các chi tiết..."
+          rows={3}
+          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
         />
       </div>
     </div>

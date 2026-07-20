@@ -130,6 +130,7 @@ export interface IeltsSpeakingQuestionItem {
   order: number;
   topic: string | null;
   text: string;
+  explanation?: string;
 }
 
 export interface IeltsSpeakingPart {

@@ -12,6 +12,7 @@ interface WritingTask {
   prompt: string;
   wordCount: [number, number];
   timeLimit: number;
+  explanation?: string;
 }
 
 const VSTEP_WRITING_TASKS = [
@@ -84,6 +85,7 @@ export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest 
               prompt: task.prompt,
               wordCount: task.wordCount || VSTEP_WRITING_TASKS[task.taskNumber - 1].wordCount,
               timeLimit: task.timeLimit || VSTEP_WRITING_TASKS[task.taskNumber - 1].timeLimit,
+              explanation: task.explanation || "",
             }));
             
             setTasks((prev) =>
@@ -124,6 +126,14 @@ export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest 
     );
   };
 
+  const updateExplanation = (content: string) => {
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.taskNumber === currentTask ? { ...t, explanation: content } : t
+      )
+    );
+  };
+
   const handleSaveTask = async (taskNumber: 1 | 2) => {
     const task = tasks.find(t => t.taskNumber === taskNumber);
     if (!task) return;
@@ -142,6 +152,7 @@ export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest 
         prompt: task.prompt,
         wordCount: task.wordCount,
         timeLimit: task.timeLimit,
+        explanation: task.explanation || "",
       };
 
       await saveVstepWritingTask(examId, taskNumber, taskData);
@@ -319,6 +330,35 @@ export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest 
                     onChange={updatePrompt}
                     theme="snow"
                     placeholder={t('vstep.writing.prompt.placeholder')}
+                    modules={{
+                      toolbar: [
+                        [{ header: [1, 2, 3, false] }],
+                        ["bold", "italic", "underline"],
+                        [{ list: "ordered" }, { list: "bullet" }],
+                        ["link"],
+                        ["clean"],
+                      ],
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Explanation Editor */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col overflow-hidden mt-6 min-h-[300px]">
+              <div className="p-4 border-b border-gray-200 flex-shrink-0 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-emerald-600" />
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Dàn ý / Giải thích đáp án (Tuỳ chọn)
+                </h2>
+              </div>
+              <div className="flex-1 p-4 overflow-hidden">
+                <div className="h-full vstep-writing-editor">
+                  <QuillEditor
+                    value={currentTaskData.explanation || ""}
+                    onChange={updateExplanation}
+                    theme="snow"
+                    placeholder="Nhập dàn ý chi tiết, từ vựng khuyên dùng, hoặc bài mẫu..."
                     modules={{
                       toolbar: [
                         [{ header: [1, 2, 3, false] }],

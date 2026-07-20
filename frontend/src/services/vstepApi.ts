@@ -219,6 +219,7 @@ export interface VstepWritingTaskData {
   prompt: string;
   wordCount: [number, number];
   timeLimit: number;
+  explanation?: string;
 }
 
 export interface VstepWritingExamData {
@@ -273,6 +274,7 @@ export interface Part1Topic {
   id: string;
   topicName: string;
   questions: string[]; // 3 questions per topic
+  explanations?: string[]; // 3 explanations per topic
 }
 
 // Part 2: Solution Discussion - Situation + 3 Solutions + Question
@@ -280,6 +282,7 @@ export interface Part2Data {
   situation: string;
   solutions: string[]; // 3 solutions
   question: string;
+  explanation?: string;
 }
 
 // Part 3: Topic Development - Main Topic + Suggested Ideas + Follow-up Questions
@@ -287,6 +290,8 @@ export interface Part3Data {
   mainTopic: string;
   suggestedIdeas: string[]; // 4-5 ideas
   followUpQuestions: string[]; // 2-3 questions
+  explanation?: string;
+  followUpExplanations?: string[];
 }
 
 export interface VstepSpeakingPartData {

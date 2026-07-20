@@ -135,25 +135,70 @@ export function IeltsSpeakingView({ payload, submissionId, onSubmit, reviewMode 
       <div className="flex-1 px-4 py-6 max-w-3xl w-full mx-auto">
         {/* Part 2: Cue Card */}
         {reviewMode && currentPart.partNumber === 2 && currentPart.cueCard ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Cue card</p>
-            <h2 className="text-lg font-bold text-slate-900">{currentPart.cueCard.topic}</h2>
-            {currentPart.cueCard.bullets?.length ? (
-              <ul className="mt-4 space-y-2 text-sm text-slate-700 list-disc pl-5">
-                {currentPart.cueCard.bullets.map((bullet, idx) => (
-                  <li key={idx}>{bullet}</li>
-                ))}
-              </ul>
-            ) : null}
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Cue card</p>
+              <h2 className="text-lg font-bold text-slate-900">{currentPart.cueCard.topic}</h2>
+              {currentPart.cueCard.bullets?.length ? (
+                <ul className="mt-4 space-y-2 text-sm text-slate-700 list-disc pl-5">
+                  {currentPart.cueCard.bullets.map((bullet, idx) => (
+                    <li key={idx}>{bullet}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+            {currentPart.explanation && (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5">
+                <p className="text-xs font-bold text-emerald-700 mb-1.5 flex items-center gap-1.5">
+                  <span>💡</span> Gợi ý trả lời / Từ vựng (Giải thích):
+                </p>
+                <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">{currentPart.explanation}</p>
+              </div>
+            )}
           </div>
         ) : reviewMode && currentPart.questions && currentPart.questions[activeQuestionIdx] ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
-              Question {activeQuestionIdx + 1} of {currentPart.questions.length}
-            </p>
-            <h2 className="text-lg font-bold text-slate-900">
-              {currentPart.questions[activeQuestionIdx].text}
-            </h2>
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                Question {activeQuestionIdx + 1} of {currentPart.questions.length}
+              </p>
+              <h2 className="text-lg font-bold text-slate-900">
+                {currentPart.questions[activeQuestionIdx].text}
+              </h2>
+            </div>
+            {currentPart.questions[activeQuestionIdx].explanation && (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5">
+                <p className="text-xs font-bold text-emerald-700 mb-1.5 flex items-center gap-1.5">
+                  <span>💡</span> Gợi ý trả lời / Từ vựng (Giải thích):
+                </p>
+                <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
+                  {currentPart.questions[activeQuestionIdx].explanation}
+                </p>
+              </div>
+            )}
+            {currentPart.questions.length > 1 && (
+              <div className="flex justify-between items-center mt-2 px-1">
+                <button
+                  type="button"
+                  onClick={() => setActiveQuestionIdx((i) => Math.max(0, i - 1))}
+                  disabled={activeQuestionIdx === 0}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 cursor-pointer"
+                >
+                  ← Câu trước
+                </button>
+                <span className="text-xs text-slate-400 font-medium">
+                  {activeQuestionIdx + 1} / {currentPart.questions.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveQuestionIdx((i) => Math.min(currentPart.questions!.length - 1, i + 1))}
+                  disabled={activeQuestionIdx === currentPart.questions.length - 1}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 cursor-pointer"
+                >
+                  Câu sau →
+                </button>
+              </div>
+            )}
           </div>
         ) : currentPart.partNumber === 2 && currentPart.cueCard ? (
           <IeltsSpeakingRecorder

@@ -250,6 +250,30 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
     );
   };
 
+  const updateTopicQuestionExplanation = (topicId: string, questionIndex: number, value: string) => {
+    setParts((prev) =>
+      prev.map((p) =>
+        p.partNumber === 1
+          ? {
+              ...p,
+              part1Data: (p.part1Data || []).map((t) =>
+                t.id === topicId
+                  ? {
+                      ...t,
+                      explanations: (() => {
+                        const arr = [...(t.explanations || ["", "", ""])];
+                        arr[questionIndex] = value;
+                        return arr;
+                      })(),
+                    }
+                  : t
+              ),
+            }
+          : p
+      )
+    );
+  };
+
   // Part 2: Solution Discussion management
   const updatePart2Field = (field: keyof Part2Data, value: string) => {
     setParts((prev) =>
@@ -346,6 +370,26 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
                 followUpQuestions: (p.part3Data?.followUpQuestions || []).map((q, i) =>
                   i === index ? value : q
                 ),
+              },
+            }
+          : p
+      )
+    );
+  };
+
+  const updatePart3FollowUpExplanation = (index: number, value: string) => {
+    setParts((prev) =>
+      prev.map((p) =>
+        p.partNumber === 3
+          ? {
+              ...p,
+              part3Data: {
+                ...(p.part3Data || createDefaultPart3Data()),
+                followUpExplanations: (() => {
+                  const arr = [...(p.part3Data?.followUpExplanations || ["", ""])];
+                  arr[index] = value;
+                  return arr;
+                })(),
               },
             }
           : p
@@ -837,23 +881,34 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
             {/* Questions */}
             <div>
               <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Questions</label>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {topic.questions.map((question, qIndex) => (
-                  <div key={qIndex} className="flex items-start gap-3">
-                    <span className="flex-shrink-0 w-7 h-7 bg-gray-50 text-gray-500 rounded-lg flex items-center justify-center font-medium text-sm mt-1">
-                      {qIndex + 1}
-                    </span>
-                    <input
-                      type="text"
-                      value={question}
-                      onChange={(e) => updateTopicQuestion(topic.id, qIndex, e.target.value)}
-                      placeholder={
-                        qIndex === 0 ? "Question 1: e.g., What do you usually do in your free time?" :
-                        qIndex === 1 ? "Question 2: e.g., How often do you do this activity?" :
-                        "Question 3: e.g., Why do you enjoy it?"
-                      }
-                      className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400/30 focus:border-blue-400 text-gray-900 placeholder:text-gray-400 transition-all"
-                    />
+                  <div key={qIndex} className="space-y-2 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                    <div className="flex items-start gap-3">
+                      <span className="flex-shrink-0 w-7 h-7 bg-gray-50 text-gray-500 rounded-lg flex items-center justify-center font-medium text-sm mt-1">
+                        {qIndex + 1}
+                      </span>
+                      <input
+                        type="text"
+                        value={question}
+                        onChange={(e) => updateTopicQuestion(topic.id, qIndex, e.target.value)}
+                        placeholder={
+                          qIndex === 0 ? "Question 1: e.g., What do you usually do in your free time?" :
+                          qIndex === 1 ? "Question 2: e.g., How often do you do this activity?" :
+                          "Question 3: e.g., Why do you enjoy it?"
+                        }
+                        className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-400/30 focus:border-blue-400 text-gray-900 placeholder:text-gray-400 transition-all"
+                      />
+                    </div>
+                    <div className="flex items-start gap-3 pl-10">
+                      <input
+                        type="text"
+                        value={topic.explanations?.[qIndex] || ""}
+                        onChange={(e) => updateTopicQuestionExplanation(topic.id, qIndex, e.target.value)}
+                        placeholder="Gợi ý trả lời / Từ vựng (Giải thích) - Tuỳ chọn"
+                        className="flex-1 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400/30 focus:border-blue-400 text-gray-700 bg-emerald-50/10 placeholder:text-gray-400 transition-all"
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -932,6 +987,7 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
                       ? {
                           ...p,
                           part2Data: {
+                            ...(p.part2Data || createDefaultPart2Data()),
                             situation: val,
                             solutions: ["", "", ""], // Size 3 to pass backend validation
                             question: "", // String to pass backend validation
@@ -945,6 +1001,18 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
               placeholder="Describe the situation, proposed solutions, and discussion question..."
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 text-gray-900 placeholder:text-gray-400 transition-all font-sans"
             />
+            <div className="mt-4">
+              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                Gợi ý trả lời / Từ vựng (Giải thích) - Tuỳ chọn
+              </label>
+              <textarea
+                value={data.explanation || ""}
+                onChange={(e) => updatePart2Field("explanation", e.target.value)}
+                placeholder="VD: Nên lựa chọn giải pháp nào và giải thích lý do..."
+                rows={3}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 text-gray-900 placeholder:text-gray-400 transition-all font-sans text-sm bg-emerald-50/10"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -999,18 +1067,32 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
         </div>
 
         {/* Main Topic Field */}
-        <div className="border border-purple-200 rounded-xl p-6 bg-purple-50/40">
-          <label className="block text-sm font-semibold text-purple-800 mb-2 flex items-center gap-2">
-            <span className="w-6 h-6 bg-purple-600 text-white rounded-lg flex items-center justify-center text-xs font-bold">T</span>
-            Main Topic <span className="text-purple-400 font-normal text-xs">(câu chủ đề – học viên phải phát triển)</span>
-          </label>
-          <textarea
-            value={data.mainTopic}
-            onChange={(e) => updatePart3Field("mainTopic", e.target.value)}
-            rows={2}
-            placeholder="e.g., The impact of social media on young people's communication skills"
-            className="w-full px-4 py-3 border-2 border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-400/30 focus:border-purple-500 text-gray-900 font-semibold placeholder:text-purple-300 transition-all resize-none bg-white"
-          />
+        <div className="border border-purple-200 rounded-xl p-6 bg-purple-50/40 space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-purple-800 mb-2 flex items-center gap-2">
+              <span className="w-6 h-6 bg-purple-600 text-white rounded-lg flex items-center justify-center text-xs font-bold">T</span>
+              Main Topic <span className="text-purple-400 font-normal text-xs">(câu chủ đề – học viên phải phát triển)</span>
+            </label>
+            <textarea
+              value={data.mainTopic}
+              onChange={(e) => updatePart3Field("mainTopic", e.target.value)}
+              rows={2}
+              placeholder="e.g., The impact of social media on young people's communication skills"
+              className="w-full px-4 py-3 border-2 border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-400/30 focus:border-purple-500 text-gray-900 font-semibold placeholder:text-purple-300 transition-all resize-none bg-white"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-purple-600 mb-2">
+              Gợi ý phát triển chủ đề / Dàn ý (Giải thích) - Tuỳ chọn
+            </label>
+            <textarea
+              value={data.explanation || ""}
+              onChange={(e) => updatePart3Field("explanation", e.target.value)}
+              rows={2}
+              placeholder="VD: Cần nêu được định nghĩa, ưu nhược điểm, và ví dụ cụ thể..."
+              className="w-full px-4 py-3 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-400/30 focus:border-purple-550 text-gray-800 placeholder:text-purple-300 transition-all resize-none bg-white text-xs"
+            />
+          </div>
         </div>
 
         {/* Mind Map Editor */}
@@ -1041,40 +1123,51 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
           </label>
           <div className="space-y-4">
             {data.followUpQuestions.map((question, index) => (
-              <div key={index} className="flex items-start gap-3">
-                <span className="flex-shrink-0 w-7 h-7 bg-purple-50 text-purple-500 rounded-lg flex items-center justify-center font-medium text-sm mt-1">
-                  {index + 1}
-                </span>
-                <div className="flex-1 relative">
-                  <textarea
-                    value={question}
-                    onChange={(e) => updatePart3Question(index, e.target.value)}
-                    rows={2}
-                    placeholder={`Question ${index + 1}: e.g., ${
-                      index === 0
-                        ? "Do you think traveling is important for young people? Why?"
-                        : "How has tourism changed in your country in recent years?"
-                    }`}
-                    className="w-full px-4 py-3 pr-10 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-400/30 focus:border-purple-400 text-gray-900 placeholder:text-gray-400 transition-all resize-none"
-                  />
-                  {question && (
+              <div key={index} className="space-y-2 border-b border-slate-100 pb-3 last:border-0 last:pb-0">
+                <div className="flex items-start gap-3">
+                  <span className="flex-shrink-0 w-7 h-7 bg-purple-50 text-purple-500 rounded-lg flex items-center justify-center font-medium text-sm mt-1">
+                    {index + 1}
+                  </span>
+                  <div className="flex-1 relative">
+                    <textarea
+                      value={question}
+                      onChange={(e) => updatePart3Question(index, e.target.value)}
+                      rows={2}
+                      placeholder={`Question ${index + 1}: e.g., ${
+                        index === 0
+                          ? "Do you think traveling is important for young people? Why?"
+                          : "How has tourism changed in your country in recent years?"
+                      }`}
+                      className="w-full px-4 py-3 pr-10 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-400/30 focus:border-purple-400 text-gray-900 placeholder:text-gray-400 transition-all resize-none"
+                    />
+                    {question && (
+                      <button
+                        onClick={() => updatePart3Question(index, "")}
+                        className="absolute right-2 top-2 p-1 text-purple-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                        title="Clear text"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  {data.followUpQuestions.length > 2 && (
                     <button
-                      onClick={() => updatePart3Question(index, "")}
-                      className="absolute right-2 top-2 p-1 text-purple-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
-                      title="Clear text"
+                      onClick={() => removePart3Question(index)}
+                      className="flex-shrink-0 p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                     >
-                      <X className="w-4 h-4" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                 </div>
-                {data.followUpQuestions.length > 2 && (
-                  <button
-                    onClick={() => removePart3Question(index)}
-                    className="flex-shrink-0 p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
+                <div className="flex items-start gap-3 pl-10">
+                  <input
+                    type="text"
+                    value={data.followUpExplanations?.[index] || ""}
+                    onChange={(e) => updatePart3FollowUpExplanation(index, e.target.value)}
+                    placeholder="Gợi ý trả lời / Từ vựng (Giải thích) - Tuỳ chọn"
+                    className="flex-1 px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-400/30 focus:border-purple-500 text-gray-700 bg-emerald-50/10 placeholder:text-gray-400 transition-all"
+                  />
+                </div>
               </div>
             ))}
           </div>

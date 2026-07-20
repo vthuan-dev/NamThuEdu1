@@ -14,6 +14,7 @@ interface WritingTask {
   /** For Task 2: essay type */
   essayType?: "opinion" | "discuss" | "problem-solution" | "advantages-disadvantages";
   modelAnswer?: string;
+  explanation?: string;
 }
 
 interface Props {
@@ -266,6 +267,20 @@ export function IeltsWritingEditor({ initialData, onSave, testType }: Props) {
             value={current.modelAnswer || ""}
             onChange={(e) => updateTask(activeTask, { modelAnswer: e.target.value })}
             placeholder="Bài mẫu band 7-8 để hệ thống tham chiếu khi chấm điểm..."
+            rows={4}
+            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none font-serif leading-relaxed"
+          />
+        </div>
+
+        {/* Explanation (optional) */}
+        <div className="mt-4">
+          <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wide">
+            Dàn ý / Giải thích đáp án (tuỳ chọn)
+          </label>
+          <textarea
+            value={current.explanation || ""}
+            onChange={(e) => updateTask(activeTask, { explanation: e.target.value })}
+            placeholder="Dàn ý chi tiết hoặc giải thích đáp án..."
             rows={4}
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none font-serif leading-relaxed"
           />
