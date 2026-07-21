@@ -270,33 +270,38 @@ export function useExamSession(options: UseExamSessionOptions): UseExamSessionRe
     timerStorageKeyRef.current = key;
     const now = Date.now();
     const maxDeadline = now + durationSec * 1000;
+    // Candidate deadlines từ dữ liệu THẬT — cho phép cả mốc ĐÃ QUA.
+    // Mốc đã qua nghĩa là bài đã hết giờ → phải auto-submit, KHÔNG được cấp
+    // lại thời gian mới (bug cũ: hết giờ mà reload lại thành full duration).
     const candidates: number[] = [];
 
+    // readStoredDeadline chỉ trả mốc còn hạn (> now); mốc đã qua coi như null.
     const storedDeadline = readStoredDeadline(key);
-    if (storedDeadline != null && storedDeadline > now) {
+    if (storedDeadline != null) {
       candidates.push(storedDeadline);
     }
 
     if (serverRemainingSec != null && Number.isFinite(Number(serverRemainingSec))) {
-      const fromRemaining = now + Math.max(0, Number(serverRemainingSec)) * 1000;
-      if (fromRemaining > now) candidates.push(fromRemaining);
+      // remaining <= 0 → deadline = now (hết giờ)
+      candidates.push(now + Math.max(0, Number(serverRemainingSec)) * 1000);
     }
 
     const fromDeadlineAt = parseVNDate(serverDeadlineAt)?.getTime()
       ?? (serverDeadlineAt ? new Date(serverDeadlineAt).getTime() : NaN);
-    if (Number.isFinite(fromDeadlineAt) && fromDeadlineAt > now) {
+    if (Number.isFinite(fromDeadlineAt)) {
       candidates.push(fromDeadlineAt);
     }
 
     const parsed = parseVNDate(startedAtServer)?.getTime()
       ?? (startedAtServer ? new Date(startedAtServer).getTime() : NaN);
     if (Number.isFinite(parsed)) {
-      const fromStart = parsed + durationSec * 1000;
-      if (fromStart > now) candidates.push(fromStart);
+      candidates.push(parsed + durationSec * 1000);
     }
 
+    // Có dữ liệu thật → lấy mốc SỚM NHẤT (kể cả đã qua → remaining 0 → auto-submit).
+    // Không có nguồn nào → fallback full duration (chỉ xảy ra lần đầu, thiếu data).
     let deadlineMs = candidates.length > 0 ? Math.min(...candidates) : maxDeadline;
-    // Không vượt full duration tính từ bây giờ
+    // Chặn trần: không vượt full duration tính từ bây giờ (chống mốc tương lai vô lý).
     deadlineMs = Math.min(deadlineMs, maxDeadline);
 
     deadlineMsRef.current = deadlineMs;
