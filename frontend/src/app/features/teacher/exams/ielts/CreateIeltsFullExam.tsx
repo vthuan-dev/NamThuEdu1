@@ -662,6 +662,7 @@ export function CreateIeltsFullExam() {
               testType={testType}
               initialData={skillData.writing}
               onSave={(d) => handleSaveSkill("writing", d)}
+              isFullTest
             />
           )}
           {activeSkill === "speaking" && (

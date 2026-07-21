@@ -797,8 +797,9 @@ export function validateIeltsSkillData(skill: IeltsSkill, data: any): Validation
 
   if (skill === "writing") {
     const tasks = data.tasks || [];
-    if (tasks.length < 2) {
-      issues.push({ severity: "error", location: "Tổng quát", message: `Cần đủ 2 tasks (hiện ${tasks.length})` });
+    // Đề đơn kỹ năng cho phép giáo viên chỉ tạo phần đang dạy (tối thiểu 1 task).
+    if (tasks.length < 1) {
+      issues.push({ severity: "error", location: "Tổng quát", message: "Cần ít nhất 1 task" });
     }
     tasks.forEach((t: any) => {
       const loc = `Task ${t.taskNumber}`;

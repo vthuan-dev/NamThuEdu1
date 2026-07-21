@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { PenLine, Save, Image as ImageIcon, Upload, Sparkles, AlertCircle } from "lucide-react";
+import { PenLine, Save, Image as ImageIcon, Upload, Sparkles, AlertCircle, Plus, X } from "lucide-react";
 import { IELTS_STRUCTURE, type IeltsTestType } from "../structure";
 
 interface WritingTask {
@@ -22,6 +22,8 @@ interface Props {
   testType: IeltsTestType;
   initialData?: any;
   onSave: (data: any) => void;
+  /** Full Test luôn giữ đủ 2 task; đề đơn kỹ năng cho phép thêm/bớt task. */
+  isFullTest?: boolean;
 }
 
 const buildEmptyTasks = (): WritingTask[] => [
@@ -29,10 +31,28 @@ const buildEmptyTasks = (): WritingTask[] => [
   { taskNumber: 2, prompt: "", essayType: "opinion" },
 ];
 
-export function IeltsWritingEditor({ initialData, onSave, testType }: Props) {
-  const [tasks, setTasks] = useState<WritingTask[]>(
-    () => initialData?.tasks || buildEmptyTasks()
-  );
+export function IeltsWritingEditor({ initialData, onSave, testType, isFullTest = false }: Props) {
+  // Luôn giữ cấu hình đầy đủ 2 task trong state để bật/tắt không mất dữ liệu đã nhập.
+  const [tasks, setTasks] = useState<WritingTask[]>(() => {
+    const empty = buildEmptyTasks();
+    if (initialData?.tasks?.length) {
+      return empty.map(
+        (e) => initialData.tasks.find((t: WritingTask) => t.taskNumber === e.taskNumber) || e
+      );
+    }
+    return empty;
+  });
+
+  // Task đang hiển thị. Full Test đủ 2 task; đề đơn kỹ năng mặc định chỉ Task 1
+  // (hoặc đúng các task đã có trong draft).
+  const [activeTasks, setActiveTasks] = useState<Set<1 | 2>>(() => {
+    if (isFullTest) return new Set<1 | 2>([1, 2]);
+    if (initialData?.tasks?.length) {
+      return new Set<1 | 2>(initialData.tasks.map((t: WritingTask) => t.taskNumber));
+    }
+    return new Set<1 | 2>([1]);
+  });
+
   const [activeTask, setActiveTask] = useState<1 | 2>(1);
 
   const current = tasks.find((t) => t.taskNumber === activeTask)!;
@@ -42,10 +62,28 @@ export function IeltsWritingEditor({ initialData, onSave, testType }: Props) {
     setTasks((prev) => prev.map((t) => (t.taskNumber === n ? { ...t, ...patch } : t)));
   };
 
+  const addTask = (n: 1 | 2) => {
+    setActiveTasks((prev) => new Set(prev).add(n));
+    setActiveTask(n);
+  };
+
+  const removeTask = (n: 1 | 2) => {
+    setActiveTasks((prev) => {
+      const next = new Set(prev);
+      next.delete(n);
+      if (activeTask === n) {
+        const remaining = [...next].sort((a, b) => a - b);
+        setActiveTask((remaining[0] ?? 1) as 1 | 2);
+      }
+      return next;
+    });
+  };
+
+  // Chỉ emit các task đang bật — học viên sẽ chỉ thấy các task giáo viên đã tạo.
   useEffect(() => {
-    onSave({ tasks });
+    onSave({ tasks: tasks.filter((t) => activeTasks.has(t.taskNumber)) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks]);
+  }, [tasks, activeTasks]);
 
   return (
     <div className="space-y-5">
@@ -57,33 +95,86 @@ export function IeltsWritingEditor({ initialData, onSave, testType }: Props) {
           : "Task 1: Viết thư (formal/semi-formal/informal). Task 2: Bài luận."}
       </div>
 
-      {/* Task tabs */}
+      {/* Task tabs — đề đơn kỹ năng cho phép thêm/bớt task, Full Test giữ đủ 2 */}
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <div className="grid grid-cols-2 divide-x divide-gray-100">
-          {tasks.map((t) => {
-            const isActive = t.taskNumber === activeTask;
-            const filled = t.prompt.trim().length > 20;
-            return (
-              <button
-                key={t.taskNumber}
-                type="button"
-                onClick={() => setActiveTask(t.taskNumber)}
-                className="px-4 py-3 text-left transition-all cursor-pointer"
-                style={{
-                  background: isActive ? "#FFF7ED" : "#FFFFFF",
-                  borderBottom: isActive ? "3px solid #F97316" : "3px solid transparent",
-                }}
-              >
-                <p className="text-sm font-bold" style={{ color: isActive ? "#C2410C" : "#374151" }}>
-                  Task {t.taskNumber}
-                </p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  ≥ {t.taskNumber === 1 ? 150 : 250} từ ·{" "}
-                  {filled ? <span className="text-emerald-600 font-medium">Đã có prompt</span> : "Chưa có prompt"}
-                </p>
-              </button>
-            );
-          })}
+        <div className="flex flex-wrap items-stretch">
+          {tasks
+            .filter((t) => activeTasks.has(t.taskNumber))
+            .map((t) => {
+              const isActive = t.taskNumber === activeTask;
+              const filled = t.prompt.trim().length > 20;
+              // Chỉ cho bỏ Task 2 ở đề đơn kỹ năng (Task 1 luôn bắt buộc; Full Test giữ đủ).
+              const canRemove = !isFullTest && t.taskNumber > 1;
+              return (
+                <div key={t.taskNumber} className="relative flex items-center flex-1 min-w-[180px]">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTask(t.taskNumber)}
+                    className="flex-1 px-4 py-3 text-left transition-all cursor-pointer"
+                    style={{
+                      background: isActive ? "#FFF7ED" : "#FFFFFF",
+                      borderBottom: isActive ? "3px solid #F97316" : "3px solid transparent",
+                    }}
+                  >
+                    <p className="text-sm font-bold" style={{ color: isActive ? "#C2410C" : "#374151" }}>
+                      Task {t.taskNumber}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      ≥ {t.taskNumber === 1 ? 150 : 250} từ ·{" "}
+                      {filled ? <span className="text-emerald-600 font-medium">Đã có prompt</span> : "Chưa có prompt"}
+                    </p>
+                  </button>
+                  {canRemove && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); removeTask(t.taskNumber); }}
+                      title={`Bỏ Task ${t.taskNumber}`}
+                      className="mr-2 p-1 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+
+          {/* Nút thêm task (chỉ ở đề đơn kỹ năng) — kèm tooltip hướng dẫn khi hover */}
+          {!isFullTest &&
+            tasks
+              .filter((t) => !activeTasks.has(t.taskNumber))
+              .map((t) => (
+                <div key={`add-${t.taskNumber}`} className="group relative flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => addTask(t.taskNumber)}
+                    className="flex items-center gap-2 m-2 px-4 py-2 border border-dashed border-gray-300 rounded-lg text-gray-500 hover:text-orange-600 hover:border-orange-400 hover:bg-orange-50 transition-colors whitespace-nowrap"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <div className="text-left">
+                      <div className="font-semibold text-sm">Thêm Task {t.taskNumber}</div>
+                      <div className="text-xs text-gray-400">
+                        ≥ {t.taskNumber === 1 ? 150 : 250} từ · {t.taskNumber === 1 ? 20 : 40} phút
+                      </div>
+                    </div>
+                  </button>
+                  {/* Tooltip hướng dẫn chi tiết khi hover */}
+                  <div className="pointer-events-none absolute top-full left-0 z-50 mt-1 w-72 origin-top-left scale-95 opacity-0 transition-all duration-150 group-hover:scale-100 group-hover:opacity-100">
+                    <div className="rounded-xl bg-gray-900 px-4 py-3 text-left shadow-xl ring-1 ring-black/5">
+                      <div className="flex items-center gap-1.5 text-sm font-semibold text-white">
+                        <Plus className="h-3.5 w-3.5 text-orange-400" />
+                        Thêm Task {t.taskNumber} (tùy chọn)
+                      </div>
+                      <p className="mt-1.5 text-xs leading-relaxed text-gray-300">
+                        Chỉ tạo phần bạn đang dạy. Nếu chỉ dạy Task {t.taskNumber === 2 ? "1" : "2"}, bạn không bắt buộc phải tạo Task {t.taskNumber}. Nhấn để thêm khi cần — học viên sẽ chỉ thấy các task bạn đã tạo.
+                      </p>
+                      <div className="mt-2 flex items-center gap-3 border-t border-white/10 pt-2 text-[11px] text-gray-400">
+                        <span>✍️ ≥ {t.taskNumber === 1 ? 150 : 250} từ</span>
+                        <span>⏱ {t.taskNumber === 1 ? 20 : 40} phút</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
         </div>
       </div>
 
