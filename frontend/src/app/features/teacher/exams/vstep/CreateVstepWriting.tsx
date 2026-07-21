@@ -177,18 +177,19 @@ export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest 
   };
 
   const handleSave = async () => {
-    for (const task of tasks) {
-      if (!task.prompt.trim()) {
-        error(t('vstep.writing.toast.missingPrompt', { task: task.taskNumber }));
-        return;
-      }
+    // Cho phép xuất bản đề chỉ với 1 task (giáo viên có thể chỉ dạy 1 dạng).
+    // Chỉ gửi các task đã nhập prompt; bỏ qua task để trống.
+    const filledTasks = tasks.filter((task) => task.prompt.trim());
+    if (filledTasks.length === 0) {
+      error(t('vstep.writing.toast.missingPrompt', { task: 1 }));
+      return;
     }
 
     setIsSaving(true);
     try {
       const examData = {
         title: examTitle,
-        tasks: tasks.map(task => ({
+        tasks: filledTasks.map(task => ({
           taskNumber: task.taskNumber,
           taskName: task.taskName,
           prompt: task.prompt,

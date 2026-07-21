@@ -699,8 +699,16 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
   };
 
   const handleSave = async () => {
-    // Validate all parts
-    for (const part of parts) {
+    // Cho phép xuất bản với tối thiểu 1 part (giáo viên có thể chỉ dạy 1 dạng).
+    // Chỉ validate & gửi các part đã có dữ liệu; part để trống được bỏ qua.
+    const partsWithData = parts.filter((p) => hasPartData(p.partNumber));
+    if (partsWithData.length === 0) {
+      error("Vui lòng nhập ít nhất 1 part trước khi xuất bản");
+      return;
+    }
+
+    // Validate đầy đủ nội dung cho từng part đã nhập
+    for (const part of partsWithData) {
       if (part.partNumber === 1) {
         const topics = part.part1Data || [];
         const validTopics = topics.filter(
@@ -733,7 +741,7 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
     try {
       const examData = {
         title: examTitle,
-        parts: parts.map((part) => {
+        parts: partsWithData.map((part) => {
           const basePart = {
             partNumber: part.partNumber,
             partName: part.partName,

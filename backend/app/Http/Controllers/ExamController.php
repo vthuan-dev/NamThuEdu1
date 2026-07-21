@@ -3069,7 +3069,7 @@ class ExamController extends Controller
 
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
-            'tasks' => 'required|array|size:2',
+            'tasks' => 'required|array|min:1|max:2',
             'tasks.*.taskNumber' => 'required|integer|min:1|max:2',
             'tasks.*.taskName' => 'required|string',
             'tasks.*.prompt' => 'required|string',
@@ -3105,16 +3105,16 @@ class ExamController extends Controller
                 'eStatus' => $moderationStatus,
             ]);
 
-            // Verify both tasks exist
+            // Cho phép xuất bản với tối thiểu 1 task (giáo viên có thể chỉ dạy 1 dạng)
             $questionCount = Question::where('exam_id', $exam->eId)->count();
-            if ($questionCount < 2) {
+            if ($questionCount < 1) {
                 DB::rollBack();
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Đề thi chưa đủ 2 tasks (Task 1 + Task 2).',
+                    'message' => 'Đề thi chưa có task nào. Vui lòng nhập ít nhất 1 task.',
                     'data' => [
                         'current_tasks' => $questionCount,
-                        'required_tasks' => 2,
+                        'required_tasks' => 1,
                     ]
                 ], 400);
             }
@@ -3472,10 +3472,12 @@ class ExamController extends Controller
 
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
-            'parts' => 'required|array|size:3',
+            'parts' => 'required|array|min:1|max:3',
             'parts.*.partNumber' => 'required|integer|min:1|max:3',
             'parts.*.partName' => 'required|string',
-            'parts.*.questions' => 'required|array',
+            // Payload gửi part1Data/part2Data/part3Data (không có 'questions').
+            // Nội dung câu hỏi đã được lưu qua saveVstepSpeakingPart; publish chỉ
+            // đổi trạng thái + đếm câu hỏi trong DB nên không cần validate 'questions'.
         ]);
 
         if ($validator->fails()) {
@@ -3508,16 +3510,16 @@ class ExamController extends Controller
                 'eStatus' => $moderationStatus,
             ]);
 
-            // Verify all 3 parts exist
+            // Cho phép xuất bản với tối thiểu 1 part (giáo viên có thể chỉ dạy 1 dạng)
             $questionCount = Question::where('exam_id', $exam->eId)->count();
-            if ($questionCount < 3) {
+            if ($questionCount < 1) {
                 DB::rollBack();
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Đề thi chưa đủ 3 parts (Part 1, 2, 3).',
+                    'message' => 'Đề thi chưa có part nào. Vui lòng nhập ít nhất 1 part.',
                     'data' => [
                         'current_questions' => $questionCount,
-                        'required_parts' => 3,
+                        'required_parts' => 1,
                     ]
                 ], 400);
             }
