@@ -1534,6 +1534,7 @@ class ExamController extends Controller
                             ];
                         })(),
                         'correctAnswer' => $q->qData['correct_answer'] ?? 'A',
+                        'explanation' => $q->qExplanation,
                     ];
                 })->toArray(),
             ];
@@ -2888,6 +2889,7 @@ class ExamController extends Controller
                                 ];
                             })(),
                             'correctAnswer' => $q->qData['correct_answer'] ?? 'A',
+                            'explanation' => $q->qExplanation,
                         ];
                     })->values()->toArray(),
                 ];

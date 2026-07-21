@@ -6,7 +6,7 @@ use App\Models\Exam;
 use App\Models\Question;
 use App\Models\Submission;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
@@ -16,7 +16,7 @@ use Tests\TestCase;
  */
 class SubmitGradingFlowTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     private User $student;
     private User $teacher;
@@ -57,7 +57,7 @@ class SubmitGradingFlowTest extends TestCase
             'sStatus' => 'in_progress',
         ]);
 
-        $response = $this->actingAs($this->student, 'api')
+        $response = $this->actingAs($this->student, 'sanctum')
             ->postJson("/api/student/thpt-exams/{$exam->eId}/submit", [
                 'submission_id' => $submission->sId,
                 'answers' => ['q1' => 'A', 'q2' => 'B'],
@@ -106,7 +106,7 @@ class SubmitGradingFlowTest extends TestCase
             'sStart_time' => now()->subMinutes(2),
         ]);
 
-        $response = $this->actingAs($this->student, 'api')
+        $response = $this->actingAs($this->student, 'sanctum')
             ->postJson("/api/student/thpt-exams/{$exam->eId}/submit", [
                 'submission_id' => $submission->sId,
                 'answers' => ['q1' => 'A'],
@@ -162,7 +162,7 @@ class SubmitGradingFlowTest extends TestCase
             'saAnswer_text' => str_repeat('word ', 50), // meaningful writing
         ]);
 
-        $response = $this->actingAs($this->student, 'api')
+        $response = $this->actingAs($this->student, 'sanctum')
             ->postJson("/api/student/tests/{$submission->sId}/submit");
 
         $response->assertOk();
@@ -197,7 +197,7 @@ class SubmitGradingFlowTest extends TestCase
             ]),
         ]);
 
-        $response = $this->actingAs($this->teacher, 'api')
+        $response = $this->actingAs($this->teacher, 'sanctum')
             ->postJson("/api/teacher/submissions/{$submission->sId}/grade", [
                 'skill_overrides' => [
                     'listening' => 8.5,
@@ -239,7 +239,7 @@ class SubmitGradingFlowTest extends TestCase
             ],
         ]);
 
-        $response = $this->actingAs($this->student, 'api')
+        $response = $this->actingAs($this->student, 'sanctum')
             ->getJson("/api/student/thpt-submissions/{$submission->sId}/result");
 
         $response->assertOk();

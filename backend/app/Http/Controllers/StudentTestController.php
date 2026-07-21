@@ -4026,6 +4026,7 @@ class StudentTestController extends Controller
                         'qId' => $q->qId,
                         'questionNumber' => $q->qData['question_number'] ?? $q->qSection_order,
                         'questionText' => $q->qContent,
+                        'qExplanation' => $q->qExplanation,
                         'options' => $q->qData['options'] ?? (function () use ($q) {
                             $sorted = ($q->answers ?? collect())->sortBy(fn($ans) => $ans->aOrder !== null ? $ans->aOrder : $ans->aId)->values();
                             return [
@@ -4101,6 +4102,7 @@ class StudentTestController extends Controller
                         'qId' => $q->qId,
                         'questionNumber' => $q->qData['question_number'] ?? $q->qSection_order,
                         'questionText' => $q->qContent,
+                        'qExplanation' => $q->qExplanation,
                         'taskTitle' => $q->qData['task_title'] ?? null,
                         'taskInstruction' => $q->qData['task_instruction'] ?? null,
                         'options' => $q->qData['options'] ?? (function () use ($q) {
@@ -4169,6 +4171,7 @@ class StudentTestController extends Controller
                     'qId' => $q->qId,
                     'questionNumber' => $q->qData['question_number'] ?? $q->qSection_order,
                     'questionText' => $q->qContent,
+                    'qExplanation' => $q->qExplanation,
                     'options' => $q->qData['options'] ?? (function () use ($q) {
                         $sorted = ($q->answers ?? collect())->sortBy(fn($ans) => $ans->aOrder !== null ? $ans->aOrder : $ans->aId)->values();
                         return [

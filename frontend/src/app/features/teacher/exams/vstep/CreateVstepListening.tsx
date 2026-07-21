@@ -33,6 +33,7 @@ interface Question {
   questionText: string;
   options: { A: string; B: string; C: string; D: string };
   correctAnswer: "A" | "B" | "C" | "D";
+  explanation?: string;
 }
 
 interface ListeningSection {
@@ -85,6 +86,7 @@ const buildEmptySection = (
       questionText: "",
       options: { A: "", B: "", C: "", D: "" },
       correctAnswer: "A" as const,
+      explanation: "",
     })),
   };
 };
@@ -252,6 +254,7 @@ export const CreateVstepListening = ({
             questionText: q.questionText,
             options: q.options,
             correctAnswer: q.correctAnswer,
+            explanation: q.explanation || "",
           })),
         });
         setSavedSections((prev) => {
@@ -351,6 +354,7 @@ export const CreateVstepListening = ({
                       options: apiQ.options || { A: "", B: "", C: "", D: "" },
                       correctAnswer: (apiQ.correctAnswer ||
                         "A") as Question["correctAnswer"],
+                      explanation: apiQ.explanation || "",
                     };
                   }
                   return {
@@ -616,7 +620,7 @@ export const CreateVstepListening = ({
     partNumber: number,
     sectionNumber: number,
     questionId: string,
-    field: "questionText" | "correctAnswer",
+    field: "questionText" | "correctAnswer" | "explanation",
     value: any
   ) => {
     updateSection(partNumber, sectionNumber, (s) => ({
@@ -781,6 +785,7 @@ export const CreateVstepListening = ({
           questionText: q.questionText,
           options: q.options,
           correctAnswer: q.correctAnswer,
+          explanation: q.explanation || "",
         })),
       });
 
@@ -1338,6 +1343,23 @@ export const CreateVstepListening = ({
                                       />
                                     </div>
                                   ))}
+
+                                  {/* Explanation (Optional) */}
+                                  <textarea
+                                    value={q.explanation || ""}
+                                    onChange={(e) =>
+                                      updateQuestion(
+                                        currentPart,
+                                        section.sectionNumber,
+                                        q.id,
+                                        "explanation",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="💡 Giải thích đáp án (tuỳ chọn) - học sinh xem lại sau khi làm bài..."
+                                    rows={2}
+                                    className="w-full mt-1 px-2 py-1.5 text-sm border border-amber-200 bg-amber-50/40 rounded focus:ring-2 focus:ring-amber-400 focus:border-transparent resize-y"
+                                  />
                                 </div>
                               </div>
                             </div>

@@ -17,6 +17,7 @@ export interface VstepPartData {
       D: string;
     };
     correctAnswer: 'A' | 'B' | 'C' | 'D';
+    explanation?: string;
   }[];
 }
 
@@ -36,6 +37,7 @@ export interface VstepExamData {
         D: string;
       };
       correctAnswer: 'A' | 'B' | 'C' | 'D';
+      explanation?: string;
     }[];
   }[];
 }
@@ -93,6 +95,7 @@ export interface VstepListeningPartData {
       D: string;
     };
     correctAnswer: 'A' | 'B' | 'C' | 'D';
+    explanation?: string;
   }[];
 }
 
@@ -112,6 +115,7 @@ export interface VstepListeningExamData {
         D: string;
       };
       correctAnswer: 'A' | 'B' | 'C' | 'D';
+      explanation?: string;
     }[];
   }[];
 }
@@ -180,6 +184,7 @@ export const saveVstepListeningSection = async (
       questionText: string;
       options: { A: string; B: string; C: string; D: string };
       correctAnswer: 'A' | 'B' | 'C' | 'D';
+      explanation?: string;
     }>;
   }
 ) => {

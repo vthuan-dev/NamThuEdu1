@@ -6,7 +6,7 @@ use Tests\TestCase;
 use App\Models\User;
 use App\Models\Exam;
 use App\Models\Submission;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 
 /**
  * Feature tests cho trang chấm điểm giáo viên Teens THPT
@@ -20,7 +20,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
  */
 class ThptGradingTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected $teacher;
     protected $teacherToken;
