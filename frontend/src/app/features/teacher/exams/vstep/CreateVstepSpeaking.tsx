@@ -1342,20 +1342,42 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
             {!isFullTest &&
               VSTEP_SPEAKING_PARTS.filter((part) => !activeParts.has(part.part)).map((part) => {
                 const Icon = part.part === 1 ? MessageSquare : part.part === 2 ? Lightbulb : Users;
+                const partHint =
+                  part.part === 1
+                    ? 'Tương tác xã hội — trả lời câu hỏi ngắn theo chủ đề.'
+                    : part.part === 2
+                      ? 'Thảo luận giải pháp — chọn & bảo vệ một phương án.'
+                      : 'Phát triển chủ đề — trình bày quan điểm sâu hơn.';
                 return (
-                  <button
-                    key={`add-${part.part}`}
-                    onClick={() => addPart(part.part as 1 | 2 | 3)}
-                    className="flex items-center gap-2 my-2 px-4 py-2 border border-dashed border-gray-300 rounded-lg text-gray-500 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 transition-colors whitespace-nowrap"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <div className="text-left">
-                      <div className="font-semibold text-sm">Thêm {part.name}</div>
-                      <div className="text-xs text-gray-400">
-                        {part.timeLimit} {t('vstep.speaking.partTab.minutes')}
+                  <div key={`add-${part.part}`} className="group relative flex items-center">
+                    <button
+                      onClick={() => addPart(part.part as 1 | 2 | 3)}
+                      className="flex items-center gap-2 my-2 px-4 py-2 border border-dashed border-gray-300 rounded-lg text-gray-500 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 transition-colors whitespace-nowrap"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <div className="text-left">
+                        <div className="font-semibold text-sm">Thêm {part.name}</div>
+                        <div className="text-xs text-gray-400">
+                          {part.timeLimit} {t('vstep.speaking.partTab.minutes')}
+                        </div>
+                      </div>
+                    </button>
+                    {/* Tooltip hướng dẫn chi tiết khi hover */}
+                    <div className="pointer-events-none absolute top-full left-0 z-50 mt-1 w-72 origin-top-left scale-95 opacity-0 transition-all duration-150 group-hover:scale-100 group-hover:opacity-100">
+                      <div className="rounded-xl bg-gray-900 px-4 py-3 text-left shadow-xl ring-1 ring-black/5">
+                        <div className="flex items-center gap-1.5 text-sm font-semibold text-white">
+                          <Icon className="h-3.5 w-3.5 text-blue-400" />
+                          Thêm {part.name} (tùy chọn)
+                        </div>
+                        <p className="mt-1.5 text-xs leading-relaxed text-gray-300">
+                          {partHint} Chỉ tạo phần bạn đang dạy — không bắt buộc đủ 3 part. Học viên sẽ chỉ luyện các part bạn đã tạo.
+                        </p>
+                        <div className="mt-2 flex items-center gap-3 border-t border-white/10 pt-2 text-[11px] text-gray-400">
+                          <span>⏱ {part.timeLimit} {t('vstep.speaking.partTab.minutes')}</span>
+                        </div>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
           </div>
