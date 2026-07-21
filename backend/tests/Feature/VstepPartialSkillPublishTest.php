@@ -140,4 +140,105 @@ class VstepPartialSkillPublishTest extends TestCase
         $publish->assertStatus(200);
         $publish->assertJson(['status' => 'success']);
     }
+
+    // ===================== DELETE TASK/PART =====================
+
+    /** @test */
+    public function teacher_can_delete_writing_task()
+    {
+        $examId = $this->createExam('writing');
+
+        // Lưu Task 1 + Task 2
+        foreach ([1, 2] as $taskNumber) {
+            $this->withHeaders($this->authHeader())
+                ->postJson("/api/teacher/exams/{$examId}/vstep/writing/tasks/{$taskNumber}", [
+                    'taskNumber' => $taskNumber,
+                    'taskName'   => "Task {$taskNumber}",
+                    'prompt'     => "Prompt for task {$taskNumber}.",
+                    'wordCount'  => [120, 150],
+                    'timeLimit'  => 20,
+                ])->assertStatus(200);
+        }
+
+        // Trước khi xoá: có 2 writing question
+        $this->assertSame(2, \App\Models\Question::where('exam_id', $examId)
+            ->where('qSkill', 'writing')->count());
+
+        // Xoá Task 2
+        $delete = $this->withHeaders($this->authHeader())
+            ->deleteJson("/api/teacher/exams/{$examId}/vstep/writing/tasks/2");
+        $delete->assertStatus(200);
+        $delete->assertJson(['status' => 'success']);
+        $delete->assertJsonPath('data.remaining_writing_questions', 1);
+
+        // Sau khi xoá: chỉ còn Task 1
+        $this->assertSame(1, \App\Models\Question::where('exam_id', $examId)
+            ->where('qSkill', 'writing')->count());
+        $this->assertSame(0, \App\Models\Question::where('exam_id', $examId)
+            ->where('qSkill', 'writing')->where('qPart', 2)->count());
+
+        // Vẫn publish OK với 1 task còn lại
+        $publish = $this->withHeaders($this->authHeader())
+            ->postJson("/api/teacher/exams/{$examId}/vstep/writing/publish", [
+                'title' => 'VSTEP Writing - sau khi xoá Task 2',
+                'tasks' => [
+                    ['taskNumber' => 1, 'taskName' => 'Task 1', 'prompt' => 'Prompt for task 1.'],
+                ],
+            ]);
+        $publish->assertStatus(200);
+    }
+
+    /** @test */
+    public function teacher_can_delete_speaking_part()
+    {
+        $examId = $this->createExam('speaking');
+
+        // Lưu Part 1 (có topic + questions) và Part 2
+        $this->withHeaders($this->authHeader())
+            ->postJson("/api/teacher/exams/{$examId}/vstep/speaking/parts/1", [
+                'partName'  => 'Part 1 - Social Interaction',
+                'timeLimit' => 3,
+                'part1Data' => [
+                    [
+                        'topicName' => 'Hobbies',
+                        'questions' => ['Q1?', 'Q2?', 'Q3?'],
+                    ],
+                ],
+            ])->assertStatus(200);
+
+        $this->withHeaders($this->authHeader())
+            ->postJson("/api/teacher/exams/{$examId}/vstep/speaking/parts/2", [
+                'partName'  => 'Part 2 - Solution Discussion',
+                'timeLimit' => 4,
+                'part2Data' => [
+                    'situation' => 'Your friend wants to learn English.',
+                    'solutions' => ['Take a course', 'Watch movies', 'Practice daily'],
+                    'question'  => 'Which solution is best and why?',
+                ],
+            ])->assertStatus(200);
+
+        // Trước khi xoá: có speaking question ở cả part 1 và 2
+        $this->assertTrue(\App\Models\Question::where('exam_id', $examId)
+            ->where('qSkill', 'speaking')->where('qPart', 2)->exists());
+
+        // Xoá Part 2
+        $delete = $this->withHeaders($this->authHeader())
+            ->deleteJson("/api/teacher/exams/{$examId}/vstep/speaking/parts/2");
+        $delete->assertStatus(200);
+        $delete->assertJson(['status' => 'success']);
+
+        // Sau khi xoá: không còn question part 2, part 1 vẫn còn
+        $this->assertSame(0, \App\Models\Question::where('exam_id', $examId)
+            ->where('qSkill', 'speaking')->where('qPart', 2)->count());
+        $this->assertTrue(\App\Models\Question::where('exam_id', $examId)
+            ->where('qSkill', 'speaking')->where('qPart', 1)->exists());
+    }
+
+    /** @test */
+    public function delete_task_returns_404_when_exam_not_found()
+    {
+        $delete = $this->withHeaders($this->authHeader())
+            ->deleteJson('/api/teacher/exams/999999/vstep/writing/tasks/2');
+        $delete->assertStatus(404);
+    }
 }

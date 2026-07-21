@@ -270,6 +270,16 @@ export const loadVstepWritingExam = async (examId: string, admin = false) => {
   return response.data;
 };
 
+/**
+ * Xoá 1 task Writing khỏi đề (dùng khi giáo viên bỏ bớt task đã thêm)
+ */
+export const deleteVstepWritingTask = async (examId: string, taskNumber: number) => {
+  const response = await api.delete(
+    `/teacher/exams/${examId}/vstep/writing/tasks/${taskNumber}`
+  );
+  return response.data;
+};
+
 /* ========================================
  * VSTEP SPEAKING APIs
  * ======================================== */
@@ -351,6 +361,16 @@ export const loadVstepSpeakingExam = async (examId: string, admin = false) => {
     ? `/admin/exams/${examId}/preview/vstep/speaking`
     : `/teacher/exams/${examId}/vstep/speaking/load`;
   const response = await api.get(url);
+  return response.data;
+};
+
+/**
+ * Xoá 1 part Speaking khỏi đề (dùng khi giáo viên bỏ bớt part đã thêm)
+ */
+export const deleteVstepSpeakingPart = async (examId: string, partNumber: number) => {
+  const response = await api.delete(
+    `/teacher/exams/${examId}/vstep/speaking/parts/${partNumber}`
+  );
   return response.data;
 };
 

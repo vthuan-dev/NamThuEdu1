@@ -338,11 +338,13 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         
         // Writing
         Route::post('/exams/{examId}/vstep/writing/tasks/{taskNumber}', [ExamController::class, 'saveVstepWritingTask']);
+        Route::delete('/exams/{examId}/vstep/writing/tasks/{taskNumber}', [ExamController::class, 'deleteVstepWritingTask']);
         Route::post('/exams/{examId}/vstep/writing/publish', [ExamController::class, 'publishVstepWritingExam']);
         Route::get('/exams/{examId}/vstep/writing/load', [ExamController::class, 'loadVstepWritingExam']);
         
         // Speaking
         Route::post('/exams/{examId}/vstep/speaking/parts/{partNumber}', [ExamController::class, 'saveVstepSpeakingPart']);
+        Route::delete('/exams/{examId}/vstep/speaking/parts/{partNumber}', [ExamController::class, 'deleteVstepSpeakingPart']);
         Route::post('/exams/{examId}/vstep/speaking/publish', [ExamController::class, 'publishVstepSpeakingExam']);
         Route::get('/exams/{examId}/vstep/speaking/load', [ExamController::class, 'loadVstepSpeakingExam']);
         

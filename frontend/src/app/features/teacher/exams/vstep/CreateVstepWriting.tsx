@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router";
-import { ArrowLeft, Save, PenTool, FileText, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Save, PenTool, FileText, CheckCircle2, X, Plus } from "lucide-react";
 import { useToastContext } from "../../../../../contexts/ToastContext";
 import { useTranslation } from "react-i18next";
 import { QuillEditor } from "../../../../../components/ui/QuillEditor";
-import { saveVstepWritingTask, publishVstepWritingExam, loadVstepWritingExam } from "../../../../../services/vstepApi";
+import { saveVstepWritingTask, publishVstepWritingExam, loadVstepWritingExam, deleteVstepWritingTask } from "../../../../../services/vstepApi";
 
 interface WritingTask {
   taskNumber: 1 | 2;
@@ -42,6 +42,10 @@ export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest 
   const [savingTask, setSavingTask] = useState<number | null>(null);
   const [currentTask, setCurrentTask] = useState<1 | 2>(1);
   const [savedTasks, setSavedTasks] = useState<Set<number>>(new Set());
+  // Danh sách task đang hiển thị. Full Test luôn đủ 2 task; đề đơn kỹ năng mặc định chỉ Task 1.
+  const [activeTasks, setActiveTasks] = useState<Set<number>>(
+    () => (isFullTest ? new Set([1, 2]) : new Set([1]))
+  );
   
   const [tasks, setTasks] = useState<WritingTask[]>(
     VSTEP_WRITING_TASKS.map((t) => ({
@@ -103,6 +107,16 @@ export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest 
               }
             });
             setSavedTasks(newSaved);
+
+            // Đề đơn kỹ năng: hiện đúng các task đã có nội dung (tối thiểu Task 1).
+            // Full Test giữ nguyên đủ 2 task.
+            if (!isFullTest) {
+              const active = new Set<number>([1]);
+              examData.tasks.forEach((task: any) => {
+                if (task.prompt?.trim()) active.add(task.taskNumber);
+              });
+              setActiveTasks(active);
+            }
             
             console.log("✅ Loaded tasks:", loadedTasks.length);
             success(t('vstep.writing.toast.loadSuccess'));
@@ -209,6 +223,45 @@ export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest 
     }
   };
 
+  // Thêm một task vào danh sách hiển thị (chỉ dùng cho đề đơn kỹ năng).
+  const addTask = (taskNumber: 1 | 2) => {
+    setActiveTasks((prev) => {
+      const next = new Set(prev);
+      next.add(taskNumber);
+      return next;
+    });
+    setCurrentTask(taskNumber);
+  };
+
+  // Bỏ một task đã thêm. Nếu task đã lưu vào DB thì gọi API xoá để tránh "task ma".
+  const removeTask = async (taskNumber: 1 | 2) => {
+    if (savedTasks.has(taskNumber)) {
+      try {
+        await deleteVstepWritingTask(examId, taskNumber);
+      } catch (err: any) {
+        error(err.response?.data?.message || t('vstep.writing.toast.deleteTaskError', { defaultValue: 'Lỗi khi xoá Task {{task}}', task: taskNumber }));
+        return;
+      }
+    }
+    // Reset nội dung task và bỏ khỏi UI.
+    setTasks((prev) =>
+      prev.map((tk) =>
+        tk.taskNumber === taskNumber ? { ...tk, prompt: "", explanation: "" } : tk
+      )
+    );
+    setSavedTasks((prev) => {
+      const next = new Set(prev);
+      next.delete(taskNumber);
+      return next;
+    });
+    const remaining = [...activeTasks].filter((n) => n !== taskNumber).sort((a, b) => a - b);
+    setActiveTasks(new Set(remaining));
+    if (currentTask === taskNumber) {
+      setCurrentTask((remaining[0] ?? 1) as 1 | 2);
+    }
+    success(t('vstep.writing.toast.deleteTaskSuccess', { defaultValue: 'Đã bỏ Task {{task}}', task: taskNumber }));
+  };
+
   return (
     <div className={`bg-gray-50 flex flex-col ${isFullTest ? 'h-full' : 'h-screen overflow-hidden'}`}>
       {!isFullTest && (
@@ -254,36 +307,65 @@ export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest 
       <div className="bg-white border-b border-gray-200 flex-shrink-0">
         <div className="max-w-[1800px] mx-auto px-6">
           <div className="flex gap-2 overflow-x-auto">
-            {VSTEP_WRITING_TASKS.map((task) => {
+            {VSTEP_WRITING_TASKS.filter((task) => activeTasks.has(task.task)).map((task) => {
               const taskData = tasks.find((t) => t.taskNumber === task.task)!;
               const hasPrompt = taskData.prompt.trim().length > 0;
               const isSaved = savedTasks.has(task.task);
+              // Chỉ cho xoá task > 1 ở đề đơn kỹ năng (Task 1 luôn bắt buộc; Full Test giữ đủ).
+              const canRemove = !isFullTest && task.task > 1;
 
               return (
+                <div key={task.task} className="relative flex items-center">
+                  <button
+                    onClick={() => setCurrentTask(task.task as 1 | 2)}
+                    className={`flex items-center gap-3 px-6 py-4 border-b-2 transition-colors whitespace-nowrap ${
+                      currentTask === task.task
+                        ? "border-blue-600 text-blue-600 bg-blue-50"
+                        : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                    }`}
+                  >
+                    <PenTool className="w-5 h-5" />
+                    <div className="text-left">
+                      <div className="font-semibold">Task {task.task} - {t(task.description)}</div>
+                      <div className="text-xs text-gray-500">
+                        {task.wordCount[0]} {t('vstep.writing.taskTab.words')} • {task.timeLimit} {t('vstep.writing.taskTab.minutes')}
+                      </div>
+                    </div>
+                    {isSaved ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    ) : hasPrompt ? (
+                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                    ) : null}
+                  </button>
+                  {canRemove && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); removeTask(task.task as 1 | 2); }}
+                      title={`Bỏ Task ${task.task}`}
+                      className="ml-0.5 mr-1 p-1 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+
+            {!isFullTest &&
+              VSTEP_WRITING_TASKS.filter((task) => !activeTasks.has(task.task)).map((task) => (
                 <button
-                  key={task.task}
-                  onClick={() => setCurrentTask(task.task as 1 | 2)}
-                  className={`flex items-center gap-3 px-6 py-4 border-b-2 transition-colors whitespace-nowrap ${
-                    currentTask === task.task
-                      ? "border-blue-600 text-blue-600 bg-blue-50"
-                      : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                  }`}
+                  key={`add-${task.task}`}
+                  onClick={() => addTask(task.task as 1 | 2)}
+                  className="flex items-center gap-2 my-2 px-4 py-2 border border-dashed border-gray-300 rounded-lg text-gray-500 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 transition-colors whitespace-nowrap"
                 >
-                  <PenTool className="w-5 h-5" />
+                  <Plus className="w-4 h-4" />
                   <div className="text-left">
-                    <div className="font-semibold">Task {task.task} - {t(task.description)}</div>
-                    <div className="text-xs text-gray-500">
+                    <div className="font-semibold text-sm">Thêm Task {task.task} - {t(task.description)}</div>
+                    <div className="text-xs text-gray-400">
                       {task.wordCount[0]} {t('vstep.writing.taskTab.words')} • {task.timeLimit} {t('vstep.writing.taskTab.minutes')}
                     </div>
                   </div>
-                  {isSaved ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                  ) : hasPrompt ? (
-                    <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                  ) : null}
                 </button>
-              );
-            })}
+              ))}
           </div>
         </div>
       </div>

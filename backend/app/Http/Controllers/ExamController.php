@@ -3650,4 +3650,178 @@ class ExamController extends Controller
             ]
         ]);
     }
+
+    /**
+     * DELETE /api/teacher/exams/{examId}/vstep/writing/tasks/{taskNumber}
+     * Xoá 1 task Writing khỏi đề (dùng khi giáo viên bỏ bớt task đã thêm).
+     * Chỉ đụng question qSkill=writing của đúng task; không ảnh hưởng kỹ năng khác.
+     */
+    public function deleteVstepWritingTask(Request $request, $examId, $taskNumber)
+    {
+        $user = $request->user();
+
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Bạn không có quyền truy cập.'
+            ], 401);
+        }
+
+        $taskNumber = (int) $taskNumber;
+        if (!in_array($taskNumber, [1, 2], true)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Task number không hợp lệ. Chỉ có Task 1, 2.'
+            ], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            $exam = Exam::where('eId', $examId)->first();
+
+            if (!$exam) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Không tìm thấy đề thi.'
+                ], 404);
+            }
+
+            // Xoá các question Writing của task này (kèm answer liên quan).
+            $questions = Question::where('exam_id', $exam->eId)
+                ->where('qSkill', 'writing')
+                ->where('qPart', $taskNumber)
+                ->get();
+
+            foreach ($questions as $q) {
+                Answer::where('question_id', $q->qId)->delete();
+                $q->delete();
+            }
+
+            // Xoá content block instruction gắn với task này (nếu có).
+            $blocks = \App\Models\ContentBlock::where('exam_id', $exam->eId)
+                ->where('block_type', 'instruction')
+                ->get()
+                ->filter(function ($b) use ($taskNumber) {
+                    $meta = $b->metadata ?? [];
+                    return ($meta['task_number'] ?? null) == $taskNumber;
+                });
+            foreach ($blocks as $b) {
+                $b->delete();
+            }
+
+            $remaining = Question::where('exam_id', $exam->eId)
+                ->where('qSkill', 'writing')
+                ->count();
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Đã xoá Task ' . $taskNumber . ' thành công',
+                'data' => [
+                    'exam_id' => $exam->eId,
+                    'task_number' => $taskNumber,
+                    'remaining_writing_questions' => $remaining,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Lỗi khi xoá Task: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * DELETE /api/teacher/exams/{examId}/vstep/speaking/parts/{partNumber}
+     * Xoá 1 part Speaking khỏi đề (dùng khi giáo viên bỏ bớt part đã thêm).
+     * Chỉ đụng question qSkill=speaking + content block instruction của đúng part.
+     */
+    public function deleteVstepSpeakingPart(Request $request, $examId, $partNumber)
+    {
+        $user = $request->user();
+
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Bạn không có quyền truy cập.'
+            ], 401);
+        }
+
+        $partNumber = (int) $partNumber;
+        if (!in_array($partNumber, [1, 2, 3], true)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Part number không hợp lệ. Chỉ có Part 1, 2, 3.'
+            ], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            $exam = Exam::where('eId', $examId)->first();
+
+            if (!$exam) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Không tìm thấy đề thi.'
+                ], 404);
+            }
+
+            // Xoá content block instruction của part này (chỉ Speaking, tránh đụng
+            // Reading passage có metadata->part_number trùng).
+            $blocks = \App\Models\ContentBlock::where('exam_id', $exam->eId)
+                ->where('block_type', 'instruction')
+                ->whereJsonContains('metadata->part_number', $partNumber)
+                ->get();
+
+            foreach ($blocks as $block) {
+                $blockQuestions = Question::where('content_block_id', $block->id)
+                    ->where('qSkill', 'speaking')
+                    ->get();
+                foreach ($blockQuestions as $q) {
+                    Answer::where('question_id', $q->qId)->delete();
+                    $q->delete();
+                }
+                // Chỉ xoá block nếu không còn question nào khác gắn vào (an toàn).
+                if (Question::where('content_block_id', $block->id)->count() === 0) {
+                    $block->delete();
+                }
+            }
+
+            // Xoá orphan Speaking question của part này (không gắn block).
+            $orphans = Question::where('exam_id', $exam->eId)
+                ->where('qSkill', 'speaking')
+                ->where('qPart', $partNumber)
+                ->get();
+            foreach ($orphans as $q) {
+                Answer::where('question_id', $q->qId)->delete();
+                $q->delete();
+            }
+
+            $remaining = Question::where('exam_id', $exam->eId)
+                ->where('qSkill', 'speaking')
+                ->count();
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Đã xoá Part ' . $partNumber . ' thành công',
+                'data' => [
+                    'exam_id' => $exam->eId,
+                    'part_number' => $partNumber,
+                    'remaining_speaking_questions' => $remaining,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Lỗi khi xoá Part: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

@@ -7,6 +7,7 @@ import {
   saveVstepSpeakingPart, 
   publishVstepSpeakingExam, 
   loadVstepSpeakingExam,
+  deleteVstepSpeakingPart,
   Part1Topic,
   Part2Data,
   Part3Data
@@ -85,6 +86,10 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
   const [isGenerating, setIsGenerating] = useState(false);
   // Track các part đã lưu thành công
   const [savedParts, setSavedParts] = useState<Set<number>>(new Set());
+  // Danh sách part đang hiển thị. Full Test luôn đủ 3 part; đề đơn kỹ năng mặc định chỉ Part 1.
+  const [activeParts, setActiveParts] = useState<Set<number>>(
+    () => (isFullTest ? new Set([1, 2, 3]) : new Set([1]))
+  );
   
   const [parts, setParts] = useState<SpeakingPart[]>([
     {
@@ -167,6 +172,20 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
               })
             );
             
+            // Đề đơn kỹ năng: hiện đúng các part đã có dữ liệu (tối thiểu Part 1).
+            // Full Test giữ nguyên đủ 3 part.
+            if (!isFullTest) {
+              const active = new Set<number>([1]);
+              loadedParts.forEach((p: any) => {
+                const hasData =
+                  (p.part1Data && p.part1Data.some((tp: any) => tp.topicName?.trim() || (tp.questions || []).some((q: string) => q?.trim()))) ||
+                  (p.part2Data && (p.part2Data.situation?.trim() || (p.part2Data.solutions || []).some((s: string) => s?.trim()))) ||
+                  (p.part3Data && (p.part3Data.mainTopic?.trim() || (p.part3Data.suggestedIdeas || []).some((i: string) => i?.trim())));
+                if (hasData) active.add(p.partNumber);
+              });
+              setActiveParts(active);
+            }
+
             console.log("✅ Loaded parts:", loadedParts.length);
             success(t('vstep.speaking.toast.loadSuccess'));
           }
@@ -809,6 +828,48 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
     }
   };
 
+  // Thêm một part vào danh sách hiển thị (chỉ dùng cho đề đơn kỹ năng).
+  const addPart = (partNumber: 1 | 2 | 3) => {
+    setActiveParts((prev) => {
+      const next = new Set(prev);
+      next.add(partNumber);
+      return next;
+    });
+    setCurrentPart(partNumber);
+  };
+
+  // Bỏ một part đã thêm. Nếu part đã lưu vào DB thì gọi API xoá để tránh "part ma".
+  const removePart = async (partNumber: 1 | 2 | 3) => {
+    if (savedParts.has(partNumber)) {
+      try {
+        await deleteVstepSpeakingPart(examId, partNumber);
+      } catch (err: any) {
+        error(err.response?.data?.message || `Lỗi khi xoá Part ${partNumber}`);
+        return;
+      }
+    }
+    // Reset nội dung part về mặc định và bỏ khỏi UI.
+    setParts((prev) =>
+      prev.map((p) => {
+        if (p.partNumber !== partNumber) return p;
+        if (partNumber === 1) return { ...p, part1Data: createDefaultPart1Data() };
+        if (partNumber === 2) return { ...p, part2Data: createDefaultPart2Data() };
+        return { ...p, part3Data: createDefaultPart3Data() };
+      })
+    );
+    setSavedParts((prev) => {
+      const next = new Set(prev);
+      next.delete(partNumber);
+      return next;
+    });
+    const remaining = [...activeParts].filter((n) => n !== partNumber).sort((a, b) => a - b);
+    setActiveParts(new Set(remaining));
+    if (currentPart === partNumber) {
+      setCurrentPart((remaining[0] ?? 1) as 1 | 2 | 3);
+    }
+    success(`Đã bỏ Part ${partNumber}`);
+  };
+
   // Render Part 1: Social Interaction
   const renderPart1 = () => {
     const topics = currentPartData.part1Data || [];
@@ -1236,35 +1297,67 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
       <div className="bg-white border-b border-gray-100 flex-shrink-0">
         <div className="max-w-[1800px] mx-auto px-6">
           <div className="flex gap-1 overflow-x-auto">
-            {VSTEP_SPEAKING_PARTS.map((part) => {
+            {VSTEP_SPEAKING_PARTS.filter((part) => activeParts.has(part.part)).map((part) => {
               const hasData = hasPartData(part.part as 1 | 2 | 3);
               const Icon = part.part === 1 ? MessageSquare : part.part === 2 ? Lightbulb : Users;
               const colorClass = part.part === 1 ? 'text-blue-500' : part.part === 2 ? 'text-amber-500' : 'text-purple-500';
               const activeColorClass = part.part === 1 ? 'border-blue-500' : part.part === 2 ? 'border-amber-500' : 'border-purple-500';
+              // Chỉ cho xoá part > 1 ở đề đơn kỹ năng (Part 1 luôn bắt buộc; Full Test giữ đủ).
+              const canRemove = !isFullTest && part.part > 1;
 
               return (
-                <button
-                  key={part.part}
-                  onClick={() => setCurrentPart(part.part as 1 | 2 | 3)}
-                  className={`flex items-center gap-3 px-6 py-4 border-b-2 transition-all whitespace-nowrap ${
-                    currentPart === part.part
-                      ? `${activeColorClass} text-gray-900 bg-gray-50/50`
-                      : "border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50/30"
-                  }`}
-                >
-                  <Icon className={`w-5 h-5 ${currentPart === part.part ? colorClass : ''}`} />
-                  <div className="text-left">
-                    <div className="font-semibold text-sm">{part.name}</div>
-                    <div className="text-xs text-gray-400">
-                      {part.timeLimit} {t('vstep.speaking.partTab.minutes')}
+                <div key={part.part} className="relative flex items-center">
+                  <button
+                    onClick={() => setCurrentPart(part.part as 1 | 2 | 3)}
+                    className={`flex items-center gap-3 px-6 py-4 border-b-2 transition-all whitespace-nowrap ${
+                      currentPart === part.part
+                        ? `${activeColorClass} text-gray-900 bg-gray-50/50`
+                        : "border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50/30"
+                    }`}
+                  >
+                    <Icon className={`w-5 h-5 ${currentPart === part.part ? colorClass : ''}`} />
+                    <div className="text-left">
+                      <div className="font-semibold text-sm">{part.name}</div>
+                      <div className="text-xs text-gray-400">
+                        {part.timeLimit} {t('vstep.speaking.partTab.minutes')}
+                      </div>
                     </div>
-                  </div>
-                  {hasData && (
-                    <div className={`w-1.5 h-1.5 rounded-full ${currentPart === part.part ? colorClass.replace('text-', 'bg-') : 'bg-emerald-400'}`}></div>
+                    {hasData && (
+                      <div className={`w-1.5 h-1.5 rounded-full ${currentPart === part.part ? colorClass.replace('text-', 'bg-') : 'bg-emerald-400'}`}></div>
+                    )}
+                  </button>
+                  {canRemove && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); removePart(part.part as 1 | 2 | 3); }}
+                      title={`Bỏ ${part.name}`}
+                      className="ml-0.5 mr-1 p-1 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   )}
-                </button>
+                </div>
               );
             })}
+
+            {!isFullTest &&
+              VSTEP_SPEAKING_PARTS.filter((part) => !activeParts.has(part.part)).map((part) => {
+                const Icon = part.part === 1 ? MessageSquare : part.part === 2 ? Lightbulb : Users;
+                return (
+                  <button
+                    key={`add-${part.part}`}
+                    onClick={() => addPart(part.part as 1 | 2 | 3)}
+                    className="flex items-center gap-2 my-2 px-4 py-2 border border-dashed border-gray-300 rounded-lg text-gray-500 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 transition-colors whitespace-nowrap"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <div className="text-left">
+                      <div className="font-semibold text-sm">Thêm {part.name}</div>
+                      <div className="text-xs text-gray-400">
+                        {part.timeLimit} {t('vstep.speaking.partTab.minutes')}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
           </div>
         </div>
       </div>
