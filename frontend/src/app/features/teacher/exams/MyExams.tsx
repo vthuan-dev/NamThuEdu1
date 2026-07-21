@@ -66,8 +66,24 @@ interface Exam {
  * Map eStatus từ backend sang status UI.
  * Backend dùng: 'draft' | 'published' | 'active' | 'inactive' | 'archived' | 'private'
  */
+/** Đếm số câu hỏi của đề, có xét THPT (lưu trong thpt_config.sections[]). */
+function countExamQuestionsFor(exam: any): number {
+  const eType = (exam?.eType || "").toUpperCase();
+  if (eType === "THPT" && exam?.thpt_config?.sections) {
+    let total = 0;
+    for (const sec of exam.thpt_config.sections) {
+      if (sec?.items?.length) total += sec.items.length;
+      else if (sec?.blanks?.length) total += sec.blanks.length;
+    }
+    if (total > 0) return total;
+  }
+  return exam?.questions_count ?? exam?.questionsCount ?? exam?.questions?.length ?? 0;
+}
+
 function deriveStatus(exam: any): "Draft" | "Published" | "Private" | "Pending" {
   const s = (exam.eStatus || "").toLowerCase();
+  // Đề chưa có câu hỏi → luôn là Nháp (không thể giao/làm bài).
+  if (countExamQuestionsFor(exam) === 0 && s !== "pending") return "Draft";
   if (s === "published" || s === "active") return "Published";
   if (s === "pending") return "Pending";
   if (s === "private") return "Private";

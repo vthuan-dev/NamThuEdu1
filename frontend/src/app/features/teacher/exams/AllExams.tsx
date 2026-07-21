@@ -49,6 +49,37 @@ function getExamPublishAt(exam: any): string | null {
   return exam?.eUpdated_at || exam?.updated_at || exam?.eCreated_at || null;
 }
 
+/**
+ * Đếm số câu hỏi của đề (dùng chung cho lọc tab + badge).
+ * THPT lưu trong thpt_config.sections[], các loại khác dùng questions_count hoặc questions[].
+ */
+function countExamQuestionsFor(exam: any): number {
+  const eType = (exam?.eType || "").toUpperCase();
+
+  // THPT: đếm từ thpt_config.sections[]
+  if (eType === "THPT" && exam?.thpt_config?.sections) {
+    let total = 0;
+    for (const sec of exam.thpt_config.sections) {
+      if (sec?.items?.length) total += sec.items.length;
+      else if (sec?.blanks?.length) total += sec.blanks.length;
+    }
+    if (total > 0) return total;
+  }
+
+  // Default: questions_count từ backend, fallback questions[].length
+  return exam?.questions_count ?? exam?.questions?.length ?? 0;
+}
+
+/**
+ * Đề được coi là "nháp" khi trạng thái là draft HOẶC chưa có câu hỏi nào.
+ * Đề chưa có câu hỏi thì không thể giao/làm bài → luôn nằm ở tab Nháp.
+ */
+function isEffectiveDraft(exam: any): boolean {
+  const status = (exam?.eStatus || "").toLowerCase();
+  if (status === "draft") return true;
+  return countExamQuestionsFor(exam) === 0;
+}
+
 interface KidsExam {
   eId: number;
   eTitle: string;
@@ -396,9 +427,10 @@ export function AllExams() {
   };
 
   const matchesStatusFn = (exam: KidsExam) => {
+    // Đề chưa có câu hỏi → luôn coi là nháp (không thể giao/làm bài).
     // eStatus có thể là 'draft', 'published', 'active', 'inactive', 'archived', 'pending'
+    if (isEffectiveDraft(exam)) return filterStatus === "draft";
     const status = (exam.eStatus || "").toLowerCase();
-    if (filterStatus === "draft") return status === "draft";
     return status === "published" || status === "active" || status === "pending";
   };
 
@@ -437,8 +469,9 @@ export function AllExams() {
     adults: ageStatsBase.filter(e => getAgeGroup(e) === "adults").length,
     mine: exams.filter(e => e._is_owner === true).length,
     others: exams.filter(e => e._is_owner === false).length,
-    draft: exams.filter(e => (e.eStatus || "").toLowerCase() === "draft").length,
+    draft: exams.filter(e => isEffectiveDraft(e)).length,
     published: exams.filter(e => {
+      if (isEffectiveDraft(e)) return false;
       const s = (e.eStatus || "").toLowerCase();
       return s === "published" || s === "active" || s === "pending";
     }).length,
@@ -1085,23 +1118,26 @@ export function AllExams() {
                       )}
 
                       <div className="flex items-center gap-1.5 flex-wrap justify-end pr-8">
-                        {exam.eStatus === "draft" && (
+                        {isEffectiveDraft(exam) ? (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
                             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                             Nháp
                           </span>
-                        )}
-                        {exam.eStatus === "pending" && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200">
-                            <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
-                            Chờ duyệt
-                          </span>
-                        )}
-                        {(exam.eStatus === "published" || exam.eStatus === "active") && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                            Đã xuất bản
-                          </span>
+                        ) : (
+                          <>
+                            {exam.eStatus === "pending" && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" />
+                                Chờ duyệt
+                              </span>
+                            )}
+                            {(exam.eStatus === "published" || exam.eStatus === "active") && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                Đã xuất bản
+                              </span>
+                            )}
+                          </>
                         )}
                         <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded">#{exam.eId}</span>
                       </div>
@@ -1185,7 +1221,7 @@ export function AllExams() {
                   {/* Actions footer — đồng nhất cả owner và non-owner.
                       Đề nháp → đổi nút thành "Sửa" để tránh dẫn vào trang preview chưa hoàn chỉnh */}
                   <div className="relative flex items-center gap-2 px-4 py-2.5 bg-gray-50/80 backdrop-blur-sm border-t border-gray-100 rounded-b-xl">
-                    {isOwner && exam.eStatus === "draft" ? (
+                    {isOwner && isEffectiveDraft(exam) ? (
                       <Link
                         to={getEditLink(exam)}
                         onClick={(e) => e.stopPropagation()}
@@ -1214,8 +1250,8 @@ export function AllExams() {
                       </Link>
                     )}
 
-                    {/* Giao đề — chỉ cho đề đã xuất bản (không phải nháp) */}
-                    {exam.eStatus !== "draft" && (
+                    {/* Giao đề — chỉ cho đề đã xuất bản (không phải nháp, có câu hỏi) */}
+                    {!isEffectiveDraft(exam) && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1252,7 +1288,7 @@ export function AllExams() {
                             onClick={(e) => e.stopPropagation()}
                           >
                             {/* Ẩn "Chỉnh sửa" trong dropdown khi nút chính đã là "Tiếp tục chỉnh sửa" (draft) */}
-                            {exam.eStatus !== "draft" && (
+                            {!isEffectiveDraft(exam) && (
                               <Link
                                 to={getEditLink(exam)}
                                 onClick={() => setOpenMenuId(null)}
