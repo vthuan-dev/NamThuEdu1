@@ -1,5 +1,5 @@
 import { Outlet } from "react-router";
-import { Sidebar } from "./Sidebar";
+import { Sidebar } from "./shared/Sidebar";
 import { SidebarProvider, useSidebar } from "../../contexts/SidebarContext";
 
 function LayoutContent() {

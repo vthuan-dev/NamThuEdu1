@@ -614,7 +614,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                   <textarea
                     value={val}
                     onChange={(e) => onAnswerChange?.(key, e.target.value)}
-                    disabled={mode === 'review'}
+                    disabled={isReview}
                     rows={12}
                     placeholder="Viết bài của bạn tại đây…"
                     className="w-full text-sm text-slate-800 border-0 px-3.5 py-3.5 focus:outline-none focus:ring-0 resize-y min-h-[220px] disabled:bg-slate-50 disabled:text-slate-600 leading-relaxed"

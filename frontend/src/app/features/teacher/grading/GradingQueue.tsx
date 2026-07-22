@@ -52,7 +52,7 @@ interface Submission {
   className: string;
   ageGroup: string; // kids | teens | adults | ''
   submissionTime: Date;
-  status: "submitted" | "graded" | "partially_graded" | "grading_subjective";
+  status: "submitted" | "graded" | "partially_graded" | "grading_subjective" | "in_progress";
   score?: number;
   maxScore: number;
   attemptNumber: number;

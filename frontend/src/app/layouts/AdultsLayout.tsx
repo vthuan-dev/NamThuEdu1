@@ -131,7 +131,12 @@ export function AdultsLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const user = getAuthUser();
+  const user = getAuthUser() as {
+    uName?: string;
+    class?: { cName?: string; name?: string } | null;
+    avatar_url?: string | null;
+    avatar?: string | null;
+  } | null;
 
   const handleLogout = async () => {
     if (loggingOut) return;

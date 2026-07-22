@@ -40,7 +40,7 @@ export function PdfCutterTab() {
       const canvas   = document.createElement('canvas');
       canvas.width   = viewport.width;
       canvas.height  = viewport.height;
-      await page.render({ canvasContext: canvas.getContext('2d')!, viewport }).promise;
+      await page.render({ canvasContext: canvas.getContext('2d')!, viewport } as Parameters<typeof page.render>[0]).promise;
       setThumbs(prev => [...prev, { pageNum: i, dataUrl: canvas.toDataURL() }]);
       setProgress({ current: i, total });
     }
@@ -72,7 +72,7 @@ export function PdfCutterTab() {
       const copied = await dst.copyPages(src, sorted.map(p => p - 1));
       copied.forEach(p => dst.addPage(p));
       const out  = await dst.save();
-      const blob = new Blob([out], { type: 'application/pdf' });
+      const blob = new Blob([out as unknown as BlobPart], { type: 'application/pdf' });
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
       a.href     = url;

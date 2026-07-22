@@ -1,4 +1,4 @@
-http://localhost:5173/hoc-vienimport { env } from '@/utils/env';
+import { env } from '@/utils/env';
 
 /**
  * API client configuration

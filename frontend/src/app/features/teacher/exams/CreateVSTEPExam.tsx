@@ -409,7 +409,7 @@ export function CreateVSTEPExam() {
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <BookOpen className="w-4 h-4 inline mr-1" />
-                    Passage {question.part} ({partData?.wordCount?.[0]}-{partData?.wordCount?.[1]}{" "}
+                    Passage {question.part} ({(partData as { wordCount?: number[] })?.wordCount?.[0]}-{(partData as { wordCount?: number[] })?.wordCount?.[1]}{" "}
                     từ)
                   </label>
                   <textarea

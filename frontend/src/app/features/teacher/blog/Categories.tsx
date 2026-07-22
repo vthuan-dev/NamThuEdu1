@@ -59,9 +59,9 @@ const iconMap: Record<string, React.ElementType> = {
 };
 
 // Helper component to render icon
-const CategoryIcon = ({ iconName, className }: { iconName: string; className?: string }) => {
+const CategoryIcon = ({ iconName, className, style }: { iconName: string; className?: string; style?: React.CSSProperties }) => {
   const IconComponent = iconMap[iconName] || BookOpen;
-  return <IconComponent className={className} />;
+  return <IconComponent className={className} style={style} />;
 };
 
 export function Categories() {

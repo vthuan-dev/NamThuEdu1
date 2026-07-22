@@ -8,6 +8,16 @@ import type { ApiResponse, PaginatedResponse } from './index';
 export type { ApiResponse, PaginatedResponse };
 
 // ============================================================================
+// Error Types
+// ============================================================================
+
+/** Shape của response lỗi validation 400 (Laravel: message + errors map). */
+export interface ValidationError {
+  message?: string;
+  errors?: Record<string, string[]>;
+}
+
+// ============================================================================
 // Course Types
 // ============================================================================
 
@@ -230,6 +240,9 @@ export interface CreateExamRequest {
   eDescription: string;
   eType: string;
   eSkill: 'listening' | 'reading' | 'writing' | 'speaking' | 'mixed';
+  eScope?: 'full' | 'skill' | 'part';
+  ePart_type?: string | null;
+  ePart_number?: number | null;
   eDuration_minutes: number;
   eIs_private: boolean;
   eSource_type?: 'manual' | 'template' | 'imported';
@@ -636,22 +649,6 @@ export interface ExportReportRequest {
 // Additional Request/Response Types
 // ============================================================================
 
-export interface CreateExamRequest {
-  eTitle: string;
-  eDescription: string;
-  eType: string;
-  eSkill: string;
-  eScope?: 'full' | 'skill' | 'part';
-  ePart_type?: string | null;
-  ePart_number?: number | null;
-  eDuration_minutes: number;
-  eIs_private: boolean;
-  eSource_type: 'manual' | 'template' | 'imported';
-  age_group?: 'kids' | 'teens' | 'adults' | 'all';
-}
-
-export interface UpdateExamRequest extends Partial<CreateExamRequest> {}
-
 export interface CreateQuestionRequest {
   qContent: string;
   qType: string;
@@ -667,51 +664,3 @@ export interface CreateQuestionRequest {
 }
 
 export interface UpdateQuestionRequest extends Partial<CreateQuestionRequest> {}
-
-export interface AssignmentProgress {
-  assignment_id: number;
-  total_students: number;
-  completed: number;
-  not_completed: number;
-  completion_rate: number;
-  students: Array<{
-    student_id: number;
-    student_name: string;
-    status: 'completed' | 'not_completed';
-    submission?: Submission;
-  }>;
-}
-
-export interface AssignmentStatistics {
-  total_assignments: number;
-  active_assignments: number;
-  overdue_assignments: number;
-  average_completion_rate: number;
-}
-
-export interface ClassReport {
-  class_id: number;
-  class_name: string;
-  exam_id?: number;
-  exam_title?: string;
-  average_score: number;
-  pass_rate: number;
-  score_distribution: {
-    [range: string]: number;
-  };
-  student_rankings: Array<{
-    student_id: number;
-    student_name: string;
-    score: number;
-    rank: number;
-  }>;
-}
-
-export interface GradingStatistics {
-  total_submissions: number;
-  graded_submissions: number;
-  pending_submissions: number;
-  average_grading_time: number;
-  auto_graded_count: number;
-  manual_graded_count: number;
-}
