@@ -126,7 +126,7 @@ export function AllExams() {
   const [filterAgeGroup, setFilterAgeGroup] = useState<string>("all");
   const [filterOwner, setFilterOwner] = useState<"all" | "mine" | "others">("all");
   const [filterStatus, setFilterStatus] = useState<"published" | "draft">("published");
-  const [sortBy, setSortBy] = useState<"updated_desc" | "created_desc" | "created_asc" | "title_asc">("updated_desc");
+  const [sortBy, setSortBy] = useState<"updated_desc" | "created_desc" | "created_asc" | "title_asc" | "questions_desc" | "questions_asc">("updated_desc");
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -446,6 +446,15 @@ export function AllExams() {
   // Sort filtered exams theo lựa chọn của user.
   // updated_desc = vừa chỉnh sửa gần nhất (mặc định, dùng updated_at fallback created_at)
   filteredExams.sort((a, b) => {
+    // Sắp xếp theo số câu hỏi (nhiều/ít nhất).
+    if (sortBy === "questions_desc" || sortBy === "questions_asc") {
+      const qA = countExamQuestionsFor(a);
+      const qB = countExamQuestionsFor(b);
+      if (qA !== qB) return sortBy === "questions_asc" ? qA - qB : qB - qA;
+      // Cùng số câu → xếp theo cập nhật gần nhất cho ổn định.
+      const u = (e: KidsExam) => getVNTimestamp(e.eUpdated_at || e.updated_at || e.eCreated_at || "");
+      return u(b) - u(a);
+    }
     const ts = (e: KidsExam) => {
       if (sortBy === "title_asc") return 0;
       const u = e.eUpdated_at || e.updated_at;
@@ -935,6 +944,8 @@ export function AllExams() {
                   <option value="created_desc">Mới tạo nhất</option>
                   <option value="created_asc">Cũ nhất</option>
                   <option value="title_asc">Tên A → Z</option>
+                  <option value="questions_desc">Nhiều câu nhất</option>
+                  <option value="questions_asc">Ít câu nhất</option>
                 </select>
                 
                 {/* Clear filters */}
