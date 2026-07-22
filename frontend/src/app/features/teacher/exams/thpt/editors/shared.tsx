@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Trash2 } from 'lucide-react';
 import { THPT_THEME } from '../sections';
 
@@ -137,6 +137,14 @@ interface FormattedTextareaProps {
 export function FormattedTextarea({ value, onChange, placeholder, rows = 2, className = '' }: FormattedTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = `${Math.max(60, el.scrollHeight)}px`;
+    }
+  }, [value]);
+
   const applyFormat = (tag: string) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -195,7 +203,7 @@ export function FormattedTextarea({ value, onChange, placeholder, rows = 2, clas
         onChange={(e) => onChange(e.target.value)}
         rows={rows}
         placeholder={placeholder}
-        className={`w-full text-sm border border-slate-200 rounded-lg pl-3 pr-20 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200 font-sans leading-relaxed ${className}`}
+        className={`w-full text-sm border border-slate-200 rounded-lg pl-3 pr-20 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200 font-sans leading-relaxed resize-none overflow-hidden ${className}`}
       />
     </div>
   );
@@ -207,6 +215,16 @@ export function ExplanationField({
   value?: string;
   onChange: (v: string) => void;
 }) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (el) {
+      el.style.height = 'auto';
+      el.style.height = `${Math.max(60, el.scrollHeight)}px`;
+    }
+  }, [value]);
+
   return (
     <div className="mt-3 pt-3 border-t border-slate-100">
       <label className="block text-xs font-bold text-amber-700 mb-1 flex items-center gap-1.5">
@@ -215,11 +233,12 @@ export function ExplanationField({
         <span className="font-normal text-slate-400">(tuỳ chọn — hiển thị cho học viên sau khi nộp bài)</span>
       </label>
       <textarea
+        ref={textareaRef}
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
         rows={2}
         placeholder="Vd: Đáp án B vì... / Quy tắc ngữ pháp... / Đây là thành ngữ có nghĩa..."
-        className="w-full text-sm border border-amber-200 rounded-lg px-3 py-2 bg-amber-50/30 focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300 resize-none"
+        className="w-full text-sm border border-amber-200 rounded-lg px-3 py-2 bg-amber-50/30 focus:outline-none focus:ring-2 focus:ring-amber-200 focus:border-amber-300 resize-none overflow-hidden"
       />
     </div>
   );
