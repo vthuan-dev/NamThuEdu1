@@ -144,7 +144,12 @@ function HoverSelect({
   minWidth?: number;
 }) {
   const [open, setOpen] = useState(false);
+  // render = giữ menu trong DOM để chạy animation đóng; show = trạng thái class transition.
+  const [render, setRender] = useState(false);
+  const [show, setShow] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const unmountTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rafId = useRef<number | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   const allOptions = groups.flatMap((g) => g.options);
@@ -163,9 +168,27 @@ function HoverSelect({
     closeTimer.current = setTimeout(() => setOpen(false), 120);
   };
 
+  // Khi open đổi: mount rồi bật `show` ở frame kế để có transition vào;
+  // khi đóng: tắt `show` trước, chờ animation xong mới unmount.
+  useEffect(() => {
+    if (unmountTimer.current) clearTimeout(unmountTimer.current);
+    if (rafId.current) cancelAnimationFrame(rafId.current);
+    if (open) {
+      setRender(true);
+      rafId.current = requestAnimationFrame(() => {
+        rafId.current = requestAnimationFrame(() => setShow(true));
+      });
+    } else {
+      setShow(false);
+      unmountTimer.current = setTimeout(() => setRender(false), 160);
+    }
+  }, [open]);
+
   useEffect(() => {
     return () => {
       if (closeTimer.current) clearTimeout(closeTimer.current);
+      if (unmountTimer.current) clearTimeout(unmountTimer.current);
+      if (rafId.current) cancelAnimationFrame(rafId.current);
     };
   }, []);
 
@@ -186,9 +209,11 @@ function HoverSelect({
         <span className="truncate">{current?.label ?? ""}</span>
         <ChevronDown className={`w-3.5 h-3.5 text-gray-400 flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
+      {render && (
         <div
-          className="absolute z-50 mt-1 left-0 min-w-full bg-white border border-gray-200 rounded-lg shadow-lg py-1 max-h-72 overflow-auto"
+          className={`absolute z-50 mt-1 left-0 min-w-full bg-white border border-gray-200 rounded-lg shadow-lg py-1 max-h-72 overflow-auto origin-top transition-all duration-150 ease-out ${
+            show ? "opacity-100 translate-y-0 scale-100" : "opacity-0 -translate-y-1 scale-95 pointer-events-none"
+          }`}
           onMouseEnter={openNow}
           onMouseLeave={closeSoon}
         >
