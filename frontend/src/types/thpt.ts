@@ -314,6 +314,7 @@ export interface ThptConfig {
   school?: string;                            // tên trường/sở (optional)
   total_duration_minutes: number;
   scale_max: number;
+  show_explanation?: boolean;                 // Hiển thị giải thích đáp án khi học viên xem lại kết quả (mặc định true)
   sections: ThptSection[];
 }
 

@@ -621,6 +621,25 @@ export function CreateThptExam() {
                   className="w-full mt-0.5 text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
                 />
               </label>
+              <div className="pt-1 border-t border-slate-100">
+                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={config.show_explanation !== false}
+                    onChange={(e) => {
+                      setConfig((p) => ({ ...p, show_explanation: e.target.checked }));
+                      setHasUnsaved(true);
+                    }}
+                    className="mt-0.5 w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer"
+                  />
+                  <div className="flex-1 text-xs">
+                    <span className="font-semibold text-slate-700 block">Hiện giải thích đáp án</span>
+                    <span className="text-slate-400 block text-[11px] leading-tight mt-0.5">
+                      Hiển thị phần giải thích cho học viên khi xem lại bài
+                    </span>
+                  </div>
+                </label>
+              </div>
             </div>
           </div>
 

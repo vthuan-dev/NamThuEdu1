@@ -46,9 +46,11 @@ interface Props {
   correctQuestions?: Record<string, boolean>;
   /** Ẩn header section (dùng khi trang ngoài đã có tiêu đề riêng) */
   hideHeader?: boolean;
+  /** Hiển thị giải thích (khi học viên xem lại bài). Mặc định true ngoại trừ khi cờ show_explanation trong config bằng false */
+  showExplanation?: boolean;
 }
 
-export function SectionView({ section, answers, correctAnswers, onAnswerChange, mode, submissionId, speakingParts, speakingAudio, writingParts, correctQuestions, hideHeader }: Props) {
+export function SectionView({ section, answers, correctAnswers, onAnswerChange, mode, submissionId, speakingParts, speakingAudio, writingParts, correctQuestions, hideHeader, showExplanation }: Props) {
   const typeLabel = TYPE_LABEL[section.type] ?? 'Phần thi';
   // Chia đôi trái–phải cho dạng có bài đọc DÀI tách biệt khỏi câu hỏi
   // (mc_cloze, reading_mixed). word_bank_cloze/open_cloze KHÔNG chia vì ô
@@ -94,7 +96,7 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
           left={<PassageBox text={passageText!} markers={section.type === 'reading_mixed'} submissionId={submissionId} sectionId={section.id} enabled={mode !== 'review'} />}
           right={
             <div className="space-y-5">
-              <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} writingParts={writingParts} correctQuestions={correctQuestions} hidePassage />
+              <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} writingParts={writingParts} correctQuestions={correctQuestions} showExplanation={showExplanation} hidePassage />
             </div>
           }
         />
@@ -148,6 +150,7 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
               speakingAudio={speakingAudio}
               writingParts={writingParts}
               correctQuestions={correctQuestions}
+              showExplanation={showExplanation}
               hidePassage
             />
           </div>
@@ -159,13 +162,14 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
   return (
     <section className="space-y-5">
       {headerEl}
-      <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} writingParts={writingParts} correctQuestions={correctQuestions} />
+      <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} writingParts={writingParts} correctQuestions={correctQuestions} showExplanation={showExplanation} />
     </section>
   );
 }
 
-function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissionId, speakingParts, speakingAudio, writingParts, correctQuestions, hidePassage }: Props & { hidePassage?: boolean }) {
+function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissionId, speakingParts, speakingAudio, writingParts, correctQuestions, hidePassage, showExplanation }: Props & { hidePassage?: boolean }) {
   const isReview = mode === 'review';
+  const showExp = isReview && showExplanation !== false;
   // Đề Nói: mỗi lần chỉ cho ghi âm 1 đề. activeSpeakingQ = số câu đang ghi (hoặc null).
   const [activeSpeakingQ, setActiveSpeakingQ] = useState<number | null>(null);
 
@@ -212,7 +216,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                     );
                   })}
                 </div>
-                {isReview && item.explanation && (
+                {showExp && item.explanation && (
                   <div className="mt-3 p-3 rounded-lg bg-emerald-50/50 border border-emerald-200">
                     <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1.5">
                       <span>💡</span> Giải thích đáp án:
@@ -263,7 +267,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                     />
                   ))}
                 </div>
-                {isReview && item.explanation && (
+                {showExp && item.explanation && (
                   <div className="mt-3 p-3 rounded-lg bg-emerald-50/50 border border-emerald-200">
                     <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1.5">
                       <span>💡</span> Giải thích đáp án:
@@ -298,7 +302,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                   isReview={isReview}
                   onChange={(v) => onAnswerChange(key, v)}
                 />
-                {isReview && item.explanation && (
+                {showExp && item.explanation && (
                   <div className="mt-3 p-3 rounded-lg bg-emerald-50/50 border border-emerald-200">
                     <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1.5">
                       <span>💡</span> Giải thích đáp án:
@@ -315,6 +319,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
     case 'listening': {
       const hideAudio = !!hidePassage; // image-block parent đã render audio sticky
       const isReviewMode = mode === 'review';
+      const showExpMode = isReviewMode && showExplanation !== false;
       const isAnswerSheet = !!hidePassage; // image_block: câu hỏi nằm trên ảnh
 
       // ── Image-block: bảng đáp án label → value (câu hỏi đã nằm trên ảnh) ──
@@ -362,7 +367,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                             correct={correctAnswers ? String(correctAnswers[key] ?? '') : undefined}
                             isCorrectMap={correctQuestions?.[key]}
                           />
-                          {isReviewMode && item.explanation && (
+                          {showExpMode && item.explanation && (
                             <div className="mt-2 p-2.5 rounded-lg bg-emerald-50/50 border border-emerald-200">
                               <p className="text-[11px] font-bold text-emerald-700 mb-0.5 flex items-center gap-1.5">
                                 <span>💡</span> Giải thích đáp án:
@@ -424,7 +429,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                             ))}
                           </div>
                         )}
-                        {isReviewMode && item.explanation && (
+                        {showExpMode && item.explanation && (
                           <div className="mt-2 p-2.5 rounded-lg bg-emerald-50/50 border border-emerald-200">
                             <p className="text-[11px] font-bold text-emerald-700 mb-0.5 flex items-center gap-1.5">
                               <span>💡</span> Giải thích đáp án:
@@ -466,7 +471,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                     correct={correctAnswers ? String(correctAnswers[key] ?? '') : undefined}
                     isCorrectMap={correctQuestions?.[key]}
                   />
-                  {isReviewMode && item.explanation && (
+                  {showExpMode && item.explanation && (
                     <div className="mt-3 p-3 rounded-lg bg-emerald-50/50 border border-emerald-200">
                       <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1.5">
                         <span>💡</span> Giải thích đáp án:
@@ -500,7 +505,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                     />
                   ))}
                 </div>
-                {isReviewMode && item.explanation && (
+                {showExpMode && item.explanation && (
                   <div className="mt-3 p-3 rounded-lg bg-emerald-50/50 border border-emerald-200">
                     <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1.5">
                       <span>💡</span> Giải thích đáp án:
@@ -790,7 +795,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                     />
                   ))}
                 </div>
-                {isReview && b.explanation && (
+                {showExp && b.explanation && (
                   <div className="mt-3 p-3 rounded-lg bg-emerald-50/50 border border-emerald-200">
                     <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1.5">
                       <span>💡</span> Giải thích đáp án:
@@ -855,7 +860,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             onAnswerChange={onAnswerChange}
             isReview={isReview}
           />
-          {isReview && section.blanks.some(b => b.explanation) && (
+          {showExp && section.blanks.some(b => b.explanation) && (
             <div className="mt-4 rounded-2xl bg-white border border-slate-200 p-5 space-y-3">
               <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 border-b border-slate-100 pb-2">
                 <span>💡</span> Giải thích đáp án các chỗ trống
@@ -894,7 +899,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                       correctAnswers={correctAnswers}
                       onAnswerChange={onAnswerChange}
                       isReview={isReview}
-                      explanation={s.explanation}
+                      explanation={showExp ? s.explanation : undefined}
                     />
                   ))}
                 </div>

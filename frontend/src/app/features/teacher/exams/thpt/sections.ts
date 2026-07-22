@@ -486,6 +486,7 @@ export function blankConfig(): ThptConfig {
     level: 'THPT',
     total_duration_minutes: 60,
     scale_max: 10,
+    show_explanation: true,
     sections: [],
   };
 }

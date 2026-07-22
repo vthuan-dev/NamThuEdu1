@@ -632,6 +632,7 @@ export function ThptResultPage() {
                   correctQuestions={result.correct_questions}
                   onAnswerChange={() => {}}
                   mode="review"
+                  showExplanation={config?.show_explanation !== false}
                   speakingParts={result.speaking?.parts}
                   speakingAudio={speakingAudio}
                   writingParts={result.writing?.parts}
