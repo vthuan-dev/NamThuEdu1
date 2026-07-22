@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router";
 import { usePageTitle, PAGE_TITLES } from "../../../../hooks/usePageTitle";
 import {
@@ -13,6 +13,7 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Layers,
   Baby,
   GraduationCap,
@@ -113,6 +114,117 @@ interface KidsExam {
   _owner_name?: string;
   eTeacher_id?: number;
   eIs_private?: boolean;
+}
+
+// ── Dropdown mở khi hover (thay cho <select> native, vốn chỉ mở khi click) ──
+interface HoverOption {
+  value: string;
+  label: string;
+}
+interface HoverGroup {
+  label?: string;
+  options: HoverOption[];
+}
+
+/**
+ * Dropdown tùy biến mở khi rê chuột vào (và vẫn mở được bằng click/bàn phím).
+ * Dùng thay `<select>` để đáp ứng yêu cầu "hover là hiện menu".
+ */
+function HoverSelect({
+  value,
+  groups,
+  onChange,
+  title,
+  minWidth = 150,
+}: {
+  value: string;
+  groups: HoverGroup[];
+  onChange: (v: string) => void;
+  title?: string;
+  minWidth?: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  const allOptions = groups.flatMap((g) => g.options);
+  const current = allOptions.find((o) => o.value === value);
+
+  const openNow = () => {
+    if (closeTimer.current) {
+      clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+    setOpen(true);
+  };
+  // Đóng có trễ nhỏ để di chuột từ nút xuống menu không bị mất.
+  const closeSoon = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => setOpen(false), 120);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    };
+  }, []);
+
+  return (
+    <div
+      ref={rootRef}
+      className="relative"
+      onMouseEnter={openNow}
+      onMouseLeave={closeSoon}
+    >
+      <button
+        type="button"
+        title={title}
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center justify-between gap-2 px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none text-xs bg-white font-medium text-gray-700 cursor-pointer hover:border-gray-400 transition-colors w-full"
+        style={{ minWidth }}
+      >
+        <span className="truncate">{current?.label ?? ""}</span>
+        <ChevronDown className={`w-3.5 h-3.5 text-gray-400 flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div
+          className="absolute z-50 mt-1 left-0 min-w-full bg-white border border-gray-200 rounded-lg shadow-lg py-1 max-h-72 overflow-auto"
+          onMouseEnter={openNow}
+          onMouseLeave={closeSoon}
+        >
+          {groups.map((g, gi) => (
+            <div key={gi}>
+              {g.label && (
+                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-gray-400">
+                  {g.label}
+                </div>
+              )}
+              {g.options.map((opt) => {
+                const active = opt.value === value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      onChange(opt.value);
+                      setOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-1.5 text-xs whitespace-nowrap transition-colors cursor-pointer ${
+                      active
+                        ? "bg-orange-50 text-orange-600 font-semibold"
+                        : "text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function AllExams() {
@@ -878,75 +990,88 @@ export function AllExams() {
                   </button>
                 </div>
                 
-                {/* Age Group Filter */}
-                <select
+                {/* Age Group Filter — mở khi hover */}
+                <HoverSelect
                   value={filterAgeGroup}
-                  onChange={(e) => setFilterAgeGroup(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none text-xs bg-white font-medium text-gray-700 cursor-pointer hover:border-gray-400 transition-colors"
-                >
-                  <option value="all">Tất cả nhóm tuổi</option>
-                  <option value="kids">Trẻ em (6-12)</option>
-                  <option value="teens">Học sinh (13-17)</option>
-                  <option value="adults">Sinh viên / Người đi làm (18+)</option>
-                </select>
-                
-                {/* Exam Type Filter */}
-                <select
+                  onChange={(v) => setFilterAgeGroup(v)}
+                  title="Nhóm tuổi"
+                  minWidth={150}
+                  groups={[
+                    {
+                      options: [
+                        { value: "all", label: "Tất cả nhóm tuổi" },
+                        { value: "kids", label: "Trẻ em (6-12)" },
+                        { value: "teens", label: "Học sinh (13-17)" },
+                        { value: "adults", label: "Sinh viên / Người đi làm (18+)" },
+                      ],
+                    },
+                  ]}
+                />
+
+                {/* Exam Type Filter — mở khi hover */}
+                <HoverSelect
                   value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none text-xs bg-white font-medium text-gray-700 cursor-pointer hover:border-gray-400 transition-colors"
-                >
-                  <option value="all">Tất cả loại đề</option>
+                  onChange={(v) => setFilterType(v)}
+                  title="Loại đề"
+                  minWidth={140}
+                  groups={[
+                    { options: [{ value: "all", label: "Tất cả loại đề" }] },
+                    ...(filterAgeGroup === "all" || filterAgeGroup === "kids"
+                      ? [{
+                          label: "Trẻ em (Cambridge YLE)",
+                          options: [
+                            { value: "yle_starters", label: "Starters (6-8)" },
+                            { value: "yle_movers", label: "Movers (8-11)" },
+                            { value: "yle_flyers", label: "Flyers (9-12)" },
+                          ],
+                        }]
+                      : []),
+                    ...(filterAgeGroup === "all" || filterAgeGroup === "teens"
+                      ? [{
+                          label: "Học sinh (THCS / THPT / ĐGNL)",
+                          options: [{ value: "thpt", label: "THPT / Đánh giá năng lực" }],
+                        }]
+                      : []),
+                    ...(filterAgeGroup === "all" || filterAgeGroup === "adults"
+                      ? [{
+                          label: "Sinh viên / Người đi làm",
+                          options: [
+                            { value: "vstep", label: "VSTEP" },
+                            { value: "ielts", label: "IELTS" },
+                            { value: "cambridge", label: "Cambridge (KET / PET / FCE…)" },
+                            { value: "toefl", label: "TOEFL" },
+                            { value: "toeic", label: "TOEIC" },
+                          ],
+                        }]
+                      : []),
+                    ...(filterAgeGroup !== "kids"
+                      ? [{
+                          label: "Khác",
+                          options: [{ value: "general", label: "Đề tổng hợp" }],
+                        }]
+                      : []),
+                  ]}
+                />
 
-                  {/* Kids exam types */}
-                  {(filterAgeGroup === "all" || filterAgeGroup === "kids") && (
-                    <optgroup label="Trẻ em (Cambridge YLE)">
-                      <option value="yle_starters">Starters (6-8)</option>
-                      <option value="yle_movers">Movers (8-11)</option>
-                      <option value="yle_flyers">Flyers (9-12)</option>
-                    </optgroup>
-                  )}
-
-                  {/* Teens — THCS / THPT / ĐGNL */}
-                  {(filterAgeGroup === "all" || filterAgeGroup === "teens") && (
-                    <optgroup label="Học sinh (THCS / THPT / ĐGNL)">
-                      <option value="thpt">THPT / Đánh giá năng lực</option>
-                    </optgroup>
-                  )}
-
-                  {/* Adults — chứng chỉ quốc tế */}
-                  {(filterAgeGroup === "all" || filterAgeGroup === "adults") && (
-                    <optgroup label="Sinh viên / Người đi làm">
-                      <option value="vstep">VSTEP</option>
-                      <option value="ielts">IELTS</option>
-                      <option value="cambridge">Cambridge (KET / PET / FCE…)</option>
-                      <option value="toefl">TOEFL</option>
-                      <option value="toeic">TOEIC</option>
-                    </optgroup>
-                  )}
-
-                  {/* General — dùng được cho teens & adults */}
-                  {filterAgeGroup !== "kids" && (
-                    <optgroup label="Khác">
-                      <option value="general">Đề tổng hợp</option>
-                    </optgroup>
-                  )}
-                </select>
-
-                {/* Sort dropdown */}
-                <select
+                {/* Sort dropdown — mở khi hover */}
+                <HoverSelect
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none text-xs bg-white font-medium text-gray-700 cursor-pointer hover:border-gray-400 transition-colors"
+                  onChange={(v) => setSortBy(v as typeof sortBy)}
                   title="Sắp xếp"
-                >
-                  <option value="updated_desc">Vừa chỉnh sửa</option>
-                  <option value="created_desc">Mới tạo nhất</option>
-                  <option value="created_asc">Cũ nhất</option>
-                  <option value="title_asc">Tên A → Z</option>
-                  <option value="questions_desc">Nhiều câu nhất</option>
-                  <option value="questions_asc">Ít câu nhất</option>
-                </select>
+                  minWidth={140}
+                  groups={[
+                    {
+                      options: [
+                        { value: "updated_desc", label: "Vừa chỉnh sửa" },
+                        { value: "created_desc", label: "Mới tạo nhất" },
+                        { value: "created_asc", label: "Cũ nhất" },
+                        { value: "title_asc", label: "Tên A → Z" },
+                        { value: "questions_desc", label: "Nhiều câu nhất" },
+                        { value: "questions_asc", label: "Ít câu nhất" },
+                      ],
+                    },
+                  ]}
+                />
                 
                 {/* Clear filters */}
                 {(filterAgeGroup !== "all" || filterType !== "all" || filterOwner !== "all") && (
