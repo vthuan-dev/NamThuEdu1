@@ -19,7 +19,7 @@ import {
 } from '../sections';
 import { SectionHeader, QuestionBadge, DeleteBtn, AddButton, OptionRow, FormattedTextarea, ExplanationField } from './shared';
 import { THPT_THEME, LETTERS } from '../sections';
-import { splitPhoneticWord, formatErrorSentence } from '../../../../../../utils/examUtils';
+import { splitPhoneticWord, formatErrorSentence, detectPhoneticEnding, isSuffixComparisonGroup } from '../../../../../../utils/examUtils';
 
 interface Props {
   section: ThptSection;
@@ -553,7 +553,10 @@ function PhoneticsEditor({ section, all, onChange }: { section: Extract<ThptSect
         </div>
       </div>
 
-      {section.items.map((item, idx) => (
+      {section.items.map((item, idx) => {
+      // Tự dò đuôi s/es/ed cho preview: chỉ khi dạng "Phát âm" VÀ cả nhóm cùng đuôi.
+      const autoDetect = section.variant === 'pronunciation' && isSuffixComparisonGroup(item.words);
+      return (
         <ItemCard key={idx} n={item.question_number} typeLabel={section.variant === 'stress' ? 'Trọng âm' : 'Phát âm'} onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {item.words.map((w, wi) => {
@@ -597,6 +600,7 @@ function PhoneticsEditor({ section, all, onChange }: { section: Extract<ThptSect
                     // Vị trí bắt đầu đã lưu; nếu chưa có thì dò theo chuỗi underline.
                     const ul = (w.underline ?? '').trim();
                     let start: number | null = null;
+                    let markLen = ul.length;
                     if (ul) {
                       if (
                         w.underlineStart != null &&
@@ -608,12 +612,20 @@ function PhoneticsEditor({ section, all, onChange }: { section: Extract<ThptSect
                         const found = w.text.toLowerCase().indexOf(ul.toLowerCase());
                         start = found === -1 ? null : found;
                       }
+                    } else if (autoDetect) {
+                      // Giáo viên chưa đánh dấu + nhóm là dạng so sánh đuôi → tự dò đuôi
+                      // s/es/ed để hiển thị preview (chỉ hiển thị, không ghi vào dữ liệu).
+                      const ending = detectPhoneticEnding(w.text);
+                      if (ending) {
+                        start = w.text.length - ending.length;
+                        markLen = ending.length;
+                      }
                     }
                     return (
                       <SyllableMarker
                         text={w.text}
                         start={start}
-                        length={ul.length}
+                        length={markLen}
                         onChange={(next) => {
                           const items = [...section.items];
                           const words = [...item.words];
@@ -642,7 +654,8 @@ function PhoneticsEditor({ section, all, onChange }: { section: Extract<ThptSect
             }}
           />
         </ItemCard>
-      ))}
+      );
+      })}
       <AddButton label="Thêm câu" onClick={() => update([...section.items, makePhoneticsItem(nextQuestionNumber(all))])} />
     </div>
   );

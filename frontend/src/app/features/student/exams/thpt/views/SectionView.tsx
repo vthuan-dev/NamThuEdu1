@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef, type ReactNode } from 'react';
 import { CheckCircle2, XCircle, Headphones, Mic, Sparkles, Loader2, FileText, PenLine, Highlighter } from 'lucide-react';
 import type { ThptAnswers, ThptSection, ViewMode } from '../types';
 import { ThptSpeakingRecorder } from '../components/ThptSpeakingRecorder';
-import { splitPhoneticWord, formatErrorSentence } from '../../../../../../utils/examUtils';
+import { splitPhoneticWord, formatErrorSentence, isSuffixComparisonGroup } from '../../../../../../utils/examUtils';
 import { useTextHighlight } from '../../../../../../hooks/exam/useTextHighlight';
 
 const THEME = {
@@ -177,13 +177,18 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             const key = `q${item.question_number}`;
             const userVal = String(answers[key] ?? '');
             const correctVal = String(correctAnswers?.[key] ?? '');
+            // Chỉ tự dò đuôi s/es/ed khi:
+            //  - Dạng "Phát âm" (không phải "Trọng âm"), VÀ
+            //  - Cả nhóm 4 phương án đều cùng có đuôi biến đổi (dạng so sánh đuôi).
+            // Dạng so sánh nguyên âm (head/bread/tea/heavy) không cùng đuôi → không auto-dò,
+            // tránh gạch chân/in nghiêng nhầm chữ cuối.
+            const isStress = section.variant === 'stress';
+            const autoDetect = !isStress && isSuffixComparisonGroup(item.words);
             return (
               <QCard key={key} n={item.question_number}>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {item.words.map((w) => {
-                    // Phát âm: tự dò đuôi ed/s/es. Trọng âm: chỉ nhấn khi giáo viên đã đánh dấu.
-                    const isStress = section.variant === 'stress';
-                    const { before, mark, after } = splitPhoneticWord(w.text, w.underline, !isStress, w.underlineStart);
+                    const { before, mark, after } = splitPhoneticWord(w.text, w.underline, autoDetect, w.underlineStart);
                     const wordLabel = mark ? (
                       <span>
                         {before}

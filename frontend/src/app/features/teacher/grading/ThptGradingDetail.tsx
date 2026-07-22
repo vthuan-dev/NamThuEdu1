@@ -45,7 +45,7 @@ import {
   type SentenceInsertionQuestion,
   type SaveQuestionPayload,
 } from '../../../../services/thptGradingApi';
-import { splitPhoneticWord } from '../../../../utils/examUtils';
+import { splitPhoneticWord, isSuffixComparisonGroup } from '../../../../utils/examUtils';
 
 interface Props {
   submissionId: number;
@@ -1474,6 +1474,10 @@ function McqReview({
       ? answerOverride[key]
       : String(q.student_answer) === String(effectiveCorrectId);
   const changed = key in answerOverride || correctChanged;
+  // Chỉ tự dò đuôi s/es/ed khi là câu ngữ âm dạng "Phát âm" VÀ cả nhóm phương án
+  // cùng có đuôi biến đổi (dạng so sánh đuôi). Câu trắc nghiệm thường (variant rỗng)
+  // hoặc dạng so sánh nguyên âm sẽ không tự gạch chân, tránh nhận diện sai.
+  const autoDetect = q.variant === 'pronunciation' && isSuffixComparisonGroup(q.options);
 
   return (
     <QCardShell n={q.question_number} effective={effective} changed={changed}>
@@ -1512,9 +1516,8 @@ function McqReview({
               <span className="flex-1 min-w-0 text-sm text-slate-800">
                 {opt.text ? (() => {
                   // Render phần gạch chân của từ ngữ âm với italic+teal (nhất quán với student view).
-                  // Trọng âm: KHÔNG tự dò đuôi ed/s/es — chỉ nhấn khi giáo viên đã đánh dấu.
-                  const isStress = q.variant === 'stress';
-                  const parts = splitPhoneticWord(opt.text, opt.underline, !isStress, opt.underlineStart);
+                  // autoDetect đã được tính ở cấp câu: chỉ bật cho dạng "Phát âm" so sánh đuôi.
+                  const parts = splitPhoneticWord(opt.text, opt.underline, autoDetect, opt.underlineStart);
                   if (!parts.mark) return <RichText text={opt.text} />;
                   return (
                     <>

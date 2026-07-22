@@ -173,6 +173,32 @@ export const detectPhoneticEnding = (word: string): string => {
 };
 
 /**
+ * Xác định 1 NHÓM từ (4 phương án của 1 câu ngữ âm) có phải dạng "so sánh đuôi"
+ * hay không. Dạng so sánh đuôi là khi TẤT CẢ các từ đều kết thúc bằng s/es/ed
+ * (ví dụ: stopped / worked / asked / wanted, hoặc laughs / stops / sleeps / plays).
+ *
+ * Chỉ nhóm như vậy mới được tự động dò & gạch chân phần đuôi. Dạng so sánh nguyên
+ * âm (head / bread / tea / heavy → phần "ea") KHÔNG cùng đuôi nên sẽ trả về false,
+ * tránh việc tự gạch nhầm chữ cuối. Câu trắc nghiệm thường (không phải ngữ âm) cũng
+ * hiếm khi có toàn bộ phương án cùng đuôi s/es/ed nên cũng được loại trừ.
+ *
+ * @param words - Danh sách các từ trong câu (mỗi phần tử có `text`).
+ * @returns true nếu nên bật auto-dò đuôi cho cả nhóm.
+ */
+export const isSuffixComparisonGroup = (
+  words: { text?: string | null }[],
+): boolean => {
+  if (!Array.isArray(words)) return false;
+  const texts = words
+    .map((w) => (w?.text ?? "").trim())
+    .filter((t) => t.length >= 2);
+  // Cần tối thiểu 2 từ để coi là 1 nhóm so sánh có nghĩa.
+  if (texts.length < 2) return false;
+  // Mọi từ đều phải có đuôi biến đổi s/es/ed thì mới coi là dạng so sánh đuôi.
+  return texts.every((t) => detectPhoneticEnding(t) !== "");
+};
+
+/**
  * Tách 1 từ thành 3 phần [before, mark, after] để render phần "mark"
  * (phần phát âm khác biệt) với gạch chân + in nghiêng.
  *
