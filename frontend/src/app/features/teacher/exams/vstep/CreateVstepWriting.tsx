@@ -108,14 +108,19 @@ export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest 
             });
             setSavedTasks(newSaved);
 
-            // Đề đơn kỹ năng: hiện đúng các task đã có nội dung (tối thiểu Task 1).
-            // Full Test giữ nguyên đủ 2 task.
+            // Đề đơn kỹ năng: hiện đúng các task đã có nội dung.
+            // Không cố định Task 1 — giáo viên có thể chỉ dạy Task 2.
             if (!isFullTest) {
-              const active = new Set<number>([1]);
+              const active = new Set<number>();
               examData.tasks.forEach((task: any) => {
                 if (task.prompt?.trim()) active.add(task.taskNumber);
               });
+              // Nếu không task nào có nội dung (đề mới trống), mặc định Task 1
+              if (active.size === 0) active.add(1);
               setActiveTasks(active);
+              // Chuyển sang task đầu tiên trong danh sách active
+              const firstActive = Math.min(...Array.from(active)) as 1 | 2;
+              setCurrentTask(firstActive);
             }
             
             console.log("✅ Loaded tasks:", loadedTasks.length);
@@ -311,8 +316,9 @@ export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest 
               const taskData = tasks.find((t) => t.taskNumber === task.task)!;
               const hasPrompt = taskData.prompt.trim().length > 0;
               const isSaved = savedTasks.has(task.task);
-              // Chỉ cho xoá task > 1 ở đề đơn kỹ năng (Task 1 luôn bắt buộc; Full Test giữ đủ).
-              const canRemove = !isFullTest && task.task > 1;
+              // Cho phép xoá bất kỳ task nào miễn là vẫn còn ≥1 task khác active.
+              // Full Test luôn giữ đủ cả 2 task nên không cho xoá.
+              const canRemove = !isFullTest && activeTasks.size > 1;
 
               return (
                 <div key={task.task} className="relative flex items-center">
@@ -340,7 +346,7 @@ export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest 
                   {canRemove && (
                     <button
                       onClick={(e) => { e.stopPropagation(); removeTask(task.task as 1 | 2); }}
-                      title={`Bỏ Task ${task.task}`}
+                      title={`Bỏ Task ${task.task} khỏi đề này. Học viên sẽ chỉ thấy Task ${task.task === 1 ? 2 : 1}.`}
                       className="ml-0.5 mr-1 p-1 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                     >
                       <X className="w-4 h-4" />
@@ -355,7 +361,9 @@ export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest 
                 <div key={`add-${task.task}`} className="relative flex items-center">
                   <button
                     onClick={() => addTask(task.task as 1 | 2)}
-                    title={`Thêm Task ${task.task} cho đề Writing này (tùy chọn). Nếu không thêm thì đề chỉ có 1 task.`}
+                    title={task.task === 2
+                      ? `Thêm Task 2 - Bài luận cho đề này (tùy chọn). Nếu không thêm thì đề chỉ có Task 1.`
+                      : `Thêm Task 1 - Thư/Email cho đề này (tùy chọn). Nếu không thêm thì đề chỉ có Task 2.`}
                     className="flex items-center gap-2 my-2 px-4 py-2 border border-dashed border-gray-300 rounded-lg text-gray-500 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 transition-colors whitespace-nowrap"
                   >
                     <Plus className="w-4 h-4" />
