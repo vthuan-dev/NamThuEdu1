@@ -541,14 +541,14 @@ export function ThptResultPage() {
 
           return (
             <section
-              className="rounded-2xl overflow-hidden bg-white"
+              className="rounded-2xl bg-white"
               style={{
                 border: `1.5px solid ${m.color}33`,
                 boxShadow: `0 8px 28px ${m.color}14, 0 1px 4px rgba(15,23,42,0.04)`,
               }}
             >
               {/* Skill color bar */}
-              <div className="h-1.5" style={{ background: `linear-gradient(90deg, ${m.color}, ${m.color}88)` }} />
+              <div className="h-1.5 rounded-t-2xl" style={{ background: `linear-gradient(90deg, ${m.color}, ${m.color}88)` }} />
 
               {/* Header — important context only */}
               <div
@@ -635,7 +635,7 @@ export function ThptResultPage() {
               )}
 
               {/* Body content */}
-              <div className="p-3 sm:p-5 bg-[#FCFDFE]">
+              <div className="p-3 sm:p-5 bg-[#FCFDFE] rounded-b-2xl">
                 {questionNumbers.length > 0 ? (
                   <div className="grid grid-cols-1 lg:grid-cols-[180px_1fr] gap-6 items-start">
                     
