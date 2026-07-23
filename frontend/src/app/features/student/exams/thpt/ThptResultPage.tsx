@@ -85,6 +85,19 @@ export function ThptResultPage() {
   const [activeIdx, setActiveIdx] = useState(0);
   const pollCountRef = useRef(0);
 
+  const activeSection = config?.sections?.[activeIdx];
+  const questionNumbers = useMemo(() => {
+    if (!activeSection) return [];
+    const sec = activeSection as any;
+    if (sec.blanks && Array.isArray(sec.blanks)) {
+      return sec.blanks.map((b: any) => b.question_number);
+    }
+    if (sec.items && Array.isArray(sec.items)) {
+      return sec.items.map((item: any) => item.question_number);
+    }
+    return [];
+  }, [activeSection]);
+
   useEffect(() => {
     let mounted = true;
     let pollTimer: number | null = null;
@@ -246,18 +259,6 @@ export function ThptResultPage() {
   const cappedDurationSec = limitSec > 0 ? Math.min(durationSec, limitSec) : durationSec;
   const minutes = Math.floor(cappedDurationSec / 60);
   const seconds = cappedDurationSec % 60;
-  const activeSection  = config.sections[activeIdx];
-  const questionNumbers = useMemo(() => {
-    if (!activeSection) return [];
-    const sec = activeSection as any;
-    if (sec.blanks && Array.isArray(sec.blanks)) {
-      return sec.blanks.map((b: any) => b.question_number);
-    }
-    if (sec.items && Array.isArray(sec.items)) {
-      return sec.items.map((item: any) => item.question_number);
-    }
-    return [];
-  }, [activeSection]);
   const cfgSections = config.sections ?? [];
   const hasSpeakingSection = cfgSections.some((s) => s.type === 'speaking')
     || sections.some((s) => s.type === 'speaking');
