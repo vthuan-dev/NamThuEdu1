@@ -1087,7 +1087,7 @@ function SpeakingResultCard({ n, prompt, result, audioUrl }: { n: number; prompt
 
 function QCard({ n, children, label }: { n: number; children: React.ReactNode; label?: string }) {
   return (
-    <article className="rounded-2xl bg-white border border-slate-200 p-5 transition-colors hover:border-slate-300">
+    <article id={`qcard-${n}`} className="rounded-2xl bg-white border border-slate-200 p-5 transition-colors hover:border-slate-300 scroll-mt-20">
       <div className="flex items-center gap-2.5 mb-3.5">
         <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-teal-600 text-white text-[13px] font-bold tabular-nums">
           {n}

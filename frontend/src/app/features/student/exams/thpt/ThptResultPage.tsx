@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import {
   Loader2, AlertCircle, ArrowLeft, Sparkles,
@@ -247,6 +247,17 @@ export function ThptResultPage() {
   const minutes = Math.floor(cappedDurationSec / 60);
   const seconds = cappedDurationSec % 60;
   const activeSection  = config.sections[activeIdx];
+  const questionNumbers = useMemo(() => {
+    if (!activeSection) return [];
+    const sec = activeSection as any;
+    if (sec.blanks && Array.isArray(sec.blanks)) {
+      return sec.blanks.map((b: any) => b.question_number);
+    }
+    if (sec.items && Array.isArray(sec.items)) {
+      return sec.items.map((item: any) => item.question_number);
+    }
+    return [];
+  }, [activeSection]);
   const cfgSections = config.sections ?? [];
   const hasSpeakingSection = cfgSections.some((s) => s.type === 'speaking')
     || sections.some((s) => s.type === 'speaking');
@@ -624,20 +635,84 @@ export function ThptResultPage() {
 
               {/* Body content */}
               <div className="p-3 sm:p-5 bg-[#FCFDFE]">
-                <SectionView
-                  key={activeSection.id}
-                  section={activeSection}
-                  answers={answers}
-                  correctAnswers={result.correct_answers}
-                  correctQuestions={result.correct_questions}
-                  onAnswerChange={() => {}}
-                  mode="review"
-                  showExplanation={config?.show_explanation !== false}
-                  speakingParts={result.speaking?.parts}
-                  speakingAudio={speakingAudio}
-                  writingParts={result.writing?.parts}
-                  hideHeader
-                />
+                {questionNumbers.length > 0 ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-[180px_1fr] gap-6 items-start">
+                    
+                    {/* Left Column: Sticky Question List */}
+                    <div className="hidden lg:block sticky top-[72px] self-start max-h-[calc(100vh-100px)] overflow-y-auto pr-1">
+                      <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2.5">
+                          Câu hỏi ({questionNumbers.length})
+                        </p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {questionNumbers.map((qn) => {
+                            const key = `q${qn}`;
+                            const isCorrect = result.correct_questions?.[key];
+                            const hasAnswer = answers[key] !== undefined && answers[key] !== '';
+                            
+                            let btnBg = 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200';
+                            if (isCorrect === true) {
+                              btnBg = 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600';
+                            } else if (isCorrect === false) {
+                              btnBg = 'bg-rose-500 text-white border-rose-500 hover:bg-rose-600';
+                            } else if (!hasAnswer) {
+                              btnBg = 'bg-slate-100 text-slate-400 border-slate-200';
+                            }
+                            
+                            return (
+                              <button
+                                key={qn}
+                                type="button"
+                                onClick={() => {
+                                  const el = document.getElementById(`qcard-${qn}`);
+                                  if (el) {
+                                    el.scrollIntoView({ behavior: 'smooth' });
+                                  }
+                                }}
+                                className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold border transition-colors cursor-pointer ${btnBg}`}
+                              >
+                                {qn}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right Column: Question Content */}
+                    <div className="min-w-0">
+                      <SectionView
+                        key={activeSection.id}
+                        section={activeSection}
+                        answers={answers}
+                        correctAnswers={result.correct_answers}
+                        correctQuestions={result.correct_questions}
+                        onAnswerChange={() => {}}
+                        mode="review"
+                        showExplanation={config?.show_explanation !== false}
+                        speakingParts={result.speaking?.parts}
+                        speakingAudio={speakingAudio}
+                        writingParts={result.writing?.parts}
+                        hideHeader
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <SectionView
+                    key={activeSection.id}
+                    section={activeSection}
+                    answers={answers}
+                    correctAnswers={result.correct_answers}
+                    correctQuestions={result.correct_questions}
+                    onAnswerChange={() => {}}
+                    mode="review"
+                    showExplanation={config?.show_explanation !== false}
+                    speakingParts={result.speaking?.parts}
+                    speakingAudio={speakingAudio}
+                    writingParts={result.writing?.parts}
+                    hideHeader
+                  />
+                )}
               </div>
             </section>
           );
