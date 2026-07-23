@@ -2856,15 +2856,15 @@ function SpeakingPrepOverlay({ prepSec, partNumber, onDone, onSkip }: { prepSec:
     return () => clearInterval(id);
   }, [prepSec, partNumber]);
   return (
-    <div className="fixed inset-0 z-[100] bg-white flex flex-col items-center justify-center px-6">
-      <p className="text-slate-700 text-[15px] text-center max-w-md">Bài thi sẽ được thu âm trực tiếp trên trình duyệt.</p>
-      <p className="text-slate-700 text-[15px] text-center mb-8">Vui lòng bật tiếng, cấp quyền thu âm (nếu có).</p>
-      <p className="text-pink-600 text-xs font-bold uppercase tracking-widest mb-2">THỜI GIAN CHUẨN BỊ CÒN</p>
-      <p className="text-pink-600 text-5xl font-bold tabular-nums">{left} <span className="text-2xl font-semibold">GIÂY</span></p>
+    <div className="fixed inset-0 z-[100] bg-slate-900/85 backdrop-blur-[3px] flex flex-col items-center justify-center px-6">
+      <p className="text-white text-[15px] font-medium text-center max-w-md">Bài thi sẽ được thu âm trực tiếp trên trình duyệt.</p>
+      <p className="text-white/70 text-[15px] text-center mb-8">Vui lòng bật tiếng, cấp quyền thu âm (nếu có).</p>
+      <p className="text-pink-400 text-xs font-bold uppercase tracking-widest mb-2">THỜI GIAN CHUẨN BỊ CÒN</p>
+      <p className="text-pink-400 text-6xl font-black tabular-nums">{left} <span className="text-2xl font-bold">GIÂY</span></p>
       <div className="mt-10 flex gap-3">
-        <button onClick={onSkip} className="px-5 py-2 bg-pink-600 text-white rounded-lg text-sm font-semibold hover:bg-pink-700 transition-colors">Bỏ qua chuẩn bị →</button>
+        <button onClick={onSkip} className="px-6 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl text-sm font-bold active:scale-[0.97] transition-all shadow-md cursor-pointer">Bỏ qua chuẩn bị →</button>
       </div>
-      <p className="mt-4 text-[11px] text-slate-400 uppercase tracking-wider">Part {partNumber}</p>
+      <p className="mt-6 text-[11px] text-white/40 uppercase tracking-widest font-bold">Part {partNumber}</p>
     </div>
   );
 }
@@ -3148,7 +3148,7 @@ function SpeakingView({
   const subtitle = partNumber === 1 ? "Social Interaction" : partNumber === 2 ? "Solution Discussion" : "Topic Development";
   const times = SPEAKING_TIMES[partNumber] ?? { prepSec: 30, recSec: 180 };
   const questionCount = partNumber === 1 ? (part.part1Data?.reduce((s, t) => s + t.questions.length, 0) || 0) : partNumber === 2 ? 1 : 1 + (part.part3Data?.followUpQuestions.length || 0);
-  if (!reviewMode && viewPhase === "prep") return <SpeakingPrepOverlay prepSec={times.prepSec} partNumber={partNumber} onDone={finishPrep} onSkip={finishPrep} />;
+
 
   const partResult = reviewSpeakingResults?.[partNumber];
   const spGradingBanner = reviewMode && isGradingPending && !partResult && (
@@ -3298,6 +3298,9 @@ function SpeakingView({
           </div>
         )}
       </div>
+      {!reviewMode && viewPhase === "prep" && (
+        <SpeakingPrepOverlay prepSec={times.prepSec} partNumber={partNumber} onDone={finishPrep} onSkip={finishPrep} />
+      )}
     </div>
   );
 }

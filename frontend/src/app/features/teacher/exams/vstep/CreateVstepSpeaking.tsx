@@ -1136,7 +1136,7 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
         </div>
 
         {/* Main Topic Field */}
-        <div className="border border-purple-200 rounded-xl p-6 bg-purple-50/40 space-y-4">
+        <div className="border border-purple-200 rounded-xl p-6 bg-purple-50/40">
           <div>
             <label className="block text-sm font-semibold text-purple-800 mb-2 flex items-center gap-2">
               <span className="w-6 h-6 bg-purple-600 text-white rounded-lg flex items-center justify-center text-xs font-bold">T</span>
@@ -1148,18 +1148,6 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
               rows={2}
               placeholder="e.g., The impact of social media on young people's communication skills"
               className="w-full px-4 py-3 border-2 border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-400/30 focus:border-purple-500 text-gray-900 font-semibold placeholder:text-purple-300 transition-all resize-none bg-white"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-purple-600 mb-2">
-              Gợi ý phát triển chủ đề / Dàn ý (Giải thích) - Tuỳ chọn
-            </label>
-            <textarea
-              value={data.explanation || ""}
-              onChange={(e) => updatePart3Field("explanation", e.target.value)}
-              rows={2}
-              placeholder="VD: Cần nêu được định nghĩa, ưu nhược điểm, và ví dụ cụ thể..."
-              className="w-full px-4 py-3 border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-400/30 focus:border-purple-550 text-gray-800 placeholder:text-purple-300 transition-all resize-none bg-white text-xs"
             />
           </div>
         </div>
