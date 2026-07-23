@@ -2961,16 +2961,27 @@ class ExamController extends Controller
 
         DB::beginTransaction();
         try {
-            // Find or create exam
-            $exam = Exam::where('eId', $examId)
-                       
-                       ->first();
+            // Find exam by numeric eId OR by exam_code (frontend-generated string like vstep-writing-TIMESTAMP)
+            $exam = is_numeric($examId)
+                ? Exam::where('eId', $examId)->first()
+                : Exam::where('exam_code', $examId)->where('eType', 'VSTEP')->where('eSkill', 'writing')->first();
 
+            // Auto-create the exam if it doesn't exist yet (Writing editor generates its own string ID)
             if (!$exam) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Không tìm thấy đề thi. Vui lòng tạo đề trước khi lưu task.'
-                ], 404);
+                $initialStatus = Exam::resolveModerationStatus();
+                $exam = Exam::create([
+                    'exam_code'        => is_numeric($examId) ? null : $examId,
+                    'eTitle'           => 'Đề VSTEP Writing mới',
+                    'eType'            => 'VSTEP',
+                    'eSkill'           => 'writing',
+                    'eScope'           => 'skill',
+                    'eTeacher_id'      => $user->uId,
+                    'eDuration_minutes'=> 60,
+                    'eIs_private'      => true,
+                    'eSource_type'     => 'manual',
+                    'age_group'        => 'adults',
+                    'eStatus'          => 'draft',
+                ]);
             }
 
             // Delete existing writing question for this task (DON'T touch listening/reading)
@@ -3085,15 +3096,16 @@ class ExamController extends Controller
 
         DB::beginTransaction();
         try {
-            // Find exam
-            $exam = Exam::where('eId', $examId)
-                       
-                       ->first();
+            // Find exam by numeric eId OR by exam_code (frontend-generated string like vstep-writing-TIMESTAMP)
+            $exam = is_numeric($examId)
+                ? Exam::where('eId', $examId)->first()
+                : Exam::where('exam_code', $examId)->where('eType', 'VSTEP')->where('eSkill', 'writing')->first();
 
             if (!$exam) {
+                DB::rollBack();
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Không tìm thấy đề thi.'
+                    'message' => 'Không tìm thấy đề thi. Vui lòng lưu ít nhất 1 task trước khi xuất bản.'
                 ], 404);
             }
 
@@ -3172,9 +3184,12 @@ class ExamController extends Controller
             ], 401);
         }
 
-        $isAdmin = $user->uRole === 'admin';
+        // Find exam by numeric eId OR by exam_code (frontend-generated string like vstep-writing-TIMESTAMP)
+        $examQuery = is_numeric($examId)
+            ? Exam::where('eId', $examId)
+            : Exam::where('exam_code', $examId)->where('eType', 'VSTEP')->where('eSkill', 'writing');
 
-        $exam = Exam::where('eId', $examId)
+        $exam = $examQuery
                    ->when(false, fn($q) => $q)
                    ->with([
                        'contentBlocks' => function($q) {
@@ -3677,7 +3692,9 @@ class ExamController extends Controller
 
         DB::beginTransaction();
         try {
-            $exam = Exam::where('eId', $examId)->first();
+            $exam = is_numeric($examId)
+                ? Exam::where('eId', $examId)->first()
+                : Exam::where('exam_code', $examId)->where('eType', 'VSTEP')->where('eSkill', 'writing')->first();
 
             if (!$exam) {
                 DB::rollBack();
