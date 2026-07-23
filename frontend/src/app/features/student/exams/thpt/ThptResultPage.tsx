@@ -648,16 +648,18 @@ export function ThptResultPage() {
                         <div className="grid grid-cols-3 gap-2">
                           {questionNumbers.map((qn) => {
                             const key = `q${qn}`;
-                            const isCorrect = result.correct_questions?.[key];
-                            const hasAnswer = answers[key] !== undefined && answers[key] !== '';
+                            const userVal = String(answers[key] ?? '').trim().toUpperCase();
+                            const correctVal = String(result.correct_answers?.[key] ?? '').trim().toUpperCase();
+                            const hasAnswer = userVal !== '';
+                            const isCorrect = result.correct_questions?.[key] === true || (hasAnswer && correctVal !== '' && userVal === correctVal);
                             
                             let btnBg = 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200';
-                            if (isCorrect === true) {
+                            if (isCorrect) {
                               btnBg = 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600';
-                            } else if (isCorrect === false) {
-                              btnBg = 'bg-rose-500 text-white border-rose-500 hover:bg-rose-600';
                             } else if (!hasAnswer) {
                               btnBg = 'bg-slate-100 text-slate-400 border-slate-200';
+                            } else {
+                              btnBg = 'bg-rose-500 text-white border-rose-500 hover:bg-rose-600';
                             }
                             
                             return (
