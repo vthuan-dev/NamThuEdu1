@@ -179,8 +179,8 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
         <>
           {section.items.map((item) => {
             const key = `q${item.question_number}`;
-            const userVal = String(answers[key] ?? '');
-            const correctVal = String(correctAnswers?.[key] ?? '');
+            const userVal = String(answers[key] ?? '').trim().toUpperCase();
+            const correctVal = String(correctAnswers?.[key] ?? '').trim().toUpperCase();
             // Chỉ tự dò đuôi s/es/ed khi:
             //  - Dạng "Phát âm" (không phải "Trọng âm"), VÀ
             //  - Cả nhóm 4 phương án đều cùng có đuôi biến đổi (dạng so sánh đuôi).
@@ -237,8 +237,8 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
         <>
           {section.items.map((item: any) => {
             const key = `q${item.question_number}`;
-            const userVal = String(answers[key] ?? '');
-            const correctVal = String(correctAnswers?.[key] ?? '');
+            const userVal = String(answers[key] ?? '').trim().toUpperCase();
+            const correctVal = String(correctAnswers?.[key] ?? '').trim().toUpperCase();
             const options = isError ? item.segments : item.options;
             return (
               <QCard key={key} n={item.question_number}>
@@ -381,8 +381,8 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                   }
 
                   const options = item.options ?? [];
-                  const userVal = String(answers[key] ?? '');
-                  const correctVal = String(correctAnswers?.[key] ?? '');
+                  const userVal = String(answers[key] ?? '').trim().toUpperCase();
+                  const correctVal = String(correctAnswers?.[key] ?? '').trim().toUpperCase();
                   // Option text trống (đã in trên ảnh) → chỉ hiện A/B/C/D
                   const labelsOnly = options.length === 0 || options.every((o: any) => !String(o.text || '').trim());
                   const opts = options.length > 0 ? options : [{ id: 'A' }, { id: 'B' }, { id: 'C' }, { id: 'D' }];
@@ -776,8 +776,8 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
           {!hidePassage && <PassageBox text={section.passage} />}
           {section.blanks.map((b) => {
             const key = `q${b.question_number}`;
-            const userVal = String(answers[key] ?? '');
-            const correctVal = String(correctAnswers?.[key] ?? '');
+            const userVal = String(answers[key] ?? '').trim().toUpperCase();
+            const correctVal = String(correctAnswers?.[key] ?? '').trim().toUpperCase();
             return (
               <QCard key={key} n={b.question_number}>
                 <div className="space-y-2">
@@ -914,8 +914,8 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                     </div>
                     {item.options.map((opt: any) => {
                       const key = `q${item.question_number}`;
-                      const userVal = String(answers[key] ?? '');
-                      const correctVal = String(correctAnswers?.[key] ?? '');
+                      const userVal = String(answers[key] ?? '').trim().toUpperCase();
+                      const correctVal = String(correctAnswers?.[key] ?? '').trim().toUpperCase();
                       return (
                         <ChoiceButton
                           key={opt.id}
@@ -951,8 +951,8 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                     <div className="flex items-center gap-2">
                       {['A', 'B', 'C', 'D'].map((m) => {
                         const key = `q${item.question_number}`;
-                        const userVal = String(answers[key] ?? '');
-                        const correctVal = String(correctAnswers?.[key] ?? '');
+                        const userVal = String(answers[key] ?? '').trim().toUpperCase();
+                        const correctVal = String(correctAnswers?.[key] ?? '').trim().toUpperCase();
                         const picked = userVal === m;
                         const correct = isReview && correctVal === m;
                         const wrong = isReview && picked && correctVal !== m;

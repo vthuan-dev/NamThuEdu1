@@ -1316,7 +1316,9 @@ class ThptExamController extends Controller
                         $secCorrect++;
                     }
                 } else {
-                    $isCorrect = ($expected !== null && $expected !== '' && ($userAnswers[$key] ?? null) === $expected);
+                    $userVal = strtoupper(trim((string) ($userAnswers[$key] ?? '')));
+                    $expectedVal = strtoupper(trim((string) $expected));
+                    $isCorrect = ($expectedVal !== '' && $userVal === $expectedVal);
                     $correctQuestions[$key] = $isCorrect;
                     if ($isCorrect) {
                         $secRaw += $pts;
@@ -1556,7 +1558,7 @@ class ThptExamController extends Controller
                     foreach ($s['items'] ?? [] as $it) {
                         $qn = $it['question_number'] ?? '?';
                         $sa = $answers["q{$qn}"] ?? null;
-                        $orig = $sa !== null && (string) $sa === (string) ($it['correct_id'] ?? '');
+                        $orig = $sa !== null && strtoupper(trim((string) $sa)) === strtoupper(trim((string) ($it['correct_id'] ?? '')));
                         $award($evalSingle($qn, $orig, true, $sa));
                     }
                     break;
@@ -1570,7 +1572,7 @@ class ThptExamController extends Controller
                             $orig = $sa !== null && $sa !== '' && $this->matchOpenCloze((string) $sa, $accepted, (bool) ($it['case_sensitive'] ?? false));
                             $award($evalSingle($qn, $orig, false, $sa));
                         } else {
-                            $orig = $sa !== null && (string) $sa === (string) ($it['correct_id'] ?? '');
+                            $orig = $sa !== null && strtoupper(trim((string) $sa)) === strtoupper(trim((string) ($it['correct_id'] ?? '')));
                             $award($evalSingle($qn, $orig, true, $sa));
                         }
                     }
@@ -1625,7 +1627,7 @@ class ThptExamController extends Controller
                             $award($evalSingle($qn, $orig, true, $sa));
                         } elseif ($kind === 'sentence_insertion') {
                             $sa = $answers["q{$qn}"] ?? null;
-                            $orig = $sa !== null && (string) $sa === (string) ($it['correct_marker'] ?? '');
+                            $orig = $sa !== null && strtoupper(trim((string) $sa)) === strtoupper(trim((string) ($it['correct_marker'] ?? '')));
                             $award($evalSingle($qn, $orig, true, $sa));
                         }
                     }
@@ -1636,7 +1638,7 @@ class ThptExamController extends Controller
                         $qn = $it['question_number'] ?? '?';
                         foreach (($it['answers'] ?? []) as $i => $expectedLetter) {
                             $ansKey = "q{$qn}.{$i}";
-                            $orig = ($answers[$ansKey] ?? null) === $expectedLetter;
+                            $orig = ($answers[$ansKey] ?? null) !== null && strtoupper(trim((string) $answers[$ansKey])) === strtoupper(trim((string) $expectedLetter));
                             $award($evalSub("{$sid}-{$qn}-r{$i}", $orig));
                         }
                     }
@@ -1646,7 +1648,7 @@ class ThptExamController extends Controller
                     foreach ($s['blanks'] ?? [] as $b) {
                         $qn = $b['question_number'] ?? '?';
                         $sa = $answers["q{$qn}"] ?? null;
-                        $orig = $sa !== null && (string) $sa === (string) ($b['correct_id'] ?? '');
+                        $orig = $sa !== null && strtoupper(trim((string) $sa)) === strtoupper(trim((string) ($b['correct_id'] ?? '')));
                         $award($evalSingle($qn, $orig, true, $sa));
                     }
                     break;
