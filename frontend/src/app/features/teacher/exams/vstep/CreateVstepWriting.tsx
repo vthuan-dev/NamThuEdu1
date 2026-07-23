@@ -352,9 +352,10 @@ export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest 
 
             {!isFullTest &&
               VSTEP_WRITING_TASKS.filter((task) => !activeTasks.has(task.task)).map((task) => (
-                <div key={`add-${task.task}`} className="group relative flex items-center">
+                <div key={`add-${task.task}`} className="relative flex items-center">
                   <button
                     onClick={() => addTask(task.task as 1 | 2)}
+                    title={`Thêm Task ${task.task} cho đề Writing này (tùy chọn). Nếu không thêm thì đề chỉ có 1 task.`}
                     className="flex items-center gap-2 my-2 px-4 py-2 border border-dashed border-gray-300 rounded-lg text-gray-500 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 transition-colors whitespace-nowrap"
                   >
                     <Plus className="w-4 h-4" />
@@ -365,22 +366,6 @@ export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest 
                       </div>
                     </div>
                   </button>
-                  {/* Tooltip hướng dẫn chi tiết khi hover */}
-                  <div className="pointer-events-none absolute top-full left-0 z-50 mt-1 w-72 origin-top-left scale-95 opacity-0 transition-all duration-150 group-hover:scale-100 group-hover:opacity-100">
-                    <div className="rounded-xl bg-gray-900 px-4 py-3 text-left shadow-xl ring-1 ring-black/5">
-                      <div className="flex items-center gap-1.5 text-sm font-semibold text-white">
-                        <Plus className="h-3.5 w-3.5 text-blue-400" />
-                        Thêm Task {task.task} (tùy chọn)
-                      </div>
-                      <p className="mt-1.5 text-xs leading-relaxed text-gray-300">
-                        Chỉ tạo phần bạn đang dạy. Nếu chỉ dạy Task {task.task === 2 ? '1' : '2'}, bạn không bắt buộc phải tạo Task {task.task}. Nhấn để thêm khi cần — học viên sẽ chỉ thấy các task bạn đã tạo.
-                      </p>
-                      <div className="mt-2 flex items-center gap-3 border-t border-white/10 pt-2 text-[11px] text-gray-400">
-                        <span>✍️ {task.wordCount[0]}+ {t('vstep.writing.taskTab.words')}</span>
-                        <span>⏱ {task.timeLimit} {t('vstep.writing.taskTab.minutes')}</span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               ))}
           </div>
