@@ -854,7 +854,36 @@ class ThptExamController extends Controller
             }
         }
 
-        // Bài đã graded nhưng chưa cache result trong payload → chấm lại để hiển thị.
+        // Luôn chấm lại khách quan bằng gradeSubmission để đảm bảo dữ liệu hiển thị chính xác nhất (bao gồm cập nhật viết hoa/thường, sửa lỗi cũ).
+        if ($submission->sStatus === 'graded' || $submission->sStatus === 'partially_graded') {
+            $newGraded = $this->gradeSubmission($reviewConfig, $answers);
+            if (is_array($result)) {
+                $result['raw_score'] = $newGraded['raw_score'];
+                $result['raw_score_max'] = $newGraded['raw_score_max'];
+                $result['scale_max'] = $newGraded['scale_max'];
+                $result['correct_answers'] = $newGraded['correct_answers'];
+                $result['correct_questions'] = $newGraded['correct_questions'];
+                $result['sections'] = $newGraded['sections'];
+
+                $hasSubjective = collect($reviewConfig['sections'] ?? [])
+                    ->contains(fn($sec) => in_array($sec['type'] ?? '', ['speaking', 'writing']));
+
+                if (!$hasSubjective) {
+                    $result['scaled_score'] = $newGraded['scaled_score'];
+                    $submission->sScore = $newGraded['scaled_score'];
+                } else {
+                    $result['scaled_score_objective'] = $newGraded['scaled_score'];
+                }
+            } else {
+                $result = $newGraded;
+                $submission->sScore = $newGraded['scaled_score'];
+            }
+
+            $payload['result'] = $result;
+            $submission->submission_payload = $payload;
+            $submission->save();
+        }
+
         if ($result === null) {
             $result = $this->gradeSubmission($reviewConfig, $answers);
         }
