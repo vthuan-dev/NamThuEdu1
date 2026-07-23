@@ -26,6 +26,7 @@ import {
 } from './sections';
 import { SectionEditor } from './editors/SectionEditor';
 import { AddSectionModal } from './AddSectionModal';
+import { AssignModal } from '../../assignments/AssignModal';
 
 type AgeGroup = 'kids' | 'teens' | 'adults' | 'all';
 type Level = 'THCS' | 'THPT' | 'DGNL' | 'OTHER';
@@ -65,6 +66,18 @@ export function CreateThptExam() {
   const [examStatus, setExamStatus] = useState<'draft' | 'published'>('draft');
   /** Đề đã xuất bản nhưng đang có thay đổi chưa áp dụng cho học viên */
   const [hasDraft, setHasDraft] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const assignExams = useMemo(() => {
+    if (!examId) return [];
+    return [
+      {
+        eId: Number(examId),
+        eTitle: examTitle,
+        eType: 'thpt',
+        ageGroup: ageGroup,
+      },
+    ];
+  }, [examId, examTitle, ageGroup]);
 
   /**
    * Snapshot dữ liệu lúc tải từ server (baseline) để so sánh phát hiện thay đổi.
@@ -505,6 +518,27 @@ export function CreateThptExam() {
               </button>
             );
           })()}
+
+          {/* Giao đề cho học viên (chỉ hiện khi đã xuất bản) */}
+          {examStatus === 'published' && (() => {
+            const canAssign = total > 0 && !isDirty && !hasUnsaved && !hasDraft;
+            return (
+              <button
+                type="button"
+                onClick={() => setShowAssignModal(true)}
+                disabled={!canAssign}
+                title={
+                  !canAssign
+                    ? 'Chỉ có thể giao đề khi số câu hỏi > 0 và đề đã được cập nhật/xuất bản mới nhất cho học viên.'
+                    : 'Giao đề cho học viên'
+                }
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-sm bg-indigo-600 hover:bg-indigo-700"
+              >
+                <Icons.UserPlus className="w-4 h-4" />
+                <span>Giao cho học viên</span>
+              </button>
+            );
+          })()}
         </div>
       </header>
 
@@ -728,6 +762,12 @@ export function CreateThptExam() {
       </div>
 
       <AddSectionModal open={showAddModal} onClose={() => setShowAddModal(false)} onPick={addSection} />
+      <AssignModal
+        open={showAssignModal}
+        exams={assignExams}
+        onClose={() => setShowAssignModal(false)}
+        onAssigned={() => setShowAssignModal(false)}
+      />
     </div>
   );
 }
