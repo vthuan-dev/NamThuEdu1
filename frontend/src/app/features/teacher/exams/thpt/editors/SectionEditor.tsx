@@ -1,6 +1,6 @@
 import type { ThptSection } from '../../../../../../types/thpt';
 import { useState, type ClipboardEvent, type DragEvent } from 'react';
-import { Upload, Loader2, Volume2, Trash2 } from 'lucide-react';
+import { Upload, Loader2, Volume2, Trash2, AlertTriangle } from 'lucide-react';
 import { api } from '../../../../../../services/api';
 import {
   makeMcItem,
@@ -1393,6 +1393,14 @@ function WordFormEditor({ section, all, onChange }: { section: Extract<ThptSecti
               placeholder="Câu có chỗ trống ____ (vd: She is very ____. )"
               className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
             />
+            {/\([^)]+\)/.test(item.sentence) && (
+              <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-900">
+                <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5 text-amber-600" />
+                <span>
+                  Cảnh báo: Bạn đã nhập từ trong ngoặc (ví dụ: <strong className="font-bold">({item.sentence.match(/\(([^)]+)\)/)?.[1] || 'MUSIC'})</strong> trong nội dung câu hỏi. Hãy xóa từ này khỏi câu hỏi để tránh hiển thị trùng lặp, vì hệ thống sẽ tự động hiển thị từ gốc ở cuối câu từ ô "Từ gốc" ở dưới.
+                </span>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <input
                 type="text"
