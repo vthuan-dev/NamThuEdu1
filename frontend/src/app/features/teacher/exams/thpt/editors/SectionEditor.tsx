@@ -666,33 +666,63 @@ function PhoneticsEditor({ section, all, onChange }: { section: Extract<ThptSect
 // ════════════════════════════════════════════════════════════════════════════
 function McQuestionsEditor({ section, all, onChange }: { section: Extract<ThptSection, { type: 'mc_questions' }>; all: ThptSection[]; onChange: (s: ThptSection) => void }) {
   const update = (items: typeof section.items) => onChange({ ...section, items });
+  // Mỗi dạng có tiêu đề + hướng dẫn riêng. Trước đây bấm chọn dạng CHỈ đổi
+  // `variant` (nút đổi màu) mà tiêu đề/hướng dẫn/sidebar không đổi gì, nên
+  // giáo viên "không thấy sự thay đổi".
   const VARIANTS = [
-    { v: 'grammar', l: 'Ngữ pháp' },
-    { v: 'vocabulary', l: 'Từ vựng' },
-    { v: 'synonym', l: 'Đồng nghĩa' },
-    { v: 'antonym', l: 'Trái nghĩa' },
-    { v: 'communication', l: 'Giao tiếp' },
-    { v: 'general', l: 'Tổng hợp' },
+    { v: 'grammar', l: 'Ngữ pháp', title: 'Trắc nghiệm ngữ pháp', hint: 'Chọn phương án đúng (A, B, C hoặc D) để hoàn thành câu.' },
+    { v: 'vocabulary', l: 'Từ vựng', title: 'Trắc nghiệm từ vựng', hint: 'Chọn từ/cụm từ đúng nhất (A, B, C hoặc D) để hoàn thành câu.' },
+    { v: 'synonym', l: 'Đồng nghĩa', title: 'Từ đồng nghĩa', hint: 'Chọn từ/cụm từ CÙNG NGHĨA với phần được gạch chân.' },
+    { v: 'antonym', l: 'Trái nghĩa', title: 'Từ trái nghĩa', hint: 'Chọn từ/cụm từ TRÁI NGHĨA với phần được gạch chân.' },
+    { v: 'communication', l: 'Giao tiếp', title: 'Tình huống giao tiếp', hint: 'Chọn câu đáp lại phù hợp nhất trong mỗi tình huống giao tiếp.' },
+    { v: 'general', l: 'Tổng hợp', title: 'Trắc nghiệm tổng hợp', hint: 'Chọn phương án đúng (A, B, C hoặc D).' },
   ] as const;
+
+  const currentVariant = VARIANTS.find((x) => x.v === section.variant) ?? VARIANTS[0];
+
+  /** Đổi dạng: cập nhật luôn tiêu đề + hướng dẫn nếu giáo viên chưa tự sửa. */
+  const pickVariant = (v: (typeof VARIANTS)[number]) => {
+    const isAutoTitle =
+      !section.title?.trim() ||
+      section.title === 'Trắc nghiệm' ||
+      VARIANTS.some((x) => x.title === section.title);
+    const isAutoHint =
+      !section.instructions?.trim() ||
+      section.instructions === 'Chọn phương án đúng (A, B, C hoặc D).' ||
+      VARIANTS.some((x) => x.hint === section.instructions);
+
+    onChange({
+      ...section,
+      variant: v.v,
+      title: isAutoTitle ? v.title : section.title,
+      instructions: isAutoHint ? v.hint : section.instructions,
+    });
+  };
 
   return (
     <div className="space-y-4">
       <InlineGuide type="mc_questions" />
-      <div className="rounded-xl bg-white border border-slate-200 p-3 flex flex-wrap items-center gap-2">
-        <span className="text-xs font-bold text-slate-500">Dạng:</span>
-        {VARIANTS.map(({ v, l }) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => onChange({ ...section, variant: v })}
-            className={`px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
-              section.variant === v ? 'text-white' : 'bg-slate-100 text-slate-500'
-            }`}
-            style={section.variant === v ? { backgroundColor: THPT_THEME.primary } : {}}
-          >
-            {l}
-          </button>
-        ))}
+      <div className="rounded-xl bg-white border border-slate-200 p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold text-slate-500">Dạng:</span>
+          {VARIANTS.map((item) => (
+            <button
+              key={item.v}
+              type="button"
+              onClick={() => pickVariant(item)}
+              className={`px-3 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                section.variant === item.v ? 'text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+              style={section.variant === item.v ? { backgroundColor: THPT_THEME.primary } : {}}
+            >
+              {item.l}
+            </button>
+          ))}
+        </div>
+        {/* Phản hồi rõ ràng cho lựa chọn hiện tại */}
+        <p className="mt-2 text-[11px] text-slate-500 leading-relaxed">
+          Đang soạn: <b className="text-slate-700">{currentVariant.title}</b> — {currentVariant.hint}
+        </p>
       </div>
 
       {section.items.map((item, idx) => (
@@ -2012,14 +2042,81 @@ function ReadingMixedEditor({ section, all, onChange }: { section: Extract<ThptS
 // ════════════════════════════════════════════════════════════════════════════
 function MatchingEditor({ section, all, onChange }: { section: Extract<ThptSection, { type: 'matching' }>; all: ThptSection[]; onChange: (s: ThptSection) => void }) {
   const update = (items: typeof section.items) => onChange({ ...section, items });
+
+  /** Thêm 1 dòng vào cột trái (câu cần nối) — answers có thêm 1 khoá. */
+  const addLeftRow = (idx: number) => {
+    const items = [...section.items];
+    const item = items[idx];
+    const list_1 = [...item.list_1, ''];
+    const answers = { ...item.answers, [String(list_1.length)]: '' };
+    items[idx] = { ...item, list_1, answers };
+    update(items);
+  };
+
+  /** Xoá 1 dòng cột trái + dồn lại khoá đáp án cho liền mạch. */
+  const removeLeftRow = (idx: number, rowIdx: number) => {
+    const items = [...section.items];
+    const item = items[idx];
+    if (item.list_1.length <= 1) return;
+    const list_1 = item.list_1.filter((_, i) => i !== rowIdx);
+    const answers: Record<string, string> = {};
+    list_1.forEach((_, i) => {
+      // dồn: dòng sau kế thừa đáp án của dòng cũ tương ứng
+      const oldIndex = i >= rowIdx ? i + 1 : i;
+      answers[String(i + 1)] = item.answers[String(oldIndex + 1)] ?? '';
+    });
+    items[idx] = { ...item, list_1, answers };
+    update(items);
+  };
+
+  /** Thêm/xoá phương án cột phải (A, B, C...). Tối đa theo LETTERS. */
+  const addRightRow = (idx: number) => {
+    const items = [...section.items];
+    const item = items[idx];
+    if (item.list_2.length >= LETTERS.length) return;
+    items[idx] = { ...item, list_2: [...item.list_2, ''] };
+    update(items);
+  };
+
+  const removeRightRow = (idx: number, rowIdx: number) => {
+    const items = [...section.items];
+    const item = items[idx];
+    if (item.list_2.length <= 2) return;
+    const removedLetter = LETTERS[rowIdx];
+    const list_2 = item.list_2.filter((_, i) => i !== rowIdx);
+    // Đáp án đang trỏ tới phương án bị xoá → bỏ trống để giáo viên chọn lại.
+    const answers: Record<string, string> = {};
+    Object.entries(item.answers).forEach(([k, v]) => {
+      answers[k] = v === removedLetter ? '' : v;
+    });
+    items[idx] = { ...item, list_2, answers };
+    update(items);
+  };
+
   return (
     <div className="space-y-4">
       <InlineGuide type="matching" />
       {section.items.map((item, idx) => (
         <ItemCard key={idx} n={item.question_number} typeLabel="Nối câu" onRemove={() => update(section.items.filter((_, i) => i !== idx))}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Cột trái (1-4) + đáp án</p>
+          {/* Khung nổi bật cho vùng nhập nối câu — dễ phân biệt 2 cột */}
+          <div
+            className="grid grid-cols-1 lg:grid-cols-2 gap-4 rounded-xl border-2 p-3"
+            style={{ borderColor: '#BFDBFE', backgroundColor: '#F8FAFF' }}
+          >
+            <div className="space-y-2 rounded-lg bg-white border border-slate-200 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: THPT_THEME.primary }}>
+                  Cột trái — câu cần nối ({item.list_1.length})
+                </p>
+                <button
+                  type="button"
+                  onClick={() => addLeftRow(idx)}
+                  className="text-[11px] font-bold px-2 py-1 rounded-md text-white cursor-pointer"
+                  style={{ backgroundColor: THPT_THEME.primary }}
+                >
+                  + Thêm dòng
+                </button>
+              </div>
               {item.list_1.map((line, i) => {
                 const key = String(i + 1);
                 return (
@@ -2047,14 +2144,40 @@ function MatchingEditor({ section, all, onChange }: { section: Extract<ThptSecti
                       className="w-14 text-xs font-bold text-center border border-slate-200 rounded-md px-1 py-1 bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-200"
                     >
                       <option value="">—</option>
-                      {LETTERS.map((L) => (<option key={L} value={L}>{L}</option>))}
+                      {item.list_2.map((_, li) => (
+                        <option key={LETTERS[li]} value={LETTERS[li]}>{LETTERS[li]}</option>
+                      ))}
                     </select>
+                    {item.list_1.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeLeftRow(idx, i)}
+                        title="Xoá dòng này"
+                        className="text-slate-300 hover:text-red-600 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 );
               })}
             </div>
-            <div className="space-y-2">
-              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Cột phải (A-F)</p>
+            <div className="space-y-2 rounded-lg bg-white border border-slate-200 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: THPT_THEME.accent }}>
+                  Cột phải — phương án ({item.list_2.length})
+                </p>
+                <button
+                  type="button"
+                  onClick={() => addRightRow(idx)}
+                  disabled={item.list_2.length >= LETTERS.length}
+                  title={item.list_2.length >= LETTERS.length ? `Tối đa ${LETTERS.length} phương án` : undefined}
+                  className="text-[11px] font-bold px-2 py-1 rounded-md text-white cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: THPT_THEME.accent }}
+                >
+                  + Thêm phương án
+                </button>
+              </div>
               {item.list_2.map((line, i) => (
                 <div key={i} className="flex items-center gap-2 rounded-lg border border-slate-200 p-2 bg-slate-50/50">
                   <span className="text-xs font-bold w-5 text-center" style={{ color: THPT_THEME.primary }}>{LETTERS[i]}.</span>
@@ -2070,6 +2193,16 @@ function MatchingEditor({ section, all, onChange }: { section: Extract<ThptSecti
                     }}
                     className="flex-1 min-w-0 text-sm bg-transparent border-0 focus:outline-none focus:ring-2 focus:ring-blue-200 rounded-md px-2 py-1"
                   />
+                  {item.list_2.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={() => removeRightRow(idx, i)}
+                      title="Xoá phương án này"
+                      className="text-slate-300 hover:text-red-600 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

@@ -30,14 +30,20 @@ const PictureQuestionsEditor: React.FC<PictureQuestionsEditorProps> = ({
   examId,
 }) => {
   const [title, setTitle] = useState(initialData?.title || '');
-  const [questions, setQuestions] = useState<QuestionItem[]>(
-    (initialData?.config?.questions || []).map((q: any, idx: number) => ({
+  // BUG FIX: trước đây khởi tạo mảng RỖNG khi tạo mới → editor mở ra không có
+  // mục nào, tức không có ô tải ảnh nào ("phần Nói không nhập được ảnh").
+  // Luôn cho sẵn 1 mục để giáo viên nhập/tải ảnh được ngay.
+  const [questions, setQuestions] = useState<QuestionItem[]>(() => {
+    const saved = (initialData?.config?.questions || []).map((q: any, idx: number) => ({
       id: q?.id ?? `q-${idx + 1}`,
       imageUrl: q?.imageUrl ?? q?.image_url ?? initialData?.config?.imageUrl ?? initialData?.config?.image_url ?? '',
       question: q?.question ?? q?.text ?? '',
       sampleAnswer: q?.sampleAnswer ?? q?.sample_answer ?? q?.answer ?? '',
-    }))
-  );
+    }));
+    return saved.length > 0
+      ? saved
+      : [{ id: 'q-1', imageUrl: '', question: '', sampleAnswer: '' }];
+  });
 
   const addQuestion = () =>
     setQuestions([

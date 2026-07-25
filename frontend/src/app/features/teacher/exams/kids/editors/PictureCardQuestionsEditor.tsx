@@ -30,14 +30,19 @@ const PictureCardQuestionsEditor: React.FC<PictureCardQuestionsEditorProps> = ({
   examId,
 }) => {
   const [title, setTitle] = useState(initialData?.title || '');
-  const [cards, setCards] = useState<CardItem[]>(
-    (initialData?.config?.cards || []).map((c: any, idx: number) => ({
+  // Luôn có sẵn 1 thẻ khi tạo mới — trước đây mảng rỗng nên editor mở ra
+  // không có ô tải ảnh nào.
+  const [cards, setCards] = useState<CardItem[]>(() => {
+    const saved = (initialData?.config?.cards || []).map((c: any, idx: number) => ({
       id: c?.id ?? `card-${idx + 1}`,
       imageUrl: c?.imageUrl ?? c?.image_url ?? '',
       question: c?.question ?? c?.text ?? '',
       sampleAnswer: c?.sampleAnswer ?? c?.sample_answer ?? '',
-    }))
-  );
+    }));
+    return saved.length > 0
+      ? saved
+      : [{ id: 'card-1', imageUrl: '', question: '', sampleAnswer: '' }];
+  });
 
   const addCard = () =>
     setCards([

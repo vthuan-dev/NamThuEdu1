@@ -134,8 +134,90 @@ interface FormattedTextareaProps {
   className?: string;
 }
 
+/**
+ * Chuyển HTML trong clipboard (copy từ Word / Google Docs / web) sang inline
+ * markup mà trình soạn đề dùng: <b>, <i>, <u>.
+ *
+ * Vì sao cần: textarea chỉ nhận text/plain nên dán từ Word bị MẤT in đậm /
+ * in nghiêng / gạch chân. Word đặt định dạng bằng cả thẻ (<b>, <strong>) lẫn
+ * style inline (font-weight:700, text-decoration:underline) nên phải xét cả hai.
+ */
+export function htmlToInlineMarkup(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+
+  const isBold = (el: HTMLElement): boolean => {
+    const tag = el.tagName.toLowerCase();
+    if (tag === 'b' || tag === 'strong') return true;
+    const w = el.style?.fontWeight || '';
+    if (w === 'bold' || w === 'bolder') return true;
+    const num = parseInt(w, 10);
+    return Number.isFinite(num) && num >= 600;
+  };
+  const isItalic = (el: HTMLElement): boolean => {
+    const tag = el.tagName.toLowerCase();
+    if (tag === 'i' || tag === 'em') return true;
+    return (el.style?.fontStyle || '') === 'italic';
+  };
+  const isUnderline = (el: HTMLElement): boolean => {
+    const tag = el.tagName.toLowerCase();
+    if (tag === 'u' || tag === 'ins') return true;
+    return (el.style?.textDecoration || el.style?.textDecorationLine || '').includes('underline');
+  };
+
+  const walk = (node: Node): string => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      // Word chèn nhiều khoảng trắng/newline trang trí — gom lại cho gọn.
+      return (node.textContent || '').replace(/\s+/g, ' ');
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return '';
+
+    const el = node as HTMLElement;
+    const tag = el.tagName.toLowerCase();
+    if (tag === 'style' || tag === 'script') return '';
+
+    let inner = Array.from(el.childNodes).map(walk).join('');
+    if (!inner.trim()) return inner.includes(' ') ? ' ' : '';
+
+    if (isBold(el)) inner = `<b>${inner}</b>`;
+    if (isItalic(el)) inner = `<i>${inner}</i>`;
+    if (isUnderline(el)) inner = `<u>${inner}</u>`;
+
+    // Xuống dòng cho block-level
+    if (['p', 'div', 'br', 'li', 'tr'].includes(tag)) inner += '\n';
+    return inner;
+  };
+
+  return Array.from(doc.body.childNodes)
+    .map(walk)
+    .join('')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 export function FormattedTextarea({ value, onChange, placeholder, rows = 2, className = '' }: FormattedTextareaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  /** Dán từ Word/Docs: giữ in đậm / nghiêng / gạch chân thay vì mất trắng. */
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const html = e.clipboardData?.getData('text/html');
+    if (!html) return; // nguồn thuần text → để trình duyệt xử lý mặc định
+
+    const markup = htmlToInlineMarkup(html);
+    if (!markup) return;
+
+    e.preventDefault();
+    const el = e.currentTarget;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const next = value.substring(0, start) + markup + value.substring(end);
+    onChange(next);
+
+    const caret = start + markup.length;
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(caret, caret);
+    }, 0);
+  };
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -201,6 +283,7 @@ export function FormattedTextarea({ value, onChange, placeholder, rows = 2, clas
         ref={textareaRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onPaste={handlePaste}
         rows={rows}
         placeholder={placeholder}
         className={`w-full text-sm border border-slate-200 rounded-lg pl-3 pr-20 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200 font-sans leading-relaxed resize-none overflow-hidden ${className}`}

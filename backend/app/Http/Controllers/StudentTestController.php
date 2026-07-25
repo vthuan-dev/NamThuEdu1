@@ -127,6 +127,10 @@ class StudentTestController extends Controller
         ])
             ->whereHas('exam', function ($q) use ($ageGroup) {
                 $this->applyAgeGroupExamFilter($q, $ageGroup);
+                // Chỉ hiện đề ĐÃ xuất bản. Đề bị hạ về draft (hoặc đã giao từ
+                // trước khi có ràng buộc publish) sẽ không mở được ở trang làm
+                // bài, hiện ra chỉ gây lỗi "không tìm thấy đề".
+                $q->where('eStatus', 'published');
             })
             ->where(function ($query) use ($user, $classIds) {
                 // Individual assignments
@@ -2214,6 +2218,8 @@ class StudentTestController extends Controller
         })
             ->whereHas('exam', function ($q) use ($ageGroup) {
                 $this->applyAgeGroupExamFilter($q, $ageGroup);
+                // Đồng bộ với /student/tests: chỉ đề đã xuất bản mới làm được.
+                $q->where('eStatus', 'published');
             })
             ->whereNotNull('taDeadline')
             ->where('taDeadline', '>=', now())

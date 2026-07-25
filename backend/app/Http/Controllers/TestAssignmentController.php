@@ -104,6 +104,17 @@ class TestAssignmentController extends Controller
             ], 404);
         }
 
+        // BUG FIX "học viên bấm vào làm đề nhưng không tìm thấy đề": trước đây
+        // giao được cả đề CHƯA xuất bản. Đề đó vẫn hiện trong danh sách bài của
+        // học viên, nhưng loader phía làm bài chỉ nhận đề published → báo không
+        // tìm thấy. Chặn ngay từ lúc giao.
+        if ($exam->eStatus !== 'published') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Đề "' . $exam->eTitle . '" chưa được xuất bản. Vui lòng xuất bản đề trước khi giao cho học viên.'
+            ], 422);
+        }
+
         $validator = Validator::make($request->all(), [
             'taTarget_type' => 'required|in:class,student',
             'taTarget_id' => 'required|integer',
@@ -639,6 +650,15 @@ class TestAssignmentController extends Controller
                     'status' => 'error',
                     'message' => 'Không tìm thấy bài thi.'
                 ], 404);
+            }
+
+            // Xem ghi chú ở assign(): không cho giao đề chưa xuất bản vì học
+            // viên sẽ không mở được đề ("không tìm thấy đề").
+            if ($exam->eStatus !== 'published') {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Đề "' . $exam->eTitle . '" chưa được xuất bản. Vui lòng xuất bản đề trước khi giao cho học viên.'
+                ], 422);
             }
 
             // Ưu tiên age_group từ exam, fallback request body (legacy).

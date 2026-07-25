@@ -18,11 +18,14 @@ const FindDifferencesEditor: React.FC<FindDifferencesEditorProps> = ({
   examId,
   questionId,
 }) => {
+  // Dữ liệu đã lưu có thể nằm ở `config` (chuẩn hiện tại) hoặc `question_data`
+  // (shape cũ của riêng editor này) — đọc cả hai để mở lại không mất ảnh.
+  const saved = initialData?.config ?? initialData?.question_data ?? {};
   const [title, setTitle] = useState(initialData?.title || '');
-  const [imageAUrl, setImageAUrl] = useState(initialData?.question_data?.image_a_url || '');
-  const [imageBUrl, setImageBUrl] = useState(initialData?.question_data?.image_b_url || '');
+  const [imageAUrl, setImageAUrl] = useState(saved.image_a_url || '');
+  const [imageBUrl, setImageBUrl] = useState(saved.image_b_url || '');
   const [differences, setDifferences] = useState<string[]>(
-    initialData?.question_data?.differences || ['']
+    Array.isArray(saved.differences) && saved.differences.length > 0 ? saved.differences : ['']
   );
   const [error, setError] = useState('');
 
@@ -45,16 +48,19 @@ const FindDifferencesEditor: React.FC<FindDifferencesEditorProps> = ({
     if (valid.length === 0) return setError('Vui lòng thêm ít nhất 1 điểm khác biệt');
 
     setError('');
+    const payload = {
+      image_a_url: imageAUrl,
+      image_b_url: imageBUrl,
+      differences: valid,
+    };
     onSave({
       id: questionId,
       type: 'find_differences',
       title,
       points: 10,
-      question_data: {
-        image_a_url: imageAUrl,
-        image_b_url: imageBUrl,
-        differences: valid,
-      },
+      // `config` là shape chuẩn mà Step2AddQuestions gửi lên API.
+      config: payload,
+      question_data: payload, // giữ tương thích ngược
     });
   };
 

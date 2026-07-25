@@ -92,7 +92,12 @@ export const CAMBRIDGE_PARTS_STRUCTURE: Record<string, CambridgeLevelStructure> 
         { partNumber: 3, name: 'Part 3', description: 'Hoàn thành hội thoại', taskType: 'dialogue_matching' },
         { partNumber: 4, name: 'Part 4', description: 'Điền chỗ trống trong truyện', taskType: 'story_completion' },
         { partNumber: 5, name: 'Part 5', description: 'Trả lời theo truyện tranh', taskType: 'look_read_write' },
-        { partNumber: 6, name: 'Part 6', description: 'Điền từ từ ngân hàng', taskType: 'word_bank_fill' },
+        // BUG FIX "Part 6 sai format": A1 Movers R&W có 6 part / 35 câu
+        // (6+6+6+6+7+4 — nguồn cambridgeenglish.org). Part 6 là "Look at the
+        // picture and read the questions. Write one-word answers" (4 câu, nhìn
+        // tranh → viết đáp án ngắn), KHÔNG phải điền từ từ ngân hàng —
+        // word_bank_fill thuộc Part 4 (truyện + hộp từ).
+        { partNumber: 6, name: 'Part 6', description: 'Nhìn tranh & viết đáp án 1 từ', taskType: 'look_read_write' },
       ],
     },
     speaking: {

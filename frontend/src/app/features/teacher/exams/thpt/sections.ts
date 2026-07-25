@@ -215,6 +215,72 @@ export function totalQuestions(config: ThptConfig): number {
   return config.sections.reduce((sum, s) => sum + countQuestions(s), 0);
 }
 
+/**
+ * Số câu mà MỘT item chiếm trong dải số thứ tự.
+ * - tf_group / reading_mixed(tf_group): mỗi statement là 1 câu.
+ * - matching: mỗi dòng cần nối là 1 câu.
+ * - còn lại: 1 câu.
+ */
+function itemSpan(sectionType: SectionType, item: any): number {
+  if (sectionType === 'tf_group') return Math.max(1, (item.statements ?? []).length);
+  if (sectionType === 'matching') return Math.max(1, Object.keys(item.answers ?? {}).length);
+  if (sectionType === 'reading_mixed' && item?.kind === 'tf_group') {
+    return Math.max(1, (item.statements ?? []).length);
+  }
+  return 1;
+}
+
+/**
+ * Gán lại số thứ tự câu LIÊN TỤC cho toàn bộ đề (bắt đầu từ 1) theo đúng thứ
+ * tự phần → item.
+ *
+ * Vì sao cần: trước đây số câu chỉ được gán MỘT LẦN lúc tạo item (max + 1).
+ * Hệ quả giáo viên gặp phải:
+ *  - Xoá bớt câu → các câu còn lại giữ số cũ, dải số bị khuyết.
+ *  - Thêm/bớt chỗ trống ở phần điền từ (tự sinh chỗ trống) → các phần SAU
+ *    không được cập nhật lại số.
+ *  - tf_group/matching chiếm nhiều câu nhưng chỉ tăng số 1 đơn vị → lệch so
+ *    với tổng số câu hiển thị.
+ * Hàm này chạy sau mọi thay đổi cấu trúc để số thứ tự luôn khớp thực tế.
+ *
+ * Trả về mảng MỚI nếu có thay đổi, hoặc chính mảng cũ nếu đã đúng (giữ
+ * referential equality để không tạo dirty-state giả).
+ */
+export function renumberSections(sections: ThptSection[]): ThptSection[] {
+  let next = 1;
+  let changed = false;
+
+  const out = sections.map((sec) => {
+    const listKey =
+      sec.type === 'mc_cloze' || sec.type === 'open_cloze' || sec.type === 'word_bank_cloze'
+        ? 'blanks'
+        : 'items';
+    const list: any[] = ((sec as any)[listKey] ?? []) as any[];
+
+    let listChanged = false;
+    const newList = list.map((entry) => {
+      const span = listKey === 'blanks' ? 1 : itemSpan(sec.type, entry);
+      const qn = next;
+      next += span;
+      if (entry?.question_number === qn) return entry;
+      listChanged = true;
+      return { ...entry, question_number: qn };
+    });
+
+    if (!listChanged) return sec;
+    changed = true;
+    return { ...(sec as any), [listKey]: newList } as ThptSection;
+  });
+
+  return changed ? out : sections;
+}
+
+/** Áp renumber cho cả config (giữ nguyên object nếu không đổi). */
+export function renumberConfig(config: ThptConfig): ThptConfig {
+  const sections = renumberSections(config.sections);
+  return sections === config.sections ? config : { ...config, sections };
+}
+
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 /**

@@ -20,10 +20,10 @@ const PictureStoryNarrationEditor: React.FC<PictureStoryNarrationEditorProps> = 
 }) => {
   const [title, setTitle] = useState(initialData?.title || '');
   const [images, setImages] = useState<string[]>(
-    initialData?.question_data?.images || ['', '', '']
+    (initialData?.config ?? initialData?.question_data)?.images || ['', '', '']
   );
   const [prompts, setPrompts] = useState<string[]>(
-    initialData?.question_data?.prompts || [
+    (initialData?.config ?? initialData?.question_data)?.prompts || [
       'What is happening in the first picture?',
       'What happened next?',
       'How did the story end?',
@@ -63,6 +63,12 @@ const PictureStoryNarrationEditor: React.FC<PictureStoryNarrationEditorProps> = 
       type: 'picture_story_narration',
       title,
       points: 10,
+      // `config` là shape Step2AddQuestions gửi lên API; `question_data` giữ
+      // tương thích với dữ liệu đã lưu trước đây.
+      config: {
+        images: validImages,
+        prompts: prompts.slice(0, validImages.length),
+      },
       question_data: {
         images: validImages,
         prompts: prompts.slice(0, validImages.length),

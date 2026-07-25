@@ -398,6 +398,23 @@ class ThptExamController extends Controller
      * GET /api/student/thpt-exams/{id}
      * Lấy đề cho học viên (đã xoá đáp án).
      */
+    /**
+     * Thời lượng làm bài (phút) — NGUỒN SỰ THẬT.
+     * Ưu tiên `thpt_config.total_duration_minutes` (giá trị giáo viên nhập trong
+     * trình soạn đề), sau đó mới đến cột `eDuration_minutes`. Hai nguồn có thể
+     * lệch với đề tạo trước khi có cơ chế đồng bộ, gây "thời gian làm bài không
+     * đúng thực tế".
+     */
+    private function resolveExamDuration(Exam $exam): int
+    {
+        $fromConfig = $exam->thpt_config['total_duration_minutes'] ?? null;
+        if (is_numeric($fromConfig) && (int) $fromConfig > 0) {
+            return (int) $fromConfig;
+        }
+        $fromColumn = (int) ($exam->eDuration_minutes ?? 0);
+        return $fromColumn > 0 ? $fromColumn : self::DEFAULT_DURATION_MINUTES;
+    }
+
     public function getForStudent(Request $request, $examId)
     {
         $user = $request->user();
@@ -405,13 +422,20 @@ class ThptExamController extends Controller
             return $this->error('Bạn không có quyền truy cập.', 401);
         }
 
-        $exam = Exam::where('eId', $examId)
-            ->where('eType', 'THPT')
-            ->where('eStatus', 'published')
-            ->first();
+        $exam = Exam::where('eId', $examId)->where('eType', 'THPT')->first();
 
         if (!$exam) {
             return $this->error('Không tìm thấy đề thi.', 404);
+        }
+
+        // Phân biệt rõ "không có đề" vs "đề chưa xuất bản". Trước đây cả hai đều
+        // trả "Không tìm thấy đề thi" nên giáo viên/học viên không hiểu vì sao
+        // bài đã được giao mà bấm vào lại báo không tìm thấy.
+        if ($exam->eStatus !== 'published') {
+            return $this->error(
+                'Đề thi này chưa được giáo viên xuất bản nên chưa thể làm. Vui lòng liên hệ giáo viên.',
+                409
+            );
         }
 
         $config = $this->stripAnswers($exam->thpt_config ?? $this->blankConfig());
@@ -422,7 +446,8 @@ class ThptExamController extends Controller
                 'eId' => $exam->eId,
                 'eTitle' => $exam->eTitle,
                 'eDescription' => $exam->eDescription,
-                'eDuration_minutes' => $exam->eDuration_minutes,
+                // Lấy từ config (nguồn GV nhập) để khớp với timer khi start.
+                'eDuration_minutes' => $this->resolveExamDuration($exam),
                 'thpt_config' => $config,
             ],
         ]);
@@ -439,13 +464,16 @@ class ThptExamController extends Controller
             return $this->error('Bạn không có quyền truy cập.', 401);
         }
 
-        $exam = Exam::where('eId', $examId)
-            ->where('eType', 'THPT')
-            ->where('eStatus', 'published')
-            ->first();
+        $exam = Exam::where('eId', $examId)->where('eType', 'THPT')->first();
 
         if (!$exam) {
             return $this->error('Không tìm thấy đề thi.', 404);
+        }
+        if ($exam->eStatus !== 'published') {
+            return $this->error(
+                'Đề thi này chưa được giáo viên xuất bản nên chưa thể làm. Vui lòng liên hệ giáo viên.',
+                409
+            );
         }
 
         // Resume nếu đã có submission đang dở
@@ -610,6 +638,12 @@ class ThptExamController extends Controller
             }
         }
 
+        // BUG FIX "thời gian hoàn thành đề không đúng thực tế": thời lượng
+        // trước đây chỉ đọc `eDuration_minutes`. Giá trị GV thực sự nhập nằm ở
+        // `thpt_config.total_duration_minutes`; hai nguồn có thể lệch nhau với
+        // đề tạo trước khi có cơ chế đồng bộ. Lấy config làm nguồn sự thật.
+        $durationMinNew = $this->resolveExamDuration($exam);
+
         $submission = Submission::create([
             'user_id' => $user->uId,
             'exam_id' => $examId,
@@ -628,14 +662,13 @@ class ThptExamController extends Controller
                     'version' => (int) ($exam->thpt_version ?? 1),
                     'snapshot_at' => now()->toIso8601String(),
                     'config' => $exam->thpt_config,
-                    'eDuration_minutes' => $exam->eDuration_minutes,
+                    'eDuration_minutes' => $durationMinNew,
                 ],
                 // Absolute deadline (ISO) — nguồn sự thật cho timer, không phụ thuộc TZ client
-                'timer_deadline_at' => now()->addMinutes((int) ($exam->eDuration_minutes ?? self::DEFAULT_DURATION_MINUTES))->toIso8601String(),
+                'timer_deadline_at' => now()->addMinutes($durationMinNew)->toIso8601String(),
             ],
         ]);
 
-        $durationMinNew = (int) ($exam->eDuration_minutes ?? self::DEFAULT_DURATION_MINUTES);
         return response()->json([
             'status' => 'success',
             'data' => [

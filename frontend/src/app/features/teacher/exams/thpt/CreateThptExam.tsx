@@ -23,6 +23,7 @@ import {
   countQuestions,
   totalQuestions,
   nextQuestionNumber,
+  renumberConfig,
 } from './sections';
 import { SectionEditor } from './editors/SectionEditor';
 import { AddSectionModal } from './AddSectionModal';
@@ -333,13 +334,15 @@ export function CreateThptExam() {
   };
 
   // ── Section ops ────────────────────────────────────────────────────────
+  // Mọi thao tác đổi cấu trúc đều đi qua renumberConfig để số thứ tự câu LUÔN
+  // liên tục từ 1 (thêm/xoá câu, thêm/bớt chỗ trống, đổi thứ tự phần...).
   const addSection = (
     type: SectionType,
     initItemKind?: 'mc' | 'fill_blank',
     initLayout?: 'image_block',
   ) => {
     const newSec = createSection(type, nextQuestionNumber(config.sections), initItemKind, initLayout);
-    setConfig((prev) => ({ ...prev, sections: [...prev.sections, newSec] }));
+    setConfig((prev) => renumberConfig({ ...prev, sections: [...prev.sections, newSec] }));
     setActiveIdx(config.sections.length);
     setHasUnsaved(true);
   };
@@ -348,14 +351,16 @@ export function CreateThptExam() {
     setConfig((prev) => {
       const sections = [...prev.sections];
       sections[idx] = next;
-      return { ...prev, sections };
+      return renumberConfig({ ...prev, sections });
     });
     setHasUnsaved(true);
   };
 
   const removeSection = (idx: number) => {
     if (!window.confirm('Xoá phần này khỏi đề?')) return;
-    setConfig((prev) => ({ ...prev, sections: prev.sections.filter((_, i) => i !== idx) }));
+    setConfig((prev) =>
+      renumberConfig({ ...prev, sections: prev.sections.filter((_, i) => i !== idx) }),
+    );
     setActiveIdx((cur) => Math.max(0, cur >= idx ? cur - 1 : cur));
     setHasUnsaved(true);
   };
@@ -366,7 +371,7 @@ export function CreateThptExam() {
     setConfig((prev) => {
       const sections = [...prev.sections];
       [sections[idx], sections[target]] = [sections[target], sections[idx]];
-      return { ...prev, sections };
+      return renumberConfig({ ...prev, sections });
     });
     setActiveIdx(target);
     setHasUnsaved(true);
@@ -489,7 +494,31 @@ export function CreateThptExam() {
             ))}
           </div>
 
-          {/* 1 nút duy nhất: Xuất bản (tự lưu thay đổi trước khi áp dụng cho học viên).
+          {/* Nút LƯU riêng — trước đây chỉ có nút Xuất bản nên giáo viên không có
+              cách nào lưu nháp giữa lúc soạn ("chưa hiển thị nút lưu"). */}
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await handleSaveDraft();
+                toast.success('Đã lưu.');
+              } catch {
+                /* handleSaveDraft đã hiện lỗi */
+              }
+            }}
+            disabled={isSaving || isPublishing || !examId || (!hasUnsaved && !isDirty)}
+            title={
+              !hasUnsaved && !isDirty
+                ? 'Không có thay đổi nào cần lưu'
+                : 'Lưu thay đổi (chưa áp dụng cho học viên)'
+            }
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold text-slate-700 bg-white ring-1 ring-slate-300 hover:bg-slate-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-sm"
+          >
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icons.Save className="w-4 h-4" />}
+            <span>Lưu</span>
+          </button>
+
+          {/* Xuất bản (tự lưu thay đổi trước khi áp dụng cho học viên).
               Đề đã xuất bản → chỉ bật khi có thay đổi so với CSDL (isDirty). */}
           {(() => {
             const isPublished = examStatus === 'published';

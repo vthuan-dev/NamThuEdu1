@@ -470,9 +470,19 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
         explanation: kidsExplanation,
       };
 
+      // BUG FIX: trước đây chỉ đọc `config`. Một số editor Speaking
+      // (find_differences, odd_one_out, picture_story_narration — tức Part 1/2/3
+      // phần Nói của Movers/Flyers) lại trả về `question_data`, nên task_data
+      // rỗng → bị chặn bởi cảnh báo "Vui lòng nhập đầy đủ thông tin câu hỏi!"
+      // và toàn bộ ảnh vừa nhập bị mất ("Full speaking không nhập được ảnh").
+      // Chấp nhận cả hai shape để không phụ thuộc từng editor.
+      const taskData = questionWithPart.config
+        ?? (questionWithPart as any).question_data
+        ?? {};
+
       const apiQuestionData = {
         task_type_code: questionWithPart.type,
-        task_data: questionWithPart.config || {},
+        task_data: taskData,
         qContent: questionWithPart.title || '',
         qPoints: questionWithPart.points || 5,
         part: selectedPart,

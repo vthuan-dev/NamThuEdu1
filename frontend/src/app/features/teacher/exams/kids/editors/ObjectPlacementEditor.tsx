@@ -34,15 +34,19 @@ const ObjectPlacementEditor: React.FC<ObjectPlacementEditorProps> = ({
   const [baseImageUrl, setBaseImageUrl] = useState(
     initialData?.config?.base_image_url || initialData?.config?.imageUrl || initialData?.config?.image_url || ''
   );
-  const [items, setItems] = useState<PlacementItem[]>(
-    (initialData?.config?.items || []).map((it: any, idx: number) => ({
+  // Luôn có sẵn 1 thẻ khi tạo mới để giáo viên tải được ảnh thẻ ngay.
+  const [items, setItems] = useState<PlacementItem[]>(() => {
+    const saved = (initialData?.config?.items || []).map((it: any, idx: number) => ({
       id: it?.id ?? `item-${idx + 1}`,
       name: it?.name ?? it?.label ?? it?.object ?? '',
       cardImageUrl: it?.cardImageUrl ?? it?.card_image_url ?? it?.image_url ?? it?.imageUrl ?? '',
       correctX: it?.correctX ?? it?.correct_position?.x ?? 50,
       correctY: it?.correctY ?? it?.correct_position?.y ?? 50,
-    }))
-  );
+    }));
+    return saved.length > 0
+      ? saved
+      : [{ id: 'item-1', name: '', cardImageUrl: '', correctX: 50, correctY: 50 }];
+  });
 
   const addItem = () => {
     setItems([

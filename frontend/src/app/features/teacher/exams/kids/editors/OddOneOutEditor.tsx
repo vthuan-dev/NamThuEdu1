@@ -26,7 +26,7 @@ const OddOneOutEditor: React.FC<OddOneOutEditorProps> = ({
 }) => {
   const [title, setTitle] = useState(initialData?.title || '');
   const [images, setImages] = useState<ImageItem[]>(
-    initialData?.question_data?.images || [
+    (initialData?.config ?? initialData?.question_data)?.images || [
       { id: 1, url: '', category: '' },
       { id: 2, url: '', category: '' },
       { id: 3, url: '', category: '' },
@@ -34,7 +34,7 @@ const OddOneOutEditor: React.FC<OddOneOutEditorProps> = ({
     ]
   );
   const [correctOddOne, setCorrectOddOne] = useState<number>(
-    initialData?.question_data?.correct_odd_one || 0
+    (initialData?.config ?? initialData?.question_data)?.correct_odd_one || 0
   );
   const [error, setError] = useState('');
 
@@ -63,6 +63,9 @@ const OddOneOutEditor: React.FC<OddOneOutEditorProps> = ({
       type: 'odd_one_out',
       title,
       points: 10,
+      // `config` là shape Step2AddQuestions gửi lên API; giữ `question_data`
+      // để tương thích dữ liệu cũ.
+      config: { images, correct_odd_one: correctOddOne },
       question_data: { images, correct_odd_one: correctOddOne },
     });
   };
