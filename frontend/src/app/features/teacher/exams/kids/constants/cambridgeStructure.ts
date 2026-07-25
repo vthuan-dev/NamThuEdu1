@@ -90,8 +90,15 @@ export const CAMBRIDGE_PARTS_STRUCTURE: Record<string, CambridgeLevelStructure> 
         { partNumber: 1, name: 'Part 1', description: 'Ghép từ với định nghĩa', taskType: 'word_definition_matching' },
         { partNumber: 2, name: 'Part 2', description: 'Yes/No về bức tranh', taskType: 'look_and_read' },
         { partNumber: 3, name: 'Part 3', description: 'Hoàn thành hội thoại', taskType: 'dialogue_matching' },
-        { partNumber: 4, name: 'Part 4', description: 'Điền chỗ trống trong truyện', taskType: 'story_completion' },
-        { partNumber: 5, name: 'Part 5', description: 'Trả lời theo truyện tranh', taskType: 'look_read_write' },
+        // BUG FIX (báo cáo lỗi MOVERS, cùng loại lỗi đã sửa cho Flyers ở 4576f7c):
+        // mapping cũ lệch một bậc — dạng của Part 5 (story_completion) bị đặt ở
+        // Part 4, còn Part 5 bị điền tạm bằng dạng của Part 6 (look_read_write)
+        // nên Part 5 ≡ Part 6; mô tả Part 5 còn bị copy từ Starters Part 5.
+        // Chọn 1 từ trong hộp từ có hình để điền vào chỗ trống của truyện (6 câu).
+        { partNumber: 4, name: 'Part 4', description: 'Điền từ từ hộp từ cho sẵn (có hình)', taskType: 'word_bank_fill' },
+        // Đọc truyện dài rồi hoàn thành câu tóm tắt bằng 1-5 từ (7 câu) —
+        // KHÔNG có truyện tranh ở part này.
+        { partNumber: 5, name: 'Part 5', description: 'Đọc truyện & hoàn thành câu', taskType: 'story_completion' },
         // BUG FIX "Part 6 sai format": A1 Movers R&W có 6 part / 35 câu
         // (6+6+6+6+7+4 — nguồn cambridgeenglish.org). Part 6 là "Look at the
         // picture and read the questions. Write one-word answers" (4 câu, nhìn

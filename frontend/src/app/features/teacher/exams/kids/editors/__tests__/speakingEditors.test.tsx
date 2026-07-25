@@ -120,9 +120,9 @@ describe('Cambridge blueprint — Movers Reading & Writing Part 6', () => {
     expect(taskType).toBe('look_read_write');
   });
 
-  it('Movers R&W vẫn đủ 6 part và Part 4 giữ dạng điền từ trong truyện', () => {
+  it('Movers R&W vẫn đủ 6 part và Part 4 là điền từ từ hộp từ cho sẵn', () => {
     const parts = getSkillParts('movers', 'reading_writing');
     expect(parts).toHaveLength(6);
-    expect(parts.find((p) => p.partNumber === 4)?.taskType).toBe('story_completion');
+    expect(parts.find((p) => p.partNumber === 4)?.taskType).toBe('word_bank_fill');
   });
 });
