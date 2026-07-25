@@ -133,10 +133,13 @@ export function CreatePost() {
   }, [postId]);
 
   const wordCount = content
-    .replace(/<[^>]*>/g, "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
     .split(/\s+/)
     .filter((word) => word.length > 0).length;
-  const charCount = content.replace(/<[^>]*>/g, "").length;
+  const charCount = content
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/gi, " ").length;
 
   const quillModules = {
     toolbar: [

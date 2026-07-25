@@ -106,7 +106,11 @@ export function PostDetail() {
   };
 
   const wordCount = blog
-    ? blog.pContent.replace(/<[^>]*>/g, "").split(/\s+/).filter((w) => w.length > 0).length
+    ? blog.pContent
+        .replace(/<[^>]*>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .split(/\s+/)
+        .filter((w) => w.length > 0).length
     : 0;
 
   if (loading) {
