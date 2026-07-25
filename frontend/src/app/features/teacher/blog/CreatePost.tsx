@@ -341,6 +341,20 @@ export function CreatePost() {
 
   return (
     <div className="min-h-screen bg-slate-50/80">
+      <style>{`
+        .quill-editor .ql-toolbar.ql-snow {
+          position: sticky;
+          top: 56px;
+          z-index: 20;
+          background: #F9FAFB !important;
+          border-top-left-radius: 11px;
+          border-top-right-radius: 11px;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+          border-top: none !important;
+          border-left: none !important;
+          border-right: none !important;
+        }
+      `}</style>
       {/* Preview Modal */}
       {showPreview && (
         <div
@@ -476,7 +490,7 @@ export function CreatePost() {
             </div>
 
             {/* Rich Text Editor */}
-            <div className="bg-white rounded-xl border border-slate-200/80 overflow-hidden">
+            <div className="bg-white rounded-xl border border-slate-200/80 overflow-visible">
               <ReactQuill
                 theme="snow"
                 value={content}
