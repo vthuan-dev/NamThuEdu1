@@ -1226,7 +1226,9 @@ class BlogController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Thích bài viết thành công.',
-            'likes' => $post->pLike
+            'data' => [
+                'likes' => $post->pLike
+            ]
         ]);
     }
 }

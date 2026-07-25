@@ -38,6 +38,7 @@ use App\Http\Controllers\ClassGoalController;
 use App\Http\Controllers\AdminHandoverController;
 use App\Http\Controllers\StudentExamScheduleController;
 use App\Http\Controllers\StudentExamSessionController;
+use App\Http\Controllers\AddressProxyController;
 
 /*
 |--------------------------------------------------------------------------

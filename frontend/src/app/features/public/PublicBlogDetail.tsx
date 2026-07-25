@@ -319,7 +319,7 @@ export function PublicBlogDetail() {
                 }`}
               >
                 <Heart className={`h-3.5 w-3.5 ${isLiked ? "fill-rose-500 text-rose-500" : ""}`} />
-                <span>{likeCount} {t('blog.public.detail.likes') || 'thích'}</span>
+                <span>{likeCount} {t('blog.public.detail.likes')}</span>
               </button>
               {post.category && (
                 <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-slate-500">
