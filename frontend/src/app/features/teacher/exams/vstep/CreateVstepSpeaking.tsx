@@ -635,18 +635,16 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
         return;
       }
 
-      const validSolutions = data.solutions.filter((s) => s.trim());
-      if (validSolutions.length < 3) {
-        error("Part 2: Please provide all 3 solutions");
-        return;
-      }
-
       isValid = true;
       partData = {
         partNumber: part.partNumber,
         partName: part.partName,
         timeLimit: part.timeLimit,
-        part2Data: data,
+        part2Data: {
+          ...data,
+          solutions: data.solutions?.length === 3 ? data.solutions : ["", "", ""],
+          question: data.question?.trim() || "Which option do you think is the best? Why?",
+        },
       };
     } else if (partNumber === 3) {
       const data = part.part3Data || createDefaultPart3Data();
@@ -1058,8 +1056,8 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
                           part2Data: {
                             ...(p.part2Data || createDefaultPart2Data()),
                             situation: val,
-                            solutions: ["", "", ""], // Size 3 to pass backend validation
-                            question: "", // String to pass backend validation
+                            solutions: p.part2Data?.solutions || ["", "", ""],
+                            question: p.part2Data?.question || "Which option do you think is the best? Why?",
                           },
                         }
                       : p

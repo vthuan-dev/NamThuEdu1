@@ -2968,6 +2968,14 @@ class ExamController extends Controller
 
             // Auto-create the exam if it doesn't exist yet (Writing editor generates its own string ID)
             if (!$exam) {
+                if (is_numeric($examId)) {
+                    DB::rollBack();
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Không tìm thấy đề thi.'
+                    ], 404);
+                }
+
                 $initialStatus = Exam::resolveModerationStatus();
                 $exam = Exam::create([
                     'exam_code'        => is_numeric($examId) ? null : $examId,

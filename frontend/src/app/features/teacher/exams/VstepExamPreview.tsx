@@ -1526,10 +1526,18 @@ function formatPartContent(part: SpeakingPart, partNumber: number): React.ReactN
       return <>{Header}<MissingPartContent partNumber={3} /></>;
     }
     const followUp = part.part3Data.followUpQuestions || [];
+    const mainTopic = part.part3Data.mainTopic;
     return (
       <>
         {Header}
         <div className="flex flex-col items-center gap-6 w-full max-w-3xl mx-auto my-6">
+          {/* Topic Banner */}
+          {mainTopic && (
+            <div className="w-full bg-purple-50 border-2 border-purple-200 rounded-2xl p-5 text-center shadow-sm">
+              <p className="text-xs font-bold text-purple-400 uppercase tracking-wider mb-2">Discuss the following topic</p>
+              <p className="text-base font-extrabold text-purple-900 leading-snug">{mainTopic}</p>
+            </div>
+          )}
           <SpeakingMindmap part={part} />
           {followUp.length > 0 && (
             <div className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-5 mt-2 shadow-sm text-left">
