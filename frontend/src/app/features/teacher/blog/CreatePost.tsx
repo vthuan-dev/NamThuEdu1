@@ -424,7 +424,7 @@ export function CreatePost() {
                   )}
                 </h1>
                 <div
-                  className="prose prose-slate max-w-none"
+                  className="prose prose-slate prose-base md:prose-lg max-w-3xl"
                   dangerouslySetInnerHTML={{
                     __html:
                       content ||

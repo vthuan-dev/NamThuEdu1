@@ -226,7 +226,7 @@ export function PublicBlogDetail() {
 
         <div className="grid gap-10 lg:grid-cols-[1fr_300px]">
           {/* ── Main content ── */}
-          <article>
+          <article className="max-w-3xl w-full overflow-hidden">
             {/* Type badge */}
             <span className={`mb-4 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${cfg.bg} ${cfg.color}`}>
               <Icon className="h-3 w-3" />
@@ -273,7 +273,7 @@ export function PublicBlogDetail() {
 
             {/* Content — render HTML safely */}
             <div
-              className="prose prose-slate prose-sm max-w-none prose-headings:font-bold prose-a:text-orange-600 prose-a:no-underline hover:prose-a:underline prose-img:rounded-lg"
+              className="prose prose-slate prose-base md:prose-lg max-w-3xl prose-headings:font-bold prose-a:text-orange-600 prose-a:no-underline hover:prose-a:underline prose-img:rounded-lg"
               dangerouslySetInnerHTML={{ __html: post.pContent ?? "" }}
             />
 

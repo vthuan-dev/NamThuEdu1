@@ -1095,3 +1095,57 @@
     animation: none !important;
   }
 }
+
+/* ==========================================================================
+   Blog Post Content & Editor Layout Improvements (Text Wrap & Overflow Fixes)
+   ========================================================================== */
+.prose,
+.quill-editor .ql-editor {
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+.prose p,
+.prose span,
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6,
+.prose li,
+.prose blockquote,
+.quill-editor .ql-editor p,
+.quill-editor .ql-editor span,
+.quill-editor .ql-editor h1,
+.quill-editor .ql-editor h2,
+.quill-editor .ql-editor h3,
+.quill-editor .ql-editor h4,
+.quill-editor .ql-editor h5,
+.quill-editor .ql-editor h6,
+.quill-editor .ql-editor li,
+.quill-editor .ql-editor blockquote {
+  white-space: normal !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+.prose img,
+.quill-editor .ql-editor img {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+.prose pre,
+.quill-editor .ql-editor pre {
+  white-space: pre-wrap !important;
+  word-break: break-all !important;
+  overflow-x: auto !important;
+}
+
+.prose table,
+.quill-editor .ql-editor table {
+  display: block !important;
+  width: 100% !important;
+  overflow-x: auto !important;
+}
