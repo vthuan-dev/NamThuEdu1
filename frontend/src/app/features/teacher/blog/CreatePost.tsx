@@ -224,7 +224,11 @@ export function CreatePost() {
           blogStatus: status,
         });
 
-        showSuccess(t("blog.create.successUpdate") || "Cập nhật bài viết thành công!");
+        if (status === "draft") {
+          showSuccess(t("blog.create.successDraft") || "Lưu bản nháp thành công!");
+        } else {
+          showSuccess(t("blog.create.successUpdate") || "Cập nhật bài viết thành công!");
+        }
 
         // Log activity (best-effort)
         import("../../../../services/teacherActivityLog").then(({ logTeacherActivity }) => {
@@ -247,8 +251,8 @@ export function CreatePost() {
 
         showSuccess(
           status === "draft"
-            ? t("blog.create.successDraft")
-            : t("blog.create.successSubmit")
+            ? (t("blog.create.successDraft") || "Lưu nháp thành công!")
+            : (t("blog.create.successSubmit") || "Gửi duyệt bài viết thành công!")
         );
 
         // Log activity (best-effort)
@@ -537,7 +541,9 @@ export function CreatePost() {
                   className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  {loading ? t("blog.create.btnSubmitting") : t("blog.create.btnSubmitReview")}
+                  {loading 
+                    ? (isEditing ? "Đang cập nhật..." : t("blog.create.btnSubmitting")) 
+                    : (isEditing ? "Cập nhật" : t("blog.create.btnSubmitReview"))}
                 </button>
               </div>
             </div>
