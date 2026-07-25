@@ -24,7 +24,7 @@ import {
 import { useBlog } from "../../../../hooks/useBlog";
 import { useToast } from "../../../../hooks/useToast";
 import { generateSlug } from "../../../../utils/slugUtils";
-import { blogTypeApi, BlogType } from "../../../../services/blogApi";
+import { blogTypeApi, BlogType, teacherBlogApi } from "../../../../services/blogApi";
 
 type PostTypeOption = {
   value: string;
@@ -55,7 +55,7 @@ export function CreatePost() {
   const { postId } = useParams();
   const { t } = useTranslation();
   const isEditing = Boolean(postId);
-  const { createBlog, loading } = useBlog();
+  const { createBlog, updateBlog, loading } = useBlog();
   const { success: showSuccess, error: showError } = useToast();
 
   const [title, setTitle] = useState("");
@@ -106,6 +106,31 @@ export function CreatePost() {
 
     fetchBlogTypes();
   }, []);
+
+  // Fetch post details if editing
+  useEffect(() => {
+    if (!postId) return;
+
+    const fetchPostDetail = async () => {
+      try {
+        const response = await teacherBlogApi.getBlogDetail(parseInt(postId));
+        if (response.data.status === 'success') {
+          const blog = response.data.data;
+          setTitle(blog.pTitle || "");
+          setContent(blog.pContent || "");
+          setPostType(blog.pType || "grammar");
+          setCategory(String(blog.pCategory || "1"));
+          setSlug(blog.pUrl || "");
+          setThumbnail(blog.pThumbnail || null);
+        }
+      } catch (error: any) {
+        console.error('Failed to fetch post detail:', error);
+        showError(t("blog.create.errorLoadPostDetail") || "Không thể tải chi tiết bài viết");
+      }
+    };
+
+    fetchPostDetail();
+  }, [postId]);
 
   const wordCount = content
     .replace(/<[^>]*>/g, "")
@@ -188,30 +213,53 @@ export function CreatePost() {
     if (!validateForm()) return;
 
     try {
-      await createBlog({
-        blogName: title,
-        blogContent: content,
-        blogType: postType as any, // Allow custom types
-        blogCategory: parseInt(category),
-        blogUrl: slug,
-        blogThumbnail: thumbnail || "",
-        blogStatus: status,
-      });
-
-      showSuccess(
-        status === "draft"
-          ? t("blog.create.successDraft")
-          : t("blog.create.successSubmit")
-      );
-
-      // Log activity (best-effort)
-      import("../../../../services/teacherActivityLog").then(({ logTeacherActivity }) => {
-        logTeacherActivity({
-          action: status === "draft" ? "blog.create" : "blog.publish",
-          entity_type: "blog",
-          detail: status === "draft" ? `Lưu nháp: ${title}` : `Đăng bài: ${title}`,
+      if (isEditing && postId) {
+        await updateBlog(parseInt(postId), {
+          blogName: title,
+          blogContent: content,
+          blogType: postType as any,
+          blogCategory: parseInt(category),
+          blogUrl: slug,
+          blogThumbnail: thumbnail || "",
+          blogStatus: status,
         });
-      });
+
+        showSuccess(t("blog.create.successUpdate") || "Cập nhật bài viết thành công!");
+
+        // Log activity (best-effort)
+        import("../../../../services/teacherActivityLog").then(({ logTeacherActivity }) => {
+          logTeacherActivity({
+            action: "blog.update",
+            entity_type: "blog",
+            detail: `Cập nhật bài viết: ${title}`,
+          });
+        });
+      } else {
+        await createBlog({
+          blogName: title,
+          blogContent: content,
+          blogType: postType as any,
+          blogCategory: parseInt(category),
+          blogUrl: slug,
+          blogThumbnail: thumbnail || "",
+          blogStatus: status,
+        });
+
+        showSuccess(
+          status === "draft"
+            ? t("blog.create.successDraft")
+            : t("blog.create.successSubmit")
+        );
+
+        // Log activity (best-effort)
+        import("../../../../services/teacherActivityLog").then(({ logTeacherActivity }) => {
+          logTeacherActivity({
+            action: status === "draft" ? "blog.create" : "blog.publish",
+            entity_type: "blog",
+            detail: status === "draft" ? `Lưu nháp: ${title}` : `Đăng bài: ${title}`,
+          });
+        });
+      }
 
       setTimeout(() => {
         navigate("/giao-vien/bai-viet");
