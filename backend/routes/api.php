@@ -102,6 +102,7 @@ Route::get('/public/courses', [CourseController::class, 'publicCourses']);
 // Public blog endpoints (no auth required)
 Route::get('/public/posts', [BlogController::class, 'publicIndex']);
 Route::get('/public/posts/{slug}', [BlogController::class, 'publicShow']);
+Route::post('/public/posts/{id}/like', [BlogController::class, 'publicLike']);
 
 // Public news feed (Google News proxy, cached 15 minutes)
 Route::get('/public/news', [\App\Http\Controllers\NewsController::class, 'index']);

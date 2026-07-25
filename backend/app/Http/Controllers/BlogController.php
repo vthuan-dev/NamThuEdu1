@@ -1202,4 +1202,31 @@ class BlogController extends Controller
             'data'   => $post,
         ]);
     }
+
+    /**
+     * POST /api/public/posts/{id}/like
+     * Thích bài viết (không cần auth)
+     */
+    public function publicLike($id)
+    {
+        $post = Post::where('pId', $id)
+            ->whereIn('pStatus', ['active', 'published'])
+            ->whereNull('pDeleted_at')
+            ->first();
+
+        if (!$post) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Không tìm thấy bài viết.',
+            ], 404);
+        }
+
+        $post->increment('pLike');
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Thích bài viết thành công.',
+            'likes' => $post->pLike
+        ]);
+    }
 }

@@ -127,4 +127,8 @@ export function invalidatePublicBlogCache(): void {
 export const publicBlogApi = {
   getPosts: (params?: PublicPostFilters) => cachedGet('/public/posts', params),
   getPost:  (slug: string)               => cachedGet(`/public/posts/${slug}`),
+  likePost: (id: number) => {
+    invalidatePublicBlogCache();
+    return api.post<ApiResponse<{ likes: number }>>(`/public/posts/${id}/like`);
+  },
 };

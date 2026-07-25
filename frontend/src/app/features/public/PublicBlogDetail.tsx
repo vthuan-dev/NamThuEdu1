@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { publicBlogApi, type Blog } from "../../../services/blogApi";
 import { Header, Footer } from "./components";
 import { BlogSEO } from "../../../components/shared/BlogSEO";
+import { useToastContext } from "../../../contexts/ToastContext";
 import {
   ArrowLeft,
   Calendar,
@@ -16,6 +17,7 @@ import {
   Newspaper,
   ArrowRight,
   ChevronRight,
+  Heart,
 } from "lucide-react";
 
 const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string; bg: string; dot: string }> = {
@@ -92,6 +94,63 @@ export function PublicBlogDetail() {
   const ctaRef = useRef<HTMLDivElement>(null);
   const [ctaInView, setCtaInView] = useState(true);
   const [flyPos, setFlyPos] = useState<{ sx: number; sy: number; ex: number; ey: number } | null>(null);
+
+  const { success: showSuccess, error: showError } = useToastContext();
+  const [likeCount, setLikeCount] = useState(0);
+  const [isLiked, setIsLiked] = useState(false);
+
+  useEffect(() => {
+    if (post) {
+      setLikeCount(post.pLike ?? 0);
+      const likedPosts = JSON.parse(localStorage.getItem("liked-posts") || "{}");
+      const lastLikedTime = likedPosts[post.pId];
+      if (lastLikedTime && Date.now() - lastLikedTime < 5 * 60 * 1000) {
+        setIsLiked(true);
+      } else {
+        setIsLiked(false);
+      }
+    }
+  }, [post]);
+
+  const handleLike = async () => {
+    if (!post || !post.pId) return;
+
+    const likedPosts = JSON.parse(localStorage.getItem("liked-posts") || "{}");
+    const lastLikedTime = likedPosts[post.pId];
+
+    if (lastLikedTime && Date.now() - lastLikedTime < 5 * 60 * 1000) {
+      const msLeft = 5 * 60 * 1000 - (Date.now() - lastLikedTime);
+      const minutesLeft = Math.ceil(msLeft / 60000);
+      const secondsLeft = Math.ceil((msLeft % 60000) / 1000);
+
+      let waitMsg = "";
+      if (minutesLeft > 1) {
+        waitMsg = `${minutesLeft} phút`;
+      } else {
+        waitMsg = `${secondsLeft} giây`;
+      }
+
+      showError(`Bạn đã thích bài viết này rồi. Vui lòng đợi ${waitMsg} nữa để tiếp tục thích!`);
+      return;
+    }
+
+    try {
+      const response = await publicBlogApi.likePost(post.pId);
+      if (response.data.status === "success") {
+        const newLikes = response.data.data.likes;
+        setLikeCount(newLikes);
+        setIsLiked(true);
+
+        likedPosts[post.pId] = Date.now();
+        localStorage.setItem("liked-posts", JSON.stringify(likedPosts));
+
+        showSuccess("Cảm ơn bạn đã thích bài viết!");
+      }
+    } catch (err) {
+      console.error(err);
+      showError("Có lỗi xảy ra khi thích bài viết. Vui lòng thử lại sau.");
+    }
+  };
 
   useEffect(() => {
     const el = ctaRef.current;
@@ -251,6 +310,17 @@ export function PublicBlogDetail() {
                 <Eye className="h-3.5 w-3.5" />
                 {post.pView ?? 0} {t('blog.public.detail.views')}
               </span>
+              <button
+                onClick={handleLike}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-medium transition-all ${
+                  isLiked
+                    ? "bg-rose-50 border-rose-200 text-rose-600 shadow-sm"
+                    : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200"
+                }`}
+              >
+                <Heart className={`h-3.5 w-3.5 ${isLiked ? "fill-rose-500 text-rose-500" : ""}`} />
+                <span>{likeCount} {t('blog.public.detail.likes') || 'thích'}</span>
+              </button>
               {post.category && (
                 <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-slate-500">
                   {post.category.caName}
