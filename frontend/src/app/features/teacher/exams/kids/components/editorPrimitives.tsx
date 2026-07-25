@@ -59,8 +59,19 @@ function useMediaUpload(examId: string | number | null) {
     setUploading(true);
     try {
       // ĐÚNG signature: (file, mediaType, examId, questionId?)
-      const res = await uploadKidsMedia(file, mediaType, examId);
-      return res.url as string;
+      const res: any = await uploadKidsMedia(file, mediaType, examId);
+      // BUG FIX: backend trả { message, media: { id, url, ... } } — KHÔNG có
+      // `url` ở top-level. Trước đây chỉ đọc `res.url` → luôn undefined →
+      // `onChange` không bao giờ được gọi → mọi editor dùng ImageUpload/
+      // AudioUpload (Sắp xếp từ, các phần Nói, Tìm điểm khác biệt, ...) đều
+      // "bấm tải ảnh mà không có gì xảy ra". Đọc cả 2 shape cho chắc.
+      const url: string | undefined = res?.media?.url ?? res?.url;
+      if (!url) {
+        console.error('Upload response missing url:', res);
+        alert('Tải tệp lên xong nhưng không nhận được đường dẫn ảnh. Vui lòng thử lại!');
+        return null;
+      }
+      return url;
     } catch (err) {
       console.error('Upload failed:', err);
       alert('Không thể tải tệp lên. Vui lòng thử lại!');

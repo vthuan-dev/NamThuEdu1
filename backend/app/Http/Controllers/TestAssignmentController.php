@@ -352,21 +352,20 @@ class TestAssignmentController extends Controller
             ], 404);
         }
 
+        // BUG FIX: trước đây validate/gán các cột KHÔNG tồn tại trong bảng
+        // `test_assignments` (taMax_attempts số nhiều, taIs_mandatory,
+        // taShow_results, taAllow_review) và thao tác 2 bảng pivot đã bị bỏ
+        // (test_assignment_students / test_assignment_classes) — kiến trúc hiện
+        // tại là single-target (taTarget_type + taTarget_id). Hệ quả: bấm "chỉnh
+        // lại yêu cầu" không lưu được gì (hoặc lỗi khi ->load('students')).
+        // Nay chỉ cập nhật đúng các cột thực có của assignment.
         $validator = Validator::make($request->all(), [
-            'taDeadline' => 'nullable|date|after:now',
-            'taInstructions' => 'nullable|string',
-            'taMax_attempts' => 'nullable|integer|min:1',
-            'taIs_mandatory' => 'nullable|boolean',
-            'taShow_results' => 'nullable|boolean',
-            'taAllow_review' => 'nullable|boolean',
-            'add_students' => 'nullable|array',
-            'add_students.*' => 'exists:users,uId',
-            'remove_students' => 'nullable|array',
-            'remove_students.*' => 'exists:users,uId',
-            'add_classes' => 'nullable|array',
-            'add_classes.*' => 'exists:classes,cId',
-            'remove_classes' => 'nullable|array',
-            'remove_classes.*' => 'exists:classes,cId',
+            'taDeadline'              => 'nullable|date',
+            'taStart_time'            => 'nullable|date',
+            'taNotify_before_minutes' => 'nullable|integer|min:0|max:10080',
+            'taInstructions'          => 'nullable|string|max:2000',
+            'taMax_attempt'           => 'nullable|integer|min:1',
+            'taIs_public'             => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
@@ -377,85 +376,33 @@ class TestAssignmentController extends Controller
             ], 400);
         }
 
-        // Update basic fields
         if ($request->has('taDeadline')) {
             $assignment->taDeadline = $request->taDeadline;
+        }
+        if ($request->has('taStart_time')) {
+            $assignment->taStart_time = $request->taStart_time;
+        }
+        if ($request->has('taNotify_before_minutes')) {
+            $assignment->taNotify_before_minutes = $request->taNotify_before_minutes;
+            // Cho phép gửi lại thông báo "trước giờ" theo mốc mới sau khi sửa lịch.
+            $assignment->taNotified_at = null;
         }
         if ($request->has('taInstructions')) {
             $assignment->taInstructions = $request->taInstructions;
         }
-        if ($request->has('taMax_attempts')) {
-            $assignment->taMax_attempts = $request->taMax_attempts;
+        if ($request->has('taMax_attempt')) {
+            $assignment->taMax_attempt = $request->taMax_attempt;
         }
-        if ($request->has('taIs_mandatory')) {
-            $assignment->taIs_mandatory = $request->taIs_mandatory;
-        }
-        if ($request->has('taShow_results')) {
-            $assignment->taShow_results = $request->taShow_results;
-        }
-        if ($request->has('taAllow_review')) {
-            $assignment->taAllow_review = $request->taAllow_review;
+        if ($request->has('taIs_public')) {
+            $assignment->taIs_public = $request->boolean('taIs_public');
         }
 
         $assignment->save();
 
-        // Handle student additions/removals
-        if ($request->has('add_students')) {
-            foreach ($request->add_students as $studentId) {
-                // Check if already assigned
-                $exists = \DB::table('test_assignment_students')
-                    ->where('assignment_id', $assignment->taId)
-                    ->where('student_id', $studentId)
-                    ->exists();
-                
-                if (!$exists) {
-                    \DB::table('test_assignment_students')->insert([
-                        'assignment_id' => $assignment->taId,
-                        'student_id' => $studentId,
-                        'created_at' => now(),
-                        'updated_at' => now()
-                    ]);
-                }
-            }
-        }
-
-        if ($request->has('remove_students')) {
-            \DB::table('test_assignment_students')
-                ->where('assignment_id', $assignment->taId)
-                ->whereIn('student_id', $request->remove_students)
-                ->delete();
-        }
-
-        // Handle class additions/removals
-        if ($request->has('add_classes')) {
-            foreach ($request->add_classes as $classId) {
-                $exists = \DB::table('test_assignment_classes')
-                    ->where('assignment_id', $assignment->taId)
-                    ->where('class_id', $classId)
-                    ->exists();
-                
-                if (!$exists) {
-                    \DB::table('test_assignment_classes')->insert([
-                        'assignment_id' => $assignment->taId,
-                        'class_id' => $classId,
-                        'created_at' => now(),
-                        'updated_at' => now()
-                    ]);
-                }
-            }
-        }
-
-        if ($request->has('remove_classes')) {
-            \DB::table('test_assignment_classes')
-                ->where('assignment_id', $assignment->taId)
-                ->whereIn('class_id', $request->remove_classes)
-                ->delete();
-        }
-
         return response()->json([
             'status' => 'success',
             'message' => 'Cập nhật phân công bài thi thành công.',
-            'data' => $assignment->load(['exam', 'students', 'classes'])
+            'data' => $assignment->load('exam')
         ]);
     }
 

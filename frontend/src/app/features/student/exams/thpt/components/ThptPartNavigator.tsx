@@ -16,9 +16,20 @@ interface QItem {
   answered: boolean;
 }
 
+/**
+ * Guard danh sách trong config đề. Panel Tiến độ nằm NGOÀI SectionErrorBoundary,
+ * nên nếu một section thiếu `items`/`blanks`/`statements` thì `.map` trên
+ * undefined sẽ sập CẢ trang làm bài (mất luôn nút Nộp bài). Luôn dùng asArray.
+ */
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
 function sectionQuestions(s: ThptSection, answers: ThptAnswers): QItem[] {
   const has = (k: string) => Object.prototype.hasOwnProperty.call(answers, k);
   const filled = (k: string) => !!String(answers[k] ?? '').trim();
+  const items = asArray<any>((s as any).items);
+  const blanks = asArray<any>((s as any).blanks);
 
   switch (s.type) {
     case 'phonetics':
@@ -26,39 +37,40 @@ function sectionQuestions(s: ThptSection, answers: ThptAnswers): QItem[] {
     case 'listening':
     case 'speaking':
     case 'error_identification':
-      return s.items.map((it: any) => ({ qn: it.question_number, answered: has(`q${it.question_number}`) }));
+      return items.map((it: any) => ({ qn: it.question_number, answered: has(`q${it.question_number}`) }));
     case 'word_form':
     case 'sentence_transformation':
-      return s.items.map((it: any) => ({ qn: it.question_number, answered: filled(`q${it.question_number}`) }));
+      return items.map((it: any) => ({ qn: it.question_number, answered: filled(`q${it.question_number}`) }));
     case 'tf_group':
-      return s.items.map((it) => ({
+      return items.map((it: any) => ({
         qn: it.question_number,
-        answered: it.statements.every((_, i) => has(`q${it.question_number}.s${i + 1}`)),
+        answered: asArray<any>(it.statements).every((_: any, i: number) => has(`q${it.question_number}.s${i + 1}`)),
       }));
     case 'matching':
-      return s.items.map((it) => ({
+      return items.map((it: any) => ({
         qn: it.question_number,
         answered: [1, 2, 3, 4].every((i) => has(`q${it.question_number}.${i}`)),
       }));
     case 'reading_mixed':
-      return s.items.map((it: any) => ({
+      return items.map((it: any) => ({
         qn: it.question_number,
         answered: it.kind === 'tf_group'
-          ? it.statements.every((_: any, i: number) => has(`q${it.question_number}.s${i + 1}`))
+          ? asArray<any>(it.statements).every((_: any, i: number) => has(`q${it.question_number}.s${i + 1}`))
           : has(`q${it.question_number}`),
       }));
     case 'mc_cloze':
-      return s.blanks.map((b) => ({ qn: b.question_number, answered: has(`q${b.question_number}`) }));
+      return blanks.map((b: any) => ({ qn: b.question_number, answered: has(`q${b.question_number}`) }));
     case 'word_bank_cloze':
     case 'open_cloze':
-      return s.blanks.map((b) => ({ qn: b.question_number, answered: filled(`q${b.question_number}`) }));
+      return blanks.map((b: any) => ({ qn: b.question_number, answered: filled(`q${b.question_number}`) }));
     default:
       return [];
   }
 }
 
 export function ThptPartNavigator({ config, answers, activeIdx, onSectionChange, onFloatingChange }: Props) {
-  const perSection = config.sections.map((s) => sectionQuestions(s, answers));
+  const sections = asArray<ThptSection>(config?.sections);
+  const perSection = sections.map((s) => sectionQuestions(s, answers));
   const total = perSection.reduce((sum, arr) => sum + arr.length, 0);
   const answered = perSection.reduce((sum, arr) => sum + arr.filter((x) => x.answered).length, 0);
 
@@ -132,7 +144,7 @@ export function ThptPartNavigator({ config, answers, activeIdx, onSectionChange,
       </div>
 
       <div className="space-y-2 max-h-[calc(100vh-14rem)] overflow-y-auto pr-1">
-        {config.sections.map((s, idx) => {
+        {sections.map((s, idx) => {
           const items = perSection[idx];
           const cnt = items.filter((x) => x.answered).length;
           const done = cnt === items.length && items.length > 0;

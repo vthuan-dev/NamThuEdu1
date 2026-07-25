@@ -7,6 +7,7 @@ import {
 import { api } from '../../../../../services/api';
 import type { ThptAnswers, ThptConfig } from './types';
 import { SectionView } from './views/SectionView';
+import { SectionErrorBoundary } from '../../../../../components/exam/SectionErrorBoundary';
 
 interface SectionStat {
   section_id: string;
@@ -684,37 +685,41 @@ export function ThptResultPage() {
 
                     {/* Right Column: Question Content */}
                     <div className="min-w-0">
-                      <SectionView
-                        key={activeSection.id}
-                        section={activeSection}
-                        answers={answers}
-                        correctAnswers={result.correct_answers}
-                        correctQuestions={result.correct_questions}
-                        onAnswerChange={() => {}}
-                        mode="review"
-                        showExplanation={config?.show_explanation !== false}
-                        speakingParts={result.speaking?.parts}
-                        speakingAudio={speakingAudio}
-                        writingParts={result.writing?.parts}
-                        hideHeader
-                      />
+                      <SectionErrorBoundary resetKey={activeSection.id} label={`phần "${activeSection.title}"`}>
+                        <SectionView
+                          key={activeSection.id}
+                          section={activeSection}
+                          answers={answers}
+                          correctAnswers={result.correct_answers}
+                          correctQuestions={result.correct_questions}
+                          onAnswerChange={() => {}}
+                          mode="review"
+                          showExplanation={config?.show_explanation !== false}
+                          speakingParts={result.speaking?.parts}
+                          speakingAudio={speakingAudio}
+                          writingParts={result.writing?.parts}
+                          hideHeader
+                        />
+                      </SectionErrorBoundary>
                     </div>
                   </div>
                 ) : (
-                  <SectionView
-                    key={activeSection.id}
-                    section={activeSection}
-                    answers={answers}
-                    correctAnswers={result.correct_answers}
-                    correctQuestions={result.correct_questions}
-                    onAnswerChange={() => {}}
-                    mode="review"
-                    showExplanation={config?.show_explanation !== false}
-                    speakingParts={result.speaking?.parts}
-                    speakingAudio={speakingAudio}
-                    writingParts={result.writing?.parts}
-                    hideHeader
-                  />
+                  <SectionErrorBoundary resetKey={activeSection.id} label={`phần "${activeSection.title}"`}>
+                    <SectionView
+                      key={activeSection.id}
+                      section={activeSection}
+                      answers={answers}
+                      correctAnswers={result.correct_answers}
+                      correctQuestions={result.correct_questions}
+                      onAnswerChange={() => {}}
+                      mode="review"
+                      showExplanation={config?.show_explanation !== false}
+                      speakingParts={result.speaking?.parts}
+                      speakingAudio={speakingAudio}
+                      writingParts={result.writing?.parts}
+                      hideHeader
+                    />
+                  </SectionErrorBoundary>
                 )}
               </div>
             </section>

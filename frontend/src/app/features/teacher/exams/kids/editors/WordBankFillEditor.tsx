@@ -279,22 +279,56 @@ const WordBankFillEditor: React.FC<WordBankFillEditorProps> = ({
     setWordBank(wordBank.filter((_, i) => i !== index));
   };
 
-  const detectGaps = () => {
-    // Auto-detect gaps in format __1__, __2__, etc.
+  /**
+   * Quét chỗ trống dạng __1__, __2__ trong đoạn văn.
+   * Giữ lại đáp án / cờ ví dụ đã nhập cho các chỗ trống cùng số.
+   */
+  const parseGapsFromText = (source: string, previous: Gap[]): Gap[] => {
     const gapPattern = /__(\d+)__/g;
-    const matches = [...text.matchAll(gapPattern)];
-    
-    const detectedGaps: Gap[] = matches.map(match => {
-      const existingGap = gaps.find(g => g.gapNumber === parseInt(match[1]));
-      return {
+    const matches = [...source.matchAll(gapPattern)];
+    const seen = new Set<number>();
+    const result: Gap[] = [];
+    matches.forEach((match) => {
+      const num = parseInt(match[1], 10);
+      if (seen.has(num)) return; // tránh trùng khi cùng số xuất hiện 2 lần
+      seen.add(num);
+      const existing = previous.find((g) => g.gapNumber === num);
+      result.push({
         id: match[1],
-        gapNumber: parseInt(match[1]),
-        correctWord: existingGap?.correctWord || '',
-        isExample: existingGap?.isExample || false,
-      };
+        gapNumber: num,
+        correctWord: existing?.correctWord || '',
+        isExample: existing?.isExample || false,
+      });
     });
+    return result;
+  };
 
+  // BUG FIX: trước đây `gaps` CHỈ được cập nhật khi giáo viên bấm nút "phát hiện
+  // chỗ trống". Nếu soạn đoạn văn (hoặc bấm In đậm / Tô màu — các hành động này
+  // chỉ setText) rồi bấm Lưu, `gaps` vẫn rỗng → báo sai
+  // "⚠️ Vui lòng thêm chỗ trống vào đoạn văn!" dù đoạn văn ĐÃ có __1__, __2__.
+  // Nay tự quét lại mỗi khi đoạn văn thay đổi, vẫn giữ đáp án đã nhập.
+  useEffect(() => {
+    setGaps((prev) => {
+      const next = parseGapsFromText(text, prev);
+      const same =
+        next.length === prev.length &&
+        next.every((g, i) =>
+          g.gapNumber === prev[i]?.gapNumber &&
+          g.correctWord === prev[i]?.correctWord &&
+          g.isExample === prev[i]?.isExample,
+        );
+      return same ? prev : next;
+    });
+  }, [text]);
+
+  const detectGaps = () => {
+    const detectedGaps = parseGapsFromText(text, gaps);
     setGaps(detectedGaps);
+    if (detectedGaps.length === 0) {
+      toast.warning('⚠️ Chưa thấy chỗ trống nào. Hãy viết __1__, __2__ trong đoạn văn nhé!');
+      return;
+    }
     toast.success(`✅ Đã phát hiện ${detectedGaps.length} chỗ trống!`);
   };
 

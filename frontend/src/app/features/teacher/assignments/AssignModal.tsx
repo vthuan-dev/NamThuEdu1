@@ -8,6 +8,7 @@ import {
 import { api } from "../../../../services/api";
 import { getAssetUrl } from "../../../../utils/apiConfig";
 import { useToastContext } from "../../../../contexts/ToastContext";
+import { ManageAssignmentsModal } from "./ManageAssignmentsModal";
 
 /** Đề được chọn để giao (rút gọn từ Ngân hàng đề). */
 export interface AssignExam {
@@ -96,6 +97,8 @@ export function AssignModal({ open, exams, onClose, onAssigned }: AssignModalPro
   const [notifyBefore, setNotifyBefore] = useState(30);
   const [instructions, setInstructions] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Quản lý/sửa các lần đã giao (chỉ khả dụng khi giao đúng 1 đề).
+  const [showManage, setShowManage] = useState(false);
 
   // Hover card kiểu Facebook: hiển thị thông tin học viên khi rê vào avatar.
   const [hovered, setHovered] = useState<{ student: StudentItem; x: number; y: number } | null>(null);
@@ -365,6 +368,7 @@ export function AssignModal({ open, exams, onClose, onAssigned }: AssignModalPro
   };
 
   return (
+    <>
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-[2px] animate-fadeIn"
       onMouseDown={onClose}
@@ -386,12 +390,24 @@ export function AssignModal({ open, exams, onClose, onAssigned }: AssignModalPro
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-white hover:text-slate-700 hover:rotate-90 transition-all duration-200"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {exams.length === 1 && (
+              <button
+                type="button"
+                onClick={() => setShowManage(true)}
+                title="Xem & chỉnh sửa các lần đã giao đề này"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-indigo-700 bg-white ring-1 ring-indigo-100 hover:bg-indigo-50 transition-colors"
+              >
+                <FileText className="w-3.5 h-3.5" /> Bài đã giao
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-white hover:text-slate-700 hover:rotate-90 transition-all duration-200"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Body — 2 cột */}
@@ -848,5 +864,14 @@ export function AssignModal({ open, exams, onClose, onAssigned }: AssignModalPro
         </div>
       )}
     </div>
+    {exams.length === 1 && (
+      <ManageAssignmentsModal
+        open={showManage}
+        examId={exams[0].eId}
+        examTitle={exams[0].eTitle}
+        onClose={() => setShowManage(false)}
+      />
+    )}
+    </>
   );
 }

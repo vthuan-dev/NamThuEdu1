@@ -12,6 +12,16 @@ const THEME = {
 };
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
+/**
+ * Guard dữ liệu đề: mọi danh sách (items/blanks/options/statements/...) có thể
+ * thiếu hoặc sai kiểu khi đề được import/sửa. Trước đây gọi `.map` trực tiếp →
+ * "Cannot read properties of undefined (reading 'map')" làm sập cả trang thi
+ * (mất luôn nút Nộp bài). Luôn đi qua asArray để render an toàn.
+ */
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
 // Nhãn ngắn theo loại phần thi — hiển thị trên header cho gọn gàng, có chủ đích.
 const TYPE_LABEL: Record<string, string> = {
   listening: 'Nghe hiểu',
@@ -177,7 +187,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
     case 'phonetics':
       return (
         <>
-          {section.items.map((item) => {
+          {asArray<any>(section.items).map((item) => {
             const key = `q${item.question_number}`;
             const userVal = String(answers[key] ?? '').trim().toUpperCase();
             const correctVal = String(correctAnswers?.[key] ?? '').trim().toUpperCase();
@@ -191,7 +201,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             return (
               <QCard key={key} n={item.question_number}>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {item.words.map((w) => {
+                  {asArray<any>(item.words).map((w) => {
                     const { before, mark, after } = splitPhoneticWord(w.text, w.underline, autoDetect, w.underlineStart);
                     const wordLabel = mark ? (
                       <span>
@@ -235,7 +245,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
       const isError = section.type === 'error_identification';
       return (
         <>
-          {section.items.map((item: any) => {
+          {asArray<any>(section.items).map((item: any) => {
             const key = `q${item.question_number}`;
             const userVal = String(answers[key] ?? '').trim().toUpperCase();
             const correctVal = String(correctAnswers?.[key] ?? '').trim().toUpperCase();
@@ -244,7 +254,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
               <QCard key={key} n={item.question_number}>
                 {!isError && item.prompt && (
                   <div className="text-sm text-slate-900 leading-relaxed font-bold mb-3 space-y-1 [&_*]:!text-slate-900 [&_*]:!font-bold">
-                    {item.prompt.split(/\s+(?=[a-e]\.\s)/i).map((part: string, i: number) => (
+                    {String(item.prompt ?? '').split(/\s+(?=[a-e]\.\s)/i).map((part: string, i: number) => (
                       <p key={i} className="leading-relaxed" dangerouslySetInnerHTML={{ __html: part.trim() }} />
                     ))}
                   </div>
@@ -253,7 +263,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                   <p className="text-sm text-slate-700 italic mb-3" dangerouslySetInnerHTML={{ __html: formatErrorSentence(item.sentence, item.segments) }} />
                 )}
                 <div className={isError ? 'grid grid-cols-2 sm:grid-cols-4 gap-2' : 'space-y-2'}>
-                  {options.map((opt: any) => (
+                  {(options ?? []).map((opt: any) => (
                     <ChoiceButton
                       key={opt.id}
                       letter={opt.id}
@@ -285,7 +295,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
     case 'word_form':
       return (
         <>
-          {section.items.map((item) => {
+          {asArray<any>(section.items).map((item) => {
             const key = `q${item.question_number}`;
             return (
               <QCard key={key} n={item.question_number}>
@@ -524,7 +534,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
       const sec = section as any;
       return (
         <>
-          {sec.items.map((item: any) => {
+          {asArray<any>(sec.items).map((item: any) => {
             const key = `q${item.question_number}`;
             const recorded = String(answers[key] ?? '').trim() !== '';
             const lockedByOther = activeSpeakingQ !== null && activeSpeakingQ !== item.question_number;
@@ -640,7 +650,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
     case 'sentence_transformation':
       return (
         <>
-          {section.items.map((item) => {
+          {asArray<any>(section.items).map((item) => {
             const key = `q${item.question_number}`;
             return (
               <QCard key={key} n={item.question_number}>
@@ -676,7 +686,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
     case 'tf_group':
       return (
         <>
-          {section.items.map((item) => (
+          {asArray<any>(section.items).map((item) => (
             <QCard key={item.question_number} n={item.question_number}>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="rounded-xl border border-teal-100 bg-teal-50/40 p-4 space-y-2">
@@ -690,7 +700,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                   ))}
                 </div>
                 <div className="space-y-2">
-                  {item.statements.map((s, si) => (
+                  {asArray<any>(item.statements).map((s: any, si: number) => (
                     <TfStatementRow
                       key={s.id}
                       idx={si}
@@ -713,11 +723,11 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
     case 'matching':
       return (
         <>
-          {section.items.map((item) => (
+          {asArray<any>(section.items).map((item) => (
             <QCard key={item.question_number} n={item.question_number}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  {item.list_1.map((line, i) => {
+                  {asArray<any>(item.list_1).map((line: any, i: number) => {
                     const key = `q${item.question_number}.${i + 1}`;
                     const userVal = String(answers[key] ?? '');
                     const correctVal = String(correctAnswers?.[key] ?? '');
@@ -749,7 +759,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                   })}
                 </div>
                 <div className="rounded-xl border border-teal-100 bg-teal-50/40 p-3 space-y-2">
-                  {item.list_2.map((line, i) => (
+                  {asArray<any>(item.list_2).map((line: any, i: number) => (
                     <div key={i} className="flex items-start gap-2">
                       <span className="text-xs font-bold text-teal-700 w-5 mt-0.5">{LETTERS[i]}.</span>
                       <p className="flex-1 text-sm text-slate-700 leading-snug">{line}</p>
@@ -774,7 +784,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
       return (
         <>
           {!hidePassage && <PassageBox text={section.passage} />}
-          {section.blanks.map((b) => {
+          {asArray<any>(section.blanks).map((b) => {
             const key = `q${b.question_number}`;
             const userVal = String(answers[key] ?? '').trim().toUpperCase();
             const correctVal = String(correctAnswers?.[key] ?? '').trim().toUpperCase();
@@ -816,7 +826,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             <div className="rounded-2xl bg-white border border-slate-200 p-4">
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Ngân hàng từ</p>
               <div className="flex flex-wrap gap-2">
-                {section.word_bank.map((w, i) => (
+                {asArray<any>(section.word_bank).map((w: any, i: number) => (
                   <span key={i} className="px-3 py-1 rounded-full bg-teal-50 text-teal-700 text-sm font-semibold">
                     {w}
                   </span>
@@ -831,13 +841,13 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             onAnswerChange={onAnswerChange}
             isReview={isReview}
           />
-          {isReview && section.blanks.some(b => b.explanation) && (
+          {isReview && asArray<any>(section.blanks).some((b) => b.explanation) && (
             <div className="mt-4 rounded-2xl bg-white border border-slate-200 p-5 space-y-3">
               <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 border-b border-slate-100 pb-2">
                 <span>💡</span> Giải thích đáp án các chỗ trống
               </h4>
               <div className="space-y-2.5">
-                {section.blanks.map(b => b.explanation && (
+                {asArray<any>(section.blanks).map((b) => b.explanation && (
                   <div key={b.question_number} className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                     <span className="font-bold text-teal-700 mr-2">Chỗ trống ({b.question_number}):</span>
                     {b.explanation}
@@ -860,13 +870,13 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             onAnswerChange={onAnswerChange}
             isReview={isReview}
           />
-          {showExp && section.blanks.some(b => b.explanation) && (
+          {showExp && asArray<any>(section.blanks).some((b) => b.explanation) && (
             <div className="mt-4 rounded-2xl bg-white border border-slate-200 p-5 space-y-3">
               <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5 border-b border-slate-100 pb-2">
                 <span>💡</span> Giải thích đáp án các chỗ trống
               </h4>
               <div className="space-y-2.5">
-                {section.blanks.map(b => b.explanation && (
+                {asArray<any>(section.blanks).map((b) => b.explanation && (
                   <div key={b.question_number} className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                     <span className="font-bold text-teal-700 mr-2">Chỗ trống ({b.question_number}):</span>
                     {b.explanation}
@@ -882,14 +892,14 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
       return (
         <>
           {!hidePassage && <PassageBox text={section.passage} markers />}
-          {section.items.map((item: any) => (
+          {asArray<any>(section.items).map((item: any) => (
             <QCard key={item.question_number} n={item.question_number}>
               {item.kind === 'tf_group' && (
                 <div className="space-y-2">
                   {item.context_paragraph_ref && (
                     <p className="text-xs italic text-slate-500 mb-1">{item.context_paragraph_ref}</p>
                   )}
-                  {item.statements.map((s: any, si: number) => (
+                  {(item.statements ?? []).map((s: any, si: number) => (
                     <TfStatementRow
                       key={s.id}
                       idx={si}
@@ -908,11 +918,11 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                 <>
                   <div className="space-y-2">
                     <div className="text-sm text-slate-900 font-bold mb-1 space-y-1 [&_*]:!text-slate-900 [&_*]:!font-bold">
-                      {item.prompt.split(/\s+(?=[a-e]\.\s)/i).map((part: string, i: number) => (
+                      {String(item.prompt ?? '').split(/\s+(?=[a-e]\.\s)/i).map((part: string, i: number) => (
                         <p key={i} className="leading-relaxed" dangerouslySetInnerHTML={{ __html: part.trim() }} />
                       ))}
                     </div>
-                    {item.options.map((opt: any) => {
+                    {(item.options ?? []).map((opt: any) => {
                       const key = `q${item.question_number}`;
                       const userVal = String(answers[key] ?? '').trim().toUpperCase();
                       const correctVal = String(correctAnswers?.[key] ?? '').trim().toUpperCase();

@@ -10,6 +10,7 @@ import {
   MultiTabWarning,
   ResumeExamModal,
   TimeWarningBanner,
+  SectionErrorBoundary,
 } from '../../../../../components/exam';
 import { examDraftStorage } from '../../../../../lib/exam/examDraftStorage';
 import type { ThptAnswers, ThptConfig } from './types';
@@ -456,7 +457,9 @@ export function StudentThptExamPage() {
     );
   }
 
-  const activeSection = config.sections[activeIdx];
+  // Guard: config lỗi/thiếu `sections` không được làm sập trang (mất nút Nộp bài).
+  const sections = Array.isArray(config.sections) ? config.sections : [];
+  const activeSection = sections[activeIdx];
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
@@ -471,14 +474,16 @@ export function StudentThptExamPage() {
       <main data-thpt-main className="flex-1 max-w-7xl w-full mx-auto px-6 pt-6 pb-24 flex flex-col lg:flex-row gap-6">
         <div className="min-w-0 flex-1">
           {activeSection && (
-            <SectionView
-              key={activeSection.id}
-              section={activeSection}
-              answers={session.answers as ThptAnswers}
-              onAnswerChange={onAnswerChange}
-              submissionId={submissionId}
-              mode="taking"
-            />
+            <SectionErrorBoundary resetKey={activeSection.id} label={`phần "${activeSection.title}"`}>
+              <SectionView
+                key={activeSection.id}
+                section={activeSection}
+                answers={session.answers as ThptAnswers}
+                onAnswerChange={onAnswerChange}
+                submissionId={submissionId}
+                mode="taking"
+              />
+            </SectionErrorBoundary>
           )}
         </div>
 
@@ -507,23 +512,27 @@ export function StudentThptExamPage() {
           className={navFloating ? 'w-0 flex-none overflow-visible' : 'w-full lg:flex-none lg:w-[var(--nav-w)]'}
           style={navFloating ? undefined : { ['--nav-w' as any]: `${navW}px` }}
         >
-          <ThptPartNavigator
-            config={config}
-            answers={session.answers as ThptAnswers}
-            activeIdx={activeIdx}
-            onSectionChange={setActiveIdx}
-            onFloatingChange={setNavFloating}
-          />
+          {/* Panel Tiến độ cũng bọc boundary: lỗi ở đây không được làm mất
+              thanh điều hướng / nút Nộp bài phía dưới. */}
+          <SectionErrorBoundary resetKey={activeSection?.id ?? activeIdx} label="bảng Tiến độ">
+            <ThptPartNavigator
+              config={config}
+              answers={session.answers as ThptAnswers}
+              activeIdx={activeIdx}
+              onSectionChange={setActiveIdx}
+              onFloatingChange={setNavFloating}
+            />
+          </SectionErrorBoundary>
         </div>
       </main>
 
       <ThptBottomNav
         activePart={activeIdx}
-        totalParts={config.sections.length}
+        totalParts={sections.length}
         canPrev={activeIdx > 0}
-        canNext={activeIdx < config.sections.length - 1}
+        canNext={activeIdx < sections.length - 1}
         onPrev={() => setActiveIdx((i) => Math.max(0, i - 1))}
-        onNext={() => setActiveIdx((i) => Math.min(config.sections.length - 1, i + 1))}
+        onNext={() => setActiveIdx((i) => Math.min(sections.length - 1, i + 1))}
         onSubmit={() => handleSubmit(false)}
         isSubmitting={isSubmitting}
       />

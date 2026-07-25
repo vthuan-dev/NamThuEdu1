@@ -15,3 +15,4 @@ export {
   type MultiTabWarningProps,
 } from './MultiTabWarning';
 export { TimeWarningBanner } from './TimeWarningBanner';
+export { SectionErrorBoundary } from './SectionErrorBoundary';

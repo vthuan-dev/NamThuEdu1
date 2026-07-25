@@ -70,7 +70,7 @@ type NextAction =
   | { kind: 'start'; assignmentId: number; examType: string; title: string; skill: string; durationMin: number; isUrgent: boolean; daysUntil: number; routeUrl: string; }
   | null;
 
-function computeNextAction(inProgress: InProgressTest[], upcoming: UpcomingTest[]): NextAction {
+export function computeNextAction(inProgress: InProgressTest[], upcoming: UpcomingTest[]): NextAction {
   const valid = inProgress.filter(t => Math.round(Number(t.time_remaining) || 0) > 0);
   if (valid.length > 0) {
     const t = valid[0];
@@ -95,8 +95,12 @@ function computeNextAction(inProgress: InProgressTest[], upcoming: UpcomingTest[
       title: t.title || 'Bài thi', skill: t.skill || '',
       durationMin: Number(t.duration) || 0, isUrgent: Boolean(t.is_urgent),
       daysUntil: Number(t.days_until) || 0,
+      // BUG FIX: `UpcomingTest` không có trường `exam_id`; `t.id` mới là eId của
+      // đề (backend trả `'id' => $exam->eId`). Trước đây fallback về
+      // `t.assignment_id` khiến URL dùng NHẦM assignmentId làm examId →
+      // getForStudent 404 "Không tìm thấy đề thi" khi vào thẳng từ trang chủ.
       routeUrl: isThpt
-        ? `/hoc-vien/lam-bai-thpt/${(t as any).exam_id ?? t.assignment_id}?assignmentId=${t.assignment_id}`
+        ? `/hoc-vien/lam-bai-thpt/${(t as any).exam_id ?? t.id}?assignmentId=${t.assignment_id}`
         : `/hoc-vien/phong-cho/${t.assignment_id}`,
     };
   }

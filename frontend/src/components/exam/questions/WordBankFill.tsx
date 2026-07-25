@@ -1,6 +1,7 @@
 import { QuestionRendererProps } from '../../../types/exam';
 import { extractTaskData } from '../../../utils/examDataExtractor';
 import { getFullMediaUrl } from '../../../utils/mediaUtils';
+import { renderFormattedText } from '../../../utils/textFormatUtils';
 
 export function WordBankFill({
   question,
@@ -63,10 +64,13 @@ export function WordBankFill({
             {/* Story/Text with gaps */}
             {storyText && storyText !== 'kids_task' && (
               <div className="p-5 bg-white rounded-xl border-3 border-purple-200 shadow-md">
-                <div 
-                  className="text-gray-700 text-lg leading-relaxed" 
-                  dangerouslySetInnerHTML={{ __html: storyText }} 
-                />
+                {/* BUG FIX: trước đây dùng dangerouslySetInnerHTML nên nút "In đậm"
+                    của giáo viên (**text**) hiện ra thô cho học viên, và HTML thô
+                    tiềm ẩn XSS. renderFormattedText xử lý cả **bold** lẫn <mark>
+                    tô màu bằng React element an toàn. */}
+                <div className="text-gray-700 text-lg leading-relaxed">
+                  {renderFormattedText(String(storyText))}
+                </div>
               </div>
             )}
             
@@ -168,10 +172,9 @@ export function WordBankFill({
           {/* Story/Text with gaps */}
           {storyText && storyText !== 'kids_task' && (
             <div className="p-5 bg-white rounded-xl border-3 border-purple-200 shadow-md">
-              <div 
-                className="text-gray-700 text-lg leading-relaxed" 
-                dangerouslySetInnerHTML={{ __html: storyText }} 
-              />
+              <div className="text-gray-700 text-lg leading-relaxed">
+                {renderFormattedText(String(storyText))}
+              </div>
             </div>
           )}
           

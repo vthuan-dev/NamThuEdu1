@@ -492,11 +492,19 @@ const LookReadEditor: React.FC<LookReadEditorProps> = ({
                 </div>
 
                 <div className="space-y-3">
-                  {/* Statement Image Upload - Only show if no shared image */}
-                  {!sharedImageUrl && (
-                    <div>
+                  {/* BUG FIX: trước đây khối upload ảnh riêng bị ẩn hoàn toàn khi
+                      đã có ảnh chung (`{!sharedImageUrl && ...}`) → giáo viên
+                      "chỉ upload được 1 ảnh cho một bài tập". Phía học viên
+                      (LookAndRead) vốn đã render được CẢ ảnh chung lẫn ảnh
+                      riêng từng câu, nên luôn cho phép tải ảnh riêng. */}
+                  <div>
                       <label className="mb-2 block text-sm font-medium text-slate-700">
                         🖼️ Hình ảnh cho câu này (Ctrl+V để paste)
+                        {sharedImageUrl && (
+                          <span className="ml-1 font-normal text-slate-400">
+                            · tùy chọn, dùng thêm cùng ảnh chung
+                          </span>
+                        )}
                       </label>
                       
                       {!stmt.imageUrl ? (
@@ -561,13 +569,12 @@ const LookReadEditor: React.FC<LookReadEditorProps> = ({
                         </div>
                       )}
                     </div>
-                  )}
 
-                  {/* Show info if using shared image */}
-                  {sharedImageUrl && (
+                  {/* Nhắc nhở: câu không có ảnh riêng sẽ dùng ảnh chung ở trên */}
+                  {sharedImageUrl && !stmt.imageUrl && (
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                       <p className="text-sm font-medium text-slate-600">
-                        ℹ️ Câu này sử dụng hình ảnh chung ở trên
+                        ℹ️ Câu này đang dùng hình ảnh chung ở trên (có thể tải ảnh riêng nếu muốn)
                       </p>
                     </div>
                   )}
@@ -604,8 +611,13 @@ const LookReadEditor: React.FC<LookReadEditorProps> = ({
                           onChange={() => updateStatement(stmt.id, 'correctAnswer', 'tick')}
                           className="h-5 w-5 text-green-600"
                         />
-                        <span className="text-xl">✓</span>
-                        <span className="text-sm font-medium text-slate-700">Đúng (Tick)</span>
+                        {/* BUG FIX "tick or a cross bị lỗi kí hiệu": ký hiệu phải
+                            theo đúng định dạng đã chọn. Học viên thấy "Yes/No"
+                            khi answer_format = yes_no, nên editor cũng phải vậy. */}
+                        <span className="text-xl">{answerFormat === 'yes_no' ? '✔' : '✓'}</span>
+                        <span className="text-sm font-medium text-slate-700">
+                          {answerFormat === 'yes_no' ? 'Yes (Đúng)' : 'Đúng (Tick)'}
+                        </span>
                       </label>
                       <label className={`flex cursor-pointer items-center space-x-2 rounded-lg border px-4 py-2 transition-all ${
                         stmt.correctAnswer === 'cross'
@@ -619,19 +631,24 @@ const LookReadEditor: React.FC<LookReadEditorProps> = ({
                           onChange={() => updateStatement(stmt.id, 'correctAnswer', 'cross')}
                           className="h-5 w-5 text-red-600"
                         />
-                        <span className="text-xl">✗</span>
-                        <span className="text-sm font-medium text-slate-700">Sai (Cross)</span>
+                        <span className="text-xl">{answerFormat === 'yes_no' ? '✘' : '✗'}</span>
+                        <span className="text-sm font-medium text-slate-700">
+                          {answerFormat === 'yes_no' ? 'No (Sai)' : 'Sai (Cross)'}
+                        </span>
                       </label>
                     </div>
                   </div>
 
-                  {/* Preview */}
-                  {stmt.statement && stmt.imageUrl && (
+                  {/* Preview — trước đây yêu cầu phải có ảnh RIÊNG mới hiện, nên
+                      khi dùng ảnh chung giáo viên không xem được đáp án đã chọn. */}
+                  {stmt.statement && (stmt.imageUrl || sharedImageUrl) && (
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                       <p className="text-sm text-slate-600">
                         <span className="font-semibold">Preview:</span> {stmt.statement}{' '}
                         <span className="text-xl">
-                          {stmt.correctAnswer === 'tick' ? '✓' : '✗'}
+                          {answerFormat === 'yes_no'
+                            ? (stmt.correctAnswer === 'tick' ? '✔ Yes' : '✘ No')
+                            : (stmt.correctAnswer === 'tick' ? '✓' : '✗')}
                         </span>
                       </p>
                     </div>
