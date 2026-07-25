@@ -79,7 +79,7 @@ const StoryCompletionEditor: React.FC<StoryCompletionEditorProps> = ({
     <EditorShell
       title="Hoàn thành câu chuyện"
       badge="Reading & Writing · Story Completion"
-      instruction="Học sinh đọc câu chuyện rồi điền 1-5 từ vào chỗ trống. Dùng ___ để đánh dấu chỗ trống trong câu. Phù hợp Movers, Flyers."
+      instruction="Học sinh đọc câu chuyện (Flyers Part 5: truyện dài, không kèm tranh) rồi tự viết 1-5 từ vào chỗ trống của mỗi câu tóm tắt. Dùng ___ để đánh dấu chỗ trống."
       saveDisabled={!canSave}
       onSave={handleSave}
       onCancel={onCancel}

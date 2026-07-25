@@ -37,7 +37,20 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
   const [title, setTitle] = useState('');
   const [mainAudioUrl, setMainAudioUrl] = useState('');
   const [mainImageUrl, setMainImageUrl] = useState('');
-  const [instructions, setInstructions] = useState<ColourInstruction[]>([]);
+  // BUG FIX "Listening Part 5: chưa hiểu lắm". Trước đây danh sách hướng dẫn
+  // trống hoàn toàn nên giáo viên không biết phải nhập bao nhiêu mục.
+  // Chuẩn Cambridge: 1 mục ví dụ + 5 mục tính điểm (Flyers/Movers Part 5 có
+  // thêm 1 mục yêu cầu VIẾT 1 từ thay vì tô màu).
+  const [instructions, setInstructions] = useState<ColourInstruction[]>(() =>
+    Array.from({ length: 6 }, (_, i) => ({
+      id: `seed-${i + 1}`,
+      objectName: '',
+      colour: '',
+      position: '',
+      writeText: '',
+      isExample: i === 0,
+    }))
+  );
   const [uploadingAudio, setUploadingAudio] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedInstForHotspot, setSelectedInstForHotspot] = useState<number | null>(null);
@@ -303,12 +316,45 @@ const ListenColourEditor: React.FC<ListenColourEditorProps> = ({
         <span className="text-2xl">🎨</span>
         <div>
           <h3 className="text-base font-semibold text-slate-900">
-            Nghe và tô màu
+            Nghe, tô màu và viết
           </h3>
           <p className="text-sm text-slate-500">
-            Học viên nghe audio, tô màu theo hướng dẫn, và upload ảnh đã tô
+            Học viên nghe audio rồi kéo thẻ màu (hoặc thẻ từ) vào đúng vật thể trong tranh
           </p>
         </div>
+      </div>
+
+      {/* Giải thích luồng làm bài — dạng bài này hay bị hiểu sai */}
+      <div className="rounded-xl border border-orange-200 bg-orange-50/60 p-4 text-sm text-slate-700">
+        <p className="mb-2 font-bold text-orange-800">
+          ℹ️ Dạng bài này hoạt động thế nào? (Starters Part 4 · Movers/Flyers Part 5)
+        </p>
+        <ol className="list-decimal space-y-1 pl-5 text-slate-700">
+          <li>
+            Tải <strong>1 audio</strong> và <strong>1 tranh đen trắng</strong> (tranh có nhiều vật
+            thể giống nhau, VD nhiều con mèo ở các vị trí khác nhau).
+          </li>
+          <li>
+            Nhập <strong>6 mục</strong>: mục đầu là <strong>ví dụ mẫu</strong> (đã tô sẵn, không
+            tính điểm) + 5 mục tính điểm.
+          </li>
+          <li>
+            Mỗi mục = 1 vật thể trong tranh. Bấm <strong>📍 Gán vị trí trên ảnh</strong> rồi click
+            đúng vật thể đó ⇒ tạo ra 1 chấm tròn để học viên kéo thẻ vào.
+          </li>
+          <li>
+            Chọn <strong>màu đúng</strong> cho vật thể đó. Riêng Movers/Flyers Part 5 có 1 mục yêu
+            cầu <strong>viết 1 từ</strong> lên tranh: điền vào ô "✍️ Từ cần viết" thay vì chọn màu.
+          </li>
+          <li>
+            Muốn khó hơn: bấm <strong>➕⚠️ Thêm vật thể nhiễu</strong> — vật thể có chấm tròn nhưng
+            không có đáp án đúng.
+          </li>
+        </ol>
+        <p className="mt-2 text-xs italic text-slate-500">
+          Học viên chỉ thấy các thẻ màu/thẻ từ ở phần "Preview Labels" bên dưới, không thấy vật thể
+          nào ứng với thẻ nào.
+        </p>
       </div>
 
       {/* Question Title */}

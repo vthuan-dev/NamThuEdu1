@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Upload, Trash2, Loader2, Plus } from 'lucide-react';
 import { uploadKidsMedia } from '../../../../../../services/kidsExamApi';
+import { getFullMediaUrl } from '../../../../../../utils/mediaUtils';
 
 /* ──────────────────────────────────────────────────────────────────────────
  * editorPrimitives — bộ field tái dùng cho mọi editor dạng bài Kids.
@@ -105,8 +106,11 @@ export const ImageUpload: React.FC<{
   if (value) {
     return (
       <div className={`relative inline-block ${size === 'lg' ? 'w-full max-w-md' : ''}`}>
+        {/* BUG FIX "không tải được ảnh": dữ liệu cũ (và một số API) trả đường
+            dẫn tương đối /storage/... — nếu gán thẳng vào src thì ảnh hỏng,
+            giáo viên tưởng là upload thất bại. */}
         <img
-          src={value}
+          src={getFullMediaUrl(value) ?? value}
           alt=""
           className={`rounded-lg border border-slate-200 object-cover ${
             size === 'sm' ? 'h-20 w-20' : 'w-full'
@@ -161,7 +165,7 @@ export const AudioUpload: React.FC<{
   if (value) {
     return (
       <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-        <audio controls src={value} className="h-9 flex-1" />
+        <audio controls src={getFullMediaUrl(value) ?? value} className="h-9 flex-1" />
         <button
           type="button"
           onClick={() => onChange('')}

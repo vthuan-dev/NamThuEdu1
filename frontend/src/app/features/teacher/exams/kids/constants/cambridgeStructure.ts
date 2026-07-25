@@ -133,13 +133,23 @@ export const CAMBRIDGE_PARTS_STRUCTURE: Record<string, CambridgeLevelStructure> 
       icon: '📖',
       totalParts: 7,
       duration: '40 phút',
+      // BUG FIX (báo cáo lỗi FLYERS): A2 Flyers R&W có 7 part / 44 câu.
+      // Mapping cũ sai ở Part 3 (word bank chứ không phải tự điền), Part 4
+      // (chọn A/B/C chứ không phải tự điền) và Part 5 (đọc truyện dài chứ
+      // không phải truyện tranh).
       parts: [
-        { partNumber: 1, name: 'Part 1', description: 'Ghép từ với định nghĩa', taskType: 'word_definition_matching' },
-        { partNumber: 2, name: 'Part 2', description: 'Hoàn thành hội thoại', taskType: 'dialogue_matching' },
-        { partNumber: 3, name: 'Part 3', description: 'Điền chỗ trống trong truyện', taskType: 'story_completion' },
-        { partNumber: 4, name: 'Part 4', description: 'Tự điền từ', taskType: 'open_cloze' },
-        { partNumber: 5, name: 'Part 5', description: 'Trả lời theo truyện tranh', taskType: 'look_read_write' },
-        { partNumber: 6, name: 'Part 6', description: 'Tự điền từ vào đoạn', taskType: 'open_cloze' },
+        // 10 định nghĩa / 15 từ ⇒ nhiều từ hơn số câu (có từ nhiễu).
+        { partNumber: 1, name: 'Part 1', description: 'Ghép định nghĩa với từ (có từ nhiễu)', taskType: 'word_definition_matching' },
+        // 7 câu, dùng CHUNG 8 lựa chọn A–H.
+        { partNumber: 2, name: 'Part 2', description: 'Hoàn thành hội thoại (chọn A–H)', taskType: 'dialogue_matching' },
+        // Chọn 1 từ trong hộp ~10-12 từ điền vào chỗ trống của truyện.
+        { partNumber: 3, name: 'Part 3', description: 'Điền từ từ hộp từ cho sẵn', taskType: 'word_bank_fill' },
+        // Chọn từ đúng A/B/C điền vào chỗ trống (multiple-choice cloze).
+        { partNumber: 4, name: 'Part 4', description: 'Chọn từ đúng A/B/C', taskType: 'cloze_test' },
+        // Đọc truyện dài rồi hoàn thành câu bằng 1-5 từ.
+        { partNumber: 5, name: 'Part 5', description: 'Đọc truyện & hoàn thành câu', taskType: 'story_completion' },
+        // Tự nghĩ 1 từ điền vào chỗ trống (không có gợi ý).
+        { partNumber: 6, name: 'Part 6', description: 'Tự điền 1 từ vào chỗ trống', taskType: 'open_cloze' },
         { partNumber: 7, name: 'Part 7', description: 'Viết truyện theo tranh', taskType: 'picture_story_writing' },
       ],
     },

@@ -4,6 +4,7 @@ import { uploadKidsMedia } from '../../../../../../services/kidsExamApi';
 import { useToastContext } from '../../../../../../contexts/ToastContext';
 import { calculateQuestionPoints, getScorableItemsCount, getExampleItemsCount } from '../../../../../../utils/examUtils';
 import { renderFormattedTextWithGaps, insertFormatting } from '../../../../../../utils/textFormatUtils';
+import { getFullMediaUrl } from '../../../../../../utils/mediaUtils';
 
 interface WordBankFillEditorProps {
   onSave: (data: any) => void;
@@ -478,7 +479,8 @@ const WordBankFillEditor: React.FC<WordBankFillEditorProps> = ({
               Điền từ từ ngân hàng từ
             </h3>
             <p className="text-sm text-slate-500">
-              Học viên chọn từ trong ngân hàng để điền vào chỗ trống (Starters, Movers)
+              Học viên chọn 1 từ trong hộp từ cho sẵn để điền vào mỗi chỗ trống. Starters Part 4 ·
+              Movers Part 4 · Flyers Part 3 (hộp ~10-12 từ, có từ dư làm nhiễu).
             </p>
           </div>
         </div>
@@ -569,7 +571,7 @@ const WordBankFillEditor: React.FC<WordBankFillEditorProps> = ({
           <div className="relative rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-center justify-center">
               <img
-                src={mainImageUrl}
+                src={getFullMediaUrl(mainImageUrl) ?? mainImageUrl}
                 alt="Main context image"
                 className="max-h-96 w-auto rounded-lg shadow-sm"
               />
@@ -798,7 +800,7 @@ Tom likes to __1__ football in the park. He has a **big** __2__ ball. Every day 
                 ) : (
                   <div className="relative">
                     <img
-                      src={item.imageUrl}
+                      src={getFullMediaUrl(item.imageUrl) ?? item.imageUrl}
                       alt={item.word}
                       className="h-24 w-full rounded-lg border border-slate-200 object-cover"
                     />
@@ -908,7 +910,7 @@ Tom likes to __1__ football in the park. He has a **big** __2__ ball. Every day 
             {mainImageUrl && (
               <div className="mb-6 flex justify-center">
                 <img
-                  src={mainImageUrl}
+                  src={getFullMediaUrl(mainImageUrl) ?? mainImageUrl}
                   alt="Main context"
                   className="max-h-64 rounded-lg border border-slate-200 shadow-sm"
                 />
@@ -931,7 +933,7 @@ Tom likes to __1__ football in the park. He has a **big** __2__ ball. Every day 
                   >
                     {item.imageUrl && (
                       <img
-                        src={item.imageUrl}
+                        src={getFullMediaUrl(item.imageUrl) ?? item.imageUrl}
                         alt={item.word}
                         className="mb-2 h-16 w-full rounded object-cover"
                       />

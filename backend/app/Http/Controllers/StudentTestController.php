@@ -2989,8 +2989,18 @@ class StudentTestController extends Controller
                     return ['manual' => false, 'ratio' => 0.0];
                 $correct = 0;
                 for ($i = 0; $i < $n; $i++) {
-                    // Player lưu nhãn chữ (A,B,C…); định nghĩa đúng của từ i mang nhãn chr(65+i)
-                    if (($map[(string) $i] ?? '') === chr(65 + $i))
+                    $got = trim((string) ($map[(string) $i] ?? ''));
+                    if ($got === '')
+                        continue;
+                    // Định dạng hiện tại: học sinh chọn CHÍNH TỪ trong hộp từ
+                    // (hộp từ có thể nhiều hơn số câu vì có từ nhiễu).
+                    $expected = trim((string) ($words[$i]['word'] ?? ''));
+                    if ($expected !== '' && mb_strtolower($got) === mb_strtolower($expected)) {
+                        $correct++;
+                        continue;
+                    }
+                    // Tương thích ngược: bản cũ lưu nhãn chữ A,B,C… theo chỉ số.
+                    if ($got === chr(65 + $i))
                         $correct++;
                 }
                 return ['manual' => false, 'ratio' => $correct / $n];

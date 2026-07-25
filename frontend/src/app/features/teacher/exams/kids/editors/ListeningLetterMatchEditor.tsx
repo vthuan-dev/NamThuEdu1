@@ -36,7 +36,16 @@ const ListeningLetterMatchEditor: React.FC<ListeningLetterMatchEditorProps> = ({
   const [audioUrl, setAudioUrl] = useState('');
   const [uploadingAudio, setUploadingAudio] = useState(false);
   const [uploadingImage, setUploadingImage] = useState<string | null>(null);
+  // BUG FIX "Listening Part 3: 6 người nhưng 8 tranh".
+  // Đúng chuẩn Cambridge: 6 chủ thể (1 ví dụ + 5 câu tính điểm) ghép với 8 tranh
+  // A-H ⇒ luôn dư 2 chữ cái làm đáp án nhiễu. Trước đây editor chỉ tạo sẵn 1
+  // chủ thể nên giáo viên tưởng số tranh và số người không khớp.
   const [subjects, setSubjects] = useState<Subject[]>([
+    { label: '', correctLetter: '', isExample: true },
+    { label: '', correctLetter: '', isExample: false },
+    { label: '', correctLetter: '', isExample: false },
+    { label: '', correctLetter: '', isExample: false },
+    { label: '', correctLetter: '', isExample: false },
     { label: '', correctLetter: '', isExample: false },
   ]);
   const [options, setOptions] = useState<Option[]>([
@@ -402,9 +411,33 @@ const ListeningLetterMatchEditor: React.FC<ListeningLetterMatchEditorProps> = ({
       {/* Subjects Section (6 items to match) */}
       <div className="rounded-xl border border-slate-200 bg-white p-5">
         <div className="sticky top-0 z-40 -mx-5 -mt-5 mb-4 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
-          <h4 className="flex items-center gap-2 text-base font-semibold text-slate-900">
-            <span className="text-lg">🔤</span> Chủ thể cần ghép nối - {subjects.length} mục
-          </h4>
+          <div>
+            <h4 className="flex items-center gap-2 text-base font-semibold text-slate-900">
+              <span className="text-lg">🔤</span> Chủ thể cần ghép nối - {subjects.length} mục
+            </h4>
+            <p
+              className={`mt-1 text-xs font-medium ${
+                subjects.length === 6 ? 'text-emerald-600' : 'text-amber-600'
+              }`}
+            >
+              {subjects.length === 6
+                ? '✓ Đúng chuẩn: 6 chủ thể / 8 tranh (2 tranh dư là đáp án nhiễu)'
+                : `⚠️ Chuẩn Cambridge là 6 chủ thể cho 8 tranh A-H. Hiện có ${subjects.length} chủ thể.`}
+            </p>
+            {(() => {
+              const used = subjects.map((s) => s.correctLetter).filter(Boolean);
+              const unused = options.map((o) => o.letter).filter((l) => !used.includes(l));
+              if (used.length === 0) return null;
+              return (
+                <p className="mt-1 text-xs text-slate-500">
+                  Tranh nhiễu (chưa gán cho chủ thể nào):{' '}
+                  <span className="font-bold text-slate-700">
+                    {unused.length > 0 ? unused.join(', ') : '(không còn)'}
+                  </span>
+                </p>
+              );
+            })()}
+          </div>
           <button
             onClick={handleAddSubject}
             className="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-orange-600"

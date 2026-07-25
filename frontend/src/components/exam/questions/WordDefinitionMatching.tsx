@@ -32,6 +32,25 @@ export function WordDefinitionMatching({
     }
   }
 
+  // Từ nhiễu: nằm trong hộp từ nhưng không là đáp án của câu nào
+  // (Flyers Part 1: 10 định nghĩa / 15 từ).
+  const distractors: string[] =
+    realTaskData?.distractor_words ||
+    config?.distractor_words ||
+    realTaskData?.distractorWords ||
+    config?.distractorWords ||
+    [];
+  if (Array.isArray(distractors) && distractors.length > 0) {
+    const existing = new Set(wordBank.map((w: string) => String(w).toLowerCase()));
+    distractors.forEach((d) => {
+      const val = String(d).trim();
+      if (val && !existing.has(val.toLowerCase())) {
+        wordBank = [...wordBank, val];
+        existing.add(val.toLowerCase());
+      }
+    });
+  }
+
   const instructions = realTaskData?.instructions || config?.instructions;
   
   return (

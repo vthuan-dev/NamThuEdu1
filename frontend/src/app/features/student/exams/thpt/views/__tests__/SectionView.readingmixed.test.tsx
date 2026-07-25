@@ -1,7 +1,8 @@
+import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { SectionView } from '../SectionView';
-import { SectionErrorBoundary } from '@/components/exam/SectionErrorBoundary';
+import { SectionErrorBoundary } from '../../../../../../../components/exam/SectionErrorBoundary';
 import type { ThptSection } from '../../types';
 
 /**
@@ -51,7 +52,7 @@ describe('SectionView — reading_mixed với dữ liệu thiếu field (regress
 });
 
 describe('SectionErrorBoundary — chặn crash một phần, giữ nút Nộp bài sống', () => {
-  function Boom(): JSX.Element {
+  function Boom(): React.ReactElement {
     throw new Error('Cannot read properties of undefined (reading \'map\')');
   }
 

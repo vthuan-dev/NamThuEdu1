@@ -45,13 +45,18 @@ export function buildReviewRows(
     case 'word_definition_matching': {
       const words: any[] = taskData?.words ?? [];
       return words.map((w, i) => {
-        const expected = String.fromCharCode(65 + i);
+        const expectedWord = String(w.word ?? '').trim();
         const student = get(String(i));
+        // Đáp án mới lưu chính chuỗi từ; đáp án cũ lưu nhãn chữ cái A/B/C…
+        const legacyLetter = String.fromCharCode(65 + i);
+        const isCorrect =
+          student !== '' &&
+          (student.trim().toLowerCase() === expectedWord.toLowerCase() || student === legacyLetter);
         return {
-          label: w.word ?? `Từ ${i + 1}`,
+          label: w.definition ?? w.word ?? `Câu ${i + 1}`,
           student: student || '—',
-          correct: expected,
-          isCorrect: student === expected,
+          correct: expectedWord || legacyLetter,
+          isCorrect,
         };
       });
     }
@@ -374,8 +379,9 @@ export function buildCorrectAnswerMap(taskType: string, taskData: any): KidsAnsw
     }
     case 'word_definition_matching': {
       const words: any[] = taskData?.words ?? [];
-      words.forEach((_w: any, i: number) => {
-        out[String(i)] = String.fromCharCode(65 + i);
+      words.forEach((w: any, i: number) => {
+        // Đáp án là chính từ cần chọn trong hộp từ (khớp WordDefinitionTask).
+        out[String(i)] = String(w?.word ?? '').trim();
       });
       break;
     }

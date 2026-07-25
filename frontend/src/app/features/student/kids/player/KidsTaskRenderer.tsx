@@ -126,34 +126,44 @@ function OddOneOutTask({ taskData, answer, onChange }: RendererProps) {
 // ─── B1. Word ↔ Definition matching ─────────────────────────────────────────
 function WordDefinitionTask({ taskData, answer, onChange, readOnly }: RendererProps) {
   const words: any[] = taskData?.words ?? [];
-  // Mỗi từ chọn 1 định nghĩa (theo nhãn A,B,C…). Định nghĩa hiển thị xáo trộn.
-  // Khi readOnly (trang chấm): giữ thứ tự gốc để nhãn A/B/C khớp đáp án đã lưu.
-  const shuffledDefs = useMemo(() => {
-    const defs = words.map((w, i) => ({ key: String.fromCharCode(65 + i), text: w.definition }));
-    return readOnly ? defs : [...defs].sort(() => Math.random() - 0.5);
-  }, [words.length, readOnly]);
+  const distractors: string[] = (taskData?.distractor_words ?? taskData?.distractorWords ?? [])
+    .map((d: any) => String(d))
+    .filter(Boolean);
+
+  // Đúng chuẩn Cambridge: ĐỊNH NGHĨA là câu hỏi (1, 2, 3…), TỪ là lựa chọn trong
+  // hộp từ. Hộp từ có thể nhiều hơn số câu vì có từ nhiễu (Flyers Part 1:
+  // 10 định nghĩa / 15 từ). Đáp án lưu là chính chuỗi từ.
+  const wordBank = useMemo(() => {
+    const bank = [...words.map((w) => String(w.word ?? '')), ...distractors].filter(Boolean);
+    return readOnly ? bank : [...bank].sort(() => Math.random() - 0.5);
+  }, [words.length, distractors.length, readOnly]);
 
   return (
     <div className="space-y-4">
       <div className="rounded-2xl bg-slate-50 p-4">
-        <SubLabel>Các định nghĩa:</SubLabel>
-        <ul className="space-y-1.5">
-          {shuffledDefs.map((d) => (
-            <li key={d.key} className="text-[15px] text-slate-700">
-              <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-lg bg-violet-100 text-sm font-bold text-violet-700">
-                {d.key}
-              </span>
-              {d.text}
-            </li>
+        <SubLabel>
+          Hộp từ ({wordBank.length} từ{distractors.length > 0 ? ' — có từ không dùng' : ''}):
+        </SubLabel>
+        <div className="flex flex-wrap gap-2">
+          {wordBank.map((w, i) => (
+            <span
+              key={`${w}-${i}`}
+              className="rounded-xl bg-white px-3 py-1.5 text-[15px] font-bold text-violet-700 shadow-sm ring-2 ring-violet-100"
+            >
+              {w}
+            </span>
           ))}
-        </ul>
+        </div>
       </div>
       <div className="space-y-2">
         {words.map((w, i) => (
           <div key={i} className="rounded-2xl border-2 border-slate-100 bg-white p-3">
-            <p className="mb-2 text-[15px] font-extrabold text-slate-800">{w.word}</p>
+            <p className="mb-2 text-[15px] font-semibold text-slate-800">
+              <span className="mr-2 font-extrabold text-rose-400">{i + 1}.</span>
+              {w.definition}
+            </p>
             <ChoiceChips
-              options={shuffledDefs.map((d) => ({ key: d.key, label: d.key }))}
+              options={wordBank.map((bw) => ({ key: bw, label: bw }))}
               selected={answer[String(i)] ?? ''}
               onSelect={(key) => onChange({ ...answer, [String(i)]: key })}
             />

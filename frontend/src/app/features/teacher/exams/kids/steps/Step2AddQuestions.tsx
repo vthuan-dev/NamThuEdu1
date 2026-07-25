@@ -170,63 +170,80 @@ const KIDS_TASK_GUIDES: Record<string, { rules: string[]; steps: string[]; note?
       "Nhập từ đáp án chính xác. Hệ thống sẽ tự động đảo lộn các chữ cái để hiển thị cho học sinh.",
     ],
   },
-  word_bank_fill: {
-    rules: [
-      "Điền từ từ ngân hàng: Có một đoạn văn ngắn và danh sách từ cho sẵn kèm ảnh gợi ý.",
-    ],
-    steps: [
-      "Soạn đoạn văn và đặt các dấu '___' tại chỗ trống cần điền.",
-      "Thêm danh sách các từ trong ngân hàng từ (kèm ảnh minh họa).",
-      "Ghép nối từ đúng với từng ô trống tương ứng trong đoạn văn.",
-    ],
-  },
   word_definition_matching: {
     rules: [
-      "Ghép từ với định nghĩa: Cho sẵn danh sách từ vựng kèm hình ảnh và các câu định nghĩa.",
+      "Định nghĩa là câu hỏi, từ là lựa chọn: Học sinh đọc từng định nghĩa rồi chọn từ đúng trong hộp từ.",
+      "<strong>Flyers Part 1</strong>: 10 định nghĩa nhưng hộp từ có <strong>15 từ</strong> ⇒ 5 từ dư là <strong>từ nhiễu</strong>. Movers Part 1: 5-8 từ.",
     ],
     steps: [
-      "Thêm danh sách từ vựng ở ô bên trái (thường là 8-10 từ kèm ảnh).",
-      "Thêm các câu định nghĩa/mô tả ở ô bên phải.",
-      "Chọn từ đúng tương ứng cho từng định nghĩa.",
+      "Nhập từng cặp <strong>định nghĩa + từ đáp án</strong> (mỗi dòng = 1 câu tính điểm).",
+      "Nếu đề có nhiều từ hơn số câu, thêm các từ dư ở mục <strong>Từ nhiễu</strong> phía dưới (không cần định nghĩa).",
     ],
+    note: "* Học viên thấy một hộp từ chung và chọn 1 từ cho mỗi định nghĩa; từ nhiễu không phải đáp án của câu nào.",
   },
   dialogue_matching: {
     rules: [
-      "Hoàn thành hội thoại: Nối câu trả lời của nhân vật B khớp với câu nói của nhân vật A.",
+      "Hoàn thành hội thoại: Chọn câu trả lời của B khớp với câu nói của A.",
+      "<strong>Flyers Part 2</strong>: 7 câu dùng <strong>CHUNG 8 lựa chọn A-H</strong> (có lựa chọn dư làm nhiễu).",
     ],
     steps: [
-      "Nhập các câu nói dẫn dắt của nhân vật A.",
-      "Nhập danh sách lựa chọn câu trả lời của nhân vật B.",
-      "Tích chọn câu trả lời chính xác nhất cho từng đoạn hội thoại.",
+      "Giữ tick <strong>“Dùng chung một danh sách lựa chọn (A-H)”</strong> rồi soạn 8 câu trả lời một lần.",
+      "Nhập từng câu nói của nhân vật A và chọn chữ cái đáp án đúng cho câu đó.",
+    ],
+    note: "* Bỏ tick nếu muốn mỗi hội thoại có bộ lựa chọn riêng (đề tự biên).",
+  },
+  word_bank_fill: {
+    rules: [
+      "Điền từ từ hộp từ cho sẵn: Mỗi chỗ trống chọn đúng 1 từ trong hộp.",
+      "<strong>Flyers Part 3</strong>: hộp <strong>10-12 từ</strong> cho ~6 chỗ trống ⇒ có từ dư làm nhiễu.",
+    ],
+    steps: [
+      "Soạn đoạn văn/câu chuyện, đánh dấu chỗ trống bằng <strong>__1__, __2__</strong>…",
+      "Nhập các từ vào hộp từ (gồm cả từ đúng và từ nhiễu), bật “Có hình ảnh kèm từ” nếu đề có tranh.",
+      "Chọn đáp án đúng cho từng chỗ trống; đánh dấu mục ví dụ nếu có.",
+    ],
+  },
+  cloze_test: {
+    rules: [
+      "Chọn từ đúng A/B/C: Mỗi chỗ trống có 3 lựa chọn, chọn 1 đáp án đúng.",
+      "<strong>Flyers Part 4</strong>: 6 câu, học sinh <strong>không tự nghĩ từ</strong> mà chọn trong A/B/C.",
+    ],
+    steps: [
+      "Soạn đoạn văn, đánh dấu chỗ trống bằng <strong>__1__, __2__</strong>… rồi bấm “Phát hiện chỗ trống”.",
+      "Với mỗi chỗ trống: nhập <strong>đáp án đúng</strong> và 3 lựa chọn (đáp án đúng phải nằm trong lựa chọn).",
+      "Bật “Câu hỏi chọn tên câu chuyện” nếu đề có thêm câu chọn tiêu đề.",
     ],
   },
   story_completion: {
     rules: [
-      "Điền chỗ trống trong truyện: Điền từ vào đoạn văn và chọn tiêu đề truyện phù hợp.",
+      "Đọc truyện & hoàn thành câu: Học sinh <strong>tự viết 1-5 từ</strong> vào chỗ trống (không cho sẵn từ).",
+      "<strong>Flyers Part 5</strong>: 1 truyện dài + 7 câu tóm tắt cần hoàn thành.",
     ],
     steps: [
-      "Nhập nội dung đoạn văn có chứa các chỗ trống '___'.",
-      "Nhập danh sách các từ lựa chọn cho sẵn.",
-      "Thêm câu hỏi trắc nghiệm chọn tiêu đề đúng cho truyện.",
+      "Dán toàn bộ nội dung câu chuyện vào ô <strong>Câu chuyện</strong>.",
+      "Thêm từng câu tóm tắt có chỗ trống '___', nhập đáp án đúng và giới hạn số từ.",
     ],
   },
   open_cloze: {
     rules: [
-      "Tự điền từ (không cho sẵn từ): Học sinh tự nghĩ từ phù hợp để điền vào chỗ trống.",
+      "Tự điền từ (không cho sẵn từ): Học sinh tự nghĩ 1 từ phù hợp cho mỗi chỗ trống.",
+      "<strong>Flyers Part 6</strong>: điền 1 từ vào bưu thiếp/đoạn văn ngắn (5 câu).",
     ],
     steps: [
-      "Nhập đoạn văn chứa các chỗ trống cần điền.",
-      "Nhập danh sách đáp án đúng được chấp nhận cho mỗi câu.",
+      "Nhập đoạn văn chứa các chỗ trống <strong>__1__, __2__</strong>…",
+      "Nhập các đáp án đúng được chấp nhận cho mỗi chỗ trống (không phân biệt hoa thường).",
     ],
   },
   picture_story_writing: {
     rules: [
       "Viết truyện theo tranh: Học sinh viết đoạn văn mô tả câu chuyện dựa trên 3 bức tranh.",
+      "<strong>Flyers Part 7</strong>: 3 tranh, tối thiểu 20 từ.",
     ],
     steps: [
-      "Tải lên 3 bức tranh diễn biến câu chuyện theo đúng thứ tự.",
-      "Nhập gợi ý hoặc từ khóa bổ trợ (nếu có).",
+      "Tải lên 3 bức tranh diễn biến câu chuyện theo đúng thứ tự (bấm vào ô “Tải tranh”).",
+      "Đặt số từ tối thiểu học sinh phải viết.",
     ],
+    note: "* Phải tạo/lưu đề ở Bước 1 trước khi tải ảnh, nếu không hệ thống sẽ báo “Vui lòng tạo đề thi trước khi tải tệp lên”.",
   },
   find_differences: {
     rules: [
