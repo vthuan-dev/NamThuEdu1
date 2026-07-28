@@ -327,6 +327,8 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
 
         // ── Teens Listening / Speaking exam (relational, AI-graded speaking) ────
         Route::post('/exams/teens',                        [\App\Http\Controllers\TeensExamController::class, 'store']);
+        Route::post('/teens/parse-pdf',                    [GeminiPdfController::class, 'parseTeensPdf']);
+        Route::post('/teens/parse-text',                   [GeminiPdfController::class, 'parseTeensText']);
         
         // Listening
         Route::post('/exams/{examId}/vstep/listening/parts/{partNumber}', [ExamController::class, 'saveVstepListeningPart']);

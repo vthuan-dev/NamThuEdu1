@@ -15,10 +15,12 @@ import { useNavigate, useParams } from "react-router";
 import {
   ArrowLeft, Save, Plus, Trash2, Headphones, Mic, Upload, Loader2,
   CheckCircle2, Volume2, AlertTriangle, Image as ImageIcon, PenLine, ListChecks,
+  Sparkles,
 } from "lucide-react";
 import { useToastContext } from "../../../../../contexts/ToastContext";
 import { api } from "../../../../../services/api";
 import { RichTextInput } from "../../../../../components/ui/RichTextInput";
+import { TeensImportModal } from "./components/TeensImportModal";
 
 const TEAL = "#0D9488";
 const TEAL_MID = "#14B8A6";
@@ -86,6 +88,49 @@ export function CreateTeensExam() {
   const [scope, setScope] = useState<"skill" | "part">("skill");
   const [scopePart, setScopePart] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+
+  const handleImport = (data: any) => {
+    if (data.skill === "listening" && Array.isArray(data.groups)) {
+      const importedGroups: LGroup[] = data.groups.map((g: any) => ({
+        id: uid(),
+        audioUrl: g.audio_url || "",
+        uploading: false,
+        taskImage: g.task_image || "",
+        imageUploading: false,
+        questions: Array.isArray(g.questions)
+          ? g.questions.map((q: any) => ({
+              id: uid(),
+              qContent: q.qContent || "",
+              qType: q.qType === "fill_blank" ? "fill_blank" : "multiple_choice",
+              options: Array.isArray(q.options)
+                ? q.options.map((o: any) => ({
+                    id: uid(),
+                    content: o.content || "",
+                    isCorrect: !!o.isCorrect,
+                  }))
+                : [newOption(), newOption(), newOption(), newOption()],
+              correctText: q.correctAnswer || q.correct_answer || "",
+              qExplanation: q.qExplanation || q.q_explanation || "",
+            }))
+          : [newLQuestion()],
+      }));
+      setGroups(importedGroups);
+      success("Đã import cấu trúc đề Listening thành công!");
+    } else if (data.skill === "speaking" && Array.isArray(data.parts)) {
+      const importedParts: SPart[] = data.parts.map((p: any) => ({
+        id: uid(),
+        qContent: p.qContent || p.q_content || "",
+        prepSeconds: Number(p.prepSeconds ?? p.prep_seconds) || 30,
+        speakSeconds: Number(p.speakSeconds ?? p.speak_seconds) || 120,
+        qExplanation: p.qExplanation || p.q_explanation || "",
+      }));
+      setParts(importedParts);
+      success("Đã import cấu trúc đề Speaking thành công!");
+    } else {
+      error("Dữ liệu import không khớp với kỹ năng hiện tại.");
+    }
+  };
 
   const isListening = skill === "listening";
   const accent = isListening ? "#0EA5E9" : "#EC4899";
@@ -253,24 +298,35 @@ export function CreateTeensExam() {
     <div className="min-h-screen bg-[#F9FAFB] p-5 sm:p-8">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate(-1)}
-            className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors">
-            <ArrowLeft className="w-4 h-4 text-slate-600" />
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <button onClick={() => navigate(-1)}
+              className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors">
+              <ArrowLeft className="w-4 h-4 text-slate-600" />
+            </button>
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: `${accent}1A` }}>
+              <SkillIcon className="w-5 h-5" style={{ color: accent }} />
+            </div>
+            <div>
+              <h1 className="text-lg font-extrabold text-slate-900">
+                Tạo đề {isListening ? "Listening" : "Speaking"} — Teens
+              </h1>
+              <p className="text-sm text-slate-500">
+                {isListening
+                  ? "Audio + ảnh đề (tuỳ chọn) + câu MCQ / điền từ — layout nguyên khối cho HS"
+                  : "Đề nói — học viên ghi âm, AI chấm điểm"}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowImportModal(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition-colors"
+          >
+            <Sparkles className="w-4 h-4 animate-pulse" style={{ color: accent }} />
+            Import (AI)
           </button>
-          <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: `${accent}1A` }}>
-            <SkillIcon className="w-5 h-5" style={{ color: accent }} />
-          </div>
-          <div>
-            <h1 className="text-lg font-extrabold text-slate-900">
-              Tạo đề {isListening ? "Listening" : "Speaking"} — Teens
-            </h1>
-            <p className="text-sm text-slate-500">
-              {isListening
-                ? "Audio + ảnh đề (tuỳ chọn) + câu MCQ / điền từ — layout nguyên khối cho HS"
-                : "Đề nói — học viên ghi âm, AI chấm điểm"}
-            </p>
-          </div>
         </div>
 
         {/* Meta */}
@@ -627,6 +683,13 @@ export function CreateTeensExam() {
           </div>
         </div>
       </div>
+
+      <TeensImportModal
+        open={showImportModal}
+        skill={skill}
+        onClose={() => setShowImportModal(false)}
+        onImport={handleImport}
+      />
     </div>
   );
 }

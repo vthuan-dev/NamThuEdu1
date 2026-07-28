@@ -1456,4 +1456,242 @@ CRITICAL RULES:
 
         return $prompts[$skill] ?? $prompts['listening'];
     }
+
+    /**
+     * Parse PDF đề Teens (Listening / Speaking) → JSON theo schema import.
+     * Route: POST /api/teacher/teens/parse-pdf
+     * Body (multipart): { file: PDF, skill: listening|speaking }
+     * Return: { success, data: { skill, groups? | parts? } }
+     */
+    public function parseTeensPdf(Request $request)
+    {
+        @set_time_limit(180);
+        @ini_set('max_execution_time', '180');
+
+        $request->validate([
+            'file'  => 'required|file|mimes:pdf|max:20480', // 20MB
+            'skill' => 'required|in:listening,speaking',
+        ]);
+
+        if (empty($this->apiKeys)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'GEMINI_API_KEY chưa được cấu hình trong .env backend.',
+            ], 500);
+        }
+
+        $file   = $request->file('file');
+        $skill  = $request->input('skill');
+        $prompt = $this->buildTeensPrompt($skill);
+
+        $lastError = '';
+        $totalKeys = count($this->apiKeys);
+
+        foreach ($this->apiKeys as $idx => $apiKey) {
+            try {
+                $fileUri = $this->uploadToGemini($file, $apiKey);
+                $result  = $this->generateContent($fileUri, $prompt, $apiKey);
+                $result  = $this->postProcessTeens($result, $skill);
+
+                return response()->json([
+                    'success' => true,
+                    'data'    => $result,
+                ]);
+            } catch (\Exception $e) {
+                $lastError = $e->getMessage();
+                $keyNo = $idx + 1;
+                if ($this->shouldRotateKey($lastError) && $keyNo < $totalKeys) {
+                    Log::warning("Gemini key #{$keyNo} lỗi ({$lastError}) — xoay sang key #" . ($keyNo + 1));
+                    continue;
+                }
+                Log::error('Gemini Teens parse PDF error: ' . $lastError);
+                break;
+            }
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => $lastError ?: 'Gemini parse Teens PDF thất bại.',
+        ], 500);
+    }
+
+    /**
+     * Parse TEXT đề Teens (đã trích xuất sẵn ở client từ PDF thuần hoặc file Word)
+     * → JSON theo schema import.
+     * Route: POST /api/teacher/teens/parse-text
+     * Body (json): { text: string, skill: listening|speaking }
+     * Return: { success, data: { skill, groups? | parts? } }
+     */
+    public function parseTeensText(Request $request)
+    {
+        @set_time_limit(180);
+        @ini_set('max_execution_time', '180');
+
+        $request->validate([
+            'text'  => 'required|string|min:30|max:120000',
+            'skill' => 'required|in:listening,speaking',
+        ]);
+
+        if (empty($this->apiKeys)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'GEMINI_API_KEY chưa được cấu hình trong .env backend.',
+            ], 500);
+        }
+
+        $text   = (string) $request->input('text');
+        $skill  = $request->input('skill');
+        $prompt = $this->buildTeensPrompt($skill)
+            . "\n\nHere is the raw exam text extracted from the document. Parse it faithfully:\n\"\"\"\n"
+            . $text
+            . "\n\"\"\"";
+
+        $lastError = '';
+        $totalKeys = count($this->apiKeys);
+
+        foreach ($this->apiKeys as $idx => $apiKey) {
+            try {
+                $result = $this->generateContentFromText($prompt, $apiKey);
+                $result = $this->postProcessTeens($result, $skill);
+
+                return response()->json([
+                    'success' => true,
+                    'data'    => $result,
+                ]);
+            } catch (\Exception $e) {
+                $lastError = $e->getMessage();
+                $keyNo = $idx + 1;
+                if ($this->shouldRotateKey($lastError) && $keyNo < $totalKeys) {
+                    Log::warning("Gemini key #{$keyNo} lỗi ({$lastError}) — xoay sang key #" . ($keyNo + 1));
+                    continue;
+                }
+                Log::error('Gemini Teens parse text error: ' . $lastError);
+                break;
+            }
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => $lastError ?: 'Gemini parse text Teens thất bại.',
+        ], 500);
+    }
+
+    /**
+     * Post-process kết quả từ Gemini cho Teens:
+     * - Chuẩn hóa options & correctAnswer
+     * - Đảm bảo cấu trúc hợp lệ
+     */
+    private function postProcessTeens(array $data, string $skill): array
+    {
+        $data['skill'] = $skill;
+
+        if ($skill === 'listening' && isset($data['groups']) && is_array($data['groups'])) {
+            foreach ($data['groups'] as &$group) {
+                if (!isset($group['questions']) || !is_array($group['questions'])) {
+                    $group['questions'] = [];
+                }
+                foreach ($group['questions'] as &$q) {
+                    $qType = strtolower(trim((string) ($q['qType'] ?? 'multiple_choice')));
+                    if (!in_array($qType, ['multiple_choice', 'fill_blank'], true)) {
+                        $qType = 'multiple_choice';
+                    }
+                    $q['qType'] = $qType;
+
+                    if ($qType === 'multiple_choice') {
+                        $opts = $q['options'] ?? [];
+                        $formattedOpts = [];
+                        if (is_array($opts)) {
+                            // Nếu options là dạng [{content, isCorrect}], giữ nguyên hoặc chuẩn hóa
+                            foreach ($opts as $opt) {
+                                $content = trim((string) ($opt['content'] ?? ''));
+                                if ($content === '') continue;
+                                $formattedOpts[] = [
+                                    'content' => $content,
+                                    'isCorrect' => filter_var($opt['isCorrect'] ?? $opt['is_correct'] ?? false, FILTER_VALIDATE_BOOLEAN)
+                                ];
+                            }
+                        }
+                        $q['options'] = $formattedOpts;
+                        unset($q['correctAnswer']);
+                    } else { // fill_blank
+                        $q['correctAnswer'] = trim((string) ($q['correctAnswer'] ?? $q['correct_answer'] ?? ''));
+                        unset($q['options']);
+                    }
+                }
+                unset($q);
+            }
+            unset($group);
+        } elseif ($skill === 'speaking' && isset($data['parts']) && is_array($data['parts'])) {
+            foreach ($data['parts'] as &$part) {
+                $part['prepSeconds'] = (int) ($part['prepSeconds'] ?? $part['prep_seconds'] ?? 30);
+                $part['speakSeconds'] = (int) ($part['speakSeconds'] ?? $part['speak_seconds'] ?? 120);
+                $part['qContent'] = trim((string) ($part['qContent'] ?? $part['q_content'] ?? ''));
+            }
+            unset($part);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Prompt cho Gemini parse đề Teens → JSON.
+     */
+    private function buildTeensPrompt(string $skill): string
+    {
+        if ($skill === 'listening') {
+            return "You are an expert at extracting English Listening exam content for Teens (age 13-17) from a document.
+Return ONLY valid JSON in EXACTLY this shape:
+{
+  \"groups\": [
+    {
+      \"audio_url\": \"\",
+      \"task_image\": \"\",
+      \"questions\": [
+        {
+          \"qContent\": \"Question text here...\",
+          \"qType\": \"multiple_choice\",
+          \"options\": [
+            { \"content\": \"Option 1 text\", \"isCorrect\": false },
+            { \"content\": \"Option 2 text\", \"isCorrect\": true },
+            { \"content\": \"Option 3 text\", \"isCorrect\": false },
+            { \"content\": \"Option 4 text\", \"isCorrect\": false }
+          ],
+          \"qExplanation\": \"Explanation for the answer...\"
+        },
+        {
+          \"qContent\": \"Fill in the blank: The speaker went to the ___ yesterday.\",
+          \"qType\": \"fill_blank\",
+          \"correctAnswer\": \"cinema\",
+          \"qExplanation\": \"Explanation...\"
+        }
+      ]
+    }
+  ]
+}
+
+CRITICAL RULES:
+1. Identify all listening questions in the document. Group them by their shared context/audio recording or section.
+2. For multiple_choice questions: there must be 2 to 4 options. Make sure exactly one option has \"isCorrect\": true.
+3. For fill_blank questions: use ___ in the qContent to indicate the blank. The answer must be in the \"correctAnswer\" field (do not use \"options\").
+4. Keep the question content clean and concise.";
+        } else {
+            return "You are an expert at extracting English Speaking prompts/tasks for Teens (age 13-17) from a document.
+Return ONLY valid JSON in EXACTLY this shape:
+{
+  \"parts\": [
+    {
+      \"qContent\": \"Speak about your holiday. You should say: where you went, who you went with, and what you did.\",
+      \"prepSeconds\": 30,
+      \"speakSeconds\": 120,
+      \"qExplanation\": \"Suggested ideas or vocabulary...\"
+    }
+  ]
+}
+
+CRITICAL RULES:
+1. Extract speaking prompts or questions.
+2. For each speaking task/part, extract the prompt text into \"qContent\".
+3. Suggest a reasonable prepSeconds (default: 30) and speakSeconds (default: 120) unless explicitly written in the document.";
+        }
+    }
 }
