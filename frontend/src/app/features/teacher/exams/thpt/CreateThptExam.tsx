@@ -25,6 +25,7 @@ import {
   totalQuestions,
   nextQuestionNumber,
   renumberConfig,
+  LETTERS,
 } from './sections';
 import { SectionEditor } from './editors/SectionEditor';
 import { AddSectionModal } from './AddSectionModal';
@@ -71,45 +72,73 @@ export function CreateThptExam() {
   const [hasDraft, setHasDraft] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
-  const [importSkill, setImportSkill] = useState<'listening' | 'speaking'>('listening');
+  const [importSkill, setImportSkill] = useState<'listening' | 'speaking' | 'auto'>('auto');
 
   const handleThptImport = (data: any) => {
     if (data.skill === 'listening' && Array.isArray(data.groups)) {
+      let runningStart = nextQuestionNumber(config.sections);
       const newSections: ThptSection[] = data.groups.map((g: any) => {
-        const sec = createSection('listening');
-        if (g.audio_url) (sec as any).audioUrl = g.audio_url;
-        if (g.task_image) (sec as any).taskImage = g.task_image;
+        const isImageBlock = !!g.task_image;
+        const sec = createSection('listening', runningStart, undefined, isImageBlock ? 'image_block' : undefined);
+        sec.title = isImageBlock ? 'Nghe + ảnh đề' : 'Nghe';
+        (sec as any).audio_url = g.audio_url || '';
+        (sec as any).task_image = g.task_image || '';
+
         const items = Array.isArray(g.questions)
-          ? g.questions.map((q: any, qi: number) => ({
-              id: `imp-${Date.now()}-${qi}`,
-              kind: q.qType === 'fill_blank' ? 'fill_blank' : 'mc',
-              stem: q.qContent || '',
-              options: Array.isArray(q.options)
-                ? q.options.map((o: any) => ({ text: o.content || '', correct: !!o.isCorrect }))
-                : [],
-              correctText: q.correctAnswer || '',
-              explanation: q.qExplanation || '',
-            }))
+          ? g.questions.map((q: any, qi: number) => {
+              const qNum = runningStart + qi;
+              if (q.qType === 'fill_blank') {
+                return {
+                  question_number: qNum,
+                  kind: 'fill_blank' as const,
+                  prompt: q.qContent || '',
+                  accepted_answers: [q.correctAnswer || q.correct_answer || ''],
+                  case_sensitive: false,
+                  explanation: q.qExplanation || q.q_explanation || '',
+                };
+              } else {
+                const opts = Array.isArray(q.options)
+                  ? q.options.map((o: any, oi: number) => ({ id: LETTERS[oi] || String(oi), text: o.content || '' }))
+                  : [];
+                const correctIdx = Array.isArray(q.options) ? q.options.findIndex((o: any) => !!o.isCorrect) : -1;
+                const correctId = correctIdx !== -1 ? (LETTERS[correctIdx] || String(correctIdx)) : '';
+                return {
+                  question_number: qNum,
+                  kind: 'mc' as const,
+                  prompt: q.qContent || '',
+                  options: opts,
+                  correct_id: correctId,
+                  explanation: q.qExplanation || q.q_explanation || '',
+                };
+              }
+            })
           : [];
         (sec as any).items = items;
+        runningStart += items.length;
         return sec;
       });
-      setConfig(prev => ({
+
+      setConfig(prev => renumberConfig({
         ...prev,
         sections: [...prev.sections, ...newSections],
       }));
       setHasUnsaved(true);
       toast.success(`Đã import ${newSections.length} phần Listening!`);
     } else if (data.skill === 'speaking' && Array.isArray(data.parts)) {
-      const newSections: ThptSection[] = data.parts.map((p: any) => {
-        const sec = createSection('speaking');
-        (sec as any).prompt = p.qContent || '';
-        (sec as any).prepSeconds = p.prepSeconds ?? 30;
-        (sec as any).speakSeconds = p.speakSeconds ?? 120;
-        (sec as any).explanation = p.qExplanation || '';
+      let runningStart = nextQuestionNumber(config.sections);
+      const newSections: ThptSection[] = data.parts.map((p: any, pi: number) => {
+        const sec = createSection('speaking', runningStart + pi);
+        const item = (sec as any).items?.[0];
+        if (item) {
+          item.prompt = p.qContent || p.q_content || '';
+          item.prep_seconds = p.prepSeconds ?? p.prep_seconds ?? 30;
+          item.speak_seconds = p.speakSeconds ?? p.speak_seconds ?? 120;
+          item.explanation = p.qExplanation || p.q_explanation || '';
+        }
         return sec;
       });
-      setConfig(prev => ({
+
+      setConfig(prev => renumberConfig({
         ...prev,
         sections: [...prev.sections, ...newSections],
       }));
@@ -543,26 +572,16 @@ export function CreateThptExam() {
             ))}
           </div>
 
-          {/* Import AI — Listening / Speaking */}
+          {/* Import AI */}
           <button
             type="button"
-            onClick={() => { setImportSkill('listening'); setShowImportModal(true); }}
+            onClick={() => { setImportSkill('auto'); setShowImportModal(true); }}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold text-white transition-all text-sm cursor-pointer"
-            style={{ backgroundColor: '#0EA5E9' }}
-            title="Import đề Listening từ PDF/Word bằng AI"
+            style={{ backgroundColor: '#0D9488' }}
+            title="Import đề Listening / Speaking từ PDF/Word bằng AI"
           >
             <Sparkles className="w-4 h-4" />
-            <span>Import Listening</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => { setImportSkill('speaking'); setShowImportModal(true); }}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold text-white transition-all text-sm cursor-pointer"
-            style={{ backgroundColor: '#EC4899' }}
-            title="Import đề Speaking từ PDF/Word bằng AI"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>Import Speaking</span>
+            <span>Import (AI)</span>
           </button>
 
           {/* Nút LỨU riêng — trước đây chỉ có nút Xuất bản nên giáo viên không có

@@ -5,12 +5,12 @@ import { getAuthToken } from '../../../../../../utils/authStorage';
 
 interface Props {
   open: boolean;
-  skill: 'listening' | 'speaking';
+  skill?: 'listening' | 'speaking' | 'auto';
   onClose: () => void;
   onImport: (data: any) => void;
 }
 
-export function TeensImportModal({ open, skill, onClose, onImport }: Props) {
+export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Props) {
   const [payload, setPayload] = useState<any>(null);
   const [fileName, setFileName] = useState('');
   const [parseError, setError] = useState('');
@@ -25,8 +25,8 @@ export function TeensImportModal({ open, skill, onClose, onImport }: Props) {
   if (!open) return null;
 
   const isListening = skill === 'listening';
-  const accentColor = isListening ? '#0EA5E9' : '#EC4899';
-  const SkillIcon = isListening ? Headphones : Mic;
+  const accentColor = isListening ? '#0EA5E9' : skill === 'speaking' ? '#EC4899' : '#0D9488';
+  const SkillIcon = isListening ? Headphones : skill === 'speaking' ? Mic : Sparkles;
 
   const handleFile = async (f: File) => {
     setError('');
@@ -54,14 +54,15 @@ export function TeensImportModal({ open, skill, onClose, onImport }: Props) {
       try {
         const text = await f.text();
         const parsed = JSON.parse(text);
-        if (skill === 'listening' && !parsed.groups) {
-          throw new Error('File JSON Listening phải chứa key "groups"');
+        const detectedSkill = parsed.skill || (parsed.groups ? 'listening' : parsed.parts ? 'speaking' : null);
+        if (!detectedSkill) {
+          throw new Error('File JSON import không hợp lệ (phải chứa key "groups" hoặc "parts")');
         }
-        if (skill === 'speaking' && !parsed.parts) {
-          throw new Error('File JSON Speaking phải chứa key "parts"');
+        if (skill !== 'auto' && skill !== detectedSkill) {
+          throw new Error(`Dữ liệu JSON không khớp kỹ năng đang yêu cầu (${skill})`);
         }
         setSourceKind('json');
-        setPayload(parsed);
+        setPayload({ ...parsed, skill: detectedSkill });
       } catch (e: any) {
         setError(e.message || 'JSON không hợp lệ');
       }
@@ -219,8 +220,8 @@ export function TeensImportModal({ open, skill, onClose, onImport }: Props) {
 
   const handleImportSubmit = () => {
     if (!payload) return;
-    // Ensure skill field is always present (JSON files may not have it)
-    onImport({ ...payload, skill });
+    const finalSkill = payload.skill || skill;
+    onImport({ ...payload, skill: finalSkill });
     onClose();
   };
 
@@ -339,7 +340,7 @@ export function TeensImportModal({ open, skill, onClose, onImport }: Props) {
                   <div>
                     <h4 className="font-bold text-emerald-800 text-sm">Phân tích thành công!</h4>
                     <p className="text-xs text-emerald-600">
-                      Tìm thấy {isListening ? `${payload.groups?.length || 0} nhóm câu hỏi` : `${payload.parts?.length || 0} đề bài nói`}
+                      Tìm thấy {payload.skill === 'listening' ? `${payload.groups?.length || 0} nhóm câu hỏi` : `${payload.parts?.length || 0} đề bài nói`} ({payload.skill === 'listening' ? 'Listening' : 'Speaking'})
                     </p>
                   </div>
                 </div>

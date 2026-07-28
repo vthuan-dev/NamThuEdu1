@@ -1470,7 +1470,7 @@ CRITICAL RULES:
 
         $request->validate([
             'file'  => 'required|file|mimes:pdf|max:20480', // 20MB
-            'skill' => 'required|in:listening,speaking',
+            'skill' => 'nullable|in:listening,speaking,auto',
         ]);
 
         if (empty($this->apiKeys)) {
@@ -1481,7 +1481,7 @@ CRITICAL RULES:
         }
 
         $file   = $request->file('file');
-        $skill  = $request->input('skill');
+        $skill  = $request->input('skill', 'auto') ?: 'auto';
         $prompt = $this->buildTeensPrompt($skill);
 
         $lastError = '';
@@ -1529,7 +1529,7 @@ CRITICAL RULES:
 
         $request->validate([
             'text'  => 'required|string|min:30|max:120000',
-            'skill' => 'required|in:listening,speaking',
+            'skill' => 'nullable|in:listening,speaking,auto',
         ]);
 
         if (empty($this->apiKeys)) {
@@ -1540,7 +1540,7 @@ CRITICAL RULES:
         }
 
         $text   = (string) $request->input('text');
-        $skill  = $request->input('skill');
+        $skill  = $request->input('skill', 'auto') ?: 'auto';
         $prompt = $this->buildTeensPrompt($skill)
             . "\n\nHere is the raw exam text extracted from the document. Parse it faithfully:\n\"\"\"\n"
             . $text
@@ -1583,6 +1583,19 @@ CRITICAL RULES:
      */
     private function postProcessTeens(array $data, string $skill): array
     {
+        if ($skill === 'auto' || empty($skill)) {
+            $skill = $data['skill'] ?? '';
+            if (empty($skill)) {
+                if (isset($data['groups'])) {
+                    $skill = 'listening';
+                } elseif (isset($data['parts'])) {
+                    $skill = 'speaking';
+                } else {
+                    $skill = 'listening'; // fallback
+                }
+            }
+        }
+
         $data['skill'] = $skill;
 
         if ($skill === 'listening' && isset($data['groups']) && is_array($data['groups'])) {
@@ -1674,7 +1687,7 @@ CRITICAL RULES:
 2. For multiple_choice questions: there must be 2 to 4 options. Make sure exactly one option has \"isCorrect\": true.
 3. For fill_blank questions: use ___ in the qContent to indicate the blank. The answer must be in the \"correctAnswer\" field (do not use \"options\").
 4. Keep the question content clean and concise.";
-        } else {
+        } elseif ($skill === 'speaking') {
             return "You are an expert at extracting English Speaking prompts/tasks for Teens (age 13-17) from a document.
 Return ONLY valid JSON in EXACTLY this shape:
 {
@@ -1692,6 +1705,59 @@ CRITICAL RULES:
 1. Extract speaking prompts or questions.
 2. For each speaking task/part, extract the prompt text into \"qContent\".
 3. Suggest a reasonable prepSeconds (default: 30) and speakSeconds (default: 120) unless explicitly written in the document.";
+        } else {
+            // auto detect
+            return "You are an expert at extracting English exam content for Teens (age 13-17) from a document.
+First, analyze the document and determine if it is primarily a Listening exam (contains listening questions, dialogues, MCQs, fill-in-the-blanks, transcripts) or a Speaking exam (prompts asking students to speak or describe something, answer questions orally).
+
+Return ONLY valid JSON.
+If it is a Listening exam, return in this shape:
+{
+  \"skill\": \"listening\",
+  \"groups\": [
+    {
+      \"audio_url\": \"\",
+      \"task_image\": \"\",
+      \"questions\": [
+        {
+          \"qContent\": \"Question text here...\",
+          \"qType\": \"multiple_choice\",
+          \"options\": [
+            { \"content\": \"Option 1 text\", \"isCorrect\": false },
+            { \"content\": \"Option 2 text\", \"isCorrect\": true },
+            { \"content\": \"Option 3 text\", \"isCorrect\": false },
+            { \"content\": \"Option 4 text\", \"isCorrect\": false }
+          ],
+          \"qExplanation\": \"Explanation for the answer...\"
+        },
+        {
+          \"qContent\": \"Fill in the blank: The speaker went to the ___ yesterday.\",
+          \"qType\": \"fill_blank\",
+          \"correctAnswer\": \"cinema\",
+          \"qExplanation\": \"Explanation...\"
+        }
+      ]
+    }
+  ]
+}
+
+If it is a Speaking exam, return in this shape:
+{
+  \"skill\": \"speaking\",
+  \"parts\": [
+    {
+      \"qContent\": \"Speak about your holiday. You should say: where you went, who you went with, and what you did.\",
+      \"prepSeconds\": 30,
+      \"speakSeconds\": 120,
+      \"qExplanation\": \"Suggested ideas or vocabulary...\"
+    }
+  ]
+}
+
+CRITICAL RULES:
+1. For Listening MCQ questions: there must be 2 to 4 options. Make sure exactly one option has \"isCorrect\": true.
+2. For Listening Fill-in-the-blank questions: use ___ in the qContent to indicate the blank. The answer must be in the \"correctAnswer\" field (do not use \"options\").
+3. For Speaking tasks: extract the prompt text into \"qContent\", and suggest reasonable prepSeconds (default: 30) and speakSeconds (default: 120).";
         }
     }
 }
