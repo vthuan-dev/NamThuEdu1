@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import * as Icons from 'lucide-react';
 import {
   ArrowLeft,
@@ -45,6 +45,9 @@ const LEVELS: { value: Level; label: string }[] = [
 export function CreateThptExam() {
   const params = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const queryAgeGroup = searchParams.get('age_group') as AgeGroup | null;
+
   // Dung toast context TOAN CUC (co ToastContainer render san o app root) thay vi
   // useToast() local — truoc day mang toasts local khong duoc render nen moi
   // canh bao publish (thieu audio/dap an, loi 422) deu VO HINH -> nguoi dung
@@ -52,10 +55,16 @@ export function CreateThptExam() {
   const toast = useToastContext();
 
   const [examId, setExamId] = useState<string | undefined>(params.examId);
-  const [examTitle, setExamTitle] = useState('Đề Tiếng Anh THPT');
+  const [examTitle, setExamTitle] = useState(queryAgeGroup === 'teens' ? 'Đề tổng hợp Teens' : 'Đề Tiếng Anh THPT');
   const [examDescription, setExamDescription] = useState('');
-  const [ageGroup, setAgeGroup] = useState<AgeGroup>('teens');
-  const [config, setConfig] = useState<ThptConfig>(blankConfig());
+  const [ageGroup, setAgeGroup] = useState<AgeGroup>(queryAgeGroup || 'teens');
+  const [config, setConfig] = useState<ThptConfig>(() => {
+    const cfg = blankConfig();
+    if (queryAgeGroup === 'teens') {
+      cfg.level = 'THCS';
+    }
+    return cfg;
+  });
 
   const [activeIdx, setActiveIdx] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);

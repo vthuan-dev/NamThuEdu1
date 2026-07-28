@@ -246,7 +246,7 @@ export function buildCreatorUrl(opts: {
       return '/giao-vien/de-thi/kids/tao-moi';
 
     case 'THPT':
-      return '/giao-vien/de-thi/thpt/tao-moi';
+      return `/giao-vien/de-thi/thpt/tao-moi?age_group=${opts.ageGroup}`;
 
     case 'TeensAudio': {
       // teens-listening → /de-thi/teens/listening/tao-moi
