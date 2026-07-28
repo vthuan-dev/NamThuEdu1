@@ -155,7 +155,8 @@ const MODAL_OPTIONS: OptionMeta[] = [
 export function AddSectionModal({ open, onClose, onPick }: Props) {
   if (!open) return null;
 
-  const groups = ['language', 'reading', 'writing', 'listening', 'speaking'] as const;
+  // listening & speaking \u0111\u01b0\u1ee3c import qua n\u00fat "Import AI" tr\u00ean header — \u1ea9n kh\u1ecfi modal th\u00eam th\u1ee7 c\u00f4ng
+  const groups = ['language', 'reading', 'writing'] as const;
 
   return (
     <div

@@ -11,6 +11,7 @@ import {
   ChevronDown,
   Trash2,
   History,
+  Sparkles,
 } from 'lucide-react';
 import { api } from '../../../../../services/api';
 import { useToastContext } from '../../../../../contexts/ToastContext';
@@ -28,6 +29,7 @@ import {
 import { SectionEditor } from './editors/SectionEditor';
 import { AddSectionModal } from './AddSectionModal';
 import { AssignModal } from '../../assignments/AssignModal';
+import { TeensImportModal } from '../teens/components/TeensImportModal';
 
 type AgeGroup = 'kids' | 'teens' | 'adults' | 'all';
 type Level = 'THCS' | 'THPT' | 'DGNL' | 'OTHER';
@@ -68,6 +70,53 @@ export function CreateThptExam() {
   /** Đề đã xuất bản nhưng đang có thay đổi chưa áp dụng cho học viên */
   const [hasDraft, setHasDraft] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importSkill, setImportSkill] = useState<'listening' | 'speaking'>('listening');
+
+  const handleThptImport = (data: any) => {
+    if (data.skill === 'listening' && Array.isArray(data.groups)) {
+      const newSections: ThptSection[] = data.groups.map((g: any) => {
+        const sec = createSection('listening');
+        if (g.audio_url) (sec as any).audioUrl = g.audio_url;
+        if (g.task_image) (sec as any).taskImage = g.task_image;
+        const items = Array.isArray(g.questions)
+          ? g.questions.map((q: any, qi: number) => ({
+              id: `imp-${Date.now()}-${qi}`,
+              kind: q.qType === 'fill_blank' ? 'fill_blank' : 'mc',
+              stem: q.qContent || '',
+              options: Array.isArray(q.options)
+                ? q.options.map((o: any) => ({ text: o.content || '', correct: !!o.isCorrect }))
+                : [],
+              correctText: q.correctAnswer || '',
+              explanation: q.qExplanation || '',
+            }))
+          : [];
+        (sec as any).items = items;
+        return sec;
+      });
+      setConfig(prev => ({
+        ...prev,
+        sections: [...prev.sections, ...newSections],
+      }));
+      setHasUnsaved(true);
+      toast.success(`Đã import ${newSections.length} phần Listening!`);
+    } else if (data.skill === 'speaking' && Array.isArray(data.parts)) {
+      const newSections: ThptSection[] = data.parts.map((p: any) => {
+        const sec = createSection('speaking');
+        (sec as any).prompt = p.qContent || '';
+        (sec as any).prepSeconds = p.prepSeconds ?? 30;
+        (sec as any).speakSeconds = p.speakSeconds ?? 120;
+        (sec as any).explanation = p.qExplanation || '';
+        return sec;
+      });
+      setConfig(prev => ({
+        ...prev,
+        sections: [...prev.sections, ...newSections],
+      }));
+      setHasUnsaved(true);
+      toast.success(`Đã import ${newSections.length} phần Speaking!`);
+    }
+  };
   const assignExams = useMemo(() => {
     if (!examId) return [];
     return [
@@ -494,7 +543,29 @@ export function CreateThptExam() {
             ))}
           </div>
 
-          {/* Nút LƯU riêng — trước đây chỉ có nút Xuất bản nên giáo viên không có
+          {/* Import AI — Listening / Speaking */}
+          <button
+            type="button"
+            onClick={() => { setImportSkill('listening'); setShowImportModal(true); }}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold text-white transition-all text-sm cursor-pointer"
+            style={{ backgroundColor: '#0EA5E9' }}
+            title="Import đề Listening từ PDF/Word bằng AI"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Import Listening</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setImportSkill('speaking'); setShowImportModal(true); }}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold text-white transition-all text-sm cursor-pointer"
+            style={{ backgroundColor: '#EC4899' }}
+            title="Import đề Speaking từ PDF/Word bằng AI"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Import Speaking</span>
+          </button>
+
+          {/* Nút LỨU riêng — trước đây chỉ có nút Xuất bản nên giáo viên không có
               cách nào lưu nháp giữa lúc soạn ("chưa hiển thị nút lưu"). */}
           <button
             type="button"
@@ -796,6 +867,12 @@ export function CreateThptExam() {
         exams={assignExams}
         onClose={() => setShowAssignModal(false)}
         onAssigned={() => setShowAssignModal(false)}
+      />
+      <TeensImportModal
+        open={showImportModal}
+        skill={importSkill}
+        onClose={() => setShowImportModal(false)}
+        onImport={handleThptImport}
       />
     </div>
   );
