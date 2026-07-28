@@ -104,9 +104,6 @@ export const AGE_GROUP_CATALOG: AgeGroupCatalog[] = [
     iconName: 'GraduationCap',
     iconColor: '#0D9488',
     examTypes: [
-      // Listening / Speaking Teens từng là card riêng (TeensAudio) — bị dư vì
-      // creator "Đề tổng hợp" đã có sẵn section Listening (MCQ / điền / ảnh đề)
-      // và Speaking trong AddSectionModal. Giữ 1 entry duy nhất.
       {
         value: 'teens-thpt',
         examType: 'THPT',
@@ -121,24 +118,48 @@ export const AGE_GROUP_CATALOG: AgeGroupCatalog[] = [
         themeColor: '#2563EB',
         highlights: [
           { iconName: 'Layers', label: 'Cấu trúc', value: 'Thêm phần linh hoạt trong modal' },
-          {
-            iconName: 'ListChecks',
-            label: 'Dạng câu',
-            value: 'Ngữ pháp · Đọc · Viết · Nghe · Nói',
-          },
-          {
-            iconName: 'Image',
-            label: 'Listening',
-            value: 'MCQ · Điền từ · Ảnh đề nguyên khối',
-          },
-          {
-            iconName: 'Mic',
-            label: 'Speaking',
-            value: 'Ghi âm + AI chấm',
-          },
+          { iconName: 'ListChecks', label: 'Dạng câu', value: 'Ngữ pháp · Đọc · Viết · Nghe · Nói' },
+          { iconName: 'Image', label: 'Listening', value: 'MCQ · Điền từ · Ảnh đề nguyên khối' },
+          { iconName: 'Mic', label: 'Speaking', value: 'Ghi âm + AI chấm' },
         ],
         needsSkill: false,
         badge: 'Mới',
+      },
+      {
+        value: 'teens-listening',
+        examType: 'TeensAudio',
+        name: 'Teens Listening',
+        description: 'Đề nghe chuyên biệt: audio + ảnh đề nguyên khối, câu MCQ / điền từ',
+        tagline: 'Creator chuyên dụng cho Listening — import từ PDF/Word bằng AI',
+        duration: '30 phút',
+        iconName: 'Headphones',
+        iconColor: '#0EA5E9',
+        themeColor: '#0EA5E9',
+        highlights: [
+          { iconName: 'Music', label: 'Audio', value: 'MP3 · M4A · WAV' },
+          { iconName: 'Image', label: 'Ảnh đề', value: 'Layout nguyên khối giống IELTS' },
+          { iconName: 'Sparkles', label: 'Import AI', value: 'Đọc PDF/Word tự động' },
+        ],
+        needsSkill: false,
+        badge: 'AI',
+      },
+      {
+        value: 'teens-speaking',
+        examType: 'TeensAudio',
+        name: 'Teens Speaking',
+        description: 'Đề nói chuyên biệt: học viên ghi âm, AI chấm điểm tự động',
+        tagline: 'Creator chuyên dụng cho Speaking — import từ PDF/Word bằng AI',
+        duration: '15 phút',
+        iconName: 'Mic',
+        iconColor: '#EC4899',
+        themeColor: '#EC4899',
+        highlights: [
+          { iconName: 'Mic', label: 'Ghi âm', value: 'Học viên thu âm trực tiếp' },
+          { iconName: 'Bot', label: 'AI chấm', value: 'Phát âm + Nội dung' },
+          { iconName: 'Sparkles', label: 'Import AI', value: 'Đọc PDF/Word tự động' },
+        ],
+        needsSkill: false,
+        badge: 'AI',
       },
     ],
   },
@@ -263,12 +284,12 @@ export function buildCreatorUrl(opts: {
     case 'THPT':
       return '/giao-vien/de-thi/thpt/tao-moi';
 
-/* ── DISABLED: creator riêng TeensAudio bị dư vì THPT modal đã có Listening/Speaking ──
     case 'TeensAudio': {
-      const slug = skill === 'speaking' ? 'speaking' : 'listening';
+      // teens-listening → /de-thi/teens/listening/tao-moi
+      // teens-speaking  → /de-thi/teens/speaking/tao-moi
+      const slug = examType.value === 'teens-speaking' ? 'speaking' : 'listening';
       return `/giao-vien/de-thi/teens/${slug}/tao-moi`;
     }
-    ── /DISABLED ───────────────────────────────────────────────────────────────────── */
 
     case 'IELTS': {
       const slug = !skill || skill === 'mixed' ? 'full' : skill;
