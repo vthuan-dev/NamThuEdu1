@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { X, Upload, FileText, CheckCircle2, Loader2, AlertCircle, Headphones, Mic, Sparkles, HelpCircle } from 'lucide-react';
 import { API_BASE_URL } from '../../../../../../utils/apiConfig';
 import { getAuthToken } from '../../../../../../utils/authStorage';
+import { PdfPageSelector } from '../../ielts/components/PdfPageSelector';
 
 interface Props {
   open: boolean;
@@ -15,13 +16,25 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
   const [fileName, setFileName] = useState('');
   const [fileSize, setFileSize] = useState<string>('');
   const [parseError, setError] = useState('');
-  const [pdfStage, setPdfStage] = useState<'idle' | 'extract' | 'scanned' | 'ai'>('idle');
+  const [pdfStage, setPdfStage] = useState<'idle' | 'trim' | 'extract' | 'scanned' | 'ai'>('idle');
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const pdfFileRef = useRef<File | null>(null);
   const [aiParsing, setAiParsing] = useState(false);
   const [pdfProgress, setPdfProgress] = useState({ label: '', done: 0, total: 0 });
   const [scannedText, setScannedText] = useState('');
   const [sourceKind, setSourceKind] = useState<'pdf' | 'docx' | 'json' | null>(null);
   const [dragActive, setDragActive] = useState(false);
+
+  const resetState = () => {
+    setPayload(null);
+    setFileName('');
+    setFileSize('');
+    setError('');
+    setPdfStage('idle');
+    setPendingFile(null);
+    pdfFileRef.current = null;
+    setScannedText('');
+  };
 
   if (!open) return null;
 
@@ -54,8 +67,8 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
 
     if (isPdf) {
       setSourceKind('pdf');
-      pdfFileRef.current = f;
-      await extractPdfText(f);
+      setPendingFile(f);
+      setPdfStage('trim');
       return;
     }
 
@@ -114,6 +127,7 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
     setError('');
     setPayload(null);
     setFileName(f.name);
+    setPendingFile(null);
     pdfFileRef.current = f;
 
     try {
@@ -260,9 +274,17 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[8px] transition-all duration-300">
       {/* Outer Shell - Nested Doppelrand Bezel */}
-      <div className="flex max-h-[82vh] h-auto w-full max-w-2xl flex-col rounded-[2.2rem] bg-slate-100/80 p-1.5 border border-white/25 shadow-2xl backdrop-blur-md overflow-hidden animate-in fade-in zoom-in-95 duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]">
+      <div 
+        className={`flex w-full border border-white/25 shadow-2xl backdrop-blur-md overflow-hidden animate-in fade-in zoom-in-95 duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+          pdfStage === 'trim' 
+            ? 'max-w-5xl h-[85vh] rounded-[2.5rem] p-2 bg-slate-100/80' 
+            : 'max-h-[82vh] h-auto max-w-2xl rounded-[2.2rem] p-1.5 bg-slate-100/80'
+        }`}
+      >
         {/* Inner Core */}
-        <div className="flex flex-1 flex-col rounded-[1.9rem] bg-white border border-slate-200/50 shadow-inner overflow-hidden">
+        <div className={`flex flex-1 flex-col bg-white border border-slate-200/50 shadow-inner overflow-hidden ${
+          pdfStage === 'trim' ? 'rounded-[2.2rem]' : 'rounded-[1.9rem]'
+        }`}>
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
             <div className="flex items-center gap-3">
@@ -292,6 +314,16 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
 
           {/* Content Body */}
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
+            {/* PDF: chọn / cắt trang trước khi xử lý */}
+            {pdfStage === 'trim' && pendingFile && (
+              <PdfPageSelector
+                file={pendingFile}
+                accentColor={themeAccent}
+                onConfirm={(result) => extractPdfText(result)}
+                onCancel={resetState}
+              />
+            )}
+
             {/* File Upload Zone */}
             {pdfStage === 'idle' && !payload && (
               <div 
@@ -491,26 +523,28 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
           </div>
 
           {/* Footer Actions */}
-          <div className="px-8 py-5 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">
-            <button
-              onClick={onClose}
-              className="px-5 py-2.5 rounded-xl font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer text-sm"
-            >
-              Hủy bỏ
-            </button>
-            <button
-              onClick={handleImportSubmit}
-              disabled={!payload}
-              className="px-6 py-2.5 rounded-xl font-bold text-white transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-95 shadow-md flex items-center gap-1.5 text-sm cursor-pointer"
-              style={{ 
-                backgroundColor: themeAccent,
-                boxShadow: payload ? `0 6px 16px ${themeAccent}30` : 'none'
-              }}
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              Xác nhận Import đề
-            </button>
-          </div>
+          {pdfStage !== 'trim' && (
+            <div className="px-8 py-5 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">
+              <button
+                onClick={onClose}
+                className="px-5 py-2.5 rounded-xl font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer text-sm"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={handleImportSubmit}
+                disabled={!payload}
+                className="px-6 py-2.5 rounded-xl font-bold text-white transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-95 shadow-md flex items-center gap-1.5 text-sm cursor-pointer"
+                style={{ 
+                  backgroundColor: themeAccent,
+                  boxShadow: payload ? `0 6px 16px ${themeAccent}30` : 'none'
+                }}
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Xác nhận Import đề
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
