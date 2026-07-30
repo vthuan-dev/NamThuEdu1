@@ -196,8 +196,27 @@ export function ThptImportModal({ open, onClose, onImport }: Props) {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
       });
+
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok) {
+        let errMsg = 'AI phân tích PDF thất bại.';
+        if (contentType.includes('application/json')) {
+          const json = await res.json();
+          errMsg = json.message || errMsg;
+        } else if (res.status === 504) {
+          errMsg = 'Máy chủ phản hồi quá lâu (Gateway Time-out 504). Vui lòng thử lại hoặc cắt bớt trang PDF để giảm thời gian xử lý.';
+        } else {
+          errMsg = `Lỗi hệ thống (${res.status}).`;
+        }
+        throw new Error(errMsg);
+      }
+
+      if (!contentType.includes('application/json')) {
+        throw new Error('Phản hồi từ máy chủ không hợp lệ (không phải JSON).');
+      }
+
       const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.message || `Lỗi AI: ${res.status}`);
+      if (!json.success) throw new Error(json.message || 'AI phân tích PDF thất bại.');
       setPdfProgress(p => ({ ...p, label: 'Hoàn tất', done: 100 }));
       setParseMethod('ai'); setPayload(json.data); setPdfStage('idle');
     } catch (e: any) {
@@ -216,13 +235,6 @@ export function ThptImportModal({ open, onClose, onImport }: Props) {
     const timeoutId  = setTimeout(() => controller.abort(), 110_000);
     try {
       const token = getAuthToken();
-      let localJson: any = null;
-      try {
-        localJson = parseTeensTextLocally(scannedText, 'listening');
-      } catch (err) {
-        console.warn('Failed to parse local JSON draft for PDF text:', err);
-      }
-
       const res   = await fetch(`${API_BASE_URL}/teacher/thpt/parse-text`, {
         method: 'POST', signal: controller.signal,
         headers: {
@@ -230,12 +242,30 @@ export function ThptImportModal({ open, onClose, onImport }: Props) {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          text: scannedText,
-          local_json: localJson || undefined
+          text: scannedText
         }),
       });
+
+      const contentType = res.headers.get('content-type') || '';
+      if (!res.ok) {
+        let errMsg = 'AI phân tích thất bại.';
+        if (contentType.includes('application/json')) {
+          const json = await res.json();
+          errMsg = json.message || errMsg;
+        } else if (res.status === 504) {
+          errMsg = 'Máy chủ phản hồi quá lâu (Gateway Time-out 504). Vui lòng thử lại hoặc chia nhỏ đề thi làm nhiều phần để import.';
+        } else {
+          errMsg = `Lỗi hệ thống (${res.status}).`;
+        }
+        throw new Error(errMsg);
+      }
+
+      if (!contentType.includes('application/json')) {
+        throw new Error('Phản hồi từ máy chủ không hợp lệ (không phải JSON).');
+      }
+
       const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.message || 'AI phân tích thất bại.');
+      if (!json.success) throw new Error(json.message || 'AI phân tích thất bại.');
       setPdfProgress(p => ({ ...p, label: 'Hoàn tất', done: 100 }));
       setParseMethod('ai'); setPayload(json.data); setPdfStage('idle');
     } catch (e: any) {
@@ -271,18 +301,21 @@ export function ThptImportModal({ open, onClose, onImport }: Props) {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({
-            text: scannedText,
-            local_json: localTeens
+            text: scannedText
           }),
         });
 
         clearTimeout(timeoutId);
-        const json = await res.json();
-        if (res.ok && json.success && json.data) {
-          setParseMethod('ai');
-          setPayload(json.data);
-          setPdfStage('idle');
-          return;
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
+          const json = await res.json();
+          if (json.success && json.data) {
+            clearInterval(timer);
+            setParseMethod('ai');
+            setPayload(json.data);
+            setPdfStage('idle');
+            return;
+          }
         }
       } catch (aiErr) {
         console.warn('AI refinement failed, falling back to local parse:', aiErr);
