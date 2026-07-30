@@ -218,10 +218,17 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
     setAiParsing(true);
     setPdfStage('ai');
     const timer = startFakeProgress('AI đang phân tích văn bản...');
+
+    // Timeout 110s: AI có thể mất tới 60-90s với đề dài.
+    // Nếu quá thời gian → hiện lỗi rõ ràng thay vì treo vô thời hạn.
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 110_000);
+
     try {
       const token = getAuthToken();
       const res = await fetch(`${API_BASE_URL}/teacher/teens/parse-text`, {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -237,9 +244,15 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
       setPayload(json.data);
       setPdfStage('idle');
     } catch (e: any) {
-      setError(e.message || 'Lỗi phân tích văn bản');
+      const isTimeout = e?.name === 'AbortError';
+      setError(
+        isTimeout
+          ? 'AI xử lý quá lâu (>110 giây). File có thể quá dài — hãy thử cắt bớt nội dung hoặc thử lại.'
+          : e.message || 'Lỗi phân tích văn bản'
+      );
       setPdfStage('scanned');
     } finally {
+      clearTimeout(timeoutId);
       clearInterval(timer);
       setAiParsing(false);
     }

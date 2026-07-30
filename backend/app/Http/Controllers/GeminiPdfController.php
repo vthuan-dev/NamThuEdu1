@@ -268,7 +268,10 @@ class GeminiPdfController extends Controller
             for ($attempt = 1; $attempt <= 3; $attempt++) {
                 try {
                     $response = Http::withOptions(['verify' => $verifySsl])
-                        ->timeout(90)
+                        // 55 s: nhỏ hơn nginx proxy_read_timeout mặc định (60 s)
+                        // → PHP bắt exception trả JSON lỗi rõ thay vì nginx kill → 504.
+                        // Muốn tăng: set proxy_read_timeout 180; fastcgi_read_timeout 180; trên nginx.
+                        ->timeout(55)
                         ->post($url, $payload);
                 } catch (\Throwable $e) {
                     $lastError = $e->getMessage();
