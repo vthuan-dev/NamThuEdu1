@@ -273,7 +273,9 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
         className={`flex w-full border border-white/25 shadow-2xl backdrop-blur-md overflow-hidden animate-in fade-in zoom-in-95 duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
           pdfStage === 'trim'
             ? 'max-w-5xl h-[85vh] rounded-[2.5rem] p-2 bg-slate-100/80'
-            : 'max-h-[82vh] h-auto max-w-2xl rounded-[2.2rem] p-1.5 bg-slate-100/80'
+            : pdfStage === 'scanned'
+              ? 'max-h-[85vh] h-auto max-w-4xl rounded-[2.2rem] p-1.5 bg-slate-100/80'
+              : 'max-h-[82vh] h-auto max-w-2xl rounded-[2.2rem] p-1.5 bg-slate-100/80'
         }`}
         onClick={e => e.stopPropagation()}
       >
@@ -401,16 +403,56 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
                 )}
                 {!isScanned && scannedText && (
                   <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-inner">
-                    <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-slate-400" />
-                      <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Nội dung trích xuất</span>
+                    {/* Header bar */}
+                    <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-slate-400" />
+                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                          {sourceKind === 'docx' ? 'Preview tài liệu Word' : 'Preview nội dung PDF'}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono">{scannedText.length.toLocaleString()} ký tự</span>
                     </div>
-                    <pre
-                      className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed p-4 overflow-y-auto"
-                      style={{ maxHeight: '200px', fontFamily: '"Times New Roman", Times, serif' }}
-                    >
-                      {scannedText}
-                    </pre>
+
+                    {/* Document preview */}
+                    <div className="overflow-y-auto bg-slate-100" style={{ maxHeight: '340px' }}>
+                      {sourceKind === 'docx' ? (
+                        /* DOCX → render HTML thật trông như trang tài liệu */
+                        <div className="p-4">
+                          <div
+                            className="bg-white shadow-md rounded-lg mx-auto p-8 prose prose-sm max-w-none"
+                            style={{
+                              fontFamily: '"Times New Roman", Times, serif',
+                              fontSize: '13px',
+                              lineHeight: '1.8',
+                              minHeight: '200px',
+                              maxWidth: '720px',
+                            }}
+                            dangerouslySetInnerHTML={{ __html: scannedText }}
+                          />
+                        </div>
+                      ) : (
+                        /* PDF → plain text nhưng trong paper-like container */
+                        <div className="p-4">
+                          <div
+                            className="bg-white shadow-md rounded-lg mx-auto p-6"
+                            style={{ maxWidth: '720px' }}
+                          >
+                            <pre
+                              className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed"
+                              style={{ fontFamily: '"Courier New", Courier, monospace' }}
+                            >
+                              {scannedText}
+                            </pre>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Scroll hint */}
+                    <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 flex items-center gap-1.5">
+                      <span className="text-[9px] text-slate-400">↕ Cuộn để xem toàn bộ nội dung · Nhấn "Phân tích bằng AI" ở footer để tiếp tục</span>
+                    </div>
                   </div>
                 )}
               </div>
