@@ -30,7 +30,7 @@ import {
 import { SectionEditor } from './editors/SectionEditor';
 import { AddSectionModal } from './AddSectionModal';
 import { AssignModal } from '../../assignments/AssignModal';
-import { TeensImportModal } from '../teens/components/TeensImportModal';
+import { ThptImportModal } from './components/ThptImportModal';
 
 type AgeGroup = 'kids' | 'teens' | 'adults' | 'all';
 type Level = 'THCS' | 'THPT' | 'DGNL' | 'OTHER';
@@ -81,9 +81,44 @@ export function CreateThptExam() {
   const [hasDraft, setHasDraft] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
-  const [importSkill, setImportSkill] = useState<'listening' | 'speaking' | 'auto'>('auto');
 
   const handleThptImport = (data: any) => {
+    if (data.sections && Array.isArray(data.sections)) {
+      let runningStart = nextQuestionNumber(config.sections);
+      const newSections: ThptSection[] = data.sections.map((s: any) => {
+        const sec = {
+          ...s,
+          id: s.id || `s_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        };
+        if (sec.type === 'mc_cloze' || sec.type === 'word_bank_cloze' || sec.type === 'open_cloze') {
+          if (Array.isArray(sec.blanks)) {
+            sec.blanks = sec.blanks.map((blank: any, idx: number) => {
+              const qNum = runningStart + idx;
+              return { ...blank, question_number: qNum };
+            });
+            runningStart += sec.blanks.length;
+          }
+        } else {
+          if (Array.isArray(sec.items)) {
+            sec.items = sec.items.map((item: any, idx: number) => {
+              const qNum = runningStart + idx;
+              return { ...item, question_number: qNum };
+            });
+            runningStart += sec.items.length;
+          }
+        }
+        return sec;
+      });
+
+      setConfig(prev => renumberConfig({
+        ...prev,
+        sections: [...prev.sections, ...newSections],
+      }));
+      setHasUnsaved(true);
+      toast.success(`Đã import ${newSections.length} phần thi thành công!`);
+      return;
+    }
+
     if (data.skill === 'listening' && Array.isArray(data.groups)) {
       let runningStart = nextQuestionNumber(config.sections);
       const newSections: ThptSection[] = data.groups.map((g: any) => {
@@ -584,10 +619,10 @@ export function CreateThptExam() {
           {/* Import AI */}
           <button
             type="button"
-            onClick={() => { setImportSkill('auto'); setShowImportModal(true); }}
+            onClick={() => { setShowImportModal(true); }}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold text-white transition-all text-sm cursor-pointer"
             style={{ backgroundColor: '#0D9488' }}
-            title="Import đề Listening / Speaking từ PDF/Word bằng AI"
+            title="Import đề thi THCS/THPT từ PDF/Word bằng AI"
           >
             <Sparkles className="w-4 h-4" />
             <span>Import (AI)</span>
@@ -896,9 +931,8 @@ export function CreateThptExam() {
         onClose={() => setShowAssignModal(false)}
         onAssigned={() => setShowAssignModal(false)}
       />
-      <TeensImportModal
+      <ThptImportModal
         open={showImportModal}
-        skill={importSkill}
         onClose={() => setShowImportModal(false)}
         onImport={handleThptImport}
       />

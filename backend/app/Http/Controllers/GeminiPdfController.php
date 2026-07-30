@@ -1596,6 +1596,291 @@ CRITICAL RULES:
     }
 
     /**
+     * Parse TEXT đề THPT (đã trích xuất sẵn ở client từ PDF thuần hoặc file Word)
+     * → JSON theo schema sections của THPT.
+     * Route: POST /api/teacher/thpt/parse-text
+     * Body (json): { text: string, local_json?: array }
+     * Return: { success, data: { sections: ThptSection[] } }
+     */
+    public function parseThptText(Request $request)
+    {
+        @set_time_limit(180);
+        @ini_set('max_execution_time', '180');
+
+        $request->validate([
+            'text'  => 'required|string|min:30|max:120000',
+            'local_json' => 'nullable|array',
+        ]);
+
+        if (empty($this->apiKeys)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'GEMINI_API_KEY chưa được cấu hình trong .env backend.',
+            ], 500);
+        }
+
+        $text   = (string) $request->input('text');
+        $localJson = $request->input('local_json');
+
+        $prompt = $this->buildThptPrompt();
+
+        if (!empty($localJson)) {
+            $prompt .= "\n\nWe have already parsed the questions, options, and correct answers locally. Here is the draft JSON structure:\n"
+                . json_encode($localJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+                . "\n\nYOUR TASK:\n"
+                . "1. Use this draft JSON as your source of truth for question numbers, options, and correct answers.\n"
+                . "2. Reorganize them into the proper THPT section types (phonetics, mc_questions, mc_cloze, reading_mixed, sentence_transformation).\n"
+                . "3. Crucially, find the reading/cloze passages from the raw text below and set them in the 'passage' property of the corresponding sections (e.g. for mc_cloze or reading_mixed). For mc_cloze, make sure the passage has (1) ______, (2) ______ etc. indicating the blanks.\n"
+                . "4. Output the refined JSON structure matching the required schema.";
+        }
+
+        $prompt .= "\n\nHere is the raw exam text extracted from the document. Parse it faithfully:\n\"\"\"\n"
+            . $text
+            . "\n\"\"\"";
+
+        $lastError = '';
+        $totalKeys = count($this->apiKeys);
+
+        foreach ($this->apiKeys as $idx => $apiKey) {
+            try {
+                $result = $this->generateContentFromText($prompt, $apiKey);
+                $result = $this->postProcessThpt($result);
+
+                return response()->json([
+                    'success' => true,
+                    'data'    => $result,
+                ]);
+            } catch (\Exception $e) {
+                $lastError = $e->getMessage();
+                $keyNo = $idx + 1;
+                if ($this->shouldRotateKey($lastError) && $keyNo < $totalKeys) {
+                    Log::warning("Gemini key #{$keyNo} lỗi ({$lastError}) — xoay sang key #" . ($keyNo + 1));
+                    continue;
+                }
+                Log::error('Gemini THPT parse text error: ' . $lastError);
+                break;
+            }
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => $lastError ?: 'Gemini parse text THPT thất bại.',
+        ], 500);
+    }
+
+    /**
+     * Parse PDF đề THPT → JSON theo schema sections của THPT.
+     * Route: POST /api/teacher/thpt/parse-pdf
+     * Body (multipart): { file: PDF }
+     * Return: { success, data: { sections: ThptSection[] } }
+     */
+    public function parseThptPdf(Request $request)
+    {
+        @set_time_limit(180);
+        @ini_set('max_execution_time', '180');
+
+        $request->validate([
+            'file'  => 'required|file|mimes:pdf|max:20480', // 20MB
+        ]);
+
+        if (empty($this->apiKeys)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'GEMINI_API_KEY chưa được cấu hình trong .env backend.',
+            ], 500);
+        }
+
+        $file   = $request->file('file');
+        $prompt = $this->buildThptPrompt();
+
+        $lastError = '';
+        $totalKeys = count($this->apiKeys);
+
+        foreach ($this->apiKeys as $idx => $apiKey) {
+            try {
+                $fileUri = $this->uploadToGemini($file, $apiKey);
+                $result  = $this->generateContent($fileUri, $prompt, $apiKey);
+                $result  = $this->postProcessThpt($result);
+
+                return response()->json([
+                    'success' => true,
+                    'data'    => $result,
+                ]);
+            } catch (\Exception $e) {
+                $lastError = $e->getMessage();
+                $keyNo = $idx + 1;
+                if ($this->shouldRotateKey($lastError) && $keyNo < $totalKeys) {
+                    Log::warning("Gemini key #{$keyNo} lỗi ({$lastError}) — xoay sang key #" . ($keyNo + 1));
+                    continue;
+                }
+                Log::error('Gemini THPT parse PDF error: ' . $lastError);
+                break;
+            }
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => $lastError ?: 'Gemini parse PDF THPT thất bại.',
+        ], 500);
+    }
+
+    /**
+     * Post-process kết quả từ Gemini cho THPT
+     */
+    private function postProcessThpt(array $data): array
+    {
+        if (!isset($data['sections']) || !is_array($data['sections'])) {
+            $data['sections'] = [];
+        }
+        foreach ($data['sections'] as &$sec) {
+            $type = $sec['type'] ?? '';
+            if (empty($sec['id'])) {
+                $sec['id'] = 's_' . uniqid();
+            }
+            if ($type === 'phonetics') {
+                if (!isset($sec['items']) || !is_array($sec['items'])) $sec['items'] = [];
+                foreach ($sec['items'] as &$item) {
+                    $item['correct_id'] = strtoupper(trim((string) ($item['correct_id'] ?? '')));
+                }
+            } elseif ($type === 'mc_questions') {
+                if (!isset($sec['items']) || !is_array($sec['items'])) $sec['items'] = [];
+                foreach ($sec['items'] as &$item) {
+                    $item['correct_id'] = strtoupper(trim((string) ($item['correct_id'] ?? '')));
+                }
+            } elseif ($type === 'mc_cloze') {
+                if (!isset($sec['blanks']) || !is_array($sec['blanks'])) $sec['blanks'] = [];
+                foreach ($sec['blanks'] as &$blank) {
+                    $blank['correct_id'] = strtoupper(trim((string) ($blank['correct_id'] ?? '')));
+                }
+            } elseif ($type === 'reading_mixed') {
+                if (!isset($sec['items']) || !is_array($sec['items'])) $sec['items'] = [];
+                foreach ($sec['items'] as &$item) {
+                    if (isset($item['correct_id'])) {
+                        $item['correct_id'] = strtoupper(trim((string) ($item['correct_id'] ?? '')));
+                    }
+                }
+            }
+        }
+        unset($sec);
+        return $data;
+    }
+
+    /**
+     * Prompt cho Gemini parse đề THPT → JSON
+     */
+    private function buildThptPrompt(): string
+    {
+        return "You are an expert at extracting and formatting English exam content for Vietnamese high school students (THCS/THPT) from raw text.
+Your goal is to parse the exam into logical sections based on the question types.
+Return ONLY valid JSON in EXACTLY this shape:
+{
+  \"sections\": [
+    {
+      \"type\": \"phonetics\",
+      \"title\": \"Ngữ âm\",
+      \"instructions\": \"Chọn từ có phần gạch chân được phát âm khác với những từ còn lại.\",
+      \"variant\": \"pronunciation\", // 'pronunciation' or 'stress'
+      \"items\": [
+        {
+          \"question_number\": 1,
+          \"words\": [
+            { \"id\": \"A\", \"text\": \"cats\", \"underline\": \"s\" },
+            { \"id\": \"B\", \"text\": \"dogs\", \"underline\": \"s\" },
+            { \"id\": \"C\", \"text\": \"books\", \"underline\": \"s\" },
+            { \"id\": \"D\", \"text\": \"cups\", \"underline\": \"s\" }
+          ],
+          \"correct_id\": \"B\",
+          \"explanation\": \"cats, books, cups end with voiceless sounds, dogs ends with voiced sound.\"
+        }
+      ]
+    },
+    {
+      \"type\": \"mc_questions\",
+      \"title\": \"Trắc nghiệm\",
+      \"instructions\": \"Chọn phương án đúng (A, B, C hoặc D).\",
+      \"variant\": \"grammar\", // 'grammar', 'vocabulary', 'synonym', 'antonym', 'communication', 'general'
+      \"items\": [
+        {
+          \"question_number\": 5,
+          \"prompt\": \"She is ______ student in her class.\",
+          \"options\": [
+            { \"id\": \"A\", \"text\": \"the best\" },
+            { \"id\": \"B\", \"text\": \"better\" },
+            { \"id\": \"C\", \"text\": \"good\" },
+            { \"id\": \"D\", \"text\": \"well\" }
+          ],
+          \"correct_id\": \"A\",
+          \"explanation\": \"Superlative comparison.\"
+        }
+      ]
+    },
+    {
+      \"type\": \"mc_cloze\",
+      \"title\": \"Đọc điền trắc nghiệm\",
+      \"instructions\": \"Đọc đoạn văn và chọn phương án đúng cho mỗi chỗ trống.\",
+      \"passage\": \"This is a paragraph with a blank (1) ______ here.\", // Keep the complete reading passage text here, replacing the blanks with (1) ______, (2) ______ etc.
+      \"blanks\": [
+        {
+          \"question_number\": 1,
+          \"options\": [
+            { \"id\": \"A\", \"text\": \"word\" },
+            { \"id\": \"B\", \"text\": \"letter\" },
+            { \"id\": \"C\", \"text\": \"sentence\" },
+            { \"id\": \"D\", \"text\": \"page\" }
+          ],
+          \"correct_id\": \"A\",
+          \"explanation\": \"Context clues...\"
+        }
+      ]
+    },
+    {
+      \"type\": \"reading_mixed\",
+      \"title\": \"Đọc hiểu\",
+      \"instructions\": \"Đọc đoạn văn và trả lời các câu hỏi.\",
+      \"passage\": \"Full reading passage text content goes here...\",
+      \"items\": [
+        {
+          \"kind\": \"mc\",
+          \"question_number\": 10,
+          \"prompt\": \"What is the main topic of the passage?\",
+          \"options\": [
+            { \"id\": \"A\", \"text\": \"Topic A\" },
+            { \"id\": \"B\", \"text\": \"Topic B\" },
+            { \"id\": \"C\", \"text\": \"Topic C\" },
+            { \"id\": \"D\", \"text\": \"Topic D\" }
+          ],
+          \"correct_id\": \"B\",
+          \"explanation\": \"The first paragraph states...\"
+        }
+      ]
+    },
+    {
+      \"type\": \"sentence_transformation\",
+      \"title\": \"Viết lại câu\",
+      \"instructions\": \"Viết lại câu sao cho nghĩa không đổi.\",
+      \"items\": [
+        {
+          \"question_number\": 15,
+          \"original\": \"They are building a new road.\",
+          \"lead_in\": \"A new road...\",
+          \"accepted_answers\": [\"is being built\"],
+          \"explanation\": \"Passive voice.\"
+        }
+      ]
+    }
+  ]
+}
+
+CRITICAL RULES:
+1. Parse the entire text into appropriate sections matching the schema above.
+2. If there are reading passages with multiple choice blanks (e.g. Q1-6, Q33-38), parse them as a single 'mc_cloze' section. The 'passage' field must contain the full text of the passage with markers like (1) ______, (2) ______ indicating the blanks, and the 'blanks' array must contain the options and correct_id for each blank. Do NOT put these blanks as separate mc_questions.
+3. If there are reading passages with comprehension questions, parse them as 'reading_mixed' sections. The 'passage' field must contain the reading passage, and the 'items' must have kind: 'mc'.
+4. For normal grammar, vocabulary, communication, synonym, antonym, sentence arrangement, or ordering questions, parse them as 'mc_questions'.
+5. For pronunciation/stress questions, parse them as 'phonetics'.
+6. If the input contains a local draft JSON (containing parsed questions/options/keys), use it as the source of truth for the answers, options, and question numbers, but reorganize them into the proper section type and extract the passages for reading/cloze tasks.";
+    }
+
+    /**
      * Post-process kết quả từ Gemini cho Teens:
      * - Chuẩn hóa options & correctAnswer
      * - Đảm bảo cấu trúc hợp lệ

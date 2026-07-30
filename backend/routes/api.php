@@ -329,6 +329,8 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         Route::post('/exams/teens',                        [\App\Http\Controllers\TeensExamController::class, 'store']);
         Route::post('/teens/parse-pdf',                    [GeminiPdfController::class, 'parseTeensPdf']);
         Route::post('/teens/parse-text',                   [GeminiPdfController::class, 'parseTeensText']);
+        Route::post('/thpt/parse-text',                    [GeminiPdfController::class, 'parseThptText']);
+        Route::post('/thpt/parse-pdf',                     [GeminiPdfController::class, 'parseThptPdf']);
         
         // Listening
         Route::post('/exams/{examId}/vstep/listening/parts/{partNumber}', [ExamController::class, 'saveVstepListeningPart']);
