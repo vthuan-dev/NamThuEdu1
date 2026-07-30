@@ -326,7 +326,7 @@ export function ThptImportModal({ open, onClose, onImport }: Props) {
 
   const handleAiSmart = () => {
     if (sourceKind === 'docx') {
-      return handleLocalParse();
+      return handleTextAiParse();
     }
     return isScanned && pdfFileRef.current ? handleGeminiParsePdf() : handleTextAiParse();
   };
