@@ -70,12 +70,13 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
   const [showJson, setShowJson]   = useState(false);
   const [jsonCopied, setJsonCopied] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [selectedPage, setSelectedPage] = useState<number | null>(null);
 
   const resetState = () => {
     setPayload(null); setFileName(''); setFileSize(''); setError('');
     setPdfStage('idle'); setPendingFile(null); pdfFileRef.current = null;
     setScannedText(''); setIsScanned(false); setSourceKind(null);
-    setAiParsing(false); setParseMethod(null);
+    setAiParsing(false); setParseMethod(null); setSelectedPage(null);
   };
 
   if (!open) return null;
@@ -274,7 +275,7 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
           pdfStage === 'trim'
             ? 'max-w-5xl h-[85vh] rounded-[2.5rem] p-2 bg-slate-100/80'
             : pdfStage === 'scanned'
-              ? 'max-h-[85vh] h-auto max-w-4xl rounded-[2.2rem] p-1.5 bg-slate-100/80'
+              ? 'max-h-[90vh] h-auto max-w-5xl rounded-[2.2rem] p-1.5 bg-slate-100/80'
               : 'max-h-[82vh] h-auto max-w-2xl rounded-[2.2rem] p-1.5 bg-slate-100/80'
         }`}
         onClick={e => e.stopPropagation()}
@@ -401,59 +402,15 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
                     <button onClick={resetState} className="text-xs text-emerald-700 hover:text-emerald-900 font-bold px-2 py-1 hover:bg-emerald-100/50 rounded-lg">Đổi file</button>
                   </div>
                 )}
+                {/* Page thumbnail gallery */}
                 {!isScanned && scannedText && (
-                  <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-inner">
-                    {/* Header bar */}
-                    <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-slate-400" />
-                        <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
-                          {sourceKind === 'docx' ? 'Preview tài liệu Word' : 'Preview nội dung PDF'}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-slate-400 font-mono">{scannedText.length.toLocaleString()} ký tự</span>
-                    </div>
-
-                    {/* Document preview */}
-                    <div className="overflow-y-auto bg-slate-100" style={{ maxHeight: '340px' }}>
-                      {sourceKind === 'docx' ? (
-                        /* DOCX → render HTML thật trông như trang tài liệu */
-                        <div className="p-4">
-                          <div
-                            className="bg-white shadow-md rounded-lg mx-auto p-8 prose prose-sm max-w-none"
-                            style={{
-                              fontFamily: '"Times New Roman", Times, serif',
-                              fontSize: '13px',
-                              lineHeight: '1.8',
-                              minHeight: '200px',
-                              maxWidth: '720px',
-                            }}
-                            dangerouslySetInnerHTML={{ __html: scannedText }}
-                          />
-                        </div>
-                      ) : (
-                        /* PDF → plain text nhưng trong paper-like container */
-                        <div className="p-4">
-                          <div
-                            className="bg-white shadow-md rounded-lg mx-auto p-6"
-                            style={{ maxWidth: '720px' }}
-                          >
-                            <pre
-                              className="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed"
-                              style={{ fontFamily: '"Courier New", Courier, monospace' }}
-                            >
-                              {scannedText}
-                            </pre>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Scroll hint */}
-                    <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 flex items-center gap-1.5">
-                      <span className="text-[9px] text-slate-400">↕ Cuộn để xem toàn bộ nội dung · Nhấn "Phân tích bằng AI" ở footer để tiếp tục</span>
-                    </div>
-                  </div>
+                  <PageThumbnailGallery
+                    content={scannedText}
+                    sourceKind={sourceKind}
+                    selectedPage={selectedPage}
+                    onSelectPage={setSelectedPage}
+                    charCount={scannedText.length}
+                  />
                 )}
               </div>
             )}
@@ -632,3 +589,177 @@ function SummaryCard({
     </div>
   );
 }
+
+// ── Page Thumbnail Gallery ───────────────────────────────────────────────────
+function splitIntoPages(content: string, sourceKind: 'pdf' | 'docx' | 'json' | null): string[] {
+  if (sourceKind === 'pdf') {
+    // PDF: đã có marker === Page N ===
+    const parts = content.split(/\n=== Page \d+ ===\n/);
+    return parts.map(p => p.trim()).filter(p => p.length > 0);
+  }
+  if (sourceKind === 'docx') {
+    // DOCX HTML: split theo block elements (~12 element/trang)
+    const parser   = new DOMParser();
+    const doc      = parser.parseFromString(content, 'text/html');
+    const children = Array.from(doc.body.children);
+    if (children.length === 0) return [content];
+
+    const perPage  = Math.max(8, Math.ceil(children.length / Math.ceil(children.length / 12)));
+    const chunks: string[] = [];
+    for (let i = 0; i < children.length; i += perPage) {
+      chunks.push(children.slice(i, i + perPage).map((el: Element) => el.outerHTML).join(''));
+    }
+    return chunks;
+  }
+  return [content];
+}
+
+function PageThumbnailGallery({
+  content, sourceKind, selectedPage, onSelectPage, charCount,
+}: {
+  content: string;
+  sourceKind: 'pdf' | 'docx' | 'json' | null;
+  selectedPage: number | null;
+  onSelectPage: (idx: number | null) => void;
+  charCount: number;
+}) {
+  const pages = splitIntoPages(content, sourceKind);
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-inner">
+      {/* Header */}
+      <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <FileText className="w-4 h-4 text-slate-400" />
+          <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">
+            {sourceKind === 'docx' ? 'Preview tài liệu Word' : 'Preview PDF'}
+          </span>
+          <span className="px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded text-[9px] font-bold">
+            {pages.length} trang
+          </span>
+        </div>
+        <span className="text-[10px] text-slate-400 font-mono">{charCount.toLocaleString()} ký tự</span>
+      </div>
+
+      {/* Thumbnail grid */}
+      <div className="p-3 bg-slate-100 overflow-y-auto" style={{ maxHeight: '340px' }}>
+        <div className="grid grid-cols-4 gap-3">
+          {pages.map((pageContent, idx) => (
+            <button
+              key={idx}
+              onClick={() => onSelectPage(idx)}
+              className="group relative bg-white rounded-lg overflow-hidden shadow-sm border-2 border-transparent hover:border-teal-400 hover:shadow-md transition-all duration-200 active:scale-95 text-left"
+              style={{ aspectRatio: '0.707' /* A4 ratio */ }}
+            >
+              {/* Scaled page content */}
+              <div
+                className="absolute inset-0 overflow-hidden pointer-events-none"
+                style={{ fontSize: '13px' }}
+              >
+                <div
+                  style={{
+                    transform: 'scale(0.28)',
+                    transformOrigin: 'top left',
+                    width: '357%',   /* 1/0.28 = ~357% */
+                    height: '357%',
+                    padding: '16px',
+                    fontFamily: '"Times New Roman", Times, serif',
+                    lineHeight: '1.7',
+                    color: '#1e293b',
+                    background: 'white',
+                  }}
+                  {...(sourceKind === 'docx'
+                    ? { dangerouslySetInnerHTML: { __html: pageContent } }
+                    : {}
+                  )}
+                >
+                  {sourceKind !== 'docx' && (
+                    <pre style={{ fontFamily: '"Courier New", Courier, monospace', fontSize: '11px', whiteSpace: 'pre-wrap' }}>
+                      {pageContent}
+                    </pre>
+                  )}
+                </div>
+              </div>
+
+              {/* Page number badge */}
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/60 to-transparent py-1.5 px-2 flex items-center justify-between">
+                <span className="text-[9px] font-bold text-white">Trang {idx + 1}</span>
+                <span className="text-[8px] text-white/70 group-hover:text-white transition-colors">↗ Xem to</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Footer hint */}
+      <div className="px-4 py-2 bg-slate-50 border-t border-slate-100">
+        <span className="text-[9px] text-slate-400">
+          Click vào trang để xem chi tiết · Nhấn "Phân tích bằng AI" ở footer để tiếp tục
+        </span>
+      </div>
+
+      {/* Lightbox overlay */}
+      {selectedPage !== null && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-6"
+          onClick={() => onSelectPage(null)}
+        >
+          <div
+            className="relative bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+            style={{ width: '680px', maxHeight: '85vh' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Lightbox header */}
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-slate-700">
+                  Trang {selectedPage + 1} / {pages.length}
+                </span>
+                {selectedPage > 0 && (
+                  <button
+                    onClick={e => { e.stopPropagation(); onSelectPage(selectedPage - 1); }}
+                    className="px-2.5 py-1 text-[11px] font-bold bg-slate-200 hover:bg-slate-300 rounded-lg transition-colors"
+                  >
+                    ← Trước
+                  </button>
+                )}
+                {selectedPage < pages.length - 1 && (
+                  <button
+                    onClick={e => { e.stopPropagation(); onSelectPage(selectedPage + 1); }}
+                    className="px-2.5 py-1 text-[11px] font-bold bg-slate-200 hover:bg-slate-300 rounded-lg transition-colors"
+                  >
+                    Tiếp →
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => onSelectPage(null)}
+                className="w-8 h-8 rounded-lg bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition-colors text-slate-600 font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Lightbox content */}
+            <div className="overflow-y-auto flex-1 p-8 bg-white">
+              {sourceKind === 'docx' ? (
+                <div
+                  style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '14px', lineHeight: '1.9' }}
+                  dangerouslySetInnerHTML={{ __html: pages[selectedPage] }}
+                />
+              ) : (
+                <pre
+                  className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed"
+                  style={{ fontFamily: '"Courier New", Courier, monospace' }}
+                >
+                  {pages[selectedPage]}
+                </pre>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
