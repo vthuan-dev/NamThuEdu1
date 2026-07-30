@@ -18,7 +18,7 @@ $vpsUser = "root"
 $vpsPort = 22
 $targetPath = "/var/www/namthuedu-fe"
 
-Write-Host "📍 Target: $vpsUser@$vpsHost:$vpsPort" -ForegroundColor Yellow
+Write-Host "📍 Target: ${vpsUser}@${vpsHost}:${vpsPort}" -ForegroundColor Yellow
 Write-Host "📂 Remote Path: $targetPath" -ForegroundColor Yellow
 
 # 2. Build the project locally
