@@ -6,6 +6,7 @@ import {
 import { API_BASE_URL } from '../../../../../../utils/apiConfig';
 import { getAuthToken } from '../../../../../../utils/authStorage';
 import { PdfPageSelector } from '../../ielts/components/PdfPageSelector';
+import { parseTeensTextLocally } from './teensParser';
 
 // Deploy trigger: 2026-07-30T09:36:00
 interface Props {
@@ -244,8 +245,37 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
     } finally { clearTimeout(timeoutId); clearInterval(timer); setAiParsing(false); }
   };
 
-  const handleAiSmart = () =>
-    isScanned && pdfFileRef.current ? handleGeminiParsePdf() : handleTextAiParse();
+  const handleLocalParse = () => {
+    if (!scannedText.trim()) { setError('Không có nội dung văn bản để phân tích.'); return; }
+    setError('');
+    setAiParsing(true);
+    setPdfStage('ai');
+    
+    // Giả lập spinner chạy cực nhanh 200ms cho mượt UX
+    setTimeout(() => {
+      try {
+        const data = parseTeensTextLocally(scannedText, skill);
+        if (skill !== 'auto' && data.skill !== skill) {
+          throw new Error(`Kỹ năng trong file không khớp với mục tiêu (${skill === 'listening' ? 'Nghe' : 'Nói'}).`);
+        }
+        setParseMethod('local');
+        setPayload(data);
+        setPdfStage('idle');
+      } catch (e: any) {
+        setError(e.message || 'Lỗi phân tích cú pháp local.');
+        setPdfStage('scanned');
+      } finally {
+        setAiParsing(false);
+      }
+    }, 400);
+  };
+
+  const handleAiSmart = () => {
+    if (sourceKind === 'docx') {
+      return handleLocalParse();
+    }
+    return isScanned && pdfFileRef.current ? handleGeminiParsePdf() : handleTextAiParse();
+  };
 
   const downloadSample = () => {
     const sample  = skill === 'speaking' ? SAMPLE_SPEAKING : SAMPLE_LISTENING;
@@ -465,6 +495,7 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
                       <div className="flex items-center gap-1.5 mt-0.5">
                         <p className="text-[10px] text-emerald-700 font-medium">Sẵn sàng import</p>
                         {parseMethod === 'ai' && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 border border-violet-200">🤖 Gemini AI</span>}
+                        {parseMethod === 'local' && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-700 border border-teal-200">⚡ Local (Offline)</span>}
                         {parseMethod === 'json' && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">JSON</span>}
                       </div>
                     </div>
@@ -552,7 +583,13 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
                   style={{ boxShadow: '0 6px 16px rgba(139, 92, 246, 0.3)' }}
                 >
                   {aiParsing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5" />}
-                  {aiParsing ? 'Đang phân tích...' : isScanned ? 'Phân tích bằng AI (OCR)' : 'Phân tích bằng AI'}
+                  {aiParsing
+                    ? 'Đang phân tích...'
+                    : sourceKind === 'docx'
+                      ? 'Trích xuất tự động'
+                      : isScanned
+                        ? 'Phân tích bằng AI (OCR)'
+                        : 'Phân tích bằng AI'}
                 </button>
               )}
               {pdfStage === 'idle' && (
