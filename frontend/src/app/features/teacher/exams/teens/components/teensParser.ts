@@ -157,7 +157,6 @@ function parseListening(html: string): TeensParsedPayload {
     .replace(/<\/div>/gi, '\n')
     .replace(/<\/tr>/gi, '\n')
     .replace(/<\/li>/gi, '\n')
-    .replace(/&nbsp;/g, ' ')
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n');
 
@@ -169,9 +168,7 @@ function parseListening(html: string): TeensParsedPayload {
 
   const pushCurrentQuestion = () => {
     if (currentQ) {
-      // Validate correct answer for MCQ
       if (currentQ.qType === 'multiple_choice' && currentQ.options.length > 0) {
-        // If no option is marked correct, default to first option
         const hasCorrect = currentQ.options.some((o: any) => o.isCorrect);
         if (!hasCorrect) {
           currentQ.options[0].isCorrect = true;
@@ -182,10 +179,16 @@ function parseListening(html: string): TeensParsedPayload {
     }
   };
 
+  let lineIdx = 0;
   for (const line of lines) {
-    // 1. Detect inline options: e.g. "A. red  B. blue  C. green  D. yellow"
-    const inlineOptRegex = /A[\.\)]\s*(.*?)\s+B[\.\)]\s*(.*?)\s+C[\.\)]\s*(.*?)\s+D[\.\)]\s*(.*)/i;
-    const inlineMatch = line.match(inlineOptRegex);
+    lineIdx++;
+    const formattedLine = stripTagsExceptFormatting(line);
+    const cleanLine = cleanHtmlText(line);
+    if (!cleanLine) continue;
+
+    // 1. Detect inline options (e.g. A. grips B. gift C. grasp D. grabs)
+    const inlineOptRegex = /A[\.\)]\s*(.*?)\s+B[\.\)]\s*(.*?)\s+C[\.\)]\s*(.*?)\s+D[\.\)]\s*(.*)/;
+    const inlineMatch = formattedLine.match(inlineOptRegex);
     
     if (inlineMatch && currentQ) {
       currentQ.qType = 'multiple_choice';
@@ -199,58 +202,126 @@ function parseListening(html: string): TeensParsedPayload {
       continue;
     }
 
-    // 2. Detect single option line: e.g. "A. apple"
-    const singleOptRegex = /^([A-D])[\.\)]\s*(.*)$/i;
-    const optMatch = line.match(singleOptRegex);
-    
-    if (optMatch && currentQ) {
-      currentQ.qType = 'multiple_choice';
-      if (!currentQ.options) currentQ.options = [];
-      
-      const letter = optMatch[1].toUpperCase();
-      const text = optMatch[2];
-      currentQ.options.push({
-        content: cleanHtmlText(text),
-        isCorrect: isMarkedCorrect(text) || isMarkedCorrect(line)
-      });
-      
-      if (currentQ.options.length >= 4 || letter === 'D') {
-        pushCurrentQuestion();
+    // 1.5. Detect inline AB options (e.g. A. option1 B. option2)
+    const abMatch = formattedLine.match(/A[\.\)]\s*(.*?)\s+B[\.\)]\s*(.*)/);
+    if (abMatch && !formattedLine.match(/C[\.\)]/)) {
+      if (currentQ) {
+        currentQ.qType = 'multiple_choice';
+        if (!currentQ.options) currentQ.options = [];
+        currentQ.options.push(
+          { content: cleanHtmlText(abMatch[1]), isCorrect: isMarkedCorrect(abMatch[1]) },
+          { content: cleanHtmlText(abMatch[2]), isCorrect: isMarkedCorrect(abMatch[2]) }
+        );
+        continue;
       }
-      continue;
     }
 
-    // 3. Detect new question line: e.g. "1. What did he do?" or "Question 1:"
-    const qRegex = /^(Question|Câu|Q)?\s*(\d+)\s*[\.:\)-]\s*(.*)$/i;
-    const qMatch = line.match(qRegex);
+    // 1.6. Detect inline CD options (e.g. C. option3 D. option4)
+    const cdMatch = formattedLine.match(/C[\.\)]\s*(.*?)\s+D[\.\)]\s*(.*)/);
+    if (cdMatch) {
+      if (currentQ) {
+        currentQ.qType = 'multiple_choice';
+        if (!currentQ.options) currentQ.options = [];
+        currentQ.options.push(
+          { content: cleanHtmlText(cdMatch[1]), isCorrect: isMarkedCorrect(cdMatch[1]) },
+          { content: cleanHtmlText(cdMatch[2]), isCorrect: isMarkedCorrect(cdMatch[2]) }
+        );
+        pushCurrentQuestion();
+        continue;
+      }
+    }
+
+    // 2. Detect single option line
+    const singleOptRegex = /^([A-D])[\.\)]\s*(.*)$/;
+    const optMatch = cleanLine.match(singleOptRegex);
     
-    if (qMatch) {
-      pushCurrentQuestion(); // push previous question
-      
-      const qContent = cleanHtmlText(qMatch[3]);
-      const isFillBlank = qContent.includes('___') || qContent.includes('...') || qContent.includes('___');
-      
-      currentQ = {
-        qContent: qContent,
-        qType: isFillBlank ? 'fill_blank' : 'multiple_choice',
-        options: [],
-        correctAnswer: isFillBlank ? 'answer' : undefined
-      };
-      
-      // Look for correct answer within blank if present
-      if (isFillBlank) {
-        // Try to extract answer from parenthesis if exists, e.g. "___ (apple)"
-        const answerMatch = qContent.match(/\(\s*([^\)]+)\s*\)/);
-        if (answerMatch) {
-          currentQ.correctAnswer = cleanText(answerMatch[1]);
-          currentQ.qContent = qContent.replace(/\s*\([^\)]+\)/g, ''); // strip the answer from content
+    if (optMatch) {
+      if (currentQ) {
+        currentQ.qType = 'multiple_choice';
+        if (!currentQ.options) currentQ.options = [];
+        
+        const letter = optMatch[1].toUpperCase();
+        const text = optMatch[2];
+        currentQ.options.push({
+          content: cleanText(text),
+          isCorrect: isMarkedCorrect(formattedLine)
+        });
+        
+        if (currentQ.options.length >= 4 || letter === 'D') {
+          pushCurrentQuestion();
         }
       }
       continue;
     }
 
-    // 4. Detect group boundaries (to create multiple audio files if needed)
-    const isGroupDivider = /^(questions?\s*\d+|part|section|audio)\s*\d+/i.test(line);
+    // 2.5. Detect key/answer lines to prevent them from overriding questions and extract answers
+    const keyMatch = cleanLine.match(/^(Question|Câu|Q)?\s*(\d+)\s*[\.:\)-]\s*(?:chọn|key|answer|đáp án)\s*([A-D])\b/i) || 
+                     cleanLine.match(/^(Question|Câu|Q)?\s*(\d+)\s*[\.:\)-]\s*([A-D])$/i);
+    if (keyMatch) {
+      const qNum = parseInt(keyMatch[2], 10);
+      const letter = keyMatch[3].toUpperCase();
+      
+      // Find the question in currentQuestions or all previously pushed groups
+      let targetQ = currentQuestions.find(q => q.qNum === qNum) || (currentQ && currentQ.qNum === qNum ? currentQ : null);
+      if (!targetQ) {
+        for (const g of groups) {
+          const found = g.questions.find((q: any) => q.qNum === qNum);
+          if (found) {
+            targetQ = found;
+            break;
+          }
+        }
+      }
+
+      if (targetQ && targetQ.options) {
+        const idx = letter.charCodeAt(0) - 65;
+        if (targetQ.options[idx]) {
+          targetQ.options.forEach((o: any) => o.isCorrect = false);
+          targetQ.options[idx].isCorrect = true;
+        }
+      }
+      continue;
+    }
+
+    // 3. Detect new question line
+    const qRegex = /^(Question|Câu|Q)?\s*(\d+)\s*[\.:\)-]\s*(.*)$/i;
+    const qMatch = cleanLine.match(qRegex);
+    
+    if (qMatch) {
+      pushCurrentQuestion();
+      
+      let qContent = cleanText(qMatch[3]);
+      const isFillBlank = qContent.includes('___') || qContent.includes('...') || qContent.includes('___');
+      const qNum = parseInt(qMatch[2], 10);
+      
+      currentQ = {
+        qNum: qNum,
+        qContent: qContent,
+        qType: isFillBlank ? 'fill_blank' : 'multiple_choice',
+        options: [],
+        correctAnswer: isFillBlank ? 'answer' : undefined
+      };
+
+      // Check if inline options exist on this same question line
+      const inlineMatchSame = formattedLine.match(inlineOptRegex);
+      if (inlineMatchSame) {
+        const optStartIdx = qContent.search(/A[\.\)]/);
+        if (optStartIdx !== -1) {
+          currentQ.qContent = cleanText(qContent.substring(0, optStartIdx));
+        }
+        currentQ.options = [
+          { content: cleanHtmlText(inlineMatchSame[1]), isCorrect: isMarkedCorrect(inlineMatchSame[1]) },
+          { content: cleanHtmlText(inlineMatchSame[2]), isCorrect: isMarkedCorrect(inlineMatchSame[2]) },
+          { content: cleanHtmlText(inlineMatchSame[3]), isCorrect: isMarkedCorrect(inlineMatchSame[3]) },
+          { content: cleanHtmlText(inlineMatchSame[4]), isCorrect: isMarkedCorrect(inlineMatchSame[4]) }
+        ];
+        pushCurrentQuestion();
+      }
+      continue;
+    }
+
+    // 4. Detect group boundaries
+    const isGroupDivider = /^(questions?\s*\d+|part|section|audio)\s*\d+/i.test(cleanLine);
     if (isGroupDivider && currentQuestions.length > 0) {
       pushCurrentQuestion();
       groups.push({
@@ -262,18 +333,16 @@ function parseListening(html: string): TeensParsedPayload {
       continue;
     }
 
-    // 5. Append trailing content to current question or correct answer
+    // 5. Append trailing content
     if (currentQ) {
-      const plainLine = cleanHtmlText(line);
-      if (plainLine.toLowerCase().startsWith('key:') || plainLine.toLowerCase().startsWith('answer:')) {
-        const ans = plainLine.replace(/^(key|answer|đáp án)\s*[\.:-]\s*/i, '');
+      if (cleanLine.toLowerCase().startsWith('key:') || cleanLine.toLowerCase().startsWith('answer:')) {
+        const ans = cleanLine.replace(/^(key|answer|đáp án)\s*[\.:-]\s*/i, '');
         if (currentQ.qType === 'fill_blank') {
           currentQ.correctAnswer = ans;
         } else {
-          // MCQ: mark correct option
           const letter = ans.trim().toUpperCase();
           if (['A', 'B', 'C', 'D'].includes(letter)) {
-            const idx = letter.charCodeAt(0) - 65; // A=0, B=1...
+            const idx = letter.charCodeAt(0) - 65;
             if (currentQ.options && currentQ.options[idx]) {
               currentQ.options.forEach((o: any) => o.isCorrect = false);
               currentQ.options[idx].isCorrect = true;
@@ -281,11 +350,10 @@ function parseListening(html: string): TeensParsedPayload {
           }
         }
         pushCurrentQuestion();
-      } else if (plainLine.toLowerCase().startsWith('explanation:') || plainLine.toLowerCase().startsWith('giải thích:')) {
-        currentQ.qExplanation = plainLine.replace(/^(explanation|giải thích)\s*[\.:-]\s*/i, '');
+      } else if (cleanLine.toLowerCase().startsWith('explanation:') || cleanLine.toLowerCase().startsWith('giải thích:')) {
+        currentQ.qExplanation = cleanLine.replace(/^(explanation|giải thích)\s*[\.:-]\s*/i, '');
       } else {
-        // Append text to question content
-        currentQ.qContent += ' ' + plainLine;
+        currentQ.qContent += ' ' + cleanLine;
       }
     }
   }
@@ -318,14 +386,48 @@ function parseListening(html: string): TeensParsedPayload {
     });
   }
 
+  // Clean up helper tracking fields (like qNum) from the final response
+  groups.forEach(g => {
+    if (g.questions) {
+      g.questions.forEach((q: any) => {
+        delete q.qNum;
+      });
+    }
+  });
+
   return { skill: 'listening', groups };
+}
+
+function stripFormattingFromOptionLetters(html: string): string {
+  if (!html) return '';
+  return html
+    .replace(/<strong[^>]*>\s*([A-D])\s*[\.\)]\s*<\/strong>/gi, ' $1. ')
+    .replace(/<b[^>]*>\s*([A-D])\s*[\.\)]\s*<\/b>/gi, ' $1. ')
+    .replace(/<u[^>]*>\s*([A-D])\s*[\.\)]\s*<\/u>/gi, ' $1. ')
+    .replace(/<span[^>]*>\s*([A-D])\s*[\.\)]\s*<\/span>/gi, ' $1. ')
+    .replace(/<strong[^>]*>\s*([A-D])\s*<\/strong>\s*[\.\)]/gi, ' $1. ')
+    .replace(/<b[^>]*>\s*([A-D])\s*<\/b>\s*[\.\)]/gi, ' $1. ')
+    .replace(/<u[^>]*>\s*([A-D])\s*<\/u>\s*[\.\)]/gi, ' $1. ')
+    .replace(/<span[^>]*>\s*([A-D])\s*<\/span>\s*[\.\)]/gi, ' $1. ');
+}
+
+function stripTagsExceptFormatting(html: string): string {
+  if (!html) return '';
+  // Convert underlined spans to <u>
+  let normalized = html.replace(/<span[^>]*text-decoration[^>]*underline[^>]*>(.*?)<\/span>/gi, '<u>$1</u>');
+  normalized = stripFormattingFromOptionLetters(normalized);
+  return normalized
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\t/g, ' ')
+    .replace(/<(?!strong|b|u|\/strong|\/b|\/u)[^>]*>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /**
  * Check if the text has markers indicating it is the correct answer
  */
 function isMarkedCorrect(html: string): boolean {
-  // Check for bold, underline tags, asterisk or bracket markers
   return /<u>|<strong>|<b>|<span[^>]*text-decoration[^>]*underline/i.test(html) || 
          html.trim().startsWith('*') || 
          html.trim().endsWith('*') || 
