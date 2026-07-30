@@ -225,13 +225,24 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
     const timeoutId  = setTimeout(() => controller.abort(), 110_000);
     try {
       const token = getAuthToken();
+      let localJson: any = null;
+      try {
+        localJson = parseTeensTextLocally(scannedText, skill);
+      } catch (err) {
+        console.warn('Failed to parse local JSON draft for PDF text:', err);
+      }
+
       const res   = await fetch(`${API_BASE_URL}/teacher/teens/parse-text`, {
         method: 'POST', signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ text: scannedText, skill }),
+        body: JSON.stringify({
+          text: scannedText,
+          skill,
+          local_json: localJson || undefined
+        }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.message || 'AI phân tích thất bại.');
@@ -245,29 +256,64 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
     } finally { clearTimeout(timeoutId); clearInterval(timer); setAiParsing(false); }
   };
 
-  const handleLocalParse = () => {
+  const handleLocalParse = async () => {
     if (!scannedText.trim()) { setError('Không có nội dung văn bản để phân tích.'); return; }
     setError('');
     setAiParsing(true);
     setPdfStage('ai');
-    
-    // Giả lập spinner chạy cực nhanh 200ms cho mượt UX
-    setTimeout(() => {
-      try {
-        const data = parseTeensTextLocally(scannedText, skill);
-        if (skill !== 'auto' && data.skill !== skill) {
-          throw new Error(`Kỹ năng trong file không khớp với mục tiêu (${skill === 'listening' ? 'Nghe' : 'Nói'}).`);
-        }
-        setParseMethod('local');
-        setPayload(data);
-        setPdfStage('idle');
-      } catch (e: any) {
-        setError(e.message || 'Lỗi phân tích cú pháp local.');
-        setPdfStage('scanned');
-      } finally {
-        setAiParsing(false);
+
+    const timer = startFakeProgress('AI đang phân tích và tối ưu câu hỏi...');
+    const controller = new AbortController();
+    const timeoutId  = setTimeout(() => controller.abort(), 110_000);
+
+    try {
+      // 1. Parse locally first to get accurate options and correct answers
+      const localData = parseTeensTextLocally(scannedText, skill);
+      if (skill !== 'auto' && localData.skill !== skill) {
+        throw new Error(`Kỹ năng trong file không khớp với mục tiêu (${skill === 'listening' ? 'Nghe' : 'Nói'}).`);
       }
-    }, 400);
+
+      // 2. Try to refine the question types & fill qContent blanks via Gemini API
+      try {
+        const token = getAuthToken();
+        const res = await fetch(`${API_BASE_URL}/teacher/teens/parse-text`, {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            text: scannedText,
+            skill,
+            local_json: localData
+          }),
+        });
+
+        clearTimeout(timeoutId);
+        const json = await res.json();
+        if (res.ok && json.success && json.data) {
+          setParseMethod('ai');
+          setPayload(json.data);
+          setPdfStage('idle');
+          return;
+        }
+      } catch (aiErr) {
+        console.warn('AI refinement failed, falling back to local parse:', aiErr);
+      }
+
+      // Fallback: use local parse directly if AI call fails or is slow
+      setParseMethod('local');
+      setPayload(localData);
+      setPdfStage('idle');
+    } catch (e: any) {
+      setError(e.message || 'Lỗi phân tích cú pháp local.');
+      setPdfStage('scanned');
+    } finally {
+      clearTimeout(timeoutId);
+      clearInterval(timer);
+      setAiParsing(false);
+    }
   };
 
   const handleAiSmart = () => {

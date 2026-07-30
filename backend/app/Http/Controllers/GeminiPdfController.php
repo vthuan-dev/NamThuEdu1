@@ -1533,6 +1533,7 @@ CRITICAL RULES:
         $request->validate([
             'text'  => 'required|string|min:30|max:120000',
             'skill' => 'nullable|in:listening,speaking,auto',
+            'local_json' => 'nullable|array',
         ]);
 
         if (empty($this->apiKeys)) {
@@ -1544,8 +1545,23 @@ CRITICAL RULES:
 
         $text   = (string) $request->input('text');
         $skill  = $request->input('skill', 'auto') ?: 'auto';
-        $prompt = $this->buildTeensPrompt($skill)
-            . "\n\nHere is the raw exam text extracted from the document. Parse it faithfully:\n\"\"\"\n"
+        $localJson = $request->input('local_json');
+
+        $prompt = $this->buildTeensPrompt($skill);
+
+        if (!empty($localJson)) {
+            $prompt .= "\n\nWe have already parsed the questions, options, and correct answers locally. Here is the draft JSON structure:\n"
+                . json_encode($localJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+                . "\n\nYOUR TASK:\n"
+                . "1. Use this draft JSON as your source of truth for question numbers, options, and correct answers.\n"
+                . "2. Refine the question types ('multiple_choice' vs 'fill_blank') and question contents ('qContent') based on the raw text below.\n"
+                . "3. For cloze test questions (multiple choice questions representing blanks in a passage like Q1-6 or Q35-40), the type must be 'multiple_choice', and you MUST extract the sentence containing the blank from the passage (e.g. 'Techworld Magazine is delighted to announce two IT assistant vacancies up for (1) ______ this summer.') and set it as the 'qContent'. Do not leave 'qContent' empty.\n"
+                . "4. For sentence arrangement questions (e.g., Q12-16), keep 'multiple_choice' type, and ensure 'qContent' contains the sentence list to order.\n"
+                . "5. For normal reading/listening comprehension questions, keep their type as 'multiple_choice' and ensure 'qContent' has the full question prompt.\n"
+                . "6. Output the refined JSON structure matching the required schema.";
+        }
+
+        $prompt .= "\n\nHere is the raw exam text extracted from the document. Parse it faithfully:\n\"\"\"\n"
             . $text
             . "\n\"\"\"";
 
