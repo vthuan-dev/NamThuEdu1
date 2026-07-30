@@ -660,29 +660,40 @@ function PageThumbnailGallery({
                 className="absolute inset-0 overflow-hidden pointer-events-none"
                 style={{ fontSize: '13px' }}
               >
-                <div
-                  style={{
-                    transform: 'scale(0.28)',
-                    transformOrigin: 'top left',
-                    width: '357%',   /* 1/0.28 = ~357% */
-                    height: '357%',
-                    padding: '16px',
-                    fontFamily: '"Times New Roman", Times, serif',
-                    lineHeight: '1.7',
-                    color: '#1e293b',
-                    background: 'white',
-                  }}
-                  {...(sourceKind === 'docx'
-                    ? { dangerouslySetInnerHTML: { __html: pageContent } }
-                    : {}
-                  )}
-                >
-                  {sourceKind !== 'docx' && (
+                {sourceKind === 'docx' ? (
+                  <div
+                    style={{
+                      transform: 'scale(0.28)',
+                      transformOrigin: 'top left',
+                      width: '357%',   /* 1/0.28 = ~357% */
+                      height: '357%',
+                      padding: '16px',
+                      fontFamily: '"Times New Roman", Times, serif',
+                      lineHeight: '1.7',
+                      color: '#1e293b',
+                      background: 'white',
+                    }}
+                    dangerouslySetInnerHTML={{ __html: pageContent }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      transform: 'scale(0.28)',
+                      transformOrigin: 'top left',
+                      width: '357%',   /* 1/0.28 = ~357% */
+                      height: '357%',
+                      padding: '16px',
+                      fontFamily: '"Times New Roman", Times, serif',
+                      lineHeight: '1.7',
+                      color: '#1e293b',
+                      background: 'white',
+                    }}
+                  >
                     <pre style={{ fontFamily: '"Courier New", Courier, monospace', fontSize: '11px', whiteSpace: 'pre-wrap' }}>
                       {pageContent}
                     </pre>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
               {/* Page number badge */}
