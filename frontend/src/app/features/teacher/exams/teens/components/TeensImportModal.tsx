@@ -106,12 +106,15 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
     setError(''); setPayload(null);
     setFileName(f.name); setFileSize(formatBytes(f.size));
 
-    const isPdf  = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
-    const isDocx = /\.docx$/i.test(f.name) || f.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-    const isJson = f.type === 'application/json' || /\.json$/i.test(f.name);
+    const ext    = f.name.split('.').pop()?.toLowerCase() ?? '';
+    // DOCX check trước: một số browser báo MIME sai (application/zip, application/octet-stream)
+    const isDocx = ext === 'docx'
+      || f.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const isPdf  = !isDocx && (ext === 'pdf' || f.type === 'application/pdf');
+    const isJson = ext === 'json' || f.type === 'application/json';
 
-    if (isPdf) { setSourceKind('pdf'); setPendingFile(f); setPdfStage('trim'); return; }
     if (isDocx) { setSourceKind('docx'); await extractDocxText(f); return; }
+    if (isPdf)  { setSourceKind('pdf'); setPendingFile(f); setPdfStage('trim'); return; }
     if (isJson) {
       try {
         const text   = await f.text();
@@ -124,8 +127,9 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
       } catch (e: any) { setError(e.message || 'JSON không hợp lệ'); }
       return;
     }
-    setError('Chỉ hỗ trợ file .pdf, .docx hoặc .json');
+    setError(`Không hỗ trợ định dạng ".${ext}". Vui lòng chọn file .pdf, .docx hoặc .json`);
   };
+
 
   const extractDocxText = async (f: File) => {
     setError(''); setPayload(null); pdfFileRef.current = null;
