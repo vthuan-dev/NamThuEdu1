@@ -349,7 +349,11 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[8px] transition-all duration-300"
-      onClick={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
     >
       <div
         className={`flex w-full border border-white/25 shadow-2xl backdrop-blur-md overflow-hidden animate-in fade-in zoom-in-95 duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
