@@ -145,7 +145,7 @@ class UserController extends Controller
                 'uAddress' => $request->address ?? '',
                 'uGender' => $request->gender ?? 0,
                 'uClass' => $request->class ?? 0,
-                'age_group' => $request->age_group,
+                'age_group' => $request->age_group ?? (($request->role ?? 'student') === 'student' ? 'teens' : null),
                 'uStatus' => $request->status ?? 'active',
             ]);
 
