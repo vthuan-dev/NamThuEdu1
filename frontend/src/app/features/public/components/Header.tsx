@@ -105,13 +105,6 @@ export function Header() {
               <Phone className="h-3 w-3 text-orange-400" />
               <span>0776 818 160</span>
             </a>
-            <a
-              href="mailto:hello@namthu.vn"
-              className="flex items-center gap-1.5 font-medium transition-colors hover:text-orange-600"
-            >
-              <Mail className="h-3 w-3 text-orange-400" />
-              <span>hello@namthu.vn</span>
-            </a>
           </div>
 
           {/* Right: Address */}
