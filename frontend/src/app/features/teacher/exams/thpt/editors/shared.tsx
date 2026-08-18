@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { THPT_THEME } from '../sections';
 
@@ -194,15 +194,37 @@ export function htmlToInlineMarkup(html: string): string {
     .trim();
 }
 
+export function smartLineBreaks(html: string): string {
+  if (!html) return html;
+  let formatted = html;
+  // 1. Remove spaces between <br> and a question number
+  formatted = formatted.replace(/(<br\/?>|\n)\s*(<b>)?\b(\d+)\./gi, '$1$2$3.');
+  // 2. Insert <br> before 2., 3., 4., etc. if not preceded by <br> or \n (allowing optional <b> tags)
+  formatted = formatted.replace(/(?<!(?:<br\/?>|\n)\s*(?:<b>)?\s*)\s*(<b>)?\b([2-9]|\d{2,})\.(?!\d)/gi, '<br>$1$2.');
+  return formatted;
+}
+
 export function FormattedTextarea({ value, onChange, placeholder, rows = 2, className = '' }: FormattedTextareaProps) {
   const editorRef = useRef<HTMLDivElement>(null);
+  const [isFocused, setIsFocused] = useState(false);
 
   // Synchronize value to innerHTML only when it changes from outside
   useEffect(() => {
-    if (editorRef.current && editorRef.current.innerHTML !== value) {
-      editorRef.current.innerHTML = value || '';
+    if (editorRef.current) {
+      let displayValue = value || '';
+      // Apply smart line breaks only when not focused (initial load / AI import)
+      if (!isFocused) {
+        displayValue = smartLineBreaks(displayValue);
+        // Propagate the formatted changes back to parent
+        if (displayValue !== value) {
+          onChange(displayValue);
+        }
+      }
+      if (editorRef.current.innerHTML !== displayValue) {
+        editorRef.current.innerHTML = displayValue;
+      }
     }
-  }, [value]);
+  }, [value, isFocused]);
 
   const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
     const html = e.currentTarget.innerHTML;
@@ -281,6 +303,8 @@ export function FormattedTextarea({ value, onChange, placeholder, rows = 2, clas
         contentEditable
         onInput={handleInput}
         onPaste={handlePaste}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
         className={`w-full text-sm border border-slate-200 rounded-lg pl-3 pr-20 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200 font-sans leading-relaxed overflow-y-auto outline-none bg-white min-h-[60px] ${className}`}
         style={{ minHeight: `${rows * 26}px` }}
       />
