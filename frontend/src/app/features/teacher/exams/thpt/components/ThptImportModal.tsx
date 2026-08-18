@@ -57,6 +57,7 @@ export function ThptImportModal({ open, onClose, onImport }: Props) {
   const [showJson, setShowJson]   = useState(false);
   const [jsonCopied, setJsonCopied] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [showFullTextModal, setShowFullTextModal] = useState(false);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault(); e.stopPropagation();
@@ -522,10 +523,22 @@ export function ThptImportModal({ open, onClose, onImport }: Props) {
                   </div>
                 )}
                 {!isScanned && scannedText && (
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 max-h-[300px] overflow-y-auto">
-                    <pre className="text-[11px] text-slate-500 whitespace-pre-wrap font-mono leading-relaxed">
-                      {scannedText.slice(0, 1500)}{scannedText.length > 1500 ? '...' : ''}
-                    </pre>
+                  <div className="space-y-2">
+                    <div 
+                      onClick={() => setShowFullTextModal(true)}
+                      className="relative rounded-2xl border border-slate-200 bg-slate-50/50 p-4 h-[120px] overflow-hidden cursor-pointer hover:border-teal-500 hover:bg-slate-50 transition-all duration-300 group shadow-inner"
+                      title="Click để phóng to xem đầy đủ văn bản"
+                    >
+                      <pre className="text-[11px] text-slate-500 whitespace-pre-wrap font-mono leading-relaxed select-none">
+                        {scannedText.slice(0, 800)}{scannedText.length > 800 ? '...' : ''}
+                      </pre>
+                      {/* Gradient overlay to indicate fade */}
+                      <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-slate-100 to-transparent pointer-events-none flex items-end justify-center pb-2">
+                        <span className="text-[10px] text-teal-600 font-bold bg-white px-2.5 py-1 rounded-full shadow-sm border border-teal-100/70 group-hover:scale-105 transition-transform">
+                          🔍 Click để xem toàn bộ ({scannedText.length.toLocaleString()} ký tự)
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -656,6 +669,42 @@ export function ThptImportModal({ open, onClose, onImport }: Props) {
 
         </div>
       </div>
+      {/* Full text overlay modal */}
+      {showFullTextModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-6 backdrop-blur-[6px] transition-all duration-300">
+          <div className="bg-white rounded-3xl max-w-4xl w-full h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div>
+                <h3 className="font-bold text-slate-800 text-sm">Toàn bộ văn bản trích xuất từ file</h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">{fileName} — {scannedText.length.toLocaleString()} ký tự</p>
+              </div>
+              <button 
+                onClick={() => setShowFullTextModal(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {/* Scrollable text body */}
+            <div className="flex-1 min-h-0 p-6 overflow-y-auto">
+              <pre className="text-xs text-slate-600 font-mono whitespace-pre-wrap leading-relaxed select-text p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-inner">
+                {scannedText}
+              </pre>
+            </div>
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
+              <button
+                onClick={() => setShowFullTextModal(false)}
+                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
