@@ -195,60 +195,50 @@ export function htmlToInlineMarkup(html: string): string {
 }
 
 export function FormattedTextarea({ value, onChange, placeholder, rows = 2, className = '' }: FormattedTextareaProps) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
 
-  /** Dán từ Word/Docs: giữ in đậm / nghiêng / gạch chân thay vì mất trắng. */
-  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const html = e.clipboardData?.getData('text/html');
-    if (!html) return; // nguồn thuần text → để trình duyệt xử lý mặc định
-
-    const markup = htmlToInlineMarkup(html);
-    if (!markup) return;
-
-    e.preventDefault();
-    const el = e.currentTarget;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const next = value.substring(0, start) + markup + value.substring(end);
-    onChange(next);
-
-    const caret = start + markup.length;
-    setTimeout(() => {
-      el.focus();
-      el.setSelectionRange(caret, caret);
-    }, 0);
-  };
-
+  // Synchronize value to innerHTML only when it changes from outside
   useEffect(() => {
-    const el = textareaRef.current;
-    if (el) {
-      el.style.height = 'auto';
-      el.style.height = `${Math.max(60, el.scrollHeight)}px`;
+    if (editorRef.current && editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value || '';
     }
   }, [value]);
 
-  const applyFormat = (tag: string) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value;
-
-    const selectedText = text.substring(start, end);
-    const replacement = `<${tag}>${selectedText}</${tag}>`;
-    const newValue = text.substring(0, start) + replacement + text.substring(end);
-
-    onChange(newValue);
-
-    // Reposition cursor and refocus after DOM update
-    setTimeout(() => {
-      if (textarea) {
-        textarea.focus();
-        textarea.setSelectionRange(start + tag.length + 2, start + tag.length + 2 + selectedText.length);
-      }
-    }, 0);
+  const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
+    const html = e.currentTarget.innerHTML;
+    // Normalize empty tags or standard browser leftovers to empty string
+    if (html === '<br>' || html === '<div><br></div>' || html === '<p><br></p>' || html === '<div></div>') {
+      onChange('');
+    } else {
+      onChange(html);
+    }
   };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    // For contentEditable, get raw text or html
+    const html = e.clipboardData?.getData('text/html');
+    if (html) {
+      const markup = htmlToInlineMarkup(html);
+      if (markup) {
+        document.execCommand('insertHTML', false, markup);
+        return;
+      }
+    }
+    const text = e.clipboardData?.getData('text/plain');
+    if (text) {
+      document.execCommand('insertText', false, text);
+    }
+  };
+
+  const applyFormat = (command: string) => {
+    document.execCommand(command, false);
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML);
+    }
+  };
+
+  const isEmpty = !value || value === '<br>' || value === '<div><br></div>' || value === '<p><br></p>' || value === '<div></div>';
 
   return (
     <div className="relative group">
@@ -256,7 +246,7 @@ export function FormattedTextarea({ value, onChange, placeholder, rows = 2, clas
       <div className="absolute right-2 top-2 z-10 flex items-center gap-1 rounded bg-slate-100/90 border border-slate-200/50 p-0.5 shadow-sm opacity-60 group-hover:opacity-100 hover:opacity-100 transition-opacity">
         <button
           type="button"
-          onClick={() => applyFormat('b')}
+          onClick={() => applyFormat('bold')}
           className="w-5 h-5 flex items-center justify-center text-xs font-bold text-slate-700 hover:bg-slate-200 hover:text-slate-900 rounded cursor-pointer transition-colors"
           title="In đậm (Bold)"
         >
@@ -264,7 +254,7 @@ export function FormattedTextarea({ value, onChange, placeholder, rows = 2, clas
         </button>
         <button
           type="button"
-          onClick={() => applyFormat('i')}
+          onClick={() => applyFormat('italic')}
           className="w-5 h-5 flex items-center justify-center text-xs font-semibold italic text-slate-700 hover:bg-slate-200 hover:text-slate-900 rounded cursor-pointer transition-colors"
           title="In nghiêng (Italic)"
         >
@@ -272,21 +262,27 @@ export function FormattedTextarea({ value, onChange, placeholder, rows = 2, clas
         </button>
         <button
           type="button"
-          onClick={() => applyFormat('u')}
+          onClick={() => applyFormat('underline')}
           className="w-5 h-5 flex items-center justify-center text-xs font-semibold underline text-slate-700 hover:bg-slate-200 hover:text-slate-900 rounded cursor-pointer transition-colors"
           title="Gạch chân (Underline)"
         >
           U
         </button>
       </div>
-      <textarea
-        ref={textareaRef}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+
+      {isEmpty && placeholder && (
+        <span className="absolute left-3 top-2.5 text-sm text-slate-400 pointer-events-none select-none">
+          {placeholder}
+        </span>
+      )}
+
+      <div
+        ref={editorRef}
+        contentEditable
+        onInput={handleInput}
         onPaste={handlePaste}
-        rows={rows}
-        placeholder={placeholder}
-        className={`w-full text-sm border border-slate-200 rounded-lg pl-3 pr-20 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200 font-sans leading-relaxed resize-none overflow-hidden ${className}`}
+        className={`w-full text-sm border border-slate-200 rounded-lg pl-3 pr-20 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200 font-sans leading-relaxed overflow-y-auto outline-none bg-white min-h-[60px] ${className}`}
+        style={{ minHeight: `${rows * 26}px` }}
       />
     </div>
   );
