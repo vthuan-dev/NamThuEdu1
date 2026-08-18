@@ -13,6 +13,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { teacherApi } from "../../../../services/teacherApi";
+import { FormattedTextarea } from "./thpt/editors/shared";
 
 // VSTEP Structure - 4 Skills, 7 Main Parts
 const VSTEP_STRUCTURE = {
@@ -365,11 +366,12 @@ export function CreateVSTEPExam() {
           </div>
           <div className="flex-1">
             {/* Question Content */}
-            <textarea
+            <FormattedTextarea
               value={question.content}
-              onChange={(e) => updateQuestion(question.id, { content: e.target.value })}
+              onChange={(v) => updateQuestion(question.id, { content: v })}
               placeholder={`Nhập nội dung câu hỏi ${question.questionNumber}...`}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 min-h-[100px]"
+              className="w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 min-h-[100px]"
+              rows={4}
             />
 
             {/* Listening: Audio + Transcript */}
@@ -412,19 +414,20 @@ export function CreateVSTEPExam() {
                     Passage {question.part} ({(partData as { wordCount?: number[] })?.wordCount?.[0]}-{(partData as { wordCount?: number[] })?.wordCount?.[1]}{" "}
                     từ)
                   </label>
-                  <textarea
+                  <FormattedTextarea
                     value={question.passage || ""}
-                    onChange={(e) => {
+                    onChange={(v) => {
                       // Update passage for all questions in this part
                       const partQuestions = questions.filter(
                         (q) => q.skill === "reading" && q.part === question.part
                       );
                       partQuestions.forEach((pq) => {
-                        updateQuestion(pq.id, { passage: e.target.value });
+                        updateQuestion(pq.id, { passage: v });
                       });
                     }}
                     placeholder={`Nhập văn bản đọc cho Part ${question.part}...`}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 min-h-[200px] font-serif"
+                    className="w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 min-h-[200px] font-serif"
+                    rows={8}
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     Văn bản này sẽ áp dụng cho tất cả {partData?.questions} câu hỏi của Part{" "}

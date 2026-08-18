@@ -37,6 +37,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { teacherApi } from "../../../../services/teacherApi";
+import { FormattedTextarea } from "./thpt/editors/shared";
 
 // VSTEP Structure - 4 Skills, 7 Main Parts
 const VSTEP_STRUCTURE = {
@@ -1458,14 +1459,14 @@ export function CreateExam() {
               <label className="block text-sm font-semibold text-gray-700 mb-3">
                 Nội dung câu hỏi
               </label>
-              <textarea
+              <FormattedTextarea
                 value={question.content}
-                onChange={(e) => {
-                  const cleanedContent = removeNumberPrefix(e.target.value);
+                onChange={(v) => {
+                  const cleanedContent = removeNumberPrefix(v);
                   updateVSTEPQuestion(question.id, { content: cleanedContent });
                 }}
                 placeholder={`Nhập nội dung câu hỏi ${question.questionNumber}...`}
-                className={`w-full px-4 py-3 text-sm border-2 border-gray-200 rounded-xl ${colors.ring} min-h-[100px] transition-all`}
+                className={`w-full border-2 border-gray-200 rounded-xl ${colors.ring} min-h-[100px] transition-all`}
                 rows={4}
               />
             </div>
@@ -1515,14 +1516,14 @@ export function CreateExam() {
                 <BookOpen className="w-4 h-4 inline mr-1" />
                 📄 Passage {question.part} ({(partData as any)?.wordCount?.[0]}-{(partData as any)?.wordCount?.[1]} từ)
               </label>
-              <textarea
+              <FormattedTextarea
                 value={question.passage || ""}
-                onChange={(e) => {
+                onChange={(v) => {
                   const partQuestions = questions.filter((q) => q.skill === "reading" && q.part === question.part);
-                  partQuestions.forEach((pq) => updateVSTEPQuestion(pq.id, { passage: e.target.value }));
+                  partQuestions.forEach((pq) => updateVSTEPQuestion(pq.id, { passage: v }));
                 }}
                 placeholder={`Nhập văn bản đọc cho Part ${question.part}...`}
-                className="w-full px-3 py-2 text-sm border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 min-h-[150px] font-serif leading-relaxed transition-all"
+                className="w-full border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 min-h-[150px] font-serif leading-relaxed transition-all"
                 rows={8}
               />
               <p className="text-xs text-green-700 mt-2 font-medium bg-green-100 rounded-lg px-3 py-1.5 inline-block">
