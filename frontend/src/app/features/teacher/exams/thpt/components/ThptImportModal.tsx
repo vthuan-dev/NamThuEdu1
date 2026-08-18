@@ -374,8 +374,10 @@ export function ThptImportModal({ open, onClose, onImport }: Props) {
 
   const handleImportSubmit = () => {
     if (!payload) return;
-    onImport(payload);
-    onClose();
+    const shouldClose = onImport(payload);
+    if (shouldClose !== false) {
+      onClose();
+    }
   };
 
   return (

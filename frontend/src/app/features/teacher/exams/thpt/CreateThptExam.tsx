@@ -92,9 +92,89 @@ export function CreateThptExam() {
     localStorage.setItem('thpt_sidebar_collapsed', String(val));
   };
 
-  const handleThptImport = (data: any) => {
+  const handleThptImport = (data: any): boolean => {
     if (data.sections && Array.isArray(data.sections)) {
-      let runningStart = nextQuestionNumber(config.sections);
+      const getSectionQuestionCount = (sec: any) => {
+        if (sec.type === 'mc_cloze' || sec.type === 'word_bank_cloze' || sec.type === 'open_cloze') {
+          return Array.isArray(sec.blanks) ? sec.blanks.length : 0;
+        }
+        return Array.isArray(sec.items) ? sec.items.length : 0;
+      };
+
+      const importedCounts = data.sections.map(getSectionQuestionCount);
+      const currentSections = config.sections || [];
+      const currentCounts = currentSections.map(getSectionQuestionCount);
+
+      // Check if structure matches exactly (same number of sections, and same question count per section)
+      const isStructureMatching = currentSections.length > 0 &&
+        currentSections.length === data.sections.length &&
+        currentCounts.every((count, idx) => count === importedCounts[idx]);
+
+      if (isStructureMatching) {
+        // Merge contents into existing sections to preserve IDs and settings
+        const mergedSections = currentSections.map((currentSec, secIdx) => {
+          const importedSec = data.sections[secIdx];
+          const newSec = {
+            ...currentSec,
+            title: importedSec.title || currentSec.title,
+            instructions: importedSec.instructions || currentSec.instructions,
+            passage: importedSec.passage !== undefined ? importedSec.passage : currentSec.passage,
+          };
+
+          if (newSec.type === 'mc_cloze' || newSec.type === 'word_bank_cloze' || newSec.type === 'open_cloze') {
+            if (Array.isArray(newSec.blanks) && Array.isArray(importedSec.blanks)) {
+              newSec.blanks = newSec.blanks.map((currentBlank, blankIdx) => {
+                const importedBlank = importedSec.blanks[blankIdx];
+                return {
+                  ...currentBlank,
+                  options: importedBlank.options !== undefined ? importedBlank.options : currentBlank.options,
+                  correct_id: importedBlank.correct_id !== undefined ? importedBlank.correct_id : currentBlank.correct_id,
+                  accepted_answers: importedBlank.accepted_answers !== undefined ? importedBlank.accepted_answers : currentBlank.accepted_answers,
+                  explanation: importedBlank.explanation !== undefined ? importedBlank.explanation : currentBlank.explanation,
+                };
+              });
+            }
+          } else {
+            if (Array.isArray(newSec.items) && Array.isArray(importedSec.items)) {
+              newSec.items = newSec.items.map((currentItem, itemIdx) => {
+                const importedItem = importedSec.items[itemIdx];
+                return {
+                  ...currentItem,
+                  prompt: importedItem.prompt !== undefined ? importedItem.prompt : currentItem.prompt,
+                  original: importedItem.original !== undefined ? importedItem.original : currentItem.original,
+                  lead_in: importedItem.lead_in !== undefined ? importedItem.lead_in : currentItem.lead_in,
+                  options: importedItem.options !== undefined ? importedItem.options : currentItem.options,
+                  correct_id: importedItem.correct_id !== undefined ? importedItem.correct_id : currentItem.correct_id,
+                  accepted_answers: importedItem.accepted_answers !== undefined ? importedItem.accepted_answers : currentItem.accepted_answers,
+                  explanation: importedItem.explanation !== undefined ? importedItem.explanation : currentItem.explanation,
+                };
+              });
+            }
+          }
+          return newSec;
+        });
+
+        setConfig(prev => renumberConfig({
+          ...prev,
+          sections: mergedSections,
+        }));
+        setHasUnsaved(true);
+        toast.success(`Đã khớp cấu trúc và đồng bộ nội dung ${data.sections.length} phần thi thành công!`);
+        return true;
+      }
+
+      // If structure doesn't match but exam has existing content, ask whether to overwrite
+      if (currentSections.length > 0) {
+        const confirmOverwrite = window.confirm(
+          `Cấu trúc đề hiện tại (${currentCounts.join('+')} câu) không khớp với cấu trúc đề import (${importedCounts.join('+')} câu).\n\nBạn có muốn GHI ĐÈ hoàn toàn đề thi cũ bằng nội dung mới không?`
+        );
+        if (!confirmOverwrite) {
+          return false;
+        }
+      }
+
+      // Overwrite / Import fresh
+      let runningStart = 1;
       const newSections: ThptSection[] = data.sections.map((s: any) => {
         const sec = {
           ...s,
@@ -122,11 +202,11 @@ export function CreateThptExam() {
 
       setConfig(prev => renumberConfig({
         ...prev,
-        sections: [...prev.sections, ...newSections],
+        sections: newSections,
       }));
       setHasUnsaved(true);
-      toast.success(`Đã import ${newSections.length} phần thi thành công!`);
-      return;
+      toast.success(`Đã ghi đè và import thành công ${newSections.length} phần mới.`);
+      return true;
     }
 
     if (data.skill === 'listening' && Array.isArray(data.groups)) {
@@ -178,6 +258,7 @@ export function CreateThptExam() {
       }));
       setHasUnsaved(true);
       toast.success(`Đã import ${newSections.length} phần Listening!`);
+      return true;
     } else if (data.skill === 'speaking' && Array.isArray(data.parts)) {
       let runningStart = nextQuestionNumber(config.sections);
       const newSections: ThptSection[] = data.parts.map((p: any, pi: number) => {
@@ -198,7 +279,9 @@ export function CreateThptExam() {
       }));
       setHasUnsaved(true);
       toast.success(`Đã import ${newSections.length} phần Speaking!`);
+      return true;
     }
+    return false;
   };
   const assignExams = useMemo(() => {
     if (!examId) return [];
@@ -627,30 +710,16 @@ export function CreateThptExam() {
           </div>
 
           {/* Import AI */}
-          {(() => {
-            const hasExistingContent = config.sections && config.sections.length > 0;
-            return (
-              <button
-                type="button"
-                onClick={() => { if (!hasExistingContent) setShowImportModal(true); }}
-                disabled={hasExistingContent}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold transition-all text-sm ${
-                  hasExistingContent
-                    ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
-                    : 'text-white cursor-pointer'
-                }`}
-                style={hasExistingContent ? {} : { backgroundColor: '#0D9488' }}
-                title={
-                  hasExistingContent
-                    ? 'Tính năng Import (AI) chỉ khả dụng cho đề thi mới chưa có câu hỏi. Để sử dụng, vui lòng xoá hết các phần hiện tại hoặc tạo một đề thi mới.'
-                    : 'Import đề thi THCS/THPT từ PDF/Word bằng AI'
-                }
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>Import (AI)</span>
-              </button>
-            );
-          })()}
+          <button
+            type="button"
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold transition-all text-sm text-white cursor-pointer"
+            style={{ backgroundColor: '#0D9488' }}
+            title="Import đề thi THCS/THPT từ PDF/Word bằng AI (khớp cấu trúc để đồng bộ nội dung hoặc ghi đè toàn bộ)"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Import (AI)</span>
+          </button>
 
           {/* Nút LỨU riêng — trước đây chỉ có nút Xuất bản nên giáo viên không có
               cách nào lưu nháp giữa lúc soạn ("chưa hiển thị nút lưu"). */}
