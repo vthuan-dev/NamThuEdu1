@@ -81,6 +81,14 @@ export function CreateThptExam() {
   const [hasDraft, setHasDraft] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('thpt_sidebar_collapsed') === 'true';
+  });
+
+  const handleToggleSidebar = (val: boolean) => {
+    setSidebarCollapsed(val);
+    localStorage.setItem('thpt_sidebar_collapsed', String(val));
+  };
 
   const handleThptImport = (data: any) => {
     if (data.sections && Array.isArray(data.sections)) {
@@ -706,147 +714,172 @@ export function CreateThptExam() {
       </header>
 
       {/* Body */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
+      <div className={`flex-1 max-w-7xl w-full mx-auto px-6 py-6 grid grid-cols-1 gap-6 transition-all duration-300 ${
+        sidebarCollapsed ? 'lg:grid-cols-[48px_1fr]' : 'lg:grid-cols-[280px_1fr]'
+      }`}>
         {/* Sidebar */}
-        <aside className="space-y-3">
-          <div className="rounded-2xl p-4 border bg-white" style={{ borderColor: '#E2E8F0' }}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Các phần</h3>
-              <span className="text-xs font-bold text-slate-700">{config.sections.length}</span>
-            </div>
-
-            <div className="space-y-1.5">
-              {config.sections.map((s, idx) => {
-                const meta = sectionMeta(s.type);
-                const Icon = (Icons as any)[meta.icon] ?? Icons.Square;
-                const isActive = activeIdx === idx;
-                return (
-                  <div
-                    key={s.id}
-                    className={`rounded-xl px-2.5 py-2 transition-all cursor-pointer ${
-                      isActive ? 'shadow-sm' : 'hover:bg-slate-50'
-                    }`}
-                    style={
-                      isActive
-                        ? { backgroundColor: '#EFF6FF', border: `1px solid ${THPT_THEME.primary}` }
-                        : { border: '1px solid transparent' }
-                    }
-                    onClick={() => setActiveIdx(idx)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Icon className="w-4 h-4 flex-shrink-0" style={{ color: isActive ? THPT_THEME.primary : '#64748B' }} />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-bold truncate" style={{ color: isActive ? THPT_THEME.primary : '#0F172A' }}>
-                          {s.title || meta.label}
-                        </div>
-                        <div className="text-[11px] text-slate-500">{countQuestions(s)} câu · {meta.label}</div>
-                      </div>
-                      <div className="flex flex-col -my-1">
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); moveSection(idx, -1); }}
-                          className="text-slate-300 hover:text-slate-600 cursor-pointer disabled:opacity-30"
-                          disabled={idx === 0}
-                        >
-                          <ChevronUp className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); moveSection(idx, 1); }}
-                          className="text-slate-300 hover:text-slate-600 cursor-pointer disabled:opacity-30"
-                          disabled={idx === config.sections.length - 1}
-                        >
-                          <ChevronDown className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); removeSection(idx); }}
-                        className="text-slate-300 hover:text-red-600 cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {config.sections.length === 0 && (
-                <p className="text-xs text-slate-400 text-center py-6">Chưa có phần nào. Bấm "Thêm phần" để bắt đầu.</p>
-              )}
-            </div>
-
+        {sidebarCollapsed ? (
+          <aside className="space-y-3 flex flex-col items-center">
             <button
               type="button"
-              onClick={() => setShowAddModal(true)}
-              disabled={!isOwner}
-              title={!isOwner ? 'Đề của giáo viên khác — chỉ xem' : undefined}
-              className="w-full mt-3 flex items-center justify-center gap-1.5 rounded-xl py-2.5 font-semibold text-sm text-white transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ backgroundColor: THPT_THEME.primary }}
+              onClick={() => handleToggleSidebar(false)}
+              className="w-10 h-10 rounded-xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-50 cursor-pointer transition-all"
+              title="Mở rộng bảng điều khiển"
             >
-              <Plus className="w-4 h-4" />
-              Thêm phần
+              <ChevronRight className="w-5 h-5" />
             </button>
-          </div>
+          </aside>
+        ) : (
+          <aside className="space-y-3">
+            <div className="rounded-2xl p-4 border bg-white" style={{ borderColor: '#E2E8F0' }}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Các phần</h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleSidebar(true)}
+                    className="text-slate-400 hover:text-slate-600 cursor-pointer p-1 rounded-md hover:bg-slate-100 transition-colors"
+                    title="Thu nhỏ bảng điều khiển"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-xs font-bold text-slate-700">{config.sections.length}</span>
+                </div>
+              </div>
 
-          <div className="rounded-2xl p-4 border bg-white" style={{ borderColor: '#E2E8F0' }}>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Cấu hình</h3>
-            <div className="space-y-3 text-sm">
-              <label className="block">
-                <span className="text-slate-500 text-xs">Thời gian (phút)</span>
-                <input
-                  type="number"
-                  min={5}
-                  value={config.total_duration_minutes}
-                  onChange={(e) => {
-                    setConfig((p) => ({ ...p, total_duration_minutes: parseInt(e.target.value) || 0 }));
-                    setHasUnsaved(true);
-                  }}
-                  className="w-full mt-0.5 text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                />
-              </label>
-              <label className="block">
-                <span className="text-slate-500 text-xs">Thang điểm</span>
-                <input
-                  type="number"
-                  min={1}
-                  value={config.scale_max}
-                  onChange={(e) => {
-                    setConfig((p) => ({ ...p, scale_max: parseInt(e.target.value) || 10 }));
-                    setHasUnsaved(true);
-                  }}
-                  className="w-full mt-0.5 text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                />
-              </label>
-              <div className="pt-1 border-t border-slate-100">
-                <label className="flex items-start gap-2.5 cursor-pointer select-none">
+              <div className="space-y-1.5">
+                {config.sections.map((s, idx) => {
+                  const meta = sectionMeta(s.type);
+                  const Icon = (Icons as any)[meta.icon] ?? Icons.Square;
+                  const isActive = activeIdx === idx;
+                  return (
+                    <div
+                      key={s.id}
+                      className={`rounded-xl px-2.5 py-2 transition-all cursor-pointer ${
+                        isActive ? 'shadow-sm' : 'hover:bg-slate-50'
+                      }`}
+                      style={
+                        isActive
+                          ? { backgroundColor: '#EFF6FF', border: `1px solid ${THPT_THEME.primary}` }
+                          : { border: '1px solid transparent' }
+                      }
+                      onClick={() => setActiveIdx(idx)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Icon className="w-4 h-4 flex-shrink-0" style={{ color: isActive ? THPT_THEME.primary : '#64748B' }} />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-bold truncate" style={{ color: isActive ? THPT_THEME.primary : '#0F172A' }}>
+                            {s.title || meta.label}
+                          </div>
+                          <div className="text-[11px] text-slate-500">{countQuestions(s)} câu · {meta.label}</div>
+                        </div>
+                        <div className="flex flex-col -my-1">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); moveSection(idx, -1); }}
+                            className="text-slate-300 hover:text-slate-600 cursor-pointer disabled:opacity-30"
+                            disabled={idx === 0}
+                          >
+                            <ChevronUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); moveSection(idx, 1); }}
+                            className="text-slate-300 hover:text-slate-600 cursor-pointer disabled:opacity-30"
+                            disabled={idx === config.sections.length - 1}
+                          >
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); removeSection(idx); }}
+                          className="text-slate-300 hover:text-red-600 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {config.sections.length === 0 && (
+                  <p className="text-xs text-slate-400 text-center py-6">Chưa có phần nào. Bấm "Thêm phần" để bắt đầu.</p>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAddModal(true)}
+                disabled={!isOwner}
+                title={!isOwner ? 'Đề của giáo viên khác — chỉ xem' : undefined}
+                className="w-full mt-3 flex items-center justify-center gap-1.5 rounded-xl py-2.5 font-semibold text-sm text-white transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: THPT_THEME.primary }}
+              >
+                <Plus className="w-4 h-4" />
+                Thêm phần
+              </button>
+            </div>
+
+            <div className="rounded-2xl p-4 border bg-white" style={{ borderColor: '#E2E8F0' }}>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Cấu hình</h3>
+              <div className="space-y-3 text-sm">
+                <label className="block">
+                  <span className="text-slate-500 text-xs">Thời gian (phút)</span>
                   <input
-                    type="checkbox"
-                    checked={config.show_explanation !== false}
+                    type="number"
+                    min={5}
+                    value={config.total_duration_minutes}
                     onChange={(e) => {
-                      setConfig((p) => ({ ...p, show_explanation: e.target.checked }));
+                      setConfig((p) => ({ ...p, total_duration_minutes: parseInt(e.target.value) || 0 }));
                       setHasUnsaved(true);
                     }}
-                    className="mt-0.5 w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer"
+                    className="w-full mt-0.5 text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
                   />
-                  <div className="flex-1 text-xs">
-                    <span className="font-semibold text-slate-700 block">Hiện giải thích đáp án</span>
-                    <span className="text-slate-400 block text-[11px] leading-tight mt-0.5">
-                      Hiển thị phần giải thích cho học viên khi xem lại bài
-                    </span>
-                  </div>
                 </label>
+                <label className="block">
+                  <span className="text-slate-500 text-xs">Thang điểm</span>
+                  <input
+                    type="number"
+                    min={1}
+                    value={config.scale_max}
+                    onChange={(e) => {
+                      setConfig((p) => ({ ...p, scale_max: parseInt(e.target.value) || 10 }));
+                      setHasUnsaved(true);
+                    }}
+                    className="w-full mt-0.5 text-sm border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  />
+                </label>
+                <div className="pt-1 border-t border-slate-100">
+                  <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={config.show_explanation !== false}
+                      onChange={(e) => {
+                        setConfig((p) => ({ ...p, show_explanation: e.target.checked }));
+                        setHasUnsaved(true);
+                      }}
+                      className="mt-0.5 w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <div className="flex-1 text-xs">
+                      <span className="font-semibold text-slate-700 block">Hiện giải thích đáp án</span>
+                      <span className="text-slate-400 block text-[11px] leading-tight mt-0.5">
+                        Hiển thị phần giải thích cho học viên khi xem lại bài
+                      </span>
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
-          </div>
 
-          {createError && (
-            <div className="rounded-xl p-3 border border-red-200 bg-red-50 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-red-700">{createError}</p>
-            </div>
-          )}
-        </aside>
+            {createError && (
+              <div className="rounded-xl p-3 border border-red-200 bg-red-50 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-red-700">{createError}</p>
+              </div>
+            )}
+          </aside>
+        )}
 
         {/* Editor */}
         <main className="min-w-0 space-y-4">
