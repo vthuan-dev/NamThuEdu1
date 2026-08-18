@@ -1867,6 +1867,38 @@ Return ONLY valid JSON in EXACTLY this shape:
           \"explanation\": \"Passive voice.\"
         }
       ]
+    },
+    {
+      \"type\": \"open_cloze\",
+      \"title\": \"Điền từ vào chỗ trống\",
+      \"instructions\": \"Điền một từ thích hợp vào mỗi chỗ trống.\",
+      \"passage\": \"I (1) ______ a new student in class 6A, and my favorite subject (2) ______ English.\",
+      \"blanks\": [
+        {
+          \"question_number\": 1,
+          \"accepted_answers\": [\"am\"],
+          \"explanation\": \"Subject 'I' goes with 'am'.\"
+        },
+        {
+          \"question_number\": 2,
+          \"accepted_answers\": [\"is\"],
+          \"explanation\": \"Singular subject 'my favorite subject' goes with 'is'.\"
+        }
+      ]
+    },
+    {
+      \"type\": \"word_bank_cloze\",
+      \"title\": \"Chọn từ trong khung điền vào chỗ trống\",
+      \"instructions\": \"Chọn từ thích hợp trong khung để điền vào chỗ trống.\",
+      \"word_bank\": [\"however\", \"although\", \"because\", \"despite\"],
+      \"passage\": \"She failed the test (1) ______ she didn't study.\",
+      \"blanks\": [
+        {
+          \"question_number\": 1,
+          \"accepted_answers\": [\"because\"],
+          \"explanation\": \"Expressing cause/reason.\"
+        }
+      ]
     }
   ]
 }
@@ -1877,7 +1909,8 @@ CRITICAL RULES:
 3. If there are reading passages with comprehension questions, parse them as 'reading_mixed' sections. The 'passage' field must contain the reading passage, and the 'items' must have kind: 'mc'.
 4. For normal grammar, vocabulary, communication, synonym, antonym, sentence arrangement, or ordering questions, parse them as 'mc_questions'.
 5. For pronunciation/stress questions, parse them as 'phonetics'.
-6. If the input contains a local draft JSON (containing parsed questions/options/keys), use it as the source of truth for the answers, options, and question numbers, but reorganize them into the proper section type and extract the passages for reading/cloze tasks.";
+6. For any section with fill-in-the-blank, open cloze, or word form questions (where type is 'open_cloze', 'word_bank_cloze', 'word_form', or 'sentence_transformation'), the 'accepted_answers' array MUST contain only the clean, direct answers (e.g. [\"am\", \"is\"] or [\"are\"] or [\"isn't\", \"is not\"]). Do NOT include any explanations, grammar notes, translations, or surrounding question context inside the answers. Any explanation or notes MUST go strictly in the 'explanation' field.
+7. If the input contains a local draft JSON (containing parsed questions/options/keys), use it as the source of truth for the answers, options, and question numbers, but reorganize them into the proper section type and extract the passages for reading/cloze tasks.";
     }
 
     /**
