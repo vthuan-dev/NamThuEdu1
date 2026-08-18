@@ -627,16 +627,30 @@ export function CreateThptExam() {
           </div>
 
           {/* Import AI */}
-          <button
-            type="button"
-            onClick={() => { setShowImportModal(true); }}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold text-white transition-all text-sm cursor-pointer"
-            style={{ backgroundColor: '#0D9488' }}
-            title="Import đề thi THCS/THPT từ PDF/Word bằng AI"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>Import (AI)</span>
-          </button>
+          {(() => {
+            const hasExistingContent = config.sections && config.sections.length > 0;
+            return (
+              <button
+                type="button"
+                onClick={() => { if (!hasExistingContent) setShowImportModal(true); }}
+                disabled={hasExistingContent}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold transition-all text-sm ${
+                  hasExistingContent
+                    ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                    : 'text-white cursor-pointer'
+                }`}
+                style={hasExistingContent ? {} : { backgroundColor: '#0D9488' }}
+                title={
+                  hasExistingContent
+                    ? 'Tính năng Import (AI) chỉ khả dụng cho đề thi mới chưa có câu hỏi. Để sử dụng, vui lòng xoá hết các phần hiện tại hoặc tạo một đề thi mới.'
+                    : 'Import đề thi THCS/THPT từ PDF/Word bằng AI'
+                }
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Import (AI)</span>
+              </button>
+            );
+          })()}
 
           {/* Nút LỨU riêng — trước đây chỉ có nút Xuất bản nên giáo viên không có
               cách nào lưu nháp giữa lúc soạn ("chưa hiển thị nút lưu"). */}
