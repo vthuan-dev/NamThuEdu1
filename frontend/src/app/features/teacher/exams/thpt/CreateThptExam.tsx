@@ -9,6 +9,8 @@ import {
   Plus,
   ChevronUp,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Trash2,
   History,
   Sparkles,
