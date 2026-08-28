@@ -219,7 +219,14 @@ class ThptExamTest extends TestCase
 
     /* ========================== STUDENT ============================= */
 
-    private function publishSampleExam(): int
+    /**
+     * Đề THPT đã publish. Mặc định giao luôn cho học viên (không giới hạn lượt)
+     * vì `/thpt-exams/{id}` và `/start` giờ áp policy assigned_only — học viên
+     * chưa được giao thì nhận 403 chứ không vào được đề.
+     *
+     * $assignToStudent = false: dùng cho các test kiểm tra chính policy đó.
+     */
+    private function publishSampleExam(bool $assignToStudent = true): int
     {
         $exam = Exam::create([
             'eTitle' => 'Đề công bố',
@@ -232,6 +239,13 @@ class ThptExamTest extends TestCase
             'age_group' => 'teens',
             'thpt_config' => $this->sampleConfig(),
         ]);
+
+        if ($assignToStudent) {
+            // taMax_attempt = 0 → không giới hạn, nên các test không liên quan
+            // tới lượt vẫn chạy như trước.
+            $this->assignToStudent($exam->eId, 0);
+        }
+
         return $exam->eId;
     }
 
@@ -321,14 +335,15 @@ class ThptExamTest extends TestCase
 
     /**
      * Giao đề cho chính học viên trong test với số lượt tối đa cụ thể.
+     * $deadline = null → mặc định còn hạn (3 ngày nữa).
      */
-    private function assignToStudent(int $examId, int $maxAttempt): TestAssignment
+    private function assignToStudent(int $examId, int $maxAttempt, $deadline = null): TestAssignment
     {
         return TestAssignment::create([
             'exam_id' => $examId,
             'taTarget_type' => 'student',
             'taTarget_id' => $this->student->uId,
-            'taDeadline' => now()->addDays(3),
+            'taDeadline' => $deadline ?? now()->addDays(3),
             'taMax_attempt' => $maxAttempt,
             'taCreated_at' => now(),
         ]);
@@ -416,6 +431,216 @@ class ThptExamTest extends TestCase
         $this->assertFalse($second->json('data.resumed'));
         $this->assertEquals(2, Submission::find($second->json('data.submission_id'))->sAttempt);
         $this->assertDatabaseCount('submissions', 2);
+    }
+
+    /** @test */
+    public function restart_is_rejected_when_no_spare_attempt_left()
+    {
+        $examId = $this->publishSampleExam();
+        $assignment = $this->assignToStudent($examId, 1);
+
+        $start = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", [
+                'assignment_id' => $assignment->taId,
+            ]);
+        $start->assertStatus(200);
+        $sid = $start->json('data.submission_id');
+
+        // Trước khi fix: restart hard-delete submission → bộ đếm lượt về 0 →
+        // học viên đọc hết đề rồi làm lại vô hạn. Giờ phải bị từ chối.
+        $restart = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", [
+                'assignment_id' => $assignment->taId,
+                'restart' => true,
+            ]);
+
+        $restart->assertStatus(403);
+        // Phiên đang làm PHẢI còn nguyên — không được huỷ rồi mới chặn.
+        $this->assertEquals('in_progress', Submission::find($sid)->sStatus);
+        $this->assertDatabaseCount('submissions', 1);
+    }
+
+    /** @test */
+    public function restart_consumes_an_attempt_instead_of_resetting_the_counter()
+    {
+        $examId = $this->publishSampleExam();
+        $assignment = $this->assignToStudent($examId, 2);
+
+        $first = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", [
+                'assignment_id' => $assignment->taId,
+            ]);
+        $firstId = $first->json('data.submission_id');
+
+        // Còn lượt dư → restart được. Phiên cũ bị void (KHÔNG xoá) nên vẫn đếm.
+        $restart = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", [
+                'assignment_id' => $assignment->taId,
+                'restart' => true,
+            ]);
+        $restart->assertStatus(200);
+
+        $voided = Submission::find($firstId);
+        $this->assertEquals('auto_submitted', $voided->sStatus);
+        $this->assertEquals('restart', $voided->auto_submit_reason);
+        $this->assertDatabaseCount('submissions', 2);
+
+        // Đã tiêu 2/2 lượt → restart lần nữa bị chặn.
+        $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", [
+                'assignment_id' => $assignment->taId,
+                'restart' => true,
+            ])->assertStatus(403);
+    }
+
+    /** @test */
+    public function resume_is_scoped_to_the_requested_assignment()
+    {
+        $examId = $this->publishSampleExam();
+        $assignmentA = $this->assignToStudent($examId, 1);
+        $assignmentB = $this->assignToStudent($examId, 1);
+
+        $startA = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", [
+                'assignment_id' => $assignmentA->taId,
+            ]);
+        $sidA = $startA->json('data.submission_id');
+
+        // Mở assignment B: trước khi fix sẽ resume phiên của A (resume không lọc
+        // assignment_id) → bài nộp ghi vào pool A, pool B vẫn 0 lượt.
+        $startB = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", [
+                'assignment_id' => $assignmentB->taId,
+            ]);
+
+        $startB->assertStatus(200);
+        $this->assertNotEquals($sidA, $startB->json('data.submission_id'));
+        $this->assertEquals(
+            $assignmentB->taId,
+            Submission::find($startB->json('data.submission_id'))->assignment_id
+        );
+    }
+
+    /** @test */
+    public function start_ignores_an_assignment_belonging_to_another_student()
+    {
+        $examId = $this->publishSampleExam();
+        $mine = $this->assignToStudent($examId, 1);
+
+        $other = User::create([
+            'uName' => 'Học viên khác',
+            'uPhone' => '0900000123',
+            'uPassword' => bcrypt('secret'),
+            'uRole' => 'student',
+            'age_group' => 'teens',
+        ]);
+        $foreign = TestAssignment::create([
+            'exam_id' => $examId,
+            'taTarget_type' => 'student',
+            'taTarget_id' => $other->uId,
+            'taDeadline' => now()->addDays(3),
+            'taMax_attempt' => 5,
+            'taCreated_at' => now(),
+        ]);
+
+        // Dùng hết lượt của assignment CỦA MÌNH.
+        $start = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", [
+                'assignment_id' => $mine->taId,
+            ]);
+        $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/submit", [
+                'submission_id' => $start->json('data.submission_id'),
+                'answers' => ['q1' => 'C'],
+                'final' => true,
+            ])->assertStatus(200);
+
+        // Mượn taId của học viên khác (max 5 lượt) để né giới hạn → phải bị bỏ
+        // qua, rơi về assignment của mình và bị chặn.
+        $borrowed = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", [
+                'assignment_id' => $foreign->taId,
+            ]);
+
+        $borrowed->assertStatus(403);
+        $this->assertDatabaseCount('submissions', 1);
+    }
+
+    /** @test */
+    public function start_requires_an_assignment()
+    {
+        // Đề đã publish nhưng CHƯA giao cho học viên này: đoán URL
+        // /hoc-vien/lam-bai-thpt/{id} không được làm bài. Trước khi fix thì
+        // được, và vì không có assignment nên cũng không có giới hạn lượt.
+        $examId = $this->publishSampleExam(false);
+
+        $response = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", []);
+
+        $response->assertStatus(403);
+        $this->assertEquals('assigned_only', $response->json('policy'));
+        $this->assertDatabaseCount('submissions', 0);
+    }
+
+    /** @test */
+    public function get_for_student_requires_an_assignment()
+    {
+        $examId = $this->publishSampleExam(false);
+
+        $response = $this->withHeaders($this->studentHeader())
+            ->getJson("/api/student/thpt-exams/{$examId}");
+
+        $response->assertStatus(403);
+        $this->assertEquals('assigned_only', $response->json('policy'));
+    }
+
+    /** @test */
+    public function attempt_limit_still_applies_after_the_deadline_passes()
+    {
+        $examId = $this->publishSampleExam(false);
+        $assignment = $this->assignToStudent($examId, 1, now()->subDay());
+
+        // Quá hạn vẫn vào được (để còn nộp bài muộn / làm nốt), nhưng lượt phải
+        // tính vào pool của assignment. Trước khi fix: resolve bỏ assignment quá
+        // hạn → assignment_id NULL → maxAttempt 0 → làm lại vô hạn.
+        $start = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", []);
+        $start->assertStatus(200);
+        $sid = $start->json('data.submission_id');
+        $this->assertEquals($assignment->taId, Submission::find($sid)->assignment_id);
+
+        $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/submit", [
+                'submission_id' => $sid,
+                'answers' => ['q1' => 'C'],
+                'final' => true,
+            ])->assertStatus(200);
+
+        $again = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", []);
+
+        $again->assertStatus(403);
+        $this->assertDatabaseCount('submissions', 1);
+    }
+
+    /** @test */
+    public function restart_after_the_deadline_is_also_gated()
+    {
+        $examId = $this->publishSampleExam(false);
+        $this->assignToStudent($examId, 1, now()->subDay());
+
+        $start = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", []);
+        $sid = $start->json('data.submission_id');
+
+        $restart = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", [
+                'restart' => true,
+            ]);
+
+        $restart->assertStatus(403);
+        $this->assertEquals('in_progress', Submission::find($sid)->sStatus);
+        $this->assertDatabaseCount('submissions', 1);
     }
 
     /** @test */

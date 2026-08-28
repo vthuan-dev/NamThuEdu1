@@ -153,6 +153,16 @@ class AssignPublishedOnlyTest extends TestCase
         // Cột lệch với config (dữ liệu cũ): config = 45, cột = 60
         $exam->update(['eDuration_minutes' => 60]);
 
+        // Đề phải được giao mới xem/làm được (policy assigned_only của THPT).
+        TestAssignment::create([
+            'exam_id' => $exam->eId,
+            'taTarget_type' => 'student',
+            'taTarget_id' => $this->student->uId,
+            'taDeadline' => now()->addDays(3),
+            'taMax_attempt' => 1,
+            'taCreated_at' => now(),
+        ]);
+
         $res = $this->actingAs($this->student, 'sanctum')
             ->getJson("/api/student/thpt-exams/{$exam->eId}");
 

@@ -134,6 +134,11 @@ export function StudentThptExamPage() {
   const [remainingSec, setRemainingSec] = useState(0);
   const [showActiveSessionModal, setShowActiveSessionModal] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
+  // Lượt làm bài của assignment (0 = không giới hạn / đề tự luyện).
+  // Dùng để ẩn nút "Làm lại từ đầu": restart tiêu 1 lượt, nên khi đã dùng
+  // hết thì backend từ chối — không để học viên bấm rồi nhận 403.
+  const [attemptsAllowed, setAttemptsAllowed] = useState(0);
+  const [attemptsUsed, setAttemptsUsed] = useState(0);
 
   // ─── Kéo chỉnh độ rộng panel Tiến độ (aside). Lưu localStorage. ────────────
   const [navW, setNavW] = useState<number>(() => {
@@ -220,6 +225,8 @@ export function StudentThptExamPage() {
         const startedParsed = parseVNDate(startData.sStart_time);
         setStartedAtServer((startedParsed ?? new Date()).toISOString());
         setSubmissionId(sid);
+        setAttemptsAllowed(Number(startData.attempts_allowed) || 0);
+        setAttemptsUsed(Number(startData.attempts_used) || 0);
 
         const deadline = resolveThptDeadline({
           examId,
@@ -461,6 +468,11 @@ export function StudentThptExamPage() {
   const sections = Array.isArray(config.sections) ? config.sections : [];
   const activeSection = sections[activeIdx];
 
+  // Restart tiêu 1 lượt: chỉ cho phép khi còn lượt DƯ sau phiên đang mở.
+  // attemptsAllowed = 0 → không giới hạn. Khớp điều kiện backend kiểm tra ở
+  // ThptExamController::startSubmission nhánh restart.
+  const canRestart = attemptsAllowed <= 0 || attemptsUsed < attemptsAllowed;
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       <OfflineBanner online={session.online} pendingCount={session.pendingCount} />
@@ -469,7 +481,12 @@ export function StudentThptExamPage() {
         onDismiss={session.dismissWarning}
         timeRemaining={session.timeRemaining}
       />
-      <ThptTopBar examTitle={examTitle} totalSeconds={remainingSec} totalDurationSec={totalDurationSec} onRestart={handleRestart} />
+      <ThptTopBar
+        examTitle={examTitle}
+        totalSeconds={remainingSec}
+        totalDurationSec={totalDurationSec}
+        onRestart={canRestart ? handleRestart : undefined}
+      />
 
       <main data-thpt-main className="flex-1 max-w-7xl w-full mx-auto px-6 pt-6 pb-24 flex flex-col lg:flex-row gap-6">
         <div className="min-w-0 flex-1">
@@ -550,10 +567,15 @@ export function StudentThptExamPage() {
       <MultiTabWarning hasOtherTab={session.hasOtherTab} position="floating" />
       <ActiveSessionChoiceModal
         open={showActiveSessionModal}
+        canRestart={canRestart}
+        attemptsAllowed={attemptsAllowed}
         onContinue={() => setShowActiveSessionModal(false)}
         onRestart={async () => {
+          const warning = attemptsAllowed > 0
+            ? `\n\nLưu ý: làm lại từ đầu sẽ tính là 1 lượt. Bạn còn ${Math.max(0, attemptsAllowed - attemptsUsed)} lượt sau lần này.`
+            : '';
           const ok = window.confirm(
-            'Bạn có chắc chắn muốn hủy phiên làm bài hiện tại và làm lại từ đầu? Tất cả câu trả lời của phiên này sẽ bị xóa.',
+            'Bạn có chắc chắn muốn hủy phiên làm bài hiện tại và làm lại từ đầu? Tất cả câu trả lời của phiên này sẽ bị xóa.' + warning,
           );
           if (!ok) return;
           setIsRestarting(true);
@@ -574,9 +596,20 @@ interface ActiveSessionChoiceModalProps {
   onContinue: () => void;
   onRestart: () => void;
   isRestarting: boolean;
+  /** false khi đã dùng hết lượt — backend sẽ từ chối restart nên ẩn nút. */
+  canRestart?: boolean;
+  /** 0 = không giới hạn lượt. Dùng để giải thích cho học viên. */
+  attemptsAllowed?: number;
 }
 
-export function ActiveSessionChoiceModal({ open, onContinue, onRestart, isRestarting }: ActiveSessionChoiceModalProps) {
+export function ActiveSessionChoiceModal({
+  open,
+  onContinue,
+  onRestart,
+  isRestarting,
+  canRestart = true,
+  attemptsAllowed = 0,
+}: ActiveSessionChoiceModalProps) {
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -587,6 +620,8 @@ export function ActiveSessionChoiceModal({ open, onContinue, onRestart, isRestar
   }, [open]);
 
   if (!open) return null;
+
+  const onlyOneAttempt = attemptsAllowed === 1;
 
   return (
     <div
@@ -605,7 +640,11 @@ export function ActiveSessionChoiceModal({ open, onContinue, onRestart, isRestar
           Bạn đang có một phiên làm bài chưa nộp
         </h3>
         <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-          Bạn có muốn tiếp tục làm bài thi với các câu trả lời trước đó hay muốn xóa hoàn toàn phiên này để làm lại từ đầu (phiên mới)?
+          {canRestart
+            ? 'Bạn có muốn tiếp tục làm bài thi với các câu trả lời trước đó hay muốn xóa hoàn toàn phiên này để làm lại từ đầu (phiên mới)?'
+            : onlyOneAttempt
+              ? 'Đề thi này chỉ được làm 1 lần nên bạn không thể làm lại từ đầu. Hãy tiếp tục phiên đang làm và nộp bài khi hoàn thành.'
+              : 'Bạn đã dùng hết số lượt làm bài nên không thể làm lại từ đầu. Hãy tiếp tục phiên đang làm và nộp bài khi hoàn thành.'}
         </p>
         <div className="flex flex-col gap-2.5">
           <button
@@ -615,14 +654,20 @@ export function ActiveSessionChoiceModal({ open, onContinue, onRestart, isRestar
           >
             Tiếp tục làm bài
           </button>
-          <button
-            type="button"
-            onClick={onRestart}
-            disabled={isRestarting}
-            className="w-full py-3 px-4 rounded-xl text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-          >
-            {isRestarting ? 'Đang khởi động lại...' : 'Hủy phiên & Làm lại từ đầu'}
-          </button>
+          {canRestart && (
+            <button
+              type="button"
+              onClick={onRestart}
+              disabled={isRestarting}
+              className="w-full py-3 px-4 rounded-xl text-sm font-bold text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            >
+              {isRestarting
+                ? 'Đang khởi động lại...'
+                : attemptsAllowed > 0
+                  ? 'Hủy phiên & Làm lại từ đầu (tính 1 lượt)'
+                  : 'Hủy phiên & Làm lại từ đầu'}
+            </button>
+          )}
         </div>
       </div>
       <style>{`

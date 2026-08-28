@@ -415,6 +415,92 @@ class ThptExamController extends Controller
         return $fromColumn > 0 ? $fromColumn : self::DEFAULT_DURATION_MINUTES;
     }
 
+    /**
+     * Assignment này có thực sự giao cho học viên này không?
+     *
+     * Cần thiết vì FE gửi `assignment_id` lên và pool lượt được đếm theo
+     * assignment. Nếu chỉ kiểm tra `exam_id` (như trước) thì học viên A có thể
+     * truyền taId của học viên B để đếm lượt vào pool của B → tự cấp thêm lượt.
+     */
+    private function assignmentBelongsToStudent(TestAssignment $assignment, $user): bool
+    {
+        if ($assignment->taTarget_type === 'student') {
+            return (int) $assignment->taTarget_id === (int) $user->uId;
+        }
+        if ($assignment->taTarget_type === 'class') {
+            return !empty($user->class_id)
+                && (int) $assignment->taTarget_id === (int) $user->class_id;
+        }
+        return false;
+    }
+
+    /**
+     * taId assignment của học viên cho đề này (null nếu chưa từng được giao).
+     *
+     * Thứ tự ưu tiên: assignment còn hạn → giao riêng cho học viên (hơn giao
+     * theo lớp) → assignment mới nhất.
+     *
+     * $includeExpired = true: lấy cả assignment đã quá hạn.
+     *
+     * Vì sao cần lấy cả bản quá hạn: pool lượt được đếm theo assignment, và
+     * `taMax_attempt` chỉ đọc được khi biết assignment. Nếu bỏ assignment hết
+     * hạn thì $assignmentId = null → không có max nào để áp → đề "hạ cấp" thành
+     * tự luyện KHÔNG giới hạn. Nghĩa là học viên chỉ cần đợi quá deadline là
+     * làm lại vô hạn, vô hiệu hoá toàn bộ gate lượt.
+     */
+    private function resolveAssignmentIdForStudent($user, int $examId, bool $includeExpired = false): ?int
+    {
+        $classIds = $user->class_id ? [$user->class_id] : [];
+
+        $query = TestAssignment::where('exam_id', $examId)
+            ->where(function ($q) use ($user, $classIds) {
+                $q->where(function ($qq) use ($user) {
+                    $qq->where('taTarget_type', 'student')
+                        ->where('taTarget_id', $user->uId);
+                })->orWhere(function ($qq) use ($classIds) {
+                    if (empty($classIds)) {
+                        $qq->whereRaw('1 = 0');
+                        return;
+                    }
+                    $qq->where('taTarget_type', 'class')
+                        ->whereIn('taTarget_id', $classIds);
+                });
+            });
+
+        if (!$includeExpired) {
+            $query->where(function ($q) {
+                $q->whereNull('taDeadline')->orWhere('taDeadline', '>=', now());
+            });
+        }
+
+        $resolved = $query
+            // Còn hạn xếp trước bản quá hạn: giáo viên giao lại = pool lượt mới,
+            // không được để bản cũ quá hạn giành mất.
+            ->orderByRaw('CASE WHEN taDeadline IS NULL OR taDeadline >= ? THEN 0 ELSE 1 END', [now()])
+            ->orderByRaw("CASE WHEN taTarget_type = 'student' THEN 0 ELSE 1 END")
+            ->orderByDesc('taId')
+            ->first();
+
+        return $resolved ? (int) $resolved->taId : null;
+    }
+
+    /**
+     * Học viên chưa được giao đề này.
+     *
+     * Cùng shape với kids/teens/VSTEP (`policy = assigned_only`) để FE xử lý
+     * chung một chỗ. THPT trước đây thiếu chốt này nên đoán URL
+     * `/hoc-vien/lam-bai-thpt/{id}` là xem + làm được mọi đề đã publish, và vì
+     * không có assignment nên cũng không có giới hạn lượt nào được áp.
+     */
+    private function assignedOnlyError()
+    {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Bạn chỉ có thể làm đề đã được giáo viên giao.',
+            'policy' => 'assigned_only',
+        ], 403);
+    }
+
     public function getForStudent(Request $request, $examId)
     {
         $user = $request->user();
@@ -436,6 +522,12 @@ class ThptExamController extends Controller
                 'Đề thi này chưa được giáo viên xuất bản nên chưa thể làm. Vui lòng liên hệ giáo viên.',
                 409
             );
+        }
+
+        // Policy: chỉ xem được đề đã được giao (kể cả assignment đã quá hạn, để
+        // học viên còn mở lại bài đang làm dở). Nhất quán với kids/teens/VSTEP.
+        if (!$this->resolveAssignmentIdForStudent($user, (int) $examId, true)) {
+            return $this->assignedOnlyError();
         }
 
         $config = $this->stripAnswers($exam->thpt_config ?? $this->blankConfig());
@@ -476,46 +568,131 @@ class ThptExamController extends Controller
             );
         }
 
-        // Resume nếu đã có submission đang dở
+        // ── RESOLVE ASSIGNMENT TRƯỚC ─────────────────────────────────────────
+        // Phải biết assignment TRƯỚC khi tìm phiên dở, vì pool lượt tính theo
+        // assignment: nếu resume không lọc theo assignment thì mở assignment B
+        // sẽ resume phiên của A → bài nộp ghi vào pool A, pool B vẫn 0 lượt.
+        // kids/teens đã lọc từ trước, chỉ THPT thiếu.
+        $assignmentId = $request->input('assignment_id');
+        if ($assignmentId) {
+            // Phải đúng đề VÀ đúng chủ sở hữu. Trước đây chỉ check exam_id nên
+            // học viên A có thể truyền taId của học viên B để đếm lượt vào pool
+            // của B → tự cấp thêm lượt cho mình.
+            $assignment = TestAssignment::where('taId', $assignmentId)
+                ->where('exam_id', $examId)
+                ->first();
+            if (!$assignment || !$this->assignmentBelongsToStudent($assignment, $user)) {
+                $assignmentId = null; // ignore invalid / không phải của mình
+            }
+        }
+        // Fallback: nếu FE không gửi assignment_id (hoặc invalid) nhưng học viên
+        // đã được giao đề → tự gắn assignment để bài vào tab "Bài giao".
+        //
+        // includeExpired = true: assignment quá hạn VẪN là pool lượt hợp lệ.
+        // Trước đây fallback chỉ lấy bản còn hạn nên sau deadline $assignmentId
+        // = null → $maxAttempt = 0 → gate không chạy → làm lại vô hạn. Đợi quá
+        // hạn là đường lách rẻ nhất, vô hiệu hoá mọi fix khác.
+        if (!$assignmentId) {
+            $assignmentId = $this->resolveAssignmentIdForStudent($user, (int) $examId, true);
+        }
+
+        // Chưa từng được giao đề → không cho làm. Đây là chốt còn thiếu so với
+        // startKidsExamDirect/startTeensExamDirect/startDirectExam: không có
+        // assignment thì cũng không có taMax_attempt để áp, nên "được vào" đồng
+        // nghĩa với "không giới hạn lượt".
+        if (!$assignmentId) {
+            return $this->assignedOnlyError();
+        }
+
+        // Số lượt tối đa của assignment. 0 = không giới hạn (GV không đặt max).
+        // Tới đây $assignmentId luôn có giá trị (guard assigned_only ở trên), nên
+        // taMax_attempt luôn được đọc — kể cả khi assignment đã quá hạn.
+        // Trả về cho FE để ẩn nút "Làm lại từ đầu" khi chỉ còn 1 lượt — bấm nút
+        // đó là tiêu lượt, không nên để học viên bấm mù.
+        $maxAttempt = (int) (TestAssignment::where('taId', $assignmentId)->value('taMax_attempt') ?? 0);
+
+        // Resume nếu đã có submission đang dở — scope theo assignment, fallback
+        // bản ghi cũ (assignment_id NULL) rồi backfill ở nhánh resume bên dưới.
         $existing = Submission::where('exam_id', $examId)
             ->where('user_id', $user->uId)
             ->where('sStatus', 'in_progress')
+            ->when($assignmentId, function ($q) use ($assignmentId) {
+                $q->where(function ($qq) use ($assignmentId) {
+                    $qq->where('assignment_id', $assignmentId)
+                        ->orWhereNull('assignment_id');
+                });
+            }, function ($q) {
+                $q->whereNull('assignment_id');
+            })
+            ->orderByRaw('CASE WHEN assignment_id IS NULL THEN 1 ELSE 0 END')
+            ->orderByDesc('sId')
             ->first();
 
         // Huy phien do de lam lai tu dau.
-        // Xoa/void TAT CA submission in_progress cua user+exam (tranh sot ban cu).
+        //
+        // KHÔNG hard-delete: model Submission không dùng SoftDeletes nên xoá là
+        // mất hẳn khỏi DB, khiến bộ đếm lượt (count submissions) tụt về 0. Học
+        // viên chỉ cần vào đề → đọc hết câu hỏi → bấm "Hủy phiên & Làm lại" là
+        // reset timer + reset lượt, lặp vô hạn dù GV giới hạn 1 lần.
+        //
+        // Void (giữ bản ghi, đánh dấu discarded) → lượt đã dùng vẫn nằm trong
+        // pool, nên restart tiêu đúng 1 lượt.
         if ($request->boolean('restart')) {
+            // Không còn lượt dư thì TỪ CHỐI restart và GIỮ phiên hiện tại.
+            // Nếu void trước rồi để gate bên dưới chặn thì học viên mất luôn bài
+            // đang làm mà cũng không vào lại được.
+            if ($maxAttempt > 0) {
+                // Dùng when() thay vì where('assignment_id', $assignmentId) cho
+                // nhất quán với hai chỗ đếm khác: `= NULL` trong SQL luôn false
+                // nên nếu sau này $assignmentId có thể null ở đây thì bộ đếm sẽ
+                // trả 0 và gate thất bại im lặng.
+                $usedIncludingCurrent = Submission::where('user_id', $user->uId)
+                    ->where('exam_id', $examId)
+                    ->when(
+                        $assignmentId,
+                        fn($q) => $q->where('assignment_id', $assignmentId),
+                        fn($q) => $q->whereNull('assignment_id')
+                    )
+                    ->count();
+
+                if ($usedIncludingCurrent >= $maxAttempt) {
+                    return $this->error(
+                        $maxAttempt === 1
+                            ? 'Đề thi này chỉ được làm 1 lần nên không thể làm lại từ đầu. Hãy tiếp tục phiên đang làm.'
+                            : "Bạn đã dùng hết {$maxAttempt} lượt làm bài nên không thể làm lại từ đầu. Hãy tiếp tục phiên đang làm.",
+                        403
+                    );
+                }
+            }
+
             $toVoid = Submission::where('exam_id', $examId)
                 ->where('user_id', $user->uId)
                 ->where('sStatus', 'in_progress')
                 ->get();
 
             foreach ($toVoid as $sub) {
-                try {
-                    \DB::transaction(function () use ($sub) {
-                        $sub->answers()->delete();
-                        $sub->delete();
-                    });
-                } catch (\Throwable $e) {
-                    \Log::warning('THPT restart hard-delete failed, voiding session instead', [
-                        'submission_id' => $sub->sId,
-                        'error' => $e->getMessage(),
-                    ]);
-                    $voidPayload = $sub->submission_payload ?? [];
-                    $voidPayload['answers'] = new \stdClass();
-                    $voidPayload['discarded'] = true;
-                    $voidPayload['discarded_at'] = now()->toIso8601String();
-                    $sub->submission_payload = $voidPayload;
-                    $sub->sStatus = 'auto_submitted';
-                    $sub->sSubmit_time = now();
-                    $sub->auto_submit_reason = 'restart';
-                    $sub->save();
-                }
+                $voidPayload = $sub->submission_payload ?? [];
+                $voidPayload['answers'] = new \stdClass();
+                $voidPayload['discarded'] = true;
+                $voidPayload['discarded_at'] = now()->toIso8601String();
+                $sub->submission_payload = $voidPayload;
+                $sub->sStatus = 'auto_submitted';
+                $sub->sSubmit_time = now();
+                $sub->auto_submit_reason = 'restart';
+                $sub->save();
             }
             $existing = null;
         }
 
         if ($existing) {
+            // Backfill assignment_id cho submission cũ (tạo trước khi resume
+            // được scope theo assignment). Không backfill thì lượt này bị đếm
+            // vào nhóm assignment_id NULL → không tính vào pool của assignment.
+            if (empty($existing->assignment_id) && $assignmentId) {
+                $existing->assignment_id = $assignmentId;
+                $existing->save();
+            }
+
             // Check if expired
             $durationMin = (int) ($existing->submission_payload['exam_snapshot']['eDuration_minutes']
                 ?? $exam->eDuration_minutes
@@ -583,6 +760,16 @@ class ThptExamController extends Controller
 
             $existingPayload = $existing->submission_payload ?? [];
             $remainingSec = max(0, (int) round($timeRemaining * 60));
+            // Lượt đã dùng TÍNH CẢ phiên đang mở — FE dùng để ẩn nút "Hủy phiên
+            // & Làm lại từ đầu" khi restart sẽ không được backend cho phép.
+            $attemptsUsedNow = Submission::where('user_id', $user->uId)
+                ->where('exam_id', $examId)
+                ->when(
+                    $assignmentId,
+                    fn($q) => $q->where('assignment_id', $assignmentId),
+                    fn($q) => $q->whereNull('assignment_id')
+                )
+                ->count();
             return response()->json([
                 'status' => 'success',
                 'data' => [
@@ -596,46 +783,10 @@ class ThptExamController extends Controller
                     'time_remaining_seconds' => $remainingSec,
                     'deadline_at' => $existingPayload['timer_deadline_at']
                         ?? $startedAt->copy()->addMinutes($durationMin)->toIso8601String(),
+                    'attempts_allowed' => $maxAttempt,
+                    'attempts_used' => $attemptsUsedNow,
                 ],
             ]);
-        }
-
-        $assignmentId = $request->input('assignment_id');
-        if ($assignmentId) {
-            $assignment = TestAssignment::where('taId', $assignmentId)
-                ->where('exam_id', $examId)
-                ->first();
-            if (!$assignment) {
-                $assignmentId = null; // ignore invalid
-            }
-        }
-        // Fallback: nếu FE không gửi assignment_id (hoặc invalid) nhưng học viên
-        // đã được giao đề → tự gắn assignment active để bài vào tab "Bài giao".
-        if (!$assignmentId) {
-            $classIds = $user->class_id ? [$user->class_id] : [];
-            $resolved = TestAssignment::where('exam_id', $examId)
-                ->where(function ($q) use ($user, $classIds) {
-                    $q->where(function ($qq) use ($user) {
-                        $qq->where('taTarget_type', 'student')
-                            ->where('taTarget_id', $user->uId);
-                    })->orWhere(function ($qq) use ($classIds) {
-                        if (empty($classIds)) {
-                            $qq->whereRaw('1 = 0');
-                            return;
-                        }
-                        $qq->where('taTarget_type', 'class')
-                            ->whereIn('taTarget_id', $classIds);
-                    });
-                })
-                ->where(function ($q) {
-                    $q->whereNull('taDeadline')->orWhere('taDeadline', '>=', now());
-                })
-                ->orderByRaw("CASE WHEN taTarget_type = 'student' THEN 0 ELSE 1 END")
-                ->orderByDesc('taId')
-                ->first();
-            if ($resolved) {
-                $assignmentId = (int) $resolved->taId;
-            }
         }
 
         // ── GATE SỐ LƯỢT LÀM BÀI (taMax_attempt) ────────────────────────────
@@ -649,6 +800,10 @@ class ThptExamController extends Controller
         // Đếm lượt theo assignment: mỗi lần giáo viên giao lại = pool lượt
         // riêng, khớp cách startTeensExamDirect đang làm. taMax_attempt <= 0
         // được hiểu là không giới hạn.
+        //
+        // $assignmentId chắc chắn non-null ở đây (guard assigned_only), kể cả
+        // với assignment đã quá hạn — nên không còn cửa "hết hạn = vô hạn".
+        // Nhánh whereNull chỉ còn là lưới an toàn nếu guard đó bị nới về sau.
         $attemptsUsed = Submission::where('user_id', $user->uId)
             ->where('exam_id', $examId)
             ->when(
@@ -658,16 +813,13 @@ class ThptExamController extends Controller
             )
             ->count();
 
-        if ($assignmentId) {
-            $maxAttempt = (int) (TestAssignment::where('taId', $assignmentId)->value('taMax_attempt') ?? 0);
-            if ($maxAttempt > 0 && $attemptsUsed >= $maxAttempt) {
-                return $this->error(
-                    $maxAttempt === 1
-                        ? 'Đề thi này chỉ được làm 1 lần và bạn đã nộp bài. Vui lòng xem lại kết quả.'
-                        : "Bạn đã dùng hết {$maxAttempt} lượt làm bài cho đề thi này.",
-                    403
-                );
-            }
+        if ($maxAttempt > 0 && $attemptsUsed >= $maxAttempt) {
+            return $this->error(
+                $maxAttempt === 1
+                    ? 'Đề thi này chỉ được làm 1 lần và bạn đã nộp bài. Vui lòng xem lại kết quả.'
+                    : "Bạn đã dùng hết {$maxAttempt} lượt làm bài cho đề thi này.",
+                403
+            );
         }
 
         // BUG FIX "thời gian hoàn thành đề không đúng thực tế": thời lượng
@@ -713,6 +865,10 @@ class ThptExamController extends Controller
                 'time_remaining_seconds' => $durationMinNew * 60,
                 'deadline_at' => $submission->submission_payload['timer_deadline_at']
                     ?? now()->addMinutes($durationMinNew)->toIso8601String(),
+                // Lượt làm bài — FE dùng để quyết định có hiện nút "Làm lại từ đầu".
+                // attempts_allowed = 0 → không giới hạn.
+                'attempts_allowed' => $maxAttempt,
+                'attempts_used' => $attemptsUsed + 1,
             ],
         ]);
     }
