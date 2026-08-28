@@ -1345,6 +1345,28 @@ class ThptExamController extends Controller
             return false;
         };
 
+        // Đáp án đúng phải trỏ tới một phương án THỰC SỰ CÓ NỘI DUNG.
+        //
+        // Các factory tạo đề luôn khởi tạo đủ 4 phương án A–D với text rỗng, nên
+        // giáo viên chọn đáp án đúng là D rồi xoá nội dung D thì $hasId vẫn pass
+        // → đề xuất bản được nhưng KHÔNG học viên nào có thể đúng câu đó, mà
+        // không ai biết cho tới khi xem điểm.
+        //
+        // Bỏ qua khi tất cả phương án đều rỗng: đó là đề dạng ảnh, nội dung nằm
+        // trên ảnh nên text rỗng là bình thường (khớp usedChoices ở frontend).
+        $answerPointsToRealChoice = function ($choices, $correctId): bool {
+            if (!is_array($choices) || empty($choices)) return true;
+            $withText = array_filter(
+                $choices,
+                fn($c) => trim((string) ($c['text'] ?? '')) !== ''
+            );
+            if (empty($withText)) return true; // đề dạng ảnh
+            foreach ($withText as $c) {
+                if ((string) ($c['id'] ?? '') === (string) $correctId) return true;
+            }
+            return false;
+        };
+
         foreach ($sections as $idx => $s) {
             $label = ($s['title'] ?? ('Phần ' . ($idx + 1)));
             $type = $s['type'] ?? null;
@@ -1359,6 +1381,12 @@ class ThptExamController extends Controller
                     foreach ($items as $i => $it) {
                         if (!$hasId($it['correct_id'] ?? null)) {
                             $errors[] = "{$label} ({$qlabel($it, $i)}): chưa chọn đáp án đúng.";
+                            continue;
+                        }
+                        // phonetics dùng `words`, error_identification dùng `segments`.
+                        $choices = $it['options'] ?? $it['words'] ?? $it['segments'] ?? [];
+                        if (!$answerPointsToRealChoice($choices, $it['correct_id'])) {
+                            $errors[] = "{$label} ({$qlabel($it, $i)}): đáp án đúng ({$it['correct_id']}) trỏ vào phương án chưa có nội dung.";
                         }
                     }
                     break;
@@ -1405,6 +1433,8 @@ class ThptExamController extends Controller
                         } else {
                             if (!$hasId($it['correct_id'] ?? null)) {
                                 $errors[] = "{$label} ({$qlabel($it, $i)}): chưa chọn đáp án đúng.";
+                            } elseif (!$answerPointsToRealChoice($it['options'] ?? [], $it['correct_id'])) {
+                                $errors[] = "{$label} ({$qlabel($it, $i)}): đáp án đúng ({$it['correct_id']}) trỏ vào phương án chưa có nội dung.";
                             }
                         }
                     }
@@ -1445,6 +1475,12 @@ class ThptExamController extends Controller
                             // mc / sentence_insertion → cần correct_id / correct
                             if (!$hasId($it['correct_id'] ?? null) && !$hasId($it['correct'] ?? null)) {
                                 $errors[] = "{$label} ({$qlabel($it, $i)}): chưa chọn đáp án đúng.";
+                            } elseif (
+                                $kind === 'mc'
+                                && $hasId($it['correct_id'] ?? null)
+                                && !$answerPointsToRealChoice($it['options'] ?? [], $it['correct_id'])
+                            ) {
+                                $errors[] = "{$label} ({$qlabel($it, $i)}): đáp án đúng ({$it['correct_id']}) trỏ vào phương án chưa có nội dung.";
                             }
                         }
                     }
@@ -1454,8 +1490,11 @@ class ThptExamController extends Controller
                     if (empty($s['passage'])) $errors[] = "{$label}: thiếu đoạn văn.";
                     if (empty($s['blanks'])) { $errors[] = "{$label}: chưa có chỗ trống nào."; break; }
                     foreach (($s['blanks'] ?? []) as $i => $b) {
+                        $bl = $b['question_number'] ?? ($i + 1);
                         if (!$hasId($b['correct_id'] ?? null)) {
-                            $errors[] = "{$label} (chỗ trống " . ($b['question_number'] ?? ($i + 1)) . "): chưa chọn đáp án đúng.";
+                            $errors[] = "{$label} (chỗ trống {$bl}): chưa chọn đáp án đúng.";
+                        } elseif (!$answerPointsToRealChoice($b['options'] ?? [], $b['correct_id'])) {
+                            $errors[] = "{$label} (chỗ trống {$bl}): đáp án đúng ({$b['correct_id']}) trỏ vào phương án chưa có nội dung.";
                         }
                     }
                     break;

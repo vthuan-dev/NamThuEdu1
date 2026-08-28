@@ -22,6 +22,52 @@ function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
+/**
+ * Lọc bỏ phương án giáo viên không dùng.
+ *
+ * Các factory tạo đề (sections.ts, SectionEditor) luôn khởi tạo ĐỦ 4 phương án
+ * A–D với text rỗng, bất kể câu hỏi thực tế có mấy phương án. Renderer map thẳng
+ * danh sách đó → câu chỉ có 3 đáp án vẫn hiện nút "D" trống và học viên chọn
+ * được, chắc chắn sai.
+ *
+ * KHÔNG lọc khi TOÀN BỘ phương án đều rỗng: đó là đề dạng ảnh (câu hỏi in trên
+ * ảnh, bảng bên phải chỉ hiện nhãn A/B/C/D để chọn) — lọc sạch thì mất luôn nút.
+ * Chỉ lọc khi có ít nhất một phương án đã nhập nội dung.
+ */
+function usedChoices<T extends { text?: string }>(list: unknown): T[] {
+  const all = asArray<T>(list);
+  const withText = all.filter((o) => String(o?.text ?? '').trim() !== '');
+  return withText.length > 0 ? withText : all;
+}
+
+/**
+ * Lọc dòng rỗng nhưng GIỮ NGUYÊN index gốc.
+ *
+ * tf_group và matching khoá đáp án theo vị trí (`q5.s2`, `q5.3`). Nếu lọc rồi
+ * đánh số lại thì mọi đáp án đã chấm bị lệch. Trả kèm index gốc để render đúng
+ * khoá.
+ *
+ * Cũng không lọc khi tất cả đều rỗng, để đề đang soạn dở vẫn hiện ra.
+ */
+function usedRows<T>(list: unknown, getText: (row: T) => string): Array<{ row: T; i: number }> {
+  const all = asArray<T>(list).map((row, i) => ({ row, i }));
+  const filled = all.filter(({ row }) => String(getText(row) ?? '').trim() !== '');
+  return filled.length > 0 ? filled : all;
+}
+
+/**
+ * Vị trí chèn câu thật có trong bài đọc, đọc từ marker [A] [B] … trong passage.
+ *
+ * Trước đây hardcode ['A','B','C','D'] nên bài đọc chỉ đánh 2 vị trí vẫn hiện 4
+ * nút — hai nút cuối không ứng với chỗ nào trong bài. Giữ fallback A–D khi
+ * passage chưa có marker để đề đang soạn dở vẫn chọn được.
+ */
+function insertionMarkers(passage: unknown): string[] {
+  const found = String(passage ?? '').match(/\[([A-F])\]/g) ?? [];
+  const letters = Array.from(new Set(found.map((m) => m.slice(1, -1))));
+  return letters.length > 0 ? letters.sort() : ['A', 'B', 'C', 'D'];
+}
+
 // Nhãn ngắn theo loại phần thi — hiển thị trên header cho gọn gàng, có chủ đích.
 const TYPE_LABEL: Record<string, string> = {
   listening: 'Nghe hiểu',
@@ -201,7 +247,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             return (
               <QCard key={key} n={item.question_number}>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {asArray<any>(item.words).map((w) => {
+                  {usedChoices<any>(item.words).map((w) => {
                     const { before, mark, after } = splitPhoneticWord(w.text, w.underline, autoDetect, w.underlineStart);
                     const wordLabel = mark ? (
                       <span>
@@ -249,7 +295,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             const key = `q${item.question_number}`;
             const userVal = String(answers[key] ?? '').trim().toUpperCase();
             const correctVal = String(correctAnswers?.[key] ?? '').trim().toUpperCase();
-            const options = isError ? item.segments : item.options;
+            const options = usedChoices<any>(isError ? item.segments : item.options);
             return (
               <QCard key={key} n={item.question_number}>
                 {!isError && item.prompt && (
@@ -263,7 +309,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                   <p className="text-sm text-slate-700 italic mb-3" dangerouslySetInnerHTML={{ __html: formatErrorSentence(item.sentence, item.segments) }} />
                 )}
                 <div className={isError ? 'grid grid-cols-2 sm:grid-cols-4 gap-2' : 'space-y-2'}>
-                  {(options ?? []).map((opt: any) => (
+                  {options.map((opt: any) => (
                     <ChoiceButton
                       key={opt.id}
                       letter={opt.id}
@@ -390,7 +436,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                     );
                   }
 
-                  const options = item.options ?? [];
+                  const options = usedChoices<any>(item.options);
                   const userVal = String(answers[key] ?? '').trim().toUpperCase();
                   const correctVal = String(correctAnswers?.[key] ?? '').trim().toUpperCase();
                   // Option text trống (đã in trên ảnh) → chỉ hiện A/B/C/D
@@ -492,7 +538,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                 </QCard>
               );
             }
-            const options = item.options ?? [];
+            const options = usedChoices<any>(item.options);
             const userVal = String(answers[key] ?? '');
             const correctVal = String(correctAnswers?.[key] ?? '');
             return (
@@ -700,9 +746,9 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                   ))}
                 </div>
                 <div className="space-y-2">
-                  {asArray<any>(item.statements).map((s: any, si: number) => (
+                  {usedRows<any>(item.statements, (s) => s?.text).map(({ row: s, i: si }) => (
                     <TfStatementRow
-                      key={s.id}
+                      key={s.id ?? si}
                       idx={si}
                       text={s.text}
                       qKey={`q${item.question_number}.s${si + 1}`}
@@ -723,11 +769,17 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
     case 'matching':
       return (
         <>
-          {asArray<any>(section.items).map((item) => (
+          {asArray<any>(section.items).map((item) => {
+            // Cột phải quyết định tập nhãn hợp lệ của dropdown. Trước đây luôn
+            // liệt kê A–F bất kể cột phải có mấy dòng → chọn được nhãn không tồn
+            // tại, chắc chắn sai.
+            const rights = usedRows<any>(item.list_2, (l) => l);
+            const validLetters = rights.map(({ i }) => LETTERS[i]).filter(Boolean);
+            return (
             <QCard key={item.question_number} n={item.question_number}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  {asArray<any>(item.list_1).map((line: any, i: number) => {
+                  {usedRows<any>(item.list_1, (l) => l).map(({ row: line, i }) => {
                     const key = `q${item.question_number}.${i + 1}`;
                     const userVal = String(answers[key] ?? '');
                     const correctVal = String(correctAnswers?.[key] ?? '');
@@ -749,7 +801,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                           className="w-14 text-sm font-bold text-center border border-slate-300 rounded-md px-1 py-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-200 disabled:cursor-default"
                         >
                           <option value="">—</option>
-                          {LETTERS.map((L) => (<option key={L} value={L}>{L}</option>))}
+                          {validLetters.map((L) => (<option key={L} value={L}>{L}</option>))}
                         </select>
                         {isReview && isWrong && (
                           <span className="text-xs font-bold text-emerald-700 whitespace-nowrap mt-1">➜ {correctVal}</span>
@@ -759,7 +811,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                   })}
                 </div>
                 <div className="rounded-xl border border-teal-100 bg-teal-50/40 p-3 space-y-2">
-                  {asArray<any>(item.list_2).map((line: any, i: number) => (
+                  {rights.map(({ row: line, i }) => (
                     <div key={i} className="flex items-start gap-2">
                       <span className="text-xs font-bold text-teal-700 w-5 mt-0.5">{LETTERS[i]}.</span>
                       <p className="flex-1 text-sm text-slate-700 leading-snug">{line}</p>
@@ -776,7 +828,8 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                 </div>
               )}
             </QCard>
-          ))}
+            );
+          })}
         </>
       );
 
@@ -791,7 +844,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             return (
               <QCard key={key} n={b.question_number}>
                 <div className="space-y-2">
-                  {b.options.map((opt) => (
+                  {usedChoices<any>(b.options).map((opt: any) => (
                     <ChoiceButton
                       key={opt.id}
                       letter={opt.id}
@@ -899,9 +952,9 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                   {item.context_paragraph_ref && (
                     <p className="text-xs italic text-slate-500 mb-1">{item.context_paragraph_ref}</p>
                   )}
-                  {(item.statements ?? []).map((s: any, si: number) => (
+                  {usedRows<any>(item.statements, (s) => s?.text).map(({ row: s, i: si }) => (
                     <TfStatementRow
-                      key={s.id}
+                      key={s.id ?? si}
                       idx={si}
                       text={s.text}
                       qKey={`q${item.question_number}.s${si + 1}`}
@@ -922,7 +975,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                         <p key={i} className="leading-relaxed" dangerouslySetInnerHTML={{ __html: part.trim() }} />
                       ))}
                     </div>
-                    {(item.options ?? []).map((opt: any) => {
+                    {usedChoices<any>(item.options).map((opt: any) => {
                       const key = `q${item.question_number}`;
                       const userVal = String(answers[key] ?? '').trim().toUpperCase();
                       const correctVal = String(correctAnswers?.[key] ?? '').trim().toUpperCase();
@@ -959,7 +1012,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                       {item.sentence_to_insert}
                     </blockquote>
                     <div className="flex items-center gap-2">
-                      {['A', 'B', 'C', 'D'].map((m) => {
+                      {insertionMarkers(section.passage).map((m) => {
                         const key = `q${item.question_number}`;
                         const userVal = String(answers[key] ?? '').trim().toUpperCase();
                         const correctVal = String(correctAnswers?.[key] ?? '').trim().toUpperCase();
