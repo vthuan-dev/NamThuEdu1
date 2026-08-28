@@ -421,6 +421,19 @@ class StudentTestController extends Controller
             ], 403);
         }
 
+        // Chưa tới giờ mở làm bài.
+        //
+        // taStart_time trước đây KHÔNG được kiểm tra ở đâu cả — chỉ lưu DB, echo
+        // qua API, và dùng tính mốc gửi thông báo nhắc. Cạnh gate taDeadline ngay
+        // trên đã có từ trước, nên cửa sổ thời gian mới chặn được một đầu.
+        if ($assignment->taStart_time && now() < $assignment->taStart_time) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Bài thi chưa mở. Thời gian bắt đầu: '
+                    . $assignment->taStart_time->format('d/m/Y H:i') . '.'
+            ], 403);
+        }
+
         // Check if there's already an in_progress submission (resume takes priority over attempt limit)
         $existingSubmission = Submission::where('user_id', $user->uId)
             ->where('assignment_id', $id)
@@ -2034,6 +2047,15 @@ class StudentTestController extends Controller
                 // Còn hạn hoặc không có deadline
                 $q->whereNull('taDeadline')->orWhere('taDeadline', '>=', now());
             })
+            ->where(function ($q) {
+                // Đã tới giờ mở, hoặc GV không đặt giờ mở.
+                //
+                // taStart_time ("Mở làm bài") trước đây KHÔNG được kiểm tra ở bất
+                // kỳ đâu — chỉ lưu DB, echo qua API, và dùng tính mốc gửi thông
+                // báo nhắc. Nên GV đặt mở ngày hôm sau mà học viên vẫn vào thi
+                // được ngay. taDeadline thì có gate → mới làm một nửa.
+                $q->whereNull('taStart_time')->orWhere('taStart_time', '<=', now());
+            })
             ->exists();
     }
 
@@ -2434,6 +2456,22 @@ class StudentTestController extends Controller
             ->whereNotNull('taDeadline')
             ->where('taDeadline', '>=', now())
             ->where('taDeadline', '<=', now()->addDay())
+            // Đã hoàn thành thì đừng nhắc nữa. Trước đây query chỉ lọc theo
+            // deadline nên học viên nộp bài xong vẫn nhận "Bài thi sắp hết hạn —
+            // hãy hoàn thành ngay", trong khi thẻ bài ngay bên cạnh hiện "Hoàn
+            // thành". Dùng completed statuses giống chỗ khác (in_progress KHÔNG
+            // tính là xong — bài dở vẫn nên được nhắc).
+            ->whereDoesntHave('submissions', function ($q) use ($studentId) {
+                $q->where('user_id', $studentId)
+                    ->whereIn('sStatus', [
+                        'submitted',
+                        'graded',
+                        'auto_submitted',
+                        'grading_subjective',
+                        'partially_graded',
+                        'ai_graded',
+                    ]);
+            })
             ->with(['exam'])
             ->get();
 

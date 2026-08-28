@@ -604,12 +604,31 @@ class ThptExamController extends Controller
             return $this->assignedOnlyError();
         }
 
+        // Lấy cả bản ghi: cần taMax_attempt cho gate lượt, và taStart_time /
+        // taDeadline cho gate cửa sổ thời gian bên dưới.
+        $activeAssignment = TestAssignment::where('taId', $assignmentId)->first();
+
         // Số lượt tối đa của assignment. 0 = không giới hạn (GV không đặt max).
         // Tới đây $assignmentId luôn có giá trị (guard assigned_only ở trên), nên
         // taMax_attempt luôn được đọc — kể cả khi assignment đã quá hạn.
         // Trả về cho FE để ẩn nút "Làm lại từ đầu" khi chỉ còn 1 lượt — bấm nút
         // đó là tiêu lượt, không nên để học viên bấm mù.
-        $maxAttempt = (int) (TestAssignment::where('taId', $assignmentId)->value('taMax_attempt') ?? 0);
+        $maxAttempt = (int) ($activeAssignment->taMax_attempt ?? 0);
+
+        // ── CỬA SỔ THỜI GIAN: chưa tới giờ mở ───────────────────────────────
+        // taStart_time ("Mở làm bài") trước đây KHÔNG được kiểm tra ở bất kỳ
+        // endpoint nào — chỉ lưu DB, echo lại qua API, và dùng để tính mốc gửi
+        // thông báo nhắc (SendScheduledAssignmentReminders). Nên giáo viên đặt mở
+        // ngày hôm sau mà học viên vẫn vào thi được ngay. Ngược lại taDeadline
+        // thì có gate ở StudentTestController::start — mới làm một nửa.
+        $openAt = $activeAssignment ? $activeAssignment->taStart_time : null;
+        if ($openAt && now()->lt($openAt)) {
+            return $this->error(
+                'Bài thi chưa mở. Thời gian bắt đầu: '
+                    . $openAt->format('d/m/Y H:i') . '.',
+                403
+            );
+        }
 
         // Resume nếu đã có submission đang dở — scope theo assignment, fallback
         // bản ghi cũ (assignment_id NULL) rồi backfill ở nhánh resume bên dưới.
@@ -787,6 +806,25 @@ class ThptExamController extends Controller
                     'attempts_used' => $attemptsUsedNow,
                 ],
             ]);
+        }
+
+        // ── CỬA SỔ THỜI GIAN: đã quá hạn chót ───────────────────────────────
+        // Đặt SAU nhánh resume (đã return ở trên) nên học viên vẫn mở lại và nộp
+        // được bài đang làm dở khi deadline trôi qua giữa lúc thi — chỉ không
+        // được BẮT ĐẦU lượt mới. Không tạo lỗ hổng: lượt của phiên dở đó đã bị
+        // tính vào pool từ lúc tạo.
+        //
+        // Trước đây THPT không kiểm tra taDeadline ở đâu cả (chỉ dùng để sắp thứ
+        // tự ưu tiên assignment), nên đề quá hạn 2 tuần vẫn vào thi bình thường.
+        // kids/teens/VSTEP được `studentHasActiveAssignmentForExam` che vì helper
+        // đó lọc `taDeadline >= now()`; riêng THPT không gọi helper nào.
+        $closeAt = $activeAssignment ? $activeAssignment->taDeadline : null;
+        if ($closeAt && now()->gt($closeAt)) {
+            return $this->error(
+                'Bài thi đã hết hạn nộp (hạn chót: '
+                    . $closeAt->format('d/m/Y H:i') . ').',
+                403
+            );
         }
 
         // ── GATE SỐ LƯỢT LÀM BÀI (taMax_attempt) ────────────────────────────
