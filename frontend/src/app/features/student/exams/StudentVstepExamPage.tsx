@@ -1068,7 +1068,16 @@ export function StudentVstepExamPage() {
     const reasons: string[] = [];
     const lrRemain = Math.max(0, stats.totalMCQ - stats.answeredMCQ);
     const wRemain = Math.max(0, stats.wq - stats.answeredWriting);
-    const sRemain = Math.max(0, speakingParts.length - stats.answeredSpeaking);
+    // stats.sq = số câu speaking THỰC SỰ có trong đề (đếm từ part1Data/part2Data/
+    // part3Data). Phải guard bằng nó, KHÔNG dùng speakingParts.length trực tiếp:
+    // backend `loadVstepSpeaking` luôn trả về 3 part cho mọi đề — part nào không
+    // có nội dung vẫn được đẩy vào mảng dưới dạng placeholder (chỉ có partNumber
+    // + partName + timeLimit). Nên với đề chỉ có Writing, speakingParts.length
+    // = 3 trong khi stats.sq = 0 → sRemain = 3 → nút "Nộp bài" bị disable vĩnh
+    // viễn dù học viên đã viết xong, và tooltip báo "còn 3 phần nói" vô lý.
+    // SubmitDialog (prop totalSpeaking) đã guard đúng theo cách này.
+    const totalSpeakingParts = stats.sq > 0 ? speakingParts.length : 0;
+    const sRemain = Math.max(0, totalSpeakingParts - stats.answeredSpeaking);
     if (lrRemain > 0) reasons.push(`còn ${lrRemain} câu trắc nghiệm`);
     if (wRemain > 0) reasons.push(`còn ${wRemain} bài viết`);
     if (sRemain > 0) reasons.push(`còn ${sRemain} phần nói`);
