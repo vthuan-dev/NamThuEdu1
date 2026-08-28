@@ -133,10 +133,51 @@ export async function refreshAuthUserFromServer(): Promise<Record<string, unknow
   }
 }
 
+/**
+ * Xoá toàn bộ cache phiên thi cục bộ của trình duyệt.
+ *
+ * Vì sao cần: bài thi lưu draft/timer theo `submissionId` ở localStorage
+ * (examDraftStorage `exam-draft:*`, sticky deadline `thpt_deadline_*` /
+ * `exam_timer_deadline_*`, cờ `thpt_fresh_start_*` ở sessionStorage). Các key
+ * này KHÔNG gắn với user nào cả. Nếu không dọn khi đăng xuất/đăng nhập, học
+ * viên B dùng chung trình duyệt với A sẽ thấy modal "Bạn đang có một phiên làm
+ * bài chưa nộp" và nút "Làm tiếp" dù chưa thi lần nào — đúng hiện tượng đã báo.
+ *
+ * Chỉ xoá dữ liệu phiên thi cục bộ; đáp án đã autosave vẫn nằm ở server.
+ */
+export function clearExamLocalCache(): void {
+  const prefixes = [
+    'exam-draft:',            // examDraftStorage (kèm exam-draft:_index)
+    'thpt_deadline_',         // sticky deadline THPT
+    'exam_timer_deadline_',   // sticky deadline engine chung
+    'thpt_fresh_start_',      // cờ bỏ qua modal sau khi restart
+  ];
+
+  const purge = (store: Storage) => {
+    try {
+      const doomed: string[] = [];
+      for (let i = 0; i < store.length; i++) {
+        const k = store.key(i);
+        if (k && prefixes.some((p) => k.startsWith(p))) doomed.push(k);
+      }
+      // Xoá sau khi liệt kê xong — removeItem trong lúc duyệt sẽ lệch index.
+      doomed.forEach((k) => store.removeItem(k));
+    } catch {
+      /* storage disabled / quota — bỏ qua, không được làm vỡ luồng logout */
+    }
+  };
+
+  if (typeof window === 'undefined') return;
+  purge(localStorage);
+  purge(sessionStorage);
+}
+
 export function clearAuthData(): void {
   ['auth_token', 'auth_role', 'user'].forEach((k) => {
     localStorage.removeItem(k);
     sessionStorage.removeItem(k);
   });
   localStorage.removeItem('remember_me');
+  // Dọn cache bài thi để không rò rỉ phiên làm bài giữa các tài khoản.
+  clearExamLocalCache();
 }

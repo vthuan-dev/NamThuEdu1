@@ -69,6 +69,10 @@ interface TeensExamItem {
   createdAt?: string | null;
   /** Thời điểm giáo viên giao (taCreated_at → start_time). */
   assignedAt?: string | null;
+  /** Số lượt đã dùng (đếm submission theo assignment). */
+  attemptsUsed?: number | null;
+  /** Số lượt tối đa GV cấu hình. <= 0 hoặc null = không giới hạn. */
+  attemptsAllowed?: number | null;
 }
 
 // ─── Card ──────────────────────────────────────────────────────────────────────
@@ -114,6 +118,16 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
       : `${BASE}/bai-tap`);
 
   const isNewAssign = isWithinLastHours(item.assignedAt, 1);
+
+  // Số lượt làm bài của đề được giao. allowed <= 0 (hoặc null) = không giới hạn.
+  // Backend (ThptExamController::startSubmission + StudentTestController::start)
+  // chặn tạo phiên mới khi hết lượt; ở đây chỉ ẩn nút để học viên không bấm
+  // vào rồi nhận lỗi 403.
+  const attemptsUsed = item.attemptsUsed ?? 0;
+  const attemptsAllowed = item.attemptsAllowed ?? 0;
+  const hasAttemptsLeft = attemptsAllowed <= 0 || attemptsUsed < attemptsAllowed;
+  // Bài đang làm dở luôn được vào tiếp (backend resume trước khi gate lượt).
+  const canStartNewAttempt = !effectiveAssigned || hasAttemptsLeft || inProgress;
 
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-xl bg-white ring-1 ring-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all duration-300 hover:-translate-y-0.5 hover:ring-teal-300/70 hover:shadow-[0_12px_26px_-14px_rgba(13,148,136,0.3)]">
@@ -200,14 +214,35 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
           )}
         </div>
 
+        {/* Số lượt làm bài — chỉ với đề giáo viên giao còn hiệu lực */}
+        {effectiveAssigned && attemptsAllowed > 0 && (
+          <div className="flex items-center flex-wrap gap-1.5 mt-2">
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-semibold text-violet-700 bg-violet-50 rounded px-1.5 py-0.5"
+              title="Số lượt làm bài giáo viên cho phép"
+            >
+              <RotateCcw className="w-2.5 h-2.5" />
+              <span className="tabular-nums">{attemptsUsed}/{attemptsAllowed}</span> lượt
+            </span>
+            {!hasAttemptsLeft && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 rounded px-1.5 py-0.5">
+                <AlertTriangle className="w-2.5 h-2.5" /> Hết lượt
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Action */}
         <div className="mt-3">
           {isCompleted && item.submissionId ? (
             <div className="flex items-center gap-2">
-              <Link to={redoTo}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-semibold text-slate-700 bg-white ring-1 ring-slate-200 transition-all hover:ring-teal-300 hover:text-teal-700 active:scale-[0.98]">
-                <RotateCcw className="w-3.5 h-3.5" /> Làm lại
-              </Link>
+              {/* Hết lượt → không hiện "Làm lại" (backend sẽ trả 403) */}
+              {canStartNewAttempt && (
+                <Link to={redoTo}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-semibold text-slate-700 bg-white ring-1 ring-slate-200 transition-all hover:ring-teal-300 hover:text-teal-700 active:scale-[0.98]">
+                  <RotateCcw className="w-3.5 h-3.5" /> Làm lại
+                </Link>
+              )}
               <Link to={`${BASE}/ket-qua/${item.submissionId}`}
                 className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-semibold text-white transition-all active:scale-[0.98]"
                 style={{ background: TEAL }}
@@ -216,7 +251,7 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
                 <CheckCircle className="w-3.5 h-3.5" /> Kết quả
               </Link>
             </div>
-          ) : (
+          ) : canStartNewAttempt ? (
             <Link to={startTo}
               className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-semibold text-white transition-all active:scale-[0.98] shadow-[0_5px_14px_-8px_rgba(13,148,136,0.6)]"
               style={{ background: TEAL }}
@@ -226,6 +261,15 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
               {inProgress ? 'Làm tiếp' : 'Bắt đầu'}
               <ArrowRight className="w-3.5 h-3.5 opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
             </Link>
+          ) : (
+            <button
+              type="button"
+              disabled
+              title="Bạn đã dùng hết số lượt làm bài giáo viên cho phép"
+              className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-semibold text-slate-400 bg-slate-100 ring-1 ring-slate-200 cursor-not-allowed"
+            >
+              <AlertTriangle className="w-3.5 h-3.5" /> Đã hết lượt làm bài
+            </button>
           )}
         </div>
       </div>
@@ -266,6 +310,10 @@ export function TeensTests() {
       createdAt: t.created_at ?? t.exam_created_at ?? null,
       // API map taCreated_at → start_time
       assignedAt: t.assigned_at ?? t.start_time ?? t.created_at ?? null,
+      // Lượt làm bài: backend /student/tests trả attempts_used + attempts_allowed
+      // (attempts_allowed = taMax_attempt của assignment).
+      attemptsUsed: t.attempts_used ?? 0,
+      attemptsAllowed: t.attempts_allowed ?? 0,
     }));
     const isPastDeadline = (d?: string | null) => !!d && new Date(d).getTime() < Date.now();
     return [

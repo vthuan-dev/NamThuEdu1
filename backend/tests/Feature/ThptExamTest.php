@@ -6,6 +6,7 @@ use Tests\TestCase;
 use App\Models\User;
 use App\Models\Exam;
 use App\Models\Submission;
+use App\Models\TestAssignment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class ThptExamTest extends TestCase
@@ -275,7 +276,11 @@ class ThptExamTest extends TestCase
         $response = $this->withHeaders($this->studentHeader())
             ->getJson("/api/student/thpt-exams/{$exam->eId}");
 
-        $response->assertStatus(404);
+        // Đề chưa publish trả 409 + thông báo rõ ràng (KHÔNG phải 404 "không
+        // tìm thấy đề") để giáo viên/học viên hiểu vì sao bài đã giao mà không
+        // mở được. Hành vi này được chốt ở AssignPublishedOnlyTest.
+        $response->assertStatus(409);
+        $this->assertStringContainsString('chưa được giáo viên xuất bản', $response->json('message'));
     }
 
     /** @test */
@@ -312,6 +317,105 @@ class ThptExamTest extends TestCase
         $this->assertEquals($firstId, $second->json('data.submission_id'));
         $this->assertTrue($second->json('data.resumed'));
         $this->assertDatabaseCount('submissions', 1);
+    }
+
+    /**
+     * Giao đề cho chính học viên trong test với số lượt tối đa cụ thể.
+     */
+    private function assignToStudent(int $examId, int $maxAttempt): TestAssignment
+    {
+        return TestAssignment::create([
+            'exam_id' => $examId,
+            'taTarget_type' => 'student',
+            'taTarget_id' => $this->student->uId,
+            'taDeadline' => now()->addDays(3),
+            'taMax_attempt' => $maxAttempt,
+            'taCreated_at' => now(),
+        ]);
+    }
+
+    /** @test */
+    public function start_is_blocked_when_assignment_attempt_limit_reached()
+    {
+        $examId = $this->publishSampleExam();
+        $assignment = $this->assignToStudent($examId, 1);
+
+        $start = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", [
+                'assignment_id' => $assignment->taId,
+            ]);
+        $start->assertStatus(200);
+        $sid = $start->json('data.submission_id');
+
+        $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/submit", [
+                'submission_id' => $sid,
+                'answers' => ['q1' => 'C'],
+                'final' => true,
+            ])->assertStatus(200);
+
+        // Đã dùng 1/1 lượt → không được tạo phiên mới nữa.
+        $again = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", [
+                'assignment_id' => $assignment->taId,
+            ]);
+
+        $again->assertStatus(403);
+        $this->assertStringContainsString('1 lần', $again->json('message'));
+        $this->assertDatabaseCount('submissions', 1);
+    }
+
+    /** @test */
+    public function start_still_resumes_in_progress_session_when_limit_is_one()
+    {
+        $examId = $this->publishSampleExam();
+        $assignment = $this->assignToStudent($examId, 1);
+
+        $first = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", [
+                'assignment_id' => $assignment->taId,
+            ]);
+        $first->assertStatus(200);
+
+        // Reload trang giữa lúc đang thi: phải resume, KHÔNG bị gate chặn.
+        $second = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", [
+                'assignment_id' => $assignment->taId,
+            ]);
+
+        $second->assertStatus(200);
+        $this->assertTrue($second->json('data.resumed'));
+        $this->assertEquals($first->json('data.submission_id'), $second->json('data.submission_id'));
+    }
+
+    /** @test */
+    public function start_allows_second_attempt_when_limit_is_two()
+    {
+        $examId = $this->publishSampleExam();
+        $assignment = $this->assignToStudent($examId, 2);
+
+        $first = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", [
+                'assignment_id' => $assignment->taId,
+            ]);
+        $sid = $first->json('data.submission_id');
+
+        $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/submit", [
+                'submission_id' => $sid,
+                'answers' => ['q1' => 'C'],
+                'final' => true,
+            ])->assertStatus(200);
+
+        $second = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", [
+                'assignment_id' => $assignment->taId,
+            ]);
+
+        $second->assertStatus(200);
+        $this->assertFalse($second->json('data.resumed'));
+        $this->assertEquals(2, Submission::find($second->json('data.submission_id'))->sAttempt);
+        $this->assertDatabaseCount('submissions', 2);
     }
 
     /** @test */

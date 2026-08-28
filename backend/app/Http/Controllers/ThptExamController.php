@@ -638,6 +638,38 @@ class ThptExamController extends Controller
             }
         }
 
+        // ── GATE SỐ LƯỢT LÀM BÀI (taMax_attempt) ────────────────────────────
+        // Chỉ chạy khi tạo phiên MỚI (nhánh resume ở trên đã return sớm) nên
+        // học viên vẫn làm tiếp được bài đang dở dù đã dùng hết lượt.
+        //
+        // Trước đây endpoint này KHÔNG kiểm tra taMax_attempt (khác với
+        // StudentTestController::start và startTeensExamDirect) → cài "1 lần"
+        // vẫn cho làm lại vô hạn.
+        //
+        // Đếm lượt theo assignment: mỗi lần giáo viên giao lại = pool lượt
+        // riêng, khớp cách startTeensExamDirect đang làm. taMax_attempt <= 0
+        // được hiểu là không giới hạn.
+        $attemptsUsed = Submission::where('user_id', $user->uId)
+            ->where('exam_id', $examId)
+            ->when(
+                $assignmentId,
+                fn($q) => $q->where('assignment_id', $assignmentId),
+                fn($q) => $q->whereNull('assignment_id')
+            )
+            ->count();
+
+        if ($assignmentId) {
+            $maxAttempt = (int) (TestAssignment::where('taId', $assignmentId)->value('taMax_attempt') ?? 0);
+            if ($maxAttempt > 0 && $attemptsUsed >= $maxAttempt) {
+                return $this->error(
+                    $maxAttempt === 1
+                        ? 'Đề thi này chỉ được làm 1 lần và bạn đã nộp bài. Vui lòng xem lại kết quả.'
+                        : "Bạn đã dùng hết {$maxAttempt} lượt làm bài cho đề thi này.",
+                    403
+                );
+            }
+        }
+
         // BUG FIX "thời gian hoàn thành đề không đúng thực tế": thời lượng
         // trước đây chỉ đọc `eDuration_minutes`. Giá trị GV thực sự nhập nằm ở
         // `thpt_config.total_duration_minutes`; hai nguồn có thể lệch nhau với
@@ -648,7 +680,8 @@ class ThptExamController extends Controller
             'user_id' => $user->uId,
             'exam_id' => $examId,
             'assignment_id' => $assignmentId,
-            'sAttempt' => 1,
+            // Trước đây hardcode 1 → lịch sử lượt thi sai khi làm lại.
+            'sAttempt' => $attemptsUsed + 1,
             'sStart_time' => now(),
             'sStatus' => 'in_progress',
             'submission_payload' => [
