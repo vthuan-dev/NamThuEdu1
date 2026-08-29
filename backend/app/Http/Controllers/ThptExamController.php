@@ -1117,6 +1117,20 @@ class ThptExamController extends Controller
         // Luôn chấm lại khách quan bằng gradeSubmission để đảm bảo dữ liệu hiển thị chính xác nhất (bao gồm cập nhật viết hoa/thường, sửa lỗi cũ).
         if ($submission->sStatus === 'graded' || $submission->sStatus === 'partially_graded') {
             $newGraded = $this->gradeSubmission($reviewConfig, $answers);
+
+            // Điểm tổng giáo viên tự nhập. Phải đọc TRƯỚC khi ghi đè $result và
+            // KHÔNG bao giờ bị việc chấm lại này thay thế.
+            //
+            // BUG FIX: trước đây nhánh `!$hasSubjective` gán thẳng
+            // `$submission->sScore = $newGraded['scaled_score']` rồi `save()`. Với đề
+            // toàn trắc nghiệm, chỉ cần học viên MỞ TRANG KẾT QUẢ là điểm giáo viên
+            // vừa chấm bị ghi đè bằng điểm tự động — ghi thẳng vào DB, và vì
+            // Submission không có SoftDeletes nên điểm cũ mất vĩnh viễn. Giáo viên
+            // sửa điểm xong, học viên xem điểm, điểm tự quay về mức máy chấm.
+            $teacherOverride = isset($result['teacher_override_score'])
+                ? (float) $result['teacher_override_score']
+                : null;
+
             if (is_array($result)) {
                 $result['raw_score'] = $newGraded['raw_score'];
                 $result['raw_score_max'] = $newGraded['raw_score_max'];
@@ -1129,10 +1143,22 @@ class ThptExamController extends Controller
                     ->contains(fn($sec) => in_array($sec['type'] ?? '', ['speaking', 'writing']));
 
                 if (!$hasSubjective) {
-                    $result['scaled_score'] = $newGraded['scaled_score'];
-                    $submission->sScore = $newGraded['scaled_score'];
+                    if ($teacherOverride !== null) {
+                        // Giữ điểm giáo viên làm điểm hiển thị/điểm lưu, nhưng vẫn cập
+                        // nhật điểm máy vào trường riêng để màn hình chấm so sánh được.
+                        $result['scaled_score'] = $teacherOverride;
+                        $result['scaled_score_objective'] = $newGraded['scaled_score'];
+                        $submission->sScore = $teacherOverride;
+                    } else {
+                        $result['scaled_score'] = $newGraded['scaled_score'];
+                        $submission->sScore = $newGraded['scaled_score'];
+                    }
                 } else {
                     $result['scaled_score_objective'] = $newGraded['scaled_score'];
+                    if ($teacherOverride !== null) {
+                        $result['scaled_score'] = $teacherOverride;
+                        $submission->sScore = $teacherOverride;
+                    }
                 }
             } else {
                 $result = $newGraded;
