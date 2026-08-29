@@ -2283,10 +2283,22 @@ class StudentTestController extends Controller
 
             // Skip if student has any active submission for this assignment
             // (in_progress belongs to /tests/in-progress; finished belongs to /tests completed)
+            //
+            // Phải đủ CẢ 6 trạng thái đã nộp. Thiếu grading_subjective /
+            // partially_graded / ai_graded thì bài đã nộp đang chờ chấm chủ quan
+            // vẫn hiện ở "sắp tới" như chưa làm. getNotifications dùng đủ 6.
             $hasActivity = Submission::where('user_id', $studentId)
                 ->where('assignment_id', $assignment->taId)
-                ->whereIn('sStatus', ['in_progress', 'submitted', 'graded'])
+                ->whereIn('sStatus', [
+                    'in_progress',
+                    'submitted',
+                    'graded',
+                    'grading_subjective',
+                    'partially_graded',
+                    'ai_graded',
+                ])
                 ->exists();
+
 
             if ($hasActivity) {
                 return null;
