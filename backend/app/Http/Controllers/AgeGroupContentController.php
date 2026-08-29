@@ -323,7 +323,7 @@ class AgeGroupContentController extends Controller
     public function smartAssign(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'content_id' => 'required|exists:exams,id',
+            'content_id' => 'required|exists:exams,eId',
             'assignment_strategy' => 'required|in:age_based,skill_based,adaptive',
             'target_groups' => 'required|array',
         ]);
@@ -354,11 +354,11 @@ class AgeGroupContentController extends Controller
 
                 foreach ($students as $studentId) {
                     DB::table('test_assignments')->insert([
-                        'exam_id' => $exam->id,
+                        'exam_id' => $exam->eId,
                         'student_id' => $studentId,
                         'age_group' => $group['age_group'],
                         'assigned_by' => $request->user()->uId,
-                        'deadline' => $request->deadline,
+                        'taDeadline' => $request->deadline,
                         'adaptive_settings' => json_encode($group),
                         'gamification_enabled' => $group['gamification']['enabled'] ?? false,
                         'competitive_mode' => $group['competitive_mode'] ?? false,
@@ -371,7 +371,7 @@ class AgeGroupContentController extends Controller
                 $breakdown[$group['age_group']] = [
                     'students' => $students->count(),
                     'format' => $this->getFormatByAgeGroup($group['age_group']),
-                    'estimated_completion' => $this->getEstimatedTime($group['age_group'], $exam->duration),
+                    'estimated_completion' => $this->getEstimatedTime($group['age_group'], $exam->eDuration),
                 ];
             }
 

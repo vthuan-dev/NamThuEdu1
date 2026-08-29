@@ -14,7 +14,9 @@ class ClassTransfer extends Model
     // teacher_id: cột NOT NULL không default trong migration. Thiếu nó ở đây thì
     // Eloquent lọc bỏ giá trị controller truyền vào → INSERT thiếu cột → SQLSTATE
     // 1364 và mọi lần chuyển lớp trả 500.
-    // transferred_by: giữ lại vì relation transferredBy() dùng tới.
+    //
+    // KHÔNG thêm 'transferred_by': bảng class_transfers không có cột đó. Giữ nó ở
+    // đây chỉ làm Eloquent âm thầm bỏ qua khi ai đó gán vào.
     protected $fillable = [
         'student_id',
         'from_class_id',
@@ -22,7 +24,6 @@ class ClassTransfer extends Model
         'reason',
         'notes',
         'teacher_id',
-        'transferred_by',
         'transferred_at',
     ];
     
@@ -48,9 +49,15 @@ class ClassTransfer extends Model
         return $this->belongsTo(ClassModel::class, 'to_class_id', 'cId');
     }
     
+    /**
+     * Giáo viên thực hiện việc chuyển lớp.
+     *
+     * Dùng `teacher_id`. Trước đây relation này trỏ vào `transferred_by` — một cột
+     * không tồn tại trong bảng — nên bất kỳ ai truy cập cũng nhận "Unknown column".
+     */
     public function transferredBy()
     {
-        return $this->belongsTo(User::class, 'transferred_by', 'uId');
+        return $this->belongsTo(User::class, 'teacher_id', 'uId');
     }
     
     /**
