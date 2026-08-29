@@ -1486,7 +1486,16 @@ function McqReview({
       )}
 
       <div className="space-y-2">
-        {q.options.map((opt) => {
+        {(() => {
+          // Bỏ phương án rỗng (factory luôn tạo sẵn A–D). Học viên không thấy
+          // chúng khi thi, mà ở đây vẫn hiện thì giáo viên có thể bấm "đặt làm đáp
+          // án đúng" trên một ô trống — tạo lại đúng lỗi mà validation publish vừa
+          // chặn. Giữ nguyên khi TẤT CẢ rỗng: đó là đề dạng ảnh.
+          const withText = (q.options ?? []).filter(
+            (o: any) => String(o?.text ?? '').trim() !== '',
+          );
+          const shown = withText.length > 0 ? withText : (q.options ?? []);
+          return shown.map((opt: any) => {
           const picked = String(q.student_answer) === String(opt.id);
           const isCorrect = String(effectiveCorrectId) === String(opt.id);
           const wasOriginalCorrect = String(q.correct_answer) === String(opt.id);
@@ -1542,7 +1551,8 @@ function McqReview({
               )}
             </button>
           );
-        })}
+          });
+        })()}
       </div>
 
       <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-slate-100">

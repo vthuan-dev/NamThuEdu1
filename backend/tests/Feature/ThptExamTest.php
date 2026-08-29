@@ -249,6 +249,189 @@ class ThptExamTest extends TestCase
         return $exam->eId;
     }
 
+    /**
+     * Config có tf_group + matching bị bỏ trống một phần — đúng như dữ liệu thật
+     * mà factory tạo ra (makeTfItem: 4 mệnh đề, makeMatchingItem: 4/6 dòng).
+     */
+    private function partiallyFilledConfig(): array
+    {
+        return [
+            'version' => '2.0',
+            'level' => 'THPT',
+            'total_duration_minutes' => 60,
+            'scale_max' => 10,
+            'sections' => [
+                [
+                    'id' => 's_tf', 'type' => 'tf_group', 'points_per_question' => 1,
+                    'title' => 'TF', 'instructions' => '',
+                    'items' => [
+                        ['question_number' => 1, 'context' => 'Notice', 'context_style' => 'notice', 'statements' => [
+                            ['id' => '1-1', 'text' => 'Mệnh đề một', 'correct' => true],
+                            ['id' => '1-2', 'text' => '', 'correct' => false],
+                            ['id' => '1-3', 'text' => 'Mệnh đề ba', 'correct' => false],
+                            ['id' => '1-4', 'text' => '', 'correct' => false],
+                        ]],
+                    ],
+                ],
+                [
+                    'id' => 's_match', 'type' => 'matching', 'points_per_question' => 1,
+                    'title' => 'Matching', 'instructions' => '',
+                    'items' => [
+                        ['question_number' => 2,
+                         'list_1' => ['Câu một', 'Câu hai', '', ''],
+                         'list_2' => ['Đáp A', 'Đáp B', '', '', '', ''],
+                         'answers' => ['1' => 'A', '2' => 'B', '3' => 'A', '4' => 'A']],
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    private function publishConfig(array $config): int
+    {
+        return Exam::create([
+            'eTitle' => 'Đề một phần',
+            'eType' => 'THPT',
+            'eSkill' => 'reading',
+            'eDuration_minutes' => 60,
+            'eStatus' => 'published',
+            'ePurpose' => 'exam',
+            'eTeacher_id' => $this->teacher->uId,
+            'age_group' => 'teens',
+            'thpt_config' => $config,
+        ])->eId;
+    }
+
+    /** @test */
+    public function empty_statements_and_rows_are_not_counted_in_the_max_score()
+    {
+        $examId = $this->publishConfig($this->partiallyFilledConfig());
+        $this->assignToStudent($examId, 0);
+
+        $start = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", []);
+        $sid = $start->json('data.submission_id');
+
+        // Trả lời ĐÚNG mọi thứ học viên thực sự nhìn thấy: 2 mệnh đề + 2 dòng nối.
+        $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/submit", [
+                'submission_id' => $sid,
+                'answers' => [
+                    'q1.s1' => true,
+                    'q1.s3' => false,
+                    'q2.1' => 'A',
+                    'q2.2' => 'B',
+                ],
+                'final' => true,
+            ])->assertStatus(200);
+
+        $res = $this->withHeaders($this->studentHeader())
+            ->getJson("/api/student/thpt-submissions/{$sid}/result");
+        $res->assertStatus(200);
+
+        // Trước khi fix: mệnh đề/dòng rỗng vẫn cộng vào điểm tối đa, mà học viên
+        // không thấy nên không trả lời → tính sai. Đúng hết 4 mà ra 4/8.
+        $this->assertEquals(4, $res->json('data.result.raw_score_max'));
+        $this->assertEquals(4, $res->json('data.result.raw_score'));
+    }
+
+    /** @test */
+    public function answer_keys_keep_their_original_index_after_filtering()
+    {
+        $examId = $this->publishConfig($this->partiallyFilledConfig());
+        $this->assignToStudent($examId, 0);
+
+        $start = $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/start", []);
+        $sid = $start->json('data.submission_id');
+
+        $this->withHeaders($this->studentHeader())
+            ->postJson("/api/student/thpt-exams/{$examId}/submit", [
+                'submission_id' => $sid,
+                'answers' => ['q1.s1' => true, 'q1.s3' => false, 'q2.1' => 'A', 'q2.2' => 'B'],
+                'final' => true,
+            ]);
+
+        $keys = array_keys(
+            $this->withHeaders($this->studentHeader())
+                ->getJson("/api/student/thpt-submissions/{$sid}/result")
+                ->json('data.result.correct_answers')
+        );
+
+        // Mệnh đề thứ 3 phải giữ khoá .s3, KHÔNG được dồn thành .s2 — đánh số lại
+        // sẽ làm lệch mọi bài đã chấm trước đó.
+        $this->assertContains('q1.s1', $keys);
+        $this->assertContains('q1.s3', $keys);
+        $this->assertNotContains('q1.s2', $keys);
+        $this->assertNotContains('q1.s4', $keys);
+        $this->assertNotContains('q2.3', $keys);
+    }
+
+    /** @test */
+    public function a_matching_question_with_only_two_rows_can_be_published()
+    {
+        $createRes = $this->withHeaders($this->teacherHeader())
+            ->postJson('/api/teacher/exams/thpt', ['eTitle' => 'Match']);
+        $examId = $createRes->json('data.eId');
+
+        $config = $this->partiallyFilledConfig();
+        // Chỉ có đáp án cho 2 dòng đã nhập; 2 dòng rỗng không có đáp án.
+        $config['sections'][1]['items'][0]['answers'] = ['1' => 'A', '2' => 'B'];
+
+        $this->withHeaders($this->teacherHeader())
+            ->putJson("/api/teacher/exams/{$examId}/thpt", ['thpt_config' => $config]);
+
+        // Trước khi fix: validation đòi đủ 4 khoá ('1'..'4') nên bài chỉ dùng 2
+        // dòng KHÔNG THỂ publish, dù giáo viên đã nối đủ mọi dòng có nội dung.
+        $this->withHeaders($this->teacherHeader())
+            ->postJson("/api/teacher/exams/{$examId}/thpt/publish")
+            ->assertStatus(200);
+
+        $this->assertEquals('published', Exam::find($examId)->eStatus);
+    }
+
+    /** @test */
+    public function publish_still_requires_an_answer_for_every_filled_matching_row()
+    {
+        $createRes = $this->withHeaders($this->teacherHeader())
+            ->postJson('/api/teacher/exams/thpt', ['eTitle' => 'Match bad']);
+        $examId = $createRes->json('data.eId');
+
+        $config = $this->partiallyFilledConfig();
+        // Dòng 2 CÓ nội dung nhưng thiếu đáp án → vẫn phải bị chặn.
+        $config['sections'][1]['items'][0]['answers'] = ['1' => 'A'];
+
+        $this->withHeaders($this->teacherHeader())
+            ->putJson("/api/teacher/exams/{$examId}/thpt", ['thpt_config' => $config]);
+
+        $this->withHeaders($this->teacherHeader())
+            ->postJson("/api/teacher/exams/{$examId}/thpt/publish")
+            ->assertStatus(422);
+    }
+
+    /** @test */
+    public function publish_is_rejected_when_the_answer_points_at_an_empty_choice()
+    {
+        $createRes = $this->withHeaders($this->teacherHeader())
+            ->postJson('/api/teacher/exams/thpt', ['eTitle' => 'Bad key']);
+        $examId = $createRes->json('data.eId');
+
+        $config = $this->sampleConfig();
+        // Chọn đáp án đúng là D rồi xoá nội dung D — trước khi fix vẫn publish
+        // được, và KHÔNG học viên nào có thể đúng câu đó.
+        $config['sections'][1]['items'][0]['correct_id'] = 'D';
+        $config['sections'][1]['items'][0]['options'][3]['text'] = '';
+
+        $this->withHeaders($this->teacherHeader())
+            ->putJson("/api/teacher/exams/{$examId}/thpt", ['thpt_config' => $config]);
+
+        $res = $this->withHeaders($this->teacherHeader())
+            ->postJson("/api/teacher/exams/{$examId}/thpt/publish");
+
+        $res->assertStatus(422);
+        $this->assertStringContainsString('chưa có nội dung', json_encode($res->json(), JSON_UNESCAPED_UNICODE));
+    }
+
     /** @test */
     public function student_gets_exam_without_answers()
     {

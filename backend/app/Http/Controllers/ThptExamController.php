@@ -1230,6 +1230,15 @@ class ThptExamController extends Controller
      * Tự điền đáp án mặc định (đáp án đầu / "A") cho câu trắc nghiệm chưa chọn,
      * và placeholder "A" cho đáp án dạng nhập (để publish được, giáo viên sửa sau).
      */
+    /**
+     * KHÔNG CÒN ĐƯỢC GỌI — publish() đã cố ý bỏ tự điền đáp án mặc định (xem chú
+     * thích tại chỗ gọi cũ): giáo viên buộc phải chọn đáp án đúng, và
+     * validateThptConfig sẽ chặn kèm danh sách câu còn thiếu. Giữ lại vì logic
+     * "đáp án mặc định theo phương án đầu" có thể cần cho import hàng loạt.
+     *
+     * Nếu dùng lại, lưu ý: chỉ điền cho dòng matching CÓ nội dung (đã sửa bên
+     * dưới) — bản cũ điền 'A' cho cả 4 khoá nên sinh đáp án cho dòng không tồn tại.
+     */
     private function fillDefaultThptAnswers(?array $config): array
     {
         if (!is_array($config)) return $config ?? [];
@@ -1290,7 +1299,11 @@ class ThptExamController extends Controller
                 case 'matching':
                     foreach (($s['items'] ?? []) as $ii => $it) {
                         $ans = is_array($it['answers'] ?? null) ? $it['answers'] : [];
-                        foreach (['1', '2', '3', '4'] as $k) {
+                        // CHỈ điền cho dòng cột trái có nội dung. Trước đây điền 'A'
+                        // cho cả 4 khoá nên sinh đáp án cho dòng giáo viên không dùng
+                        // → phồng số câu và làm chấm điểm trừ oan học viên.
+                        foreach ($this->usedMatchingPositions($it['list_1'] ?? []) as $pos) {
+                            $k = (string) $pos;
                             if ($blank($ans[$k] ?? null)) $ans[$k] = 'A';
                         }
                         $config['sections'][$si]['items'][$ii]['answers'] = $ans;
@@ -1414,8 +1427,10 @@ class ThptExamController extends Controller
                     foreach ($items as $i => $it) {
                         $ans = $it['answers'] ?? [];
                         $missing = false;
-                        foreach (['1', '2', '3', '4'] as $k) {
-                            if (!$hasId($ans[$k] ?? null)) { $missing = true; break; }
+                        // Chỉ đòi đáp án cho dòng cột trái có nội dung. Trước đây bắt
+                        // buộc đủ 4 khoá nên bài chỉ dùng 2 dòng không publish được.
+                        foreach ($this->usedMatchingPositions($it['list_1'] ?? []) as $pos) {
+                            if (!$hasId($ans[(string) $pos] ?? ($ans[$pos] ?? null))) { $missing = true; break; }
                         }
                         if ($missing) $errors[] = "{$label} ({$qlabel($it, $i)}): chưa nối đủ đáp án.";
                     }
@@ -1607,6 +1622,59 @@ class ThptExamController extends Controller
     }
 
     /**
+     * Mệnh đề Đúng/Sai giáo viên thực sự dùng, KÈM index gốc.
+     *
+     * makeTfItem() luôn tạo sẵn 4 mệnh đề với text rỗng. Trước đây cả chấm điểm
+     * lẫn đếm số câu đều lặp qua toàn bộ danh sách nên mệnh đề rỗng vẫn được cộng
+     * vào điểm tối đa. Mệnh đề rỗng mặc định `correct = false`, và kể từ khi
+     * frontend ẩn chúng thì học viên không thể trả lời → luôn bị tính SAI. Giáo
+     * viên nhập 2 mệnh đề, học viên đúng cả 2, điểm ra 2/4.
+     *
+     * Index gốc là bắt buộc: khoá đáp án là "q{n}.s{i}" theo vị trí, đánh số lại
+     * sẽ làm lệch mọi bài đã chấm.
+     *
+     * Không lọc khi TẤT CẢ đều rỗng, để khớp `usedRows()` ở frontend (đề soạn dở
+     * vẫn hiện ra thay vì biến mất không dấu vết).
+     *
+     * @return array<int, array{0:int, 1:array}> [[indexGốc, mệnhĐề], ...]
+     */
+    private function usedStatements($statements): array
+    {
+        $all = [];
+        foreach ((array) $statements as $i => $st) {
+            $all[] = [(int) $i, is_array($st) ? $st : []];
+        }
+        $filled = array_values(array_filter(
+            $all,
+            fn($pair) => trim((string) ($pair[1]['text'] ?? '')) !== ''
+        ));
+        return count($filled) > 0 ? $filled : $all;
+    }
+
+    /**
+     * Vị trí (1-based) của các dòng matching giáo viên thực sự dùng.
+     *
+     * makeMatchingItem() tạo sẵn list_1 4 dòng / list_2 6 dòng. Cùng lỗi như
+     * usedStatements: dòng rỗng vẫn được cộng vào điểm tối đa.
+     *
+     * @return int[] danh sách vị trí 1-based, giữ nguyên số gốc
+     */
+    private function usedMatchingPositions($list1): array
+    {
+        $all = [];
+        foreach ((array) $list1 as $i => $line) {
+            $all[] = (int) $i + 1;
+        }
+        $filled = [];
+        foreach ((array) $list1 as $i => $line) {
+            if (trim((string) $line) !== '') {
+                $filled[] = (int) $i + 1;
+            }
+        }
+        return count($filled) > 0 ? $filled : $all;
+    }
+
+    /**
      * Auto-grade section-based. Trả raw_score, scaled_score, per-section stats, correct_answers.
      *
      * Answer key conventions:
@@ -1702,7 +1770,7 @@ class ThptExamController extends Controller
                 case 'tf_group':
                     foreach ($s['items'] ?? [] as $it) {
                         $qn = $it['question_number'] ?? '?';
-                        foreach ($it['statements'] ?? [] as $idx => $st) {
+                        foreach ($this->usedStatements($it['statements'] ?? []) as [$idx, $st]) {
                             $key = "q{$qn}.s" . ($idx + 1);
                             $expected = (bool) ($st['correct'] ?? false);
                             $correct[$key] = $expected;
@@ -1721,7 +1789,7 @@ class ThptExamController extends Controller
                         $kind = $it['kind'] ?? null;
                         $qn = $it['question_number'] ?? '?';
                         if ($kind === 'tf_group') {
-                            foreach ($it['statements'] ?? [] as $idx => $st) {
+                            foreach ($this->usedStatements($it['statements'] ?? []) as [$idx, $st]) {
                                 $key = "q{$qn}.s" . ($idx + 1);
                                 $expected = (bool) ($st['correct'] ?? false);
                                 $correct[$key] = $expected;
@@ -1741,8 +1809,14 @@ class ThptExamController extends Controller
                 case 'matching':
                     foreach ($s['items'] ?? [] as $it) {
                         $qn = $it['question_number'] ?? '?';
-                        foreach (($it['answers'] ?? []) as $idx => $expectedLetter) {
-                            $key = "q{$qn}.{$idx}";
+                        $ans = $it['answers'] ?? [];
+                        // Chỉ chấm những dòng cột trái có nội dung. `answers` luôn có
+                        // đủ 4 khoá (fillDefaultThptAnswers từng điền 'A' cho cả dòng
+                        // rỗng) nên lặp theo `answers` là tính cả dòng học viên không
+                        // thấy → mất điểm oan.
+                        foreach ($this->usedMatchingPositions($it['list_1'] ?? []) as $pos) {
+                            $expectedLetter = $ans[$pos] ?? ($ans[(string) $pos] ?? null);
+                            $key = "q{$qn}.{$pos}";
                             $correct[$key] = $expectedLetter;
                             $secMax += $pts; $secTotal++;
                             $isCorrect = (($userAnswers[$key] ?? null) === $expectedLetter);
@@ -1929,7 +2003,7 @@ class ThptExamController extends Controller
                 case 'tf_group':
                     foreach ($s['items'] ?? [] as $it) {
                         $qn = $it['question_number'] ?? '?';
-                        foreach ($it['statements'] ?? [] as $i => $st) {
+                        foreach ($this->usedStatements($it['statements'] ?? []) as [$i, $st]) {
                             $ansKey = "q{$qn}.s" . ($i + 1);
                             $expected = (bool) ($st['correct'] ?? false);
                             $orig = array_key_exists($ansKey, $answers) && (bool) $answers[$ansKey] === $expected;
@@ -1943,7 +2017,7 @@ class ThptExamController extends Controller
                         $kind = $it['kind'] ?? null;
                         $qn = $it['question_number'] ?? '?';
                         if ($kind === 'tf_group') {
-                            foreach ($it['statements'] ?? [] as $i => $st) {
+                            foreach ($this->usedStatements($it['statements'] ?? []) as [$i, $st]) {
                                 $ansKey = "q{$qn}.s" . ($i + 1);
                                 $expected = (bool) ($st['correct'] ?? false);
                                 $orig = array_key_exists($ansKey, $answers) && (bool) $answers[$ansKey] === $expected;
@@ -1964,10 +2038,14 @@ class ThptExamController extends Controller
                 case 'matching':
                     foreach ($s['items'] ?? [] as $it) {
                         $qn = $it['question_number'] ?? '?';
-                        foreach (($it['answers'] ?? []) as $i => $expectedLetter) {
-                            $ansKey = "q{$qn}.{$i}";
+                        $ans = $it['answers'] ?? [];
+                        foreach ($this->usedMatchingPositions($it['list_1'] ?? []) as $pos) {
+                            $expectedLetter = $ans[$pos] ?? ($ans[(string) $pos] ?? null);
+                            $ansKey = "q{$qn}.{$pos}";
                             $orig = ($answers[$ansKey] ?? null) !== null && strtoupper(trim((string) $answers[$ansKey])) === strtoupper(trim((string) $expectedLetter));
-                            $award($evalSub("{$sid}-{$qn}-r{$i}", $orig));
+                            // evalSub dùng index 0-based ở đuôi khoá → giữ nguyên quy
+                            // ước cũ (pos - 1) để override thủ công đã lưu không bị mất.
+                            $award($evalSub("{$sid}-{$qn}-r" . ($pos - 1), $orig));
                         }
                     }
                     break;

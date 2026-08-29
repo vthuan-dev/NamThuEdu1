@@ -559,10 +559,31 @@ class ThptGradingController extends Controller
             ], $extra);
         };
 
+        // Vị trí chèn câu thật có trong bài đọc (marker [A] [B] … trong passage).
+        $insertionMarkers = function ($passage): array {
+            preg_match_all('/\[([A-F])\]/', (string) $passage, $m);
+            $letters = array_values(array_unique($m[1] ?? []));
+            sort($letters);
+            return count($letters) > 0 ? $letters : ['A', 'B', 'C', 'D'];
+        };
+
         // Mệnh đề Đúng/Sai (q{n}.s{i} → bool).
+        // Mệnh đề rỗng (makeTfItem luôn tạo sẵn 4) không được hiển thị cho giáo
+        // viên: học viên không thấy chúng khi thi và chấm điểm cũng đã bỏ qua, nên
+        // hiện ra chỉ gây nhầm là học viên bỏ trống. Giữ index gốc cho khoá.
         $tfStatements = function ($qn, $statements) use ($answers): array {
+            $all = [];
+            foreach ((array) $statements as $i => $st) {
+                $all[] = [(int) $i, is_array($st) ? $st : []];
+            }
+            $filled = array_values(array_filter(
+                $all,
+                fn($p) => trim((string) ($p[1]['text'] ?? '')) !== ''
+            ));
+            $rows = count($filled) > 0 ? $filled : $all;
+
             $out = [];
-            foreach ((array) $statements as $idx => $st) {
+            foreach ($rows as [$idx, $st]) {
                 $key = "q{$qn}.s" . ($idx + 1);
                 $expected = (bool) ($st['correct'] ?? false);
                 $hasAns = array_key_exists($key, $answers);
@@ -696,8 +717,18 @@ class ThptGradingController extends Controller
                     foreach (($s['items'] ?? []) as $it) {
                         $qn = $it['question_number'] ?? '?';
                         $rows = [];
-                        foreach (($it['list_1'] ?? []) as $i => $line) {
-                            $pos = $i + 1;
+                        // Bỏ dòng rỗng ở cả hai cột (makeMatchingItem tạo sẵn 4/6 dòng).
+                        // Chấm điểm đã bỏ qua chúng nên hiện ra chỉ gây nhầm.
+                        $keepText = fn($l) => trim((string) $l) !== '';
+                        $l1 = (array) ($it['list_1'] ?? []);
+                        $l2 = (array) ($it['list_2'] ?? []);
+                        $l1Used = array_filter($l1, $keepText);
+                        if (empty($l1Used)) $l1Used = $l1;
+                        $l2Used = array_filter($l2, $keepText);
+                        if (empty($l2Used)) $l2Used = $l2;
+
+                        foreach ($l1Used as $i => $line) {
+                            $pos = (int) $i + 1;
                             $key = "q{$qn}.{$pos}";
                             $student = $answers[$key] ?? null;
                             $correctLetter = $it['answers'][$pos] ?? ($it['answers'][(string) $pos] ?? null);
@@ -713,8 +744,8 @@ class ThptGradingController extends Controller
                         $questions[] = [
                             'question_number' => (int) $qn,
                             'kind' => 'matching',
-                            'list_1' => array_values($it['list_1'] ?? []),
-                            'list_2' => array_values($it['list_2'] ?? []),
+                            'list_1' => array_values($l1Used),
+                            'list_2' => array_values($l2Used),
                             'rows' => $rows,
                             'explanation' => $it['explanation'] ?? null,
                         ];
@@ -766,7 +797,10 @@ class ThptGradingController extends Controller
                                 'kind' => 'sentence_insertion',
                                 'prompt' => $it['prompt'] ?? '',
                                 'sentence_to_insert' => $it['sentence_to_insert'] ?? '',
-                                'markers' => ['A', 'B', 'C', 'D'],
+                                // Vị trí chèn thật có trong bài đọc, không hardcode A–D:
+                                // bài chỉ đánh 2 marker thì 2 nút cuối không ứng với chỗ
+                                // nào. Khớp `insertionMarkers()` ở frontend.
+                                'markers' => $insertionMarkers($s['passage'] ?? ''),
                                 'student_answer' => $student,
                                 'correct_answer' => $correctMarker,
                                 'is_correct' => $student !== null && (string) $student === (string) $correctMarker,

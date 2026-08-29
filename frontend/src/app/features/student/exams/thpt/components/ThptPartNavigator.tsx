@@ -25,6 +25,22 @@ function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
 }
 
+/**
+ * Index (0-based) của những dòng giáo viên thực sự nhập.
+ *
+ * Phải khứp `usedRows()` trong SectionView, vì panel này đếm số câu cần trả
+ * lời còn SectionView quyết định học viên thấy gì. Lệch nhau là tiến độ không
+ * bao giờ đầy — học viên tưỏng còn sót câu và tìm mãi không thấy.
+ */
+function usedIdx<T>(list: unknown, getText: (row: T) => unknown): number[] {
+  const all = asArray<T>(list);
+  const filled = all
+    .map((row, i) => ({ row, i }))
+    .filter(({ row }) => String(getText(row) ?? '').trim() !== '')
+    .map(({ i }) => i);
+  return filled.length > 0 ? filled : all.map((_, i) => i);
+}
+
 function sectionQuestions(s: ThptSection, answers: ThptAnswers): QItem[] {
   const has = (k: string) => Object.prototype.hasOwnProperty.call(answers, k);
   const filled = (k: string) => !!String(answers[k] ?? '').trim();
@@ -44,18 +60,26 @@ function sectionQuestions(s: ThptSection, answers: ThptAnswers): QItem[] {
     case 'tf_group':
       return items.map((it: any) => ({
         qn: it.question_number,
-        answered: asArray<any>(it.statements).every((_: any, i: number) => has(`q${it.question_number}.s${i + 1}`)),
+        answered: usedIdx<any>(it.statements, (s) => s?.text).every((i) =>
+          has(`q${it.question_number}.s${i + 1}`),
+        ),
       }));
     case 'matching':
       return items.map((it: any) => ({
         qn: it.question_number,
-        answered: [1, 2, 3, 4].every((i) => has(`q${it.question_number}.${i}`)),
+        // Trước đây hardcode [1,2,3,4] nên bài chỉ dùng 2 dòng KHÔNG BAO GIỜ
+        // được tính là xong → tiến độ kịt vĩnh viễn.
+        answered: usedIdx<any>(it.list_1, (l) => l).every((i) =>
+          has(`q${it.question_number}.${i + 1}`),
+        ),
       }));
     case 'reading_mixed':
       return items.map((it: any) => ({
         qn: it.question_number,
         answered: it.kind === 'tf_group'
-          ? asArray<any>(it.statements).every((_: any, i: number) => has(`q${it.question_number}.s${i + 1}`))
+          ? usedIdx<any>(it.statements, (s) => s?.text).every((i) =>
+              has(`q${it.question_number}.s${i + 1}`),
+            )
           : has(`q${it.question_number}`),
       }));
     case 'mc_cloze':
