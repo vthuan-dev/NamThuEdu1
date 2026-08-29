@@ -1146,7 +1146,31 @@ class ThptExamController extends Controller
         }
 
         // Luôn chấm lại khách quan bằng gradeSubmission để đảm bảo dữ liệu hiển thị chính xác nhất (bao gồm cập nhật viết hoa/thường, sửa lỗi cũ).
-        if ($submission->sStatus === 'graded' || $submission->sStatus === 'partially_graded') {
+        //
+        // NGOẠI LỆ: chỉ chấm lại khi cấu hình CÓ section để chấm. Nếu không có section
+        // nào thì `gradeSubmission` trả `raw_score = 0` trên `raw_score_max = 1`
+        // (xem `max($rawMax, 1)`) → `scaled_score = 0`, và trước đây số 0 đó được ghi
+        // thẳng vào `sScore`. Hệ quả: chỉ cần học viên MỞ TRANG KẾT QUẢ là điểm thật
+        // biến thành 0, mất vĩnh viễn vì Submission không có SoftDeletes.
+        //
+        // Xảy ra khi bài nộp không có `exam_snapshot` VÀ `exam.thpt_config` là NULL
+        // → rơi về `blankConfig()` với `sections = []`. Bài cũ tạo trước khi có
+        // snapshot, hoặc đề bị xoá cấu hình sau khi học viên đã thi, rơi đúng vào đây.
+        //
+        // KHÔNG kiểm bằng `raw_score_max <= 0` — giá trị đó luôn >= 1 nên điều kiện
+        // đó không bao giờ đúng.
+        $coSectionDeCham = !empty($reviewConfig['sections'] ?? []);
+
+        if (!$coSectionDeCham && in_array($submission->sStatus, ['graded', 'partially_graded'], true)) {
+            \Log::warning('THPT bỏ qua chấm lại: cấu hình đề không có section nào', [
+                'submission_id' => $submission->sId,
+                'exam_id' => $submission->exam_id,
+                'sScore_giu_nguyen' => $submission->sScore,
+                'co_snapshot' => isset($payload['exam_snapshot']),
+            ]);
+        }
+
+        if ($coSectionDeCham && ($submission->sStatus === 'graded' || $submission->sStatus === 'partially_graded')) {
             $newGraded = $this->gradeSubmission($reviewConfig, $answers);
 
             // Điểm tổng giáo viên tự nhập. Phải đọc TRƯỚC khi ghi đè $result và

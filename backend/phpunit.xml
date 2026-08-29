@@ -11,6 +11,15 @@
         <testsuite name="Feature">
             <directory suffix="Test.php">./tests/Feature</directory>
         </testsuite>
+        <!--
+            tests/Integration trước đây KHÔNG được khai báo ở đây, nên
+            SubmitGradingFlowTest (5 test cho luồng nộp, chấm, xem điểm của
+            THPT/VSTEP) chưa bao giờ được chạy, kể cả khi chạy toàn bộ suite.
+            Lệnh artisan test filter SubmitGradingFlowTest báo "No tests executed!".
+        -->
+        <testsuite name="Integration">
+            <directory suffix="Test.php">./tests/Integration</directory>
+        </testsuite>
     </testsuites>
     <coverage processUncoveredFiles="true">
         <include>
