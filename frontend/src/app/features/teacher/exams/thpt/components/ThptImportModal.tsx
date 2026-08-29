@@ -7,12 +7,20 @@ import { API_BASE_URL } from '../../../../../../utils/apiConfig';
 import { getAuthToken } from '../../../../../../utils/authStorage';
 import { PdfPageSelector } from '../../ielts/components/PdfPageSelector';
 import { parseTeensTextLocally } from '../../teens/components/teensParser';
-import type { ThptSection } from '../../../../../types/thpt';
+import type { ThptSection } from '../../../../../../types/thpt';
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  onImport: (data: any) => void;
+  /**
+   * Trả `false` để giữ modal mở (vd: dữ liệu import không khớp cấu trúc đề hiện tại
+   * và cần giáo viên xác nhận). Bất kỳ giá trị khác đều đóng modal.
+   *
+   * Trước đây khai báo là `void` trong khi CreateThptExam truyền vào một hàm trả
+   * `boolean` — TS coi `shouldClose !== false` là so sánh vô nghĩa, nên modal luôn
+   * đóng kể cả khi handler yêu cầu giữ mở.
+   */
+  onImport: (data: any) => boolean | void;
 }
 
 const SAMPLE_THPT = {
@@ -122,8 +130,17 @@ export function ThptImportModal({ open, onClose, onImport }: Props) {
     } finally { setAiParsing(false); }
   };
 
-  const extractPdfText = async (options: { start: number; end: number }) => {
-    const file = pendingFile;
+  /**
+   * Trích xuất text từ PDF.
+   *
+   * Nhận thẳng `File` vì `PdfPageSelector` ĐÃ cắt đúng khoảng trang giáo viên chọn
+   * rồi mới gọi `onConfirm`. Hợp đồng cũ ở đây là `{ start, end }` — lệch với
+   * component, nên TS báo lỗi và nếu chạy được thì `options.start/end` là
+   * `undefined`, khiến `Math.min(pdf.numPages, undefined)` ra `NaN` và vòng lặp
+   * không trích xuất trang nào.
+   */
+  const extractPdfText = async (selectedFile: File) => {
+    const file = selectedFile ?? pendingFile;
     if (!file) return;
     setError(''); setAiParsing(true); setPdfStage('extract');
     setPdfProgress({ label: 'Đang khởi tạo thư viện PDF...', done: 10, total: 100 });
@@ -135,9 +152,9 @@ export function ThptImportModal({ open, onClose, onImport }: Props) {
       const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
 
       let extracted = '';
-      const start = Math.max(1, options.start);
-      const end   = Math.min(pdf.numPages, options.end);
-      const totalPages = end - start + 1;
+      const start = 1;
+      const end   = pdf.numPages;
+      const totalPages = Math.max(1, end - start + 1);
 
       for (let i = start; i <= end; i++) {
         setPdfProgress({

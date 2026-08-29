@@ -64,7 +64,10 @@ export function TeensImportModal({ open, skill = 'auto', onClose, onImport }: Pr
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const pdfFileRef  = useRef<File | null>(null);
   const [aiParsing, setAiParsing] = useState(false);
-  const [parseMethod, setParseMethod] = useState<'ai' | 'json' | null>(null);
+  // 'local': parser chạy offline, dùng khi gọi AI thất bại hoặc quá chậm. Giá trị này
+  // đã được set ở nhánh fallback và có badge riêng trong UI, nhưng trước đây thiếu
+  // trong union type → TS chặn, và badge "Local (Offline)" không bao giờ hiện được.
+  const [parseMethod, setParseMethod] = useState<'ai' | 'json' | 'local' | null>(null);
   const [pdfProgress, setPdfProgress] = useState({ label: '', done: 0, total: 0 });
   const [scannedText, setScannedText] = useState('');
   const [isScanned, setIsScanned] = useState(false);

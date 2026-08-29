@@ -114,12 +114,22 @@ export function CreateThptExam() {
         // Merge contents into existing sections to preserve IDs and settings
         const mergedSections = currentSections.map((currentSec, secIdx) => {
           const importedSec = data.sections[secIdx];
+
+          // `passage` chỉ tồn tại ở các dạng có đoạn văn (cloze, reading...). Gán vô
+          // điều kiện sẽ nhét thêm trường lạ vào những dạng như phonetics —
+          // TS chặn, và config gửi lên backend cũng có field không thuộc schema.
+          const passagePatch = 'passage' in currentSec || importedSec.passage !== undefined
+            ? { passage: importedSec.passage !== undefined
+                ? importedSec.passage
+                : (currentSec as { passage?: string }).passage }
+            : {};
+
           const newSec = {
             ...currentSec,
             title: importedSec.title || currentSec.title,
             instructions: importedSec.instructions || currentSec.instructions,
-            passage: importedSec.passage !== undefined ? importedSec.passage : currentSec.passage,
-          };
+            ...passagePatch,
+          } as typeof currentSec & { passage?: string; blanks?: any[]; items?: any[] };
 
           if (newSec.type === 'mc_cloze' || newSec.type === 'word_bank_cloze' || newSec.type === 'open_cloze') {
             if (Array.isArray(newSec.blanks) && Array.isArray(importedSec.blanks)) {
