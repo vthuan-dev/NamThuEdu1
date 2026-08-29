@@ -249,11 +249,28 @@ export function TeacherLogin() {
         {/* LEFT: Image panel */}
         <div className="hidden lg:flex lg:w-[52%] xl:w-[55%] items-center justify-end pr-4 pl-8 py-8">
           <div className="overflow-hidden" style={{ maxWidth: '645px', width: '100%', borderRadius: '40px' }}>
-            <img
-              src="/images/form-login-gv.png"
-              alt="NamThuEdu"
-              className="w-full h-auto block"
-            />
+            {/*
+              Cùng lý do như trang đăng nhập học viên: PNG gốc 1857 KB.
+              WebP còn 88 KB (màn thường) / 172 KB (Retina), giảm ~95%.
+              Khung ở trang này rộng 645px nên `sizes` khai theo đúng số đó.
+            */}
+            <picture>
+              <source
+                type="image/webp"
+                srcSet="/images/form-login-gv-770.webp 770w, /images/form-login-gv-1540.webp 1540w"
+                sizes="(min-width: 1280px) 645px, 52vw"
+              />
+              <img
+                src="/images/form-login-gv.png"
+                alt="NamThuEdu - Cổng dành cho giáo viên"
+                className="w-full h-auto block"
+                width={1254}
+                height={1254}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+              />
+            </picture>
           </div>
         </div>
 

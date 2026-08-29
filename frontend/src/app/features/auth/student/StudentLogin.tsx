@@ -223,11 +223,33 @@ export function StudentLogin() {
         {/* ── LEFT: Image panel (hidden on mobile) ─────────────────────── */}
         <div className="hidden lg:flex lg:w-[52%] xl:w-[55%] items-center justify-end pr-4 pl-8 py-8">
           <div className="overflow-hidden" style={{ maxWidth: '770px', width: '100%', borderRadius: '40px' }}>
-            <img
-              src="/images/form-login.png"
-              alt="NamThuEdu"
-              className="w-full h-auto block"
-            />
+            {/*
+              Ảnh này trước đây là PNG 1732 KB nên trang đăng nhập tải rất chậm.
+              Nay dùng WebP: 67 KB cho màn thường, 144 KB cho màn Retina (giảm ~96%).
+              PNG giữ lại làm fallback cho trình duyệt không hỗ trợ WebP.
+
+              - `width`/`height` khai báo đúng tỉ lệ gốc (1370x1148) để trình duyệt
+                giữ chỗ sẵn, tránh nhảy layout khi ảnh tải xong.
+              - `fetchPriority="high"` + `loading="eager"`: đây là ảnh lớn nhất trong
+                khung nhìn đầu tiên, cần tải sớm chứ không nên trì hoãn.
+            */}
+            <picture>
+              <source
+                type="image/webp"
+                srcSet="/images/form-login-770.webp 770w, /images/form-login-1540.webp 1540w"
+                sizes="(min-width: 1280px) 770px, 52vw"
+              />
+              <img
+                src="/images/form-login.png"
+                alt="NamThuEdu - Học vui, hiểu sâu, tiến xa mỗi ngày"
+                className="w-full h-auto block"
+                width={1370}
+                height={1148}
+                loading="eager"
+                fetchPriority="high"
+                decoding="async"
+              />
+            </picture>
           </div>
         </div>
 
