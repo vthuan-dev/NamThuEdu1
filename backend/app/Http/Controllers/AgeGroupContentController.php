@@ -347,7 +347,10 @@ class AgeGroupContentController extends Controller
                 // Class system deprecated — gán theo age_group thuần thay vì
                 // còn lọc class_ids.
                 $students = DB::table('users')
-                    ->where('role', 'student')
+                    // `uRole`, KHÔNG phải `role`. Bảng users có cả hai cột nhưng
+                    // `role` toàn NULL trên production — query cũ luôn trả rỗng,
+                    // nên endpoint báo "thành công, 0 học viên" mà không gán ai.
+                    ->where('uRole', 'student')
                     ->where('age_group', $group['age_group'])
                     ->whereNull('uDeleted_at')
                     ->pluck('uId');
@@ -563,8 +566,11 @@ class AgeGroupContentController extends Controller
             ->where('test_assignments.age_group', $ageGroup)
             ->select(
                 DB::raw('COUNT(*) as total'),
-                DB::raw('AVG(score) as avg_score'),
-                DB::raw('AVG(TIMESTAMPDIFF(MINUTE, started_at, submitted_at)) as avg_time')
+                // `sScore`/`sStart_time`/`sSubmit_time` là cột thật. Bản cũ dùng
+                // `score`/`started_at`/`submitted_at` — cả ba rỗng 100% trên
+                // production, nên điểm trung bình và thời gian làm bài luôn ra NULL.
+                DB::raw('AVG(submissions.sScore) as avg_score'),
+                DB::raw('AVG(TIMESTAMPDIFF(MINUTE, submissions.sStart_time, submissions.sSubmit_time)) as avg_time')
             )
             ->first();
 

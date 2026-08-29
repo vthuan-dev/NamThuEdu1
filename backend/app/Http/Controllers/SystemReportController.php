@@ -470,7 +470,7 @@ class SystemReportController extends Controller
         $totalExams = Exam::count();
         $publicExams = Exam::where('eIs_private', false)->count();
         $totalSubmissions = Submission::count();
-        $newSubmissionsToday = Submission::whereDate('sSubmitted_at', today())->count();
+        $newSubmissionsToday = Submission::whereDate('sSubmit_time', today())->count();
 
         return [
             'total' => $totalExams,
@@ -489,7 +489,7 @@ class SystemReportController extends Controller
         return [
             'logins_today' => $this->getLoginsCount($today),
             'logins_yesterday' => $this->getLoginsCount($yesterday),
-            'tests_taken_today' => Submission::whereDate('sSubmitted_at', $today)->count(),
+            'tests_taken_today' => Submission::whereDate('sSubmit_time', $today)->count(),
             'posts_created_today' => Post::whereDate('pCreated_at', $today)->count(),
             'courses_created_today' => Course::whereDate('cCreated_at', $today)->count(),
         ];
@@ -497,8 +497,10 @@ class SystemReportController extends Controller
 
     private function getPerformanceMetrics()
     {
-        // Average test scores
-        $avgScore = Submission::whereNotNull('sTotal_score')->avg('sTotal_score');
+        // Average test scores.
+        // `sScore` là cột điểm thật; `sTotal_score` rỗng 100% trên production nên
+        // chỉ số này trước đây luôn hiện 0.
+        $avgScore = Submission::whereNotNull('sScore')->avg('sScore');
         
         // Completion rates
         $totalAssignments = TestAssignment::count();
@@ -585,7 +587,7 @@ class SystemReportController extends Controller
     private function getTestActivity($days)
     {
         $totalTests = TestAssignment::where('created_at', '>=', now()->subDays($days))->count();
-        $completedTests = Submission::where('sSubmitted_at', '>=', now()->subDays($days))->count();
+        $completedTests = Submission::where('sSubmit_time', '>=', now()->subDays($days))->count();
 
         return [
             'tests_assigned' => $totalTests,
@@ -618,13 +620,13 @@ class SystemReportController extends Controller
         $peakHours = $this->getPeakHoursAnalysis($days);
         $peakHour = collect($peakHours)->sortByDesc('activity_level')->first();
 
-        $peakDay = Submission::where('sSubmitted_at', '>=', now()->subDays($days))
-            ->selectRaw('DAYNAME(sSubmitted_at) as day_name, COUNT(*) as total')
+        $peakDay = Submission::where('sSubmit_time', '>=', now()->subDays($days))
+            ->selectRaw('DAYNAME(sSubmit_time) as day_name, COUNT(*) as total')
             ->groupBy('day_name')
             ->orderByDesc('total')
             ->first();
 
-        $testsCount = Submission::where('sSubmitted_at', '>=', now()->subDays($days))->count();
+        $testsCount = Submission::where('sSubmit_time', '>=', now()->subDays($days))->count();
         $contentCount = Post::where('pCreated_at', '>=', now()->subDays($days))->count()
             + Exam::where('eCreated_at', '>=', now()->subDays($days))->count();
         $enrollCount = DB::table('course_enrollments')
@@ -647,8 +649,8 @@ class SystemReportController extends Controller
 
     private function getPeakHoursAnalysis($days)
     {
-        $hourly = Submission::where('sSubmitted_at', '>=', now()->subDays($days))
-            ->selectRaw('HOUR(sSubmitted_at) as hour, COUNT(*) as total')
+        $hourly = Submission::where('sSubmit_time', '>=', now()->subDays($days))
+            ->selectRaw('HOUR(sSubmit_time) as hour, COUNT(*) as total')
             ->groupBy('hour')
             ->pluck('total', 'hour');
 
@@ -674,8 +676,8 @@ class SystemReportController extends Controller
         $coursesRecent = Course::where('cCreated_at', '>=', $recentStart)->count();
         $coursesPrevious = Course::whereBetween('cCreated_at', [$previousStart, $recentStart])->count();
 
-        $engRecent = Submission::where('sSubmitted_at', '>=', $recentStart)->count();
-        $engPrevious = Submission::whereBetween('sSubmitted_at', [$previousStart, $recentStart])->count();
+        $engRecent = Submission::where('sSubmit_time', '>=', $recentStart)->count();
+        $engPrevious = Submission::whereBetween('sSubmit_time', [$previousStart, $recentStart])->count();
 
         return [
             'user_growth_rate' => $this->calculateGrowthRate($usersRecent, $usersPrevious),
@@ -717,7 +719,7 @@ class SystemReportController extends Controller
             ->whereNull('uDeleted_at')
             ->count() / max(1, $days);
         $dailyCourses = Course::where('cCreated_at', '>=', now()->subDays($days))->count() / max(1, $days);
-        $dailyTests = Submission::where('sSubmitted_at', '>=', now()->subDays($days))->count() / max(1, $days);
+        $dailyTests = Submission::where('sSubmit_time', '>=', now()->subDays($days))->count() / max(1, $days);
 
         return [
             'next_month_users' => (int) round(User::whereNull('uDeleted_at')->count() + ($dailyUsers * 30)),
@@ -728,7 +730,7 @@ class SystemReportController extends Controller
 
     private function getLoginsCount($date)
     {
-        return Submission::whereDate('sSubmitted_at', $date)->count()
+        return Submission::whereDate('sSubmit_time', $date)->count()
             + User::whereDate('uCreated_at', $date)->whereNull('uDeleted_at')->count();
     }
 
@@ -741,7 +743,7 @@ class SystemReportController extends Controller
             $timeline[] = [
                 'date' => $date,
                 'new_users' => User::whereDate('uCreated_at', $date)->whereNull('uDeleted_at')->count(),
-                'submissions' => Submission::whereDate('sSubmitted_at', $date)->count(),
+                'submissions' => Submission::whereDate('sSubmit_time', $date)->count(),
                 'new_enrollments' => DB::table('course_enrollments')->whereDate('enrolled_at', $date)->count(),
                 'posts_created' => Post::whereDate('pCreated_at', $date)->count(),
             ];
