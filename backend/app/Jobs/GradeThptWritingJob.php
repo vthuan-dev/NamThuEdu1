@@ -159,7 +159,23 @@ class GradeThptWritingJob implements ShouldQueue
         $payload['result'] = $result;
 
         $submission->submission_payload = $payload;
-        $submission->sScore = $result['scaled_score'];
+
+        // Điểm tổng giáo viên tự nhập thắng điểm AI.
+        //
+        // Job này nằm trong queue nên có thể chạy SAU khi giáo viên đã chấm tay: học
+        // viên nộp → job xếp hàng → queue tắc → giáo viên vào chấm → job mới chạy và
+        // ghi đè. Đề Viết/Nói lại đúng là loại giáo viên phải chấm tay, nên đây là
+        // đường dễ mất điểm nhất. Vẫn cập nhật payload để điểm AI hiển thị được.
+        $teacherOverride = isset($result['teacher_override_score'])
+            ? (float) $result['teacher_override_score']
+            : null;
+
+        if ($teacherOverride === null) {
+            $submission->sScore = $result['scaled_score'];
+        } else {
+            Log::info("GradeThptWritingJob: giữ điểm giáo viên {$teacherOverride} cho sub {$this->submissionId}, không ghi đè bằng điểm AI {$result['scaled_score']}");
+        }
+
         $submission->sGraded_time = now();
         if ($submission->sStatus !== 'graded') {
             $submission->sStatus = 'graded';

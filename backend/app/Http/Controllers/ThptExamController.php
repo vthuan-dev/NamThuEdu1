@@ -746,6 +746,17 @@ class ThptExamController extends Controller
                     ?? $this->blankConfig();
 
                 $result = $this->gradeSubmission($configForGrading, $answers);
+
+                // Điểm giáo viên (nếu đã có) thắng điểm máy. `save()` ở đây chạy cả
+                // khi giáo viên đã chấm tay phiên này — màn hình chấm không chặn bài
+                // `in_progress`, nên trường hợp đó có thật.
+                $existingOverride = $payload['result']['teacher_override_score'] ?? null;
+                if ($existingOverride !== null) {
+                    $result['teacher_override_score'] = (float) $existingOverride;
+                    $result['scaled_score_objective'] = $result['scaled_score'];
+                    $result['scaled_score'] = (float) $existingOverride;
+                }
+
                 $existing->sScore = $result['scaled_score'];
                 $existing->sStatus = 'graded';
                 $existing->sSubmit_time = now();
@@ -973,6 +984,17 @@ class ThptExamController extends Controller
                 ?? $this->blankConfig();
 
             $result = $this->gradeSubmission($configForGrading, $answers);
+
+            // Nếu giáo viên đã chấm tay phiên này thì giữ điểm đó. Màn hình chấm
+            // không chặn bài `in_progress`, nên giáo viên hoàn toàn có thể chấm
+            // trước khi học viên bấm nộp.
+            $existingOverride = $payload['result']['teacher_override_score'] ?? null;
+            if ($existingOverride !== null) {
+                $result['teacher_override_score'] = (float) $existingOverride;
+                $result['scaled_score_objective'] = $result['scaled_score'];
+                $result['scaled_score'] = (float) $existingOverride;
+            }
+
             $submission->sScore = $result['scaled_score'];
             $submission->sStatus = 'graded';
             $submission->sSubmit_time = now();
@@ -1075,6 +1097,15 @@ class ThptExamController extends Controller
 
             try {
                 $result = $this->gradeSubmission($reviewConfig, $answers);
+
+                // Giữ điểm giáo viên nếu đã chấm tay trước khi bài kịp về 'graded'.
+                $existingOverride = $payload['result']['teacher_override_score'] ?? null;
+                if ($existingOverride !== null) {
+                    $result['teacher_override_score'] = (float) $existingOverride;
+                    $result['scaled_score_objective'] = $result['scaled_score'] ?? 0;
+                    $result['scaled_score'] = (float) $existingOverride;
+                }
+
                 $payload['result'] = $result;
                 $submission->submission_payload = $payload;
                 $submission->sScore = $result['scaled_score'] ?? 0;
