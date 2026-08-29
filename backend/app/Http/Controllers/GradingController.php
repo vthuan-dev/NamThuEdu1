@@ -2152,6 +2152,23 @@ class GradingController extends Controller
                         ->where('taTarget_type', 'class')
                         ->whereIn('taTarget_id', $classIds);
                 });
+
+                // 4) Assignment giao TRỰC TIẾP cho học viên thuộc lớp GV quản lý.
+                // Nhánh này từng bị thiếu dù docblock có nêu: teacherCanAccessSubmission()
+                // cho phép chấm bài đó, nhưng query danh sách lại không trả về → GV
+                // không thấy bài cần chấm, chỉ vào được nếu biết ID.
+                // Không trùng nhánh 2: học viên có thể đã chuyển lớp (hoặc chưa có
+                // class_id) sau khi được giao bài.
+                $outer->orWhereIn('assignment_id', function ($sub) use ($classIds) {
+                    $sub->select('taId')
+                        ->from('test_assignments')
+                        ->where('taTarget_type', 'student')
+                        ->whereIn('taTarget_id', function ($u) use ($classIds) {
+                            $u->select('uId')
+                                ->from('users')
+                                ->whereIn('class_id', $classIds);
+                        });
+                });
             }
         });
 

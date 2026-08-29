@@ -25,7 +25,11 @@ class ClassApiTest extends TestCase
 
         $this->teacher = User::factory()->create(['uRole' => 'teacher']);
 
-        $this->student = User::factory()->create(['uRole' => 'student']);
+        // Đặt age_group rõ ràng: enroll() từ chối học viên lệch độ tuổi với lớp.
+        $this->student = User::factory()->create([
+            'uRole' => 'student',
+            'age_group' => 'teens',
+        ]);
     }
 
     /** @test */
@@ -44,14 +48,16 @@ class ClassApiTest extends TestCase
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
         ])->postJson('/api/teacher/classes', [
-            'cName' => 'IELTS 7.0 Class',
-            'cDescription' => 'Advanced IELTS preparation',
-            'cStatus' => 'active',
-            'course' => $course->cId,
+            // API nhận name/description/age_group/max_students — KHÔNG phải tên cột
+            // DB (cName/cDescription/cStatus). Test cũ gửi tên cột nên luôn 400.
+            'name' => 'IELTS 7.0 Class',
+            'description' => 'Advanced IELTS preparation',
+            'age_group' => 'teens',
+            'max_students' => 30,
         ]);
 
-        $response->assertStatus(200)
-                 ->assertStatus(200);
+        // 201 Created — đúng chuẩn REST cho việc tạo mới.
+        $response->assertStatus(201);
 
         $this->assertDatabaseHas('classes', [
             'cName' => 'IELTS 7.0 Class',
@@ -62,8 +68,11 @@ class ClassApiTest extends TestCase
     /** @test */
     public function teacher_can_enroll_student_to_class()
     {
+        // ClassesFactory không set age_group (→ NULL) nên phải đặt rõ, không thì
+        // enroll() chặn vì lệch độ tuổi và test không kiểm được luồng ghi danh.
         $class = Classes::factory()->create([
             'cTeacher_id' => $this->teacher->uId,
+            'age_group' => 'teens',
         ]);
 
         $token = $this->teacher->createToken('test-token')->plainTextToken;
@@ -75,6 +84,14 @@ class ClassApiTest extends TestCase
         ]);
 
         $response->assertStatus(200);
+
+        // users.class_id là nguồn dữ liệu chính; ClassEnrollment chỉ giữ để tương
+        // thích cũ. UserFactory tự gán student vào một lớp mặc định, nên đây là
+        // kiểm tra class_id ĐÃ ĐỔI sang lớp mới.
+        $this->assertEquals(
+            $class->cId,
+            (int) $this->student->fresh()->class_id
+        );
 
         $this->assertDatabaseHas('class_enrollments', [
             'class_id' => $class->cId,
@@ -118,6 +135,8 @@ class ClassApiTest extends TestCase
             'from_class_id' => $fromClass->cId,
             'to_class_id' => $toClass->cId,
             'student_id' => $this->student->uId,
+            // teacher_id từng bị $fillable lọc bỏ → INSERT thiếu cột NOT NULL → 500.
+            'teacher_id' => $this->teacher->uId,
         ]);
     }
 

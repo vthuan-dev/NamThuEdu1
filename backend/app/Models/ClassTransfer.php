@@ -11,11 +11,17 @@ class ClassTransfer extends Model
 
     protected $table = 'class_transfers';
     
+    // teacher_id: cột NOT NULL không default trong migration. Thiếu nó ở đây thì
+    // Eloquent lọc bỏ giá trị controller truyền vào → INSERT thiếu cột → SQLSTATE
+    // 1364 và mọi lần chuyển lớp trả 500.
+    // transferred_by: giữ lại vì relation transferredBy() dùng tới.
     protected $fillable = [
         'student_id',
         'from_class_id',
         'to_class_id',
         'reason',
+        'notes',
+        'teacher_id',
         'transferred_by',
         'transferred_at',
     ];

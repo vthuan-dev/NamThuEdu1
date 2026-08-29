@@ -827,7 +827,12 @@ class ClassController extends Controller
         $successCount = 0;
         $errors = [];
 
-        // Remove transaction to avoid savepoint issues in tests
+        // Mỗi học viên cần 4 lệnh ghi (xoá enrollment nguồn, thêm enrollment đích,
+        // đổi users.class_id, ghi log). Không có transaction thì lỗi giữa chừng để
+        // học viên KHÔNG thuộc lớp nào. Chú thích cũ nói bỏ transaction để tránh
+        // "savepoint issues in tests" — nhưng enroll() ngay trên vẫn dùng
+        // DB::beginTransaction() và test chạy bình thường.
+        DB::beginTransaction();
         try {
             foreach ($request->student_ids as $studentId) {
                 // Check if student exists and has role='student'
@@ -841,22 +846,27 @@ class ClassController extends Controller
                     continue;
                 }
 
-                // Check if student is enrolled in from_class
-                $fromEnrollment = ClassEnrollment::where('class_id', $fromId)
-                                                ->where('student_id', $studentId)
-                                                ->first();
+                // Thành viên lớp nguồn: xét CẢ users.class_id lẫn ClassEnrollment,
+                // giống removeStudent(). Chỉ xét bảng phụ thì học viên được gán lớp
+                // qua đường khác (admin, import) sẽ bị báo "không có trong lớp nguồn"
+                // dù giao diện vẫn hiển thị họ trong lớp đó.
+                $inFromClass = (int) $student->class_id === (int) $fromId
+                    || ClassEnrollment::where('class_id', $fromId)
+                        ->where('student_id', $studentId)
+                        ->exists();
 
-                if (!$fromEnrollment) {
+                if (!$inFromClass) {
                     $errors[] = "Học viên {$student->uName} không có trong lớp nguồn.";
                     continue;
                 }
 
-                // Check if student is already in to_class
-                $toEnrollment = ClassEnrollment::where('class_id', $toId)
-                                              ->where('student_id', $studentId)
-                                              ->exists();
+                // Đã ở lớp đích.
+                $inToClass = (int) $student->class_id === (int) $toId
+                    || ClassEnrollment::where('class_id', $toId)
+                        ->where('student_id', $studentId)
+                        ->exists();
 
-                if ($toEnrollment) {
+                if ($inToClass) {
                     $errors[] = "Học viên {$student->uName} đã có trong lớp đích.";
                     continue;
                 }
@@ -873,7 +883,14 @@ class ClassController extends Controller
                     'student_id' => $studentId,
                 ]);
 
-                // 3. Log transfer
+                // 3. Cập nhật users.class_id — ĐÂY LÀ NGUỒN DỮ LIỆU CHÍNH.
+                // enroll() và removeStudent() đều ghi cột này; chỉ transfer bỏ sót,
+                // nên học viên đã chuyển vẫn thuộc lớp cũ ở mọi chỗ đọc theo
+                // class_id: danh sách bài giao, quyền chấm của GV, sĩ số lớp.
+                $student->class_id = $toId;
+                $student->save();
+
+                // 4. Log transfer
                 ClassTransfer::create([
                     'student_id' => $studentId,
                     'from_class_id' => $fromId,
@@ -887,6 +904,8 @@ class ClassController extends Controller
                 $successCount++;
             }
 
+            DB::commit();
+
             return response()->json([
                 'status' => 'success',
                 'data' => [
@@ -899,6 +918,7 @@ class ClassController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'status' => 'error',
                 'message' => 'Lỗi hệ thống khi chuyển học viên.',
