@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Models\Classes;
 use App\Models\ClassCoTeacher;
 use App\Support\ScoreScale;
+use App\Services\GradingNotifier;
 
 class GradingController extends Controller
 {
@@ -333,6 +334,12 @@ class GradingController extends Controller
             ], 400);
         }
 
+        // Đọc TRƯỚC khi update để biết đây là lần chấm đầu hay sửa điểm, và
+        // để báo cho học viên điểm cũ → điểm mới. `teacher_reviewed_at` là mốc
+        // phân biệt đúng hơn `sStatus` vì bài có thể đã 'graded' do AI chấm.
+        $previousScore = $submission->sScore;
+        $wasReviewed   = $submission->teacher_reviewed_at !== null;
+
         $validator = Validator::make($request->all(), [
             'score' => 'nullable|numeric|min:0|max:100',
             'feedback' => 'nullable|string',
@@ -632,6 +639,17 @@ class GradingController extends Controller
                     'teacher_reviewed_at' => now(),
                 ]);
             }
+
+            // Ghi audit + push cho học viên. Đường này (nút "Xét duyệt") trước đây
+            // không gửi thông báo nào — chỉ `save-all` có — nên học viên phải đợi
+            // polling 10 giây của NotificationDropdown mới biết.
+            (new GradingNotifier())->afterFinalize(
+                $submission->fresh(['exam']),
+                $user,
+                $previousScore,
+                $wasReviewed,
+                ['score' => $totalScore]
+            );
 
             return response()->json([
                 'status' => 'success',

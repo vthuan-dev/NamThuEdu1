@@ -6,7 +6,6 @@ use App\Models\GradingHistory;
 use App\Models\Submission;
 use App\Models\SubmissionAnswer;
 use App\Models\User;
-use App\Services\PushNotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -214,7 +213,11 @@ class GradingReviewService
             throw new \RuntimeException('Còn ' . $pending->count() . ' câu chưa được review.');
         }
 
-        DB::transaction(function () use ($submission, $data, $teacher) {
+        // Đọc TRƯỚC transaction để biết đây là lần chấm đầu hay sửa điểm.
+        $previousScore = $submission->sScore;
+        $wasReviewed   = $submission->teacher_reviewed_at !== null;
+
+        DB::transaction(function () use ($submission, $data, $teacher, $previousScore, $wasReviewed) {
             $examType = strtoupper($submission->exam->eType ?? '');
             $isIelts  = $examType === 'IELTS';
             $isVstep  = $examType === 'VSTEP' || $isIelts;
@@ -269,14 +272,7 @@ class GradingReviewService
 
                 $submission->update($update);
 
-                GradingHistory::create([
-                    'submission_id' => $submission->sId,
-                    'answer_id'     => null,
-                    'ghAction'      => GradingHistory::ACTION_TEACHER_SAVE,
-                    'ghActor_id'    => $teacher->uId,
-                    'ghNew_score'   => $overallAvg,
-                    'ghMetadata'    => [$scoresKey => $skillScores],
-                ]);
+                $historyMeta = [$scoresKey => $skillScores];
             } else {
                 // Non-VSTEP/Kids/General logic
                 $totalPoints = 0;
@@ -307,28 +303,18 @@ class GradingReviewService
 
                 $submission->update($update);
 
-                GradingHistory::create([
-                    'submission_id' => $submission->sId,
-                    'answer_id'     => null,
-                    'ghAction'      => GradingHistory::ACTION_TEACHER_SAVE,
-                    'ghActor_id'    => $teacher->uId,
-                    'ghNew_score'   => $finalScore,
-                    'ghMetadata'    => ['score' => $finalScore],
-                ]);
+                $historyMeta = ['score' => $finalScore];
             }
 
-            // Push notification khi giáo viên chấm xong
-            try {
-                $examTitle = optional($submission->exam)->eTitle ?? 'Bài thi';
-                (new PushNotificationService())->sendToUser(
-                    (int) $submission->user_id,
-                    '📝 Giáo viên đã chấm xong bài của bạn',
-                    $examTitle . ' · Xem kết quả ngay',
-                    ['url' => '/hoc-vien/ket-qua/' . $submission->sId]
-                );
-            } catch (\Exception $e) {
-                Log::warning('[Push] Teacher review push failed: ' . $e->getMessage());
-            }
+            // Ghi audit + push. Phân biệt "chấm xong" với "sửa điểm" — trước đây
+            // chỉ có một loại thông báo nên học viên không biết điểm đã bị sửa.
+            (new GradingNotifier())->afterFinalize(
+                $submission->fresh(['exam']),
+                $teacher,
+                $previousScore,
+                $wasReviewed,
+                $historyMeta
+            );
         });
 
         return $submission->fresh();

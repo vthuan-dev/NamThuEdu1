@@ -12,6 +12,8 @@ use App\Models\Submission;
 use App\Models\SubmissionAnswer;
 use App\Models\Question;
 use App\Models\ExamComment;
+use App\Models\GradingHistory;
+use App\Services\GradingNotifier;
 use App\Services\StudentProgressService;
 use App\Services\VstepGradingService;
 use App\Jobs\GradeVstepSubjectiveJob;
@@ -2510,10 +2512,11 @@ class StudentTestController extends Controller
         // cùng 1 đề học viên có thể thi nhiều lần và mỗi lần điểm khác nhau → mỗi
         // phiên phải có 1 thông báo riêng.
         //
-        // Mỗi thông báo key theo `graded_<sId>` (id của phiên). Khi giáo viên
-        // chấm lại CÙNG 1 PHIÊN, GradingReviewService dùng $submission->update()
-        // nên giữ nguyên sId → cùng id thông báo → frontend cập nhật điểm mới tại
-        // chỗ, KHÔNG đẻ ra thông báo thứ hai.
+        // Thông báo "đã chấm" key theo `graded_<sId>`. Khi giáo viên chấm lại CÙNG
+        // 1 PHIÊN, submission giữ nguyên sId nên mục này được cập nhật tại chỗ. Riêng
+        // việc SỬA ĐIỂM thì phát thêm một mục `score_updated_<sId>` — trước đây
+        // chỉ có một loại thông báo nên con số âm thầm đổi từ 3.75 thành 8.00 mà
+        // học viên không hề biết điểm đã bị sửa.
         $recentGraded = Submission::where('user_id', $studentId)
             ->where('sStatus', 'graded')
             ->whereNotNull('sGraded_time')
@@ -2523,55 +2526,31 @@ class StudentTestController extends Controller
             ->take(5)
             ->get();
 
+        // Lịch sử chấm của chính các phiên trên — dùng để biết phiên nào đã bị
+        // chấm lại. Nhiều hơn 1 lần TEACHER_SAVE nghĩa là có sửa điểm.
+        $teacherSaves = collect();
+        if ($recentGraded->isNotEmpty()) {
+            $teacherSaves = GradingHistory::whereIn('submission_id', $recentGraded->pluck('sId'))
+                ->where('ghAction', GradingHistory::ACTION_TEACHER_SAVE)
+                ->orderBy('ghId')
+                ->get()
+                ->groupBy('submission_id');
+        }
+
         foreach ($recentGraded as $submission) {
             if (!$submission->exam)
                 continue;
 
-            // Compute display score on 0–10 scale (match frontend gradeHelpers.getSubmissionDisplayScore)
-            // - VSTEP: average of 4 AI skill scores (hệ 10), fallback sScore/10
-            // - Other: sScore/10 (sScore is stored as percentage 0-100)
-            $displayScore = null;
-            $isVstep = strtoupper($submission->exam->eType ?? '') === 'VSTEP'
-                || stripos($submission->exam->eTitle ?? '', 'VSTEP') !== false;
+            // Nhãn điểm theo thang của đề (3.75/10, band 7.5/9, ...). Dùng chung
+            // ScoreScale với frontend để không chệch nhau; trước đây đoạn này tự
+            // chia /10 nên đề IELTS bị biến band 7.0 thành 7.8/10.
+            $scoreLabel = GradingNotifier::scoreLabel($submission, $submission->sScore);
 
-            if ($isVstep) {
-                $raw = is_string($submission->sGemini_feedback)
-                    ? (json_decode($submission->sGemini_feedback, true) ?: [])
-                    : ((array) ($submission->sGemini_feedback ?? []));
-                $vs = $raw['vstep_scores'] ?? [];
-                $vals = [];
-                foreach (['listening', 'reading', 'writing', 'speaking'] as $sk) {
-                    if (isset($vs[$sk]) && is_numeric($vs[$sk])) {
-                        $vals[] = (float) $vs[$sk];
-                    }
-                }
-                if (count($vals) === 4) {
-                    $displayScore = array_sum($vals) / 4;
-                } elseif ($submission->sScore !== null) {
-                    $displayScore = (float) $submission->sScore / 10;
-                }
-            } elseif ($submission->sScore !== null) {
-                $displayScore = (float) $submission->sScore / 10;
-            }
-
-            $scoreLabel = $displayScore !== null
-                ? number_format(round($displayScore, 1), 1, '.', '') . '/10'
-                : '—';
-
-            // Trỏ tới đúng trang kết quả theo LOẠI ĐỀ của phiên này. Trước đây luôn
-            // dùng '/ket-qua/<sId>' → với THPT/VSTEP/IELTS trang chung này chỉ tải
-            // rồi tự redirect sang trang chuyên biệt, nên khi mở trong modal sẽ
-            // "nháy rồi biến mất". Nay điều hướng thẳng để tránh xung đột đó.
-            $examType = strtoupper($submission->exam->eType ?? '');
-            if ($examType === 'THPT') {
-                $actionUrl = '/ket-qua-thpt/' . $submission->sId;
-            } elseif ($isVstep || $examType === 'VSTEP') {
-                $actionUrl = '/ket-qua-vstep/' . $submission->sId;
-            } elseif ($examType === 'IELTS') {
-                $actionUrl = '/ket-qua-ielts/' . $submission->sId;
-            } else {
-                $actionUrl = '/ket-qua/' . $submission->sId;
-            }
+            // Trỏ tới đúng trang kết quả theo LOẠI ĐỀ của phiên này. Trang chung
+            // '/ket-qua/<sId>' chỉ tải rồi tự redirect với THPT/VSTEP/IELTS nên khi
+            // mở trong modal sẽ "nháy rồi biến mất". Dùng chung một hàm với push để
+            // hai kênh thông báo không trỏ khác nhau.
+            $actionUrl = GradingNotifier::resultUrl($submission);
 
             $notifications[] = [
                 'id' => 'graded_' . $submission->sId,
@@ -2584,6 +2563,39 @@ class StudentTestController extends Controller
                 'action_url' => $actionUrl,
                 'action_label' => 'Xem kết quả',
             ];
+
+            // Phiên bị chấm lại → thêm một mục riêng báo điểm cũ → điểm mới.
+            $saves = $teacherSaves->get($submission->sId) ?? collect();
+            if ($saves->count() >= 2) {
+                $latest = $saves->last();
+                // ghPrev_score chỉ có từ khi GradingNotifier ghi; dữ liệu cũ không có
+                // nên lấy điểm của lần lưu trước đó làm điểm cũ.
+                $prev = $latest->ghPrev_score;
+                if ($prev === null) {
+                    $prevRow = $saves->slice(-2, 1)->first();
+                    $prev = $prevRow ? $prevRow->ghNew_score : null;
+                }
+
+                // ghNew_score/ghPrev_score lưu theo thang thô giống sScore nên quy đổi
+                // qua cùng một đường với điểm hiện tại.
+                $oldLabel = GradingNotifier::scoreLabel($submission, $prev);
+                $newLabel = GradingNotifier::scoreLabel($submission, $submission->sScore);
+
+                if ($oldLabel !== $newLabel) {
+                    $notifications[] = [
+                        'id' => 'score_updated_' . $submission->sId,
+                        'title' => 'Điểm đã được cập nhật',
+                        'message' => 'Giáo viên đã sửa điểm bài "' . $submission->exam->eTitle
+                            . '": ' . $oldLabel . ' → ' . $newLabel,
+                        'type' => 'score_updated',
+                        'color' => '#F59E0B',
+                        'is_read' => false,
+                        'created_at' => $latest->created_at ?? $submission->sGraded_time,
+                        'action_url' => $actionUrl,
+                        'action_label' => 'Xem chi tiết',
+                    ];
+                }
+            }
         }
 
         // Newly assigned tests (last 7 days, not yet started)

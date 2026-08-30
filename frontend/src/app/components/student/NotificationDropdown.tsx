@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Bell, Check, ClipboardList, CheckCircle, AlertCircle,
-  MessageSquare, Trophy, Clock, ChevronRight, X,
+  MessageSquare, Trophy, Clock, ChevronRight, X, PenLine,
 } from "lucide-react";
 import { studentApi } from "../../../services/studentApi";
 import type { ExamSchedule } from "../../../services/studentApi";
@@ -28,6 +28,9 @@ interface NotificationDto {
 const ICON_MAP: Record<string, any> = {
   assignment: ClipboardList,
   graded:     CheckCircle,
+  // Điểm bị sửa sau khi đã chấm — tách khỏi `graded` để học viên nhận ra ngay
+  // đây không phải thông báo chấm bài bình thường.
+  score_updated: PenLine,
   deadline:   AlertCircle,
   message:    MessageSquare,
   achievement: Trophy,

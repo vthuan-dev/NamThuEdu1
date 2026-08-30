@@ -13,6 +13,7 @@ import {
   MoreVertical,
   Check,
   Trash2,
+  PenLine,
 } from "lucide-react";
 import { studentApi } from "../../../../services/studentApi";
 import { Header } from "../../../components/shared/Header";
@@ -21,7 +22,7 @@ import { studentRolePalette } from "../../../../utils/studentRoleTheme";
 
 const PAL = studentRolePalette();
 
-type NotificationType = 'all' | 'assignment' | 'graded' | 'deadline' | 'message' | 'achievement';
+type NotificationType = 'all' | 'assignment' | 'graded' | 'score_updated' | 'deadline' | 'message' | 'achievement';
 const STUDENT_BASE_PATH = "/hoc-vien";
 
 function resolveStudentActionUrl(actionUrl: string): string {
@@ -52,6 +53,10 @@ export function NotificationList() {
   const { data, isLoading } = useQuery({
     queryKey: ['student', 'notifications'],
     queryFn: () => studentApi.getNotifications(),
+    // Khớp với NotificationDropdown: không có dòng này thì trang này phải F5 mới
+    // thấy điểm vừa được chấm, trong khi chuông ở header đã hiện.
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false,
   });
 
   const markAsReadMutation = useMutation({
@@ -78,14 +83,20 @@ export function NotificationList() {
   const notifications = (data as any)?.data?.data?.notifications || [];
   const unreadCount = (data as any)?.data?.data?.unread_count || 0;
 
-  const filteredNotifications = notifications.filter(notif =>
-    filter === 'all' ? true : notif.type === filter
-  );
+  const filteredNotifications = notifications.filter(notif => {
+    if (filter === 'all') return true;
+    // Tab "Kết quả" hiện cả thông báo sửa điểm — loại này không có tab riêng nên
+    // nếu lọc đúng bằng nhau thì nó chỉ xem được ở tab "Tất cả".
+    if (filter === 'graded') return notif.type === 'graded' || notif.type === 'score_updated';
+    return notif.type === filter;
+  });
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'assignment': return ClipboardList;
       case 'graded': return CheckCircle;
+      // Phân biệt "đã chấm" với "điểm bị sửa sau khi chấm".
+      case 'score_updated': return PenLine;
       case 'deadline': return AlertCircle;
       case 'message': return MessageSquare;
       case 'achievement': return Trophy;
