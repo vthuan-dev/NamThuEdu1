@@ -10,14 +10,14 @@ use Illuminate\Support\Facades\Log;
 /**
  * VSTEP Subjective Grading Service
  *
- * Writing  → Groq LLM  (llama-3.3-70b-versatile) with VSTEP rubric
+ * Writing  → Groq LLM  (openai/gpt-oss-120b) with VSTEP rubric
  * Speaking → Groq Whisper (whisper-large-v3-turbo) transcribe audio
  *            → Groq LLM evaluate transcript with VSTEP speaking criteria
  *            → Pronunciation derived from Whisper signals (no external service)
  *
  * Config in .env:
  *   GROQ_API_KEY=gsk_...
- *   GROQ_MODEL=llama-3.3-70b-versatile   (optional, this is default)
+ *   GROQ_MODEL=openai/gpt-oss-120b   (optional, this is default)
  */
 class VstepGradingService
 {
@@ -66,7 +66,7 @@ class VstepGradingService
                     'saAi_score'      => 0,
                     'saAi_feedback'   => 'Bài viết quá ngắn hoặc bỏ trống.',
                     'saAi_criteria'   => [],
-                    'saAi_model'      => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+                    'saAi_model'      => env('GROQ_MODEL', 'openai/gpt-oss-120b'),
                     'saAi_graded_at'  => now(),
                     'saReview_status' => 'pending',
                     // ⚠️ Đồng bộ saPoints_awarded để FE result page (đọc cột này
@@ -88,7 +88,7 @@ class VstepGradingService
                     'criterion_comments' => $result['criterion_comments'] ?? [],
                     'suggestions'        => $result['suggestions'] ?? [],
                 ],
-                'saAi_model'      => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+                'saAi_model'      => env('GROQ_MODEL', 'openai/gpt-oss-120b'),
                 'saAi_graded_at'  => now(),
                 'saReview_status' => 'pending',
                 // ⚠️ Đồng bộ saPoints_awarded để FE đọc đúng điểm per-task.
@@ -102,7 +102,7 @@ class VstepGradingService
                 'ghAction'      => \App\Models\GradingHistory::ACTION_AI_GRADE,
                 'ghActor_id'    => null,
                 'ghNew_score'   => $score,
-                'ghMetadata'    => ['model' => env('GROQ_MODEL', 'llama-3.3-70b-versatile'), 'task' => $taskNum],
+                'ghMetadata'    => ['model' => env('GROQ_MODEL', 'openai/gpt-oss-120b'), 'task' => $taskNum],
             ]);
 
             $taskScores[] = $score;
@@ -201,7 +201,7 @@ class VstepGradingService
                             'criterion_comments' => $contentResult['criterion_comments'] ?? [],
                             'suggestions'        => $contentResult['suggestions'] ?? [],
                         ],
-                        'saAi_model'      => 'llama-3.3-70b-versatile + whisper-large-v3-turbo',
+                        'saAi_model'      => 'openai/gpt-oss-120b + whisper-large-v3-turbo',
                         'saAi_graded_at'  => now(),
                         'saReview_status' => 'pending',
                         // ⚠️ Đồng bộ saPoints_awarded để FE đọc đúng điểm per-part.
@@ -711,7 +711,7 @@ PROMPT;
     private function callGroqLLMFull(string $system, string $user, string $context, int $maxTokens = 500): array
     {
         $apiKey = config('services.groq.api_key');
-        $model  = config('services.groq.model', 'llama-3.3-70b-versatile');
+        $model  = config('services.groq.model', 'openai/gpt-oss-120b');
 
         if (!$apiKey) {
             Log::warning("VSTEP grading: GROQ_API_KEY not set for {$context}, returning default.");

@@ -249,7 +249,7 @@ PROMPT;
                 ->withOptions(['verify' => config('services.groq.verify_ssl', true)])
                 ->timeout(45)
                 ->post(self::LLM_URL, [
-                    'model' => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+                    'model' => env('GROQ_MODEL', 'openai/gpt-oss-120b'),
                     'temperature' => 0.3,
                     'max_tokens' => 1500,
                     'response_format' => ['type' => 'json_object'],

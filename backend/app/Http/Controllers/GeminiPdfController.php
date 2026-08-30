@@ -873,7 +873,7 @@ Transcript to analyze:
     private function callGroqJson(string $prompt, string $apiKey): array
     {
         $models = [
-            config('services.groq.model', 'llama-3.3-70b-versatile'),
+            config('services.groq.model', 'openai/gpt-oss-120b'),
             'llama-3.1-8b-instant',
             'gemma2-9b-it',
         ];

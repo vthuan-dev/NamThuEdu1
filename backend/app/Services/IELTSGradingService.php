@@ -75,7 +75,7 @@ class IELTSGradingService
                     'saAi_score'      => 0,
                     'saAi_feedback'   => 'Bài viết quá ngắn hoặc bỏ trống.',
                     'saAi_criteria'   => [],
-                    'saAi_model'      => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+                    'saAi_model'      => env('GROQ_MODEL', 'openai/gpt-oss-120b'),
                     'saAi_graded_at'  => now(),
                     'saReview_status' => 'pending',
                 ]);
@@ -95,7 +95,7 @@ class IELTSGradingService
                     'criterion_comments' => $result['criterion_comments'] ?? [],
                     'suggestions'        => $result['suggestions'] ?? [],
                 ],
-                'saAi_model'      => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+                'saAi_model'      => env('GROQ_MODEL', 'openai/gpt-oss-120b'),
                 'saAi_graded_at'  => now(),
                 'saReview_status' => 'pending',
             ]);
@@ -107,7 +107,7 @@ class IELTSGradingService
                 'ghActor_id'    => null,
                 'ghNew_score'   => $band,
                 'ghMetadata'    => [
-                    'model' => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+                    'model' => env('GROQ_MODEL', 'openai/gpt-oss-120b'),
                     'task'  => $taskNum,
                     'type'  => 'IELTS Writing',
                 ],
@@ -206,7 +206,7 @@ class IELTSGradingService
                             'criterion_comments' => $contentResult['criterion_comments'] ?? [],
                             'suggestions'        => $contentResult['suggestions'] ?? [],
                         ],
-                        'saAi_model'      => 'llama-3.3-70b-versatile + whisper-large-v3-turbo',
+                        'saAi_model'      => 'openai/gpt-oss-120b + whisper-large-v3-turbo',
                         'saAi_graded_at'  => now(),
                         'saReview_status' => 'pending',
                     ]);
@@ -618,7 +618,7 @@ PROMPT;
                     'Content-Type'  => 'application/json',
                 ],
                 'json' => [
-                    'model'       => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+                    'model'       => env('GROQ_MODEL', 'openai/gpt-oss-120b'),
                     'messages'    => [
                         ['role' => 'system', 'content' => $system],
                         ['role' => 'user',   'content' => $user],

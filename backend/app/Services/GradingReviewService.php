@@ -167,7 +167,7 @@ class GradingReviewService
                         'criterion_comments' => $result['criterion_comments'] ?? [],
                         'suggestions'        => $result['suggestions'] ?? [],
                     ],
-                    'saAi_model'      => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+                    'saAi_model'      => env('GROQ_MODEL', 'openai/gpt-oss-120b'),
                     'saAi_graded_at'  => now(),
                     // If teacher hadn't yet reviewed, keep pending; otherwise mark pending again
                     'saReview_status' => 'pending',

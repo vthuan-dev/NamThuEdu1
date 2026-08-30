@@ -1,0 +1,91 @@
+{
+  "sections": [
+    {
+      "type": "mc_cloze",
+      "title": "Đọc điền trắc nghiệm",
+      "instructions": "Read the following advertisement and mark the letter A, B, C or D on your answer sheet to indicate the option that best fits each of the numbered blanks from 1 to 6.",
+      "passage": "SUMMER PART-TIME JOBS FOR UNDERGRADUATES\n\nTechworld Magazine is delighted to announce two IT assistant vacancies up for (1) ______ this summer. The better understanding of STEM you have, (2) ______ likely you are to be selected! Successful applicants will get plenty of hands-on experience, good pay, and access to the local STEM community.\n\n(3) ______, we offer flexible working hours and remote options for those living far away. On top of that, (4) ______ position requires previous experience as new recruits are provided with in-service training sessions.\n\nApplications (5) ______ be submitted to us at info@techworldmagazine.com by 30 June.\n\nNever before has there been such a(n) (6) ______ opportunity to kick-start your career in STEM. Don’t let this chance slip through your fingers – apply today!",
+      "blanks": [
+        {
+          "question_number": 1,
+          "options": [
+            { "id": "A", "text": "grips" },
+            { "id": "B", "text": "gift" },
+            { "id": "C", "text": "grasp" },
+            { "id": "D", "text": "grabs" }
+          ],
+          "correct_id": "D",
+          "explanation": "Cụm cố định: up for grabs = có sẵn để giành lấy, có thể đăng ký/ứng tuyển."
+        },
+        {
+          "question_number": 2,
+          "options": [
+            { "id": "A", "text": "most" },
+            { "id": "B", "text": "the most" },
+            { "id": "C", "text": "the more" },
+            { "id": "D", "text": "more" }
+          ],
+          "correct_id": "C",
+          "explanation": "Cấu trúc so sánh kép: The + so sánh hơn ..., the + so sánh hơn ..."
+        },
+        {
+          "question_number": 3,
+          "options": [
+            { "id": "A", "text": "Additionally" },
+            { "id": "B", "text": "Subsequently" },
+            { "id": "C", "text": "Consequently" },
+            { "id": "D", "text": "Finally" }
+          ],
+          "correct_id": "A",
+          "explanation": "Đoạn trước nói về lợi ích: kinh nghiệm, lương, kết nối cộng đồng STEM. Đoạn sau bổ sung thêm lợi ích: giờ làm linh hoạt, làm từ xa. Additionally = thêm vào đó, ngoài ra."
+        },
+        {
+          "question_number": 4,
+          "options": [
+            { "id": "A", "text": "both" },
+            { "id": "B", "text": "either" },
+            { "id": "C", "text": "none" },
+            { "id": "D", "text": "neither" }
+          ],
+          "correct_id": "D",
+          "explanation": "Câu có “position” số ít và nghĩa là “không vị trí nào yêu cầu kinh nghiệm trước đó”. Dùng: neither position requires... = không vị trí nào trong hai vị trí yêu cầu..."
+        },
+        {
+          "question_number": 5,
+          "options": [
+            { "id": "A", "text": "ought not" },
+            { "id": "B", "text": "should not" },
+            { "id": "C", "text": "ought" },
+            { "id": "D", "text": "should" }
+          ],
+          "correct_id": "D",
+          "explanation": "Câu thông báo yêu cầu nộp hồ sơ trước hạn: “Applications should be submitted...” = Hồ sơ nên/cần được nộp... “ought” phải đi với “to”: ought to be submitted, nên đáp án C sai."
+        },
+        {
+          "question_number": 6,
+          "options": [
+            { "id": "A", "text": "lively" },
+            { "id": "B", "text": "private" },
+            { "id": "C", "text": "active" },
+            { "id": "D", "text": "golden" }
+          ],
+          "correct_id": "D",
+          "explanation": "Cụm quen thuộc: a golden opportunity = cơ hội vàng."
+        }
+      ]
+    },
+    {
+      "type": "mc_cloze",
+      "title": "Đọc điền trắc nghiệm 2",
+      "instructions": "Read the following passage and mark the letter A, B, C or D on your answer sheet to indicate the option that best fits each of the numbered blanks from 7 to 11.",
+      "passage": "Money has many ironies, and here is an important one: wealth is what you do not see...",
+      "blanks": [
+        { "question_number": 7, "options": [], "correct_id": "A", "explanation": "..." },
+        { "question_number": 8, "options": [], "correct_id": "D", "explanation": "..." },
+        { "question_number": 9, "options": [], "correct_id": "A", "explanation": "..." },
+        { "question_number": 10, "options": [], "correct_id": "D", "explanation": "..." },
+        { "question_number": 11, "options": [], "correct_id": "D", "explanation": "..." }
+      ]
+    }
+  ]
+}

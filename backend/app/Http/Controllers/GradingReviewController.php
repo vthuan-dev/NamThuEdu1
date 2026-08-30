@@ -118,7 +118,7 @@ class GradingReviewController extends Controller
             ), fn($v) => $v !== null);
             $speaking = [
                 'graded_at'     => $raw['speaking_graded_at'] ?? null,
-                'model'         => 'llama-3.3-70b-versatile + whisper-large-v3-turbo',
+                'model'         => 'openai/gpt-oss-120b + whisper-large-v3-turbo',
                 'overall_score' => count($scores) ? round(array_sum($scores) / count($scores), 2) : null,
                 'parts_count'   => count($scores),
             ];
