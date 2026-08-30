@@ -34,20 +34,22 @@ export function StudentRewards() {
   }
 
   return (
-    <div className="py-6 space-y-5">
+    <div className="py-4 sm:py-6 space-y-4 sm:space-y-5">
       <div
-        className="rounded-3xl p-6"
+        className="rounded-3xl p-4 sm:p-6"
         style={{
           background: "linear-gradient(135deg, #F5F3FF 0%, #EEF2FF 100%)",
           border: "1.5px solid #E9D5FF",
         }}
       >
-        <div className="flex items-center gap-3">
-          <Gift className="w-7 h-7" style={{ color: PURPLE }} />
-          <h1 className="text-2xl font-extrabold text-slate-800">Phần thưởng học tập</h1>
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <Gift className="w-6 h-6 sm:w-7 sm:h-7 flex-shrink-0" style={{ color: PURPLE }} />
+          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-800">Phần thưởng học tập</h1>
         </div>
         <p className="text-sm text-slate-500 mt-2">Tích lũy XP để mở khóa badge, giao diện và ưu đãi học tập.</p>
-        <div className="mt-4 rounded-2xl bg-white p-4 border border-purple-100 flex items-center justify-between">
+        {/* `flex-wrap` + `gap-3`: XP hiện tại và mức tiếp theo là hai số cỡ lớn,
+            để cùng một hàng trên màn hẹp thì chen nhau. */}
+        <div className="mt-4 rounded-2xl bg-white p-4 border border-purple-100 flex items-center justify-between flex-wrap gap-3">
           <div>
             <p className="text-xs text-slate-500">XP hiện tại</p>
             <p className="text-3xl font-black text-slate-800">{xp.toLocaleString()} XP</p>

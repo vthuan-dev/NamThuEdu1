@@ -124,34 +124,36 @@ export function NotificationList() {
           <div className="absolute bottom-0 right-1/4 w-52 h-52 rounded-full opacity-15"
             style={{ background: `radial-gradient(circle, ${PAL.orb}, transparent)`, transform: "translateY(40%)" }} />
         </div>
-        <div className="relative z-10 px-8 lg:px-16 py-10">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-4">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg"
+        <div className="relative z-10 px-4 sm:px-8 lg:px-16 py-6 sm:py-10">
+          {/* `flex-col` dưới sm: tiêu đề và khối "chưa đọc + Đánh dấu đã đọc"
+              đứng cạnh nhau trên màn 375px thì cả hai đều bị bóp. */}
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+              <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg"
                 style={{ background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.25)" }}>
-                <Bell className="w-7 h-7 text-white" />
+                <Bell className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
               </div>
-              <div>
-                <p className="text-sm font-semibold tracking-widest uppercase mb-1" style={{ color: PAL.label }}>Hệ thống</p>
-                <h1 className="text-3xl font-extrabold text-white tracking-tight leading-tight">
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-semibold tracking-widest uppercase mb-1" style={{ color: PAL.label }}>Hệ thống</p>
+                <h1 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight">
                   {t('student.notifications.title')}
                 </h1>
                 <p className="text-sm mt-1 font-medium" style={{ color: PAL.sub }}>Theo dõi các thông báo và cập nhật mới nhất</p>
               </div>
             </div>
             {unreadCount > 0 && (
-              <div className="flex items-center gap-3">
-                <div className="px-3 py-1.5 rounded-full text-sm font-bold"
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                <div className="px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold whitespace-nowrap"
                   style={{ background: "rgba(255,255,255,0.15)", color: "#FCD34D", border: "1px solid rgba(255,255,255,0.2)" }}>
                   {unreadCount} chưa đọc
                 </div>
                 <button
                   onClick={() => markAllReadMutation.mutate()}
                   disabled={markAllReadMutation.isPending}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
+                  className="inline-flex items-center justify-center gap-2 min-h-11 px-4 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 whitespace-nowrap"
                   style={{ background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.25)" }}
                 >
-                  <Check className="w-4 h-4" />
+                  <Check className="w-4 h-4 flex-shrink-0" />
                   {t('student.notifications.markAllRead')}
                 </button>
               </div>
@@ -160,14 +162,15 @@ export function NotificationList() {
         </div>
       </div>
 
-      <div className="px-8 lg:px-16 py-8 space-y-5">
-        {/* Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto">
+      <div className="px-4 sm:px-8 lg:px-16 py-6 sm:py-8 space-y-4 sm:space-y-5">
+        {/* Tabs — `scrollbar-none` vì dải cuộn ngang có thanh scroll trên
+            Windows trông rất lạc quẻ, còn trên mobile thì không cần. */}
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
           {tabs.map(tab => (
             <button
               key={tab.key}
               onClick={() => setFilter(tab.key as NotificationType)}
-              className="px-4 py-2 rounded-xl transition-all whitespace-nowrap text-sm font-semibold"
+              className="inline-flex items-center justify-center min-h-11 px-4 rounded-xl transition-all whitespace-nowrap text-sm font-semibold flex-shrink-0"
               style={{
                 background: filter === tab.key ? PAL.accent : "white",
                 color: filter === tab.key ? "white" : "#6B7280",

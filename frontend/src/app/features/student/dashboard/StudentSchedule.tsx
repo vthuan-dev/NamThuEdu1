@@ -55,11 +55,11 @@ export function StudentSchedule() {
   }
 
   return (
-    <div className="py-6 space-y-5">
-      <div className="rounded-3xl bg-white p-6" style={{ border: "1.5px solid #E5E7EB" }}>
-        <div className="flex items-center gap-3">
-          <Calendar className="w-7 h-7 text-sky-600" />
-          <h1 className="text-2xl font-extrabold text-slate-800">Lịch học của tôi</h1>
+    <div className="py-4 sm:py-6 space-y-4 sm:space-y-5">
+      <div className="rounded-3xl bg-white p-4 sm:p-6" style={{ border: "1.5px solid #E5E7EB" }}>
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <Calendar className="w-6 h-6 sm:w-7 sm:h-7 text-sky-600 flex-shrink-0" />
+          <h1 className="text-xl sm:text-2xl font-extrabold text-slate-800">Lịch học của tôi</h1>
         </div>
         <p className="text-sm text-slate-500 mt-2">Theo dõi buổi học, lịch luyện tập và bài thi sắp tới.</p>
       </div>
@@ -79,20 +79,22 @@ export function StudentSchedule() {
 
           return (
             <div key={item.id} className="rounded-2xl bg-white p-4" style={{ border: "1.5px solid #F1F5F9" }}>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
                   {icon}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-slate-800 truncate">{item.title}</p>
-                  <p className="text-sm text-slate-500">{item.date} • {item.start} - {item.end}</p>
+                  <p className="text-xs sm:text-sm text-slate-500">{item.date} • {item.start} - {item.end}</p>
                 </div>
+                {/* `flex-shrink-0` + `whitespace-nowrap`: không có hai thuộc tính
+                    này thì chữ "Hoàn thành" bị ngắt thành hai dòng trên màn hẹp. */}
                 {item.done ? (
-                  <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
+                  <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 flex-shrink-0 whitespace-nowrap">
                     <CheckCircle2 className="w-3.5 h-3.5" /> Hoàn thành
                   </span>
                 ) : (
-                  <span className="text-xs font-bold text-sky-600">Sắp tới</span>
+                  <span className="text-xs font-bold text-sky-600 flex-shrink-0 whitespace-nowrap">Sắp tới</span>
                 )}
               </div>
             </div>

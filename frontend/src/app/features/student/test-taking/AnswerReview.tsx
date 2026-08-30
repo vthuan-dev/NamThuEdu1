@@ -166,7 +166,7 @@ export function AnswerReview() {
   }
 
   return (
-    <div className="flex gap-6 py-6 px-4 max-w-7xl mx-auto">
+    <div className="flex gap-6 py-4 sm:py-6 px-3 sm:px-4 max-w-7xl mx-auto">
       {/* Sidebar - Question list */}
       <aside className="hidden lg:block w-64 flex-shrink-0">
         <div className="sticky top-6 space-y-4">
@@ -235,7 +235,10 @@ export function AnswerReview() {
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 max-w-3xl space-y-5">
+      {/* Main content. `min-w-0` là bắt buộc: mặc định flex item không co nhỏ
+          hơn nội dung, nên một chuỗi dài không có khoảng trắng trong đề bài sẽ
+          đẩy cả cột rộng ra và tạo cuộn ngang toàn trang. */}
+      <div className="flex-1 min-w-0 max-w-3xl space-y-5">
         {/* Header */}
         <div className="flex items-center gap-3">
           <button onClick={() => navigate(-1)}
@@ -251,9 +254,12 @@ export function AnswerReview() {
           </div>
         </div>
 
-        {/* Mobile Question Navigator */}
+        {/* Mobile Question Navigator.
+            `top-0` thay vì `top-[52px]`: 52px là chiều cao header của một layout
+            cụ thể, mà trang này dùng chung cho cả ba nhóm tuổi với ba layout
+            khác nhau — số cứng đó sai ở ít nhất hai trong ba trường hợp. */}
         {filtered.length > 0 && (
-          <div className="lg:hidden flex overflow-x-auto gap-2 py-2 px-1 sticky top-[52px] bg-white/95 backdrop-blur z-15 border-b border-slate-100 shadow-sm mb-3 scrollbar-none">
+          <div className="lg:hidden flex overflow-x-auto gap-2 py-2 px-1 sticky top-0 bg-white/95 backdrop-blur z-15 border-b border-slate-100 shadow-sm mb-3 scrollbar-none">
             {filtered.map((item: any, idx: number) => {
               const studentAns = item.student_answer;
               const isCorrect = studentAns?.saIs_correct === true;
@@ -269,7 +275,10 @@ export function AnswerReview() {
                   key={idx}
                   id={`mb-nav-item-${idx}`}
                   onClick={() => scrollToQuestion(idx)}
-                  className={`w-8 h-8 rounded-lg flex-shrink-0 text-xs font-bold transition-all ${
+                  title={`Câu ${idx + 1}`}
+                  // 40px thay vì 32px: các ô sát nhau trong dải cuộn ngang nên
+                  // ngón tay dễ bấm lệch sang câu bên cạnh.
+                  className={`w-10 h-10 rounded-lg flex-shrink-0 text-xs font-bold transition-all ${
                     isCurrent ? "ring-2 ring-offset-1" : ""
                   }`}
                   style={{

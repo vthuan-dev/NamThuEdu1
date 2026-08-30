@@ -27,6 +27,7 @@ import { logout } from '../../services/authApi';
 import { getAuthUser } from '../../utils/authStorage';
 import { getFullMediaUrl } from '../../utils/mediaUtils';
 import { DailyMotivationPopup } from '../../components/student/DailyMotivationPopup';
+import { isExamTakingPath } from '../../utils/examRoutes';
 
 type NavItem = { icon: any; label: string; path: string };
 
@@ -36,6 +37,9 @@ export function KidsLayout() {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+
+  /** Đang ở trang làm bài? Khi đó ẩn hết chrome của layout (xem chỗ render). */
+  const takingExam = isExamTakingPath(location.pathname);
 
   const readUser = () => getAuthUser();
 
@@ -93,9 +97,13 @@ export function KidsLayout() {
   return (
     <div className="kids-scope min-h-screen" style={{ background: 'linear-gradient(160deg, #FFF1F2 0%, #FFF7ED 50%, #F0FDF4 100%)' }}>
       <LogoutOverlay show={loggingOut} />
-      <NotificationPermissionBanner push={push} />
+      {!takingExam && <NotificationPermissionBanner push={push} />}
 
-      {/* ─── Top Header (sticky, ngang) ──────────────────────────────── */}
+      {/* ─── Top Header (sticky, ngang) ──────────────────────── */}
+      {/* Ẩn khi đang làm bài: header sticky cộng với thanh của trang thi chiếm
+          mất phần lớn màn hình điện thoại, và menu trong đó lại mời bạn nhỏ
+          điều hướng ra khỏi bài đang làm. */}
+      {!takingExam && (
       <header
         className="sticky top-0 z-40"
         style={{
@@ -216,12 +224,16 @@ export function KidsLayout() {
           </div>
         )}
       </header>
+      )}
 
-      {/* ─── Main Content (full width) ───────────────────────────────── */}
+      {/* ─── Main Content (full width) ───────────────────────── */}
       <main className="min-w-0">
         <Outlet />
       </main>
-      <DailyMotivationPopup accent="#FB7185" accentMid="#F97316" accentSoft="#FFF1F2" />
+      {/* Popup động lực nổi ở z cao — không được che nút nộp bài giữa bài thi. */}
+      {!takingExam && (
+        <DailyMotivationPopup accent="#FB7185" accentMid="#F97316" accentSoft="#FFF1F2" />
+      )}
     </div>
   );
 }

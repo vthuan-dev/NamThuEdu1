@@ -8,16 +8,18 @@ export function WaitingForClass() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center p-4">
       <div className="max-w-2xl w-full">
-        <div className="bg-white rounded-2xl shadow-xl p-8 md:p-12">
+        {/* `p-5` dưới sm: card này nằm trong container đã có `p-4`, nên p-8 cộng
+            lại ăn 96px chiều ngang — trên máy 375px chỉ còn ~280px cho nội dung. */}
+        <div className="bg-white rounded-2xl shadow-xl p-5 sm:p-8 md:p-12">
           {/* Icon */}
-          <div className="flex justify-center mb-6">
-            <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-amber-500 rounded-full flex items-center justify-center">
-              <Clock className="w-10 h-10 text-white" />
+          <div className="flex justify-center mb-5 sm:mb-6">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-orange-500 to-amber-500 rounded-full flex items-center justify-center">
+              <Clock className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
             </div>
           </div>
 
           {/* Title */}
-          <h1 className="text-3xl font-bold text-center text-gray-900 mb-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-center text-gray-900 mb-4">
             Chờ xếp lớp
           </h1>
 

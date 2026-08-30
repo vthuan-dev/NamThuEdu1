@@ -8,6 +8,7 @@ import { PwaInstallBanner } from "../../components/PwaInstallBanner";
 import { ResultDetail } from "../features/student/test-taking/ResultDetail";
 import { DailyMotivationPopup } from "../../components/student/DailyMotivationPopup";
 import { X } from "lucide-react";
+import { isExamTakingPath } from "../../utils/examRoutes";
 
 export function StudentLayout() {
   const push = usePushNotification();
@@ -19,6 +20,17 @@ export function StudentLayout() {
   useEffect(() => {
     setActiveSubmissionId(null);
   }, [location.pathname, location.search]);
+
+  /**
+   * Đang ở trang làm bài?
+   *
+   * Các route làm bài là con của layout này, nên mặc định học viên vừa thi vừa
+   * thấy đủ navbar. Trên điện thoại điều đó gây hai vấn đề: thanh nav dưới
+   * của `StudentNavbar` (`md:hidden fixed bottom-0`) nằm đúng chỗ thanh nộp bài
+   * của trang thi, và `DailyMotivationPopup` có thể nổi lên giữa bài.
+   * TeensLayout đã xử lý ở 712dc12; đây là bản cho người lớn.
+   */
+  const takingExam = isExamTakingPath(location.pathname);
 
   useEffect(() => {
     const handleOpenModal = (e: Event) => {
@@ -63,16 +75,22 @@ export function StudentLayout() {
           "linear-gradient(160deg, #FAF8FF 0%, #F5F3FF 40%, #F9FAFB 100%)",
       }}
     >
-      <NotificationPermissionBanner push={push} />
-      <PwaInstallBanner pwa={pwa} />
-      <StudentNavbar />
+      {!takingExam && <NotificationPermissionBanner push={push} />}
+      {!takingExam && <PwaInstallBanner pwa={pwa} />}
+      {!takingExam && <StudentNavbar />}
 
-      <DailyMotivationPopup accent="#7C3AED" accentMid="#8B5CF6" accentSoft="#F5F3FF" />
+      {!takingExam && (
+        <DailyMotivationPopup accent="#7C3AED" accentMid="#8B5CF6" accentSoft="#F5F3FF" />
+      )}
 
-      {/* Main content — extra bottom padding on mobile for bottom nav */}
+      {/* Main content — chừa chỗ cho thanh nav dưới trên mobile.
+          Khi làm bài thì không còn thanh nav nên bỏ padding, nếu không sẽ có
+          80px trắng dưới thanh nộp bài. Wrapper `px-4 sm:px-8` vẫn giữ cả hai
+          trường hợp: các trang làm bài dùng `-mx-4 sm:-mx-8` để tràn viền, bỏ
+          wrapper thì chúng vượt quá viewport và sinh cuộn ngang. */}
       <main
         className="w-full"
-        style={{ paddingBottom: "80px" }}
+        style={{ paddingBottom: takingExam ? 0 : "80px" }}
       >
         <div className="px-4 sm:px-8">
           <Outlet />

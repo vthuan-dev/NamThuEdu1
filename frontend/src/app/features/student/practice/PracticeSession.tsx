@@ -79,7 +79,7 @@ export function PracticeSession() {
   }
 
   return (
-    <div className="py-6 max-w-3xl mx-auto space-y-5">
+    <div className="py-4 sm:py-6 max-w-3xl mx-auto space-y-4 sm:space-y-5">
       <button
         onClick={() => navigate(`${STUDENT_BASE_PATH}/luyen-tap`)}
         className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-800"
@@ -112,7 +112,9 @@ export function PracticeSession() {
               <button
                 key={`${current.id}-${optIdx}`}
                 onClick={() => setAnswers((prev) => ({ ...prev, [current.id]: optIdx }))}
-                className="w-full text-left rounded-xl p-3 transition-all"
+                // min-h-11 = 44px: đáp án một chữ ("A. Yes") chỉ cao ~40px với
+                // p-3, sát ngưỡng touch target.
+                className="w-full text-left rounded-xl p-3 min-h-11 transition-all"
                 style={{
                   border: `1.5px solid ${active ? PRIMARY : "#E2E8F0"}`,
                   background: active ? "#F5F3FF" : "#FFFFFF",
@@ -126,34 +128,36 @@ export function PracticeSession() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-2 sm:gap-3">
         <button
           onClick={() => setIdx((n) => Math.max(0, n - 1))}
           disabled={idx === 0}
-          className="px-4 py-2.5 rounded-xl border text-sm font-semibold disabled:opacity-50"
+          className="inline-flex items-center justify-center min-h-11 px-3 sm:px-4 rounded-xl border text-sm font-semibold disabled:opacity-50 flex-shrink-0"
           style={{ borderColor: "#CBD5E1", color: "#475569" }}
         >
-          <ChevronLeft className="w-4 h-4 inline mr-1" /> Câu trước
+          <ChevronLeft className="w-4 h-4 inline sm:mr-1" /> <span className="hidden sm:inline">Câu trước</span>
         </button>
 
         {idx < questions.length - 1 ? (
           <button
             onClick={() => setIdx((n) => Math.min(questions.length - 1, n + 1))}
-            className="px-4 py-2.5 rounded-xl text-sm font-semibold text-white"
+            className="inline-flex items-center justify-center min-h-11 px-4 rounded-xl text-sm font-semibold text-white flex-shrink-0"
             style={{ background: PRIMARY }}
           >
             Câu tiếp <ChevronRight className="w-4 h-4 inline ml-1" />
           </button>
         ) : (
+          /* Nhãn "Hoàn thành luyện tập" quá dài cho màn 375px khi đứng cạnh nút
+             Câu trước — rút gọn còn "Hoàn thành" ở màn hẹp. */
           <button
             onClick={() => completeMutation.mutate()}
             disabled={completeMutation.isPending}
-            className="px-4 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
+            className="inline-flex items-center justify-center min-h-11 px-3 sm:px-4 rounded-xl text-sm font-semibold text-white disabled:opacity-60 flex-shrink-0"
             style={{ background: "#16A34A" }}
           >
             {completeMutation.isPending ? "Đang nộp..." : (
               <>
-                <Send className="w-4 h-4 inline mr-1" /> Hoàn thành luyện tập
+                <Send className="w-4 h-4 inline mr-1" /> Hoàn thành<span className="hidden sm:inline">&nbsp;luyện tập</span>
               </>
             )}
           </button>
