@@ -56,6 +56,38 @@ export function NotificationDropdown({ activeColor = "#7C3AED", hoverBg = "hover
   const isInitialLoadRef = useRef(true);
   const prevNotificationsRef = useRef<NotificationDto[]>([]);
 
+  /**
+   * Vị trí đỉnh panel trên mobile, và cờ "màn hẹp".
+   *
+   * Trước đây panel dùng `top-[56px]` cố định, nhưng header của Teens và Kids
+   * đều `h-16` (64px) nên panel chồng lên header 8px. Đo cạnh dưới thật của nút
+   * chuông thay vì đoán chiều cao header — cách này đúng cho cả ba layout mà
+   * không cần biết layout nào đang bọc.
+   */
+  const [panelTop, setPanelTop] = useState(64);
+  const [isNarrow, setIsNarrow] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < 640
+  );
+
+  const measurePanel = () => {
+    if (typeof window === "undefined") return;
+    setIsNarrow(window.innerWidth < 640);
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) setPanelTop(Math.round(rect.bottom + 8));
+  };
+
+  // Đo lại khi đổi bề ngang hoặc xoay máy: panel đang mở mà xoay ngang thì
+  // header đổi chiều cao, `top` cũ sẽ lệch.
+  useEffect(() => {
+    const onResize = () => measurePanel();
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
+  }, []);
+
   // Audio: single preloaded instance + autoplay unlock on first user gesture.
   // Browsers block Audio.play() until the user interacts with the page,
   // so we silently warm it up once on the first pointer/key/touch event.
@@ -220,6 +252,7 @@ export function NotificationDropdown({ activeColor = "#7C3AED", hoverBg = "hover
   }, [notifications, isLoading]);
 
   const handleOpen = () => {
+    measurePanel();
     setOpen(true);
     requestAnimationFrame(() =>
       requestAnimationFrame(() => setIsVisible(true))
@@ -325,8 +358,11 @@ export function NotificationDropdown({ activeColor = "#7C3AED", hoverBg = "hover
 
         <div
           className={[
-            /* mobile: fixed full-width below navbar */
-            "fixed left-2 right-2 top-[56px]",
+            /* mobile: fixed full-width dưới navbar. `top` tính từ vị trí thật
+               của chuông (xem panelTop) — trước đây hardcode 56px trong khi
+               header của Teens và Kids đều `h-16` (64px), nên panel chồng lên
+               header 8px. */
+            "fixed left-2 right-2",
             /* sm+: classic absolute dropdown */
             "sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-[400px]",
             "z-[110] rounded-2xl overflow-hidden border bg-white/95 backdrop-blur-md",
@@ -339,6 +375,10 @@ export function NotificationDropdown({ activeColor = "#7C3AED", hoverBg = "hover
             borderColor: "#E5E7EB",
             boxShadow:
               "0 20px 48px rgba(124,58,237,0.12), 0 4px 12px rgba(0,0,0,0.06)",
+            // Chỉ áp cho mobile; từ sm trở lên `sm:top-auto` của Tailwind thắng
+            // vì class có độ ưu tiên thấp hơn inline style... nên phải tự bỏ
+            // giá trị khi màn rộng (xem isNarrow).
+            ...(isNarrow ? { top: panelTop, maxHeight: `calc(100vh - ${panelTop + 16}px)` } : {}),
           }}
         >
           {/* Header */}
@@ -372,8 +412,15 @@ export function NotificationDropdown({ activeColor = "#7C3AED", hoverBg = "hover
 
           {/* List */}
           <div
-            className="overflow-y-auto"
-            style={{ maxHeight: 420 }}
+            className="overflow-y-auto overscroll-contain"
+            // 420px cứng cộng header + footer vượt quá chiều cao khả dụng trên
+            // máy nhỏ (iPhone SE cao 667px, trừ header còn ~600px). Trên mobile
+            // tính theo chỗ thật còn lại; desktop giữ nguyên 420px.
+            style={{
+              maxHeight: isNarrow
+                ? `calc(100vh - ${panelTop + 132}px)`
+                : 420,
+            }}
           >
             {isLoading ? (
               <div className="py-12 text-center">
@@ -540,6 +587,21 @@ export function NotificationDropdown({ activeColor = "#7C3AED", hoverBg = "hover
               </div>
             )}
           </div>
+
+          {/* Chân panel — dropdown chỉ nạp 10 tin (`limit: 10`), nên trước đây
+              tin thứ 11 trở đi không có cách nào xem: không role nào có link
+              tới `/hoc-vien/thong-bao`. Kids thậm chí không có mục nào trong
+              menu. Đặt link ở đây thì cả ba layout đều được, vì cùng dùng
+              component này. */}
+          <Link
+            to={`${STUDENT_BASE_PATH}/thong-bao`}
+            onClick={handleClose}
+            className="w-full flex items-center justify-center gap-1.5 min-h-11 px-4 border-t text-[13px] font-bold transition-colors hover:bg-slate-50"
+            style={{ borderColor: "#F1F5F9", color: activeColor }}
+          >
+            Xem tất cả thông báo
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
         </>
       )}

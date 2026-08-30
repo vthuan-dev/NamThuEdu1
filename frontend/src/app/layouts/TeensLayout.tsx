@@ -14,7 +14,7 @@ import { ExamReminderPopup } from '../../components/student/ExamReminderPopup';
 import { DailyMotivationPopup } from '../../components/student/DailyMotivationPopup';
 import {
   Home, BookOpen, TrendingUp,
-  LogOut, Menu, X, Clock, User, ChevronDown,
+  LogOut, Menu, X, Clock, User, ChevronDown, Bell,
 } from 'lucide-react';
 import { NotificationDropdown } from '../components/student/NotificationDropdown';
 import { isExamTakingPath } from '../../utils/examRoutes';
@@ -105,6 +105,22 @@ export function TeensLayout() {
   });
   const profileFromApi: any = (profileData as any)?.data?.data ?? (profileData as any)?.data ?? null;
 
+  /**
+   * Số thông báo chưa đọc, để gắn badge cho mục Thông báo trong menu mobile.
+   *
+   * Dùng ĐÚNG queryKey mà `NotificationDropdown` dùng, nên React Query chia sẻ
+   * cache: không phát sinh request thứ hai, và badge ở menu với badge ở chuông
+   * không bao giờ lệch nhau.
+   */
+  const { data: notiData } = useQuery({
+    queryKey: ['student', 'notifications', 'dropdown'],
+    queryFn: () => studentApi.getNotifications({ limit: 10 }),
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false,
+    staleTime: 0,
+  });
+  const unreadCount: number = (notiData as any)?.data?.data?.unread_count || 0;
+
   // Merge: API profile overwrites localStorage for avatar/name
   const user = profileFromApi || localUser;
   const initial = (user?.uName || 'B')[0]?.toUpperCase() || 'B';
@@ -173,6 +189,9 @@ export function TeensLayout() {
   ];
 
   const systemItems: NavItem[] = [
+    // Chuông chỉ mở dropdown 10 tin gần nhất. Trang đầy đủ có lọc theo loại và
+    // đánh dấu đã đọc tất cả, trước đây không có đường nào tới trên mobile.
+    { icon: Bell, label: 'Thông báo', path: '/hoc-vien/thong-bao', badge: unreadCount || undefined },
     { icon: User, label: 'Hồ sơ', path: '/hoc-vien/ho-so' },
   ];
 
@@ -252,9 +271,14 @@ export function TeensLayout() {
 
             {/* Right actions */}
             <div className="flex items-center gap-2 flex-shrink-0">
-              {/* Notification (moved slightly left with margin) */}
-              {/* Notification dropdown dropdown like FB */}
-              <div className="hidden sm:block mr-1">
+              {/* Chuông thông báo.
+                  Trước đây bọc trong `hidden sm:block`, tức là ẩn dưới 640px —
+                  nghĩa là ẩn trên gần như mọi điện thoại. Menu hamburger cũng
+                  không có mục Thông báo nào, nên học viên dùng điện thoại không
+                  còn đường nào xem thông báo dù trang `/hoc-vien/thong-bao` vẫn
+                  tồn tại. Chuông là thành phần chính để biết có bài mới hoặc
+                  điểm mới, phải luôn hiện. */}
+              <div className="mr-1">
                 <NotificationDropdown activeColor="#0D9488" hoverBg="hover:bg-teal-50/50" />
               </div>
 
