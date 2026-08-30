@@ -753,7 +753,7 @@ export function GradingQueue() {
             {/* Source tabs: Đề đã giao / Quản lý đề giao + refresh inline */}
             <div className="relative z-10 flex items-center gap-0 px-5 pt-2 border-b border-slate-100 group/tabguide">
               {([
-                { key: 'assigned', label: 'Đề đã giao', hint: 'Bài nộp — cần chấm & xét duyệt' },
+                { key: 'assigned', label: 'Đề chờ chấm', hint: 'Bài nộp — cần chấm & xét duyệt' },
                 { key: 'assignments', label: 'Quản lý đề giao', hint: 'Tiến độ làm bài & nhắc nhở' },
               ] as const).map(({ key, label, hint }) => (
                 <button
@@ -810,7 +810,7 @@ export function GradingQueue() {
                           <ClipboardCheck className="w-4 h-4 text-violet-600" />
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-slate-800 mb-0.5">Đề đã giao (Cần chấm)</p>
+                          <p className="text-xs font-bold text-slate-800 mb-0.5">Đề chờ chấm</p>
                           <p className="text-[11px] text-slate-500 leading-relaxed">
                             Danh sách bài làm học viên đã nộp: chấm trắc nghiệm tự động, xét duyệt điểm bài tự luận (Writing/Speaking do AI chấm).
                           </p>
