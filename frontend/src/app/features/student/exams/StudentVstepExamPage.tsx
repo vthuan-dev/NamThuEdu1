@@ -1259,10 +1259,20 @@ export function StudentVstepExamPage() {
   const isUrgent = skillTimeLeft < 300;
 
   return (
-    <div className={teacherMode ? "flex flex-col h-screen overflow-hidden bg-slate-50" : "fixed inset-0 z-50 flex flex-col bg-slate-50"}>
+    <div
+      className={teacherMode ? "flex flex-col h-screen overflow-hidden bg-slate-50" : "fixed inset-0 z-50 flex flex-col bg-slate-50"}
+      // `fixed inset-0` phủ kín màn hình nên phải tự tránh notch và home
+      // indicator; không có layout nào ở ngoài làm việc đó hộ.
+      style={teacherMode ? undefined : {
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}
+    >
       {/* ─── HEADER ──────────────────────────────────────────── */}
       <header className="flex-shrink-0 bg-white border-b border-slate-200 shadow-sm z-30">
-        <div className="px-4 h-14 flex items-center justify-between gap-4">
+        {/* Chiều cao bỏ cố định `h-14`: trên 375px hàng này chứa back + đồng hồ
+            + Nộp bài, cần được phép cao hơn thay vì bóp nội dung. */}
+        <div className="px-2 sm:px-4 min-h-14 py-1.5 sm:py-0 flex items-center justify-between gap-2 sm:gap-4">
           {/* LEFT: back + title */}
           <div className="flex items-center gap-3 min-w-0">
             {teacherMode ? (
@@ -1280,7 +1290,7 @@ export function StudentVstepExamPage() {
                 <ArrowLeft className="w-5 h-5 text-slate-600" />
               </button>
             )}
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+            <div className="hidden lg:flex w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 items-center justify-center text-white text-xs font-bold flex-shrink-0">
               {teacherMode ? "GV" : "V"}
             </div>
             <div className="hidden md:flex flex-col min-w-0">
@@ -1305,13 +1315,13 @@ export function StudentVstepExamPage() {
               <span className="text-sm font-bold text-emerald-700">Chế độ xem lại</span>
             </div>
           ) : (
-            <div className={`flex items-center gap-2 px-4 py-1.5 rounded-lg border flex-shrink-0 ${
+            <div className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-1.5 rounded-lg border flex-shrink-0 ${
               isUrgent
                 ? "bg-red-50 border-red-200 animate-pulse"
                 : "bg-sky-50 border-sky-200"
             }`}>
-              <Clock className={`w-4 h-4 ${isUrgent ? "text-red-500" : "text-sky-600"}`} />
-              <span className={`text-lg font-bold tabular-nums ${isUrgent ? "text-red-600" : "text-sky-700"}`}>
+              <Clock className={`w-4 h-4 flex-shrink-0 ${isUrgent ? "text-red-500" : "text-sky-600"}`} />
+              <span className={`text-base sm:text-lg font-bold tabular-nums ${isUrgent ? "text-red-600" : "text-sky-700"}`}>
                 {fmtTime(skillTimeLeft)}
               </span>
               <span className={`text-[11px] font-medium hidden sm:inline ${isUrgent ? "text-red-400" : "text-sky-400"}`}>
@@ -1340,17 +1350,20 @@ export function StudentVstepExamPage() {
               </button>
             ) : (
               <>
+                {/* min-h-11 = 44px. Nút này là đường nộp bài duy nhất trên
+                    mobile (cột navigator bên phải ẩn dưới lg), nên phải luôn
+                    vừa đủ to để bấm. */}
                 <button
                   onClick={() => setShowSubmit(true)}
                   disabled={!submitGate.canSubmit}
                   title={submitGate.tooltip}
-                  className={`inline-flex items-center gap-2 px-5 py-2 text-base font-semibold rounded-lg active:scale-[0.97] transition-all shadow-sm ${
+                  className={`inline-flex items-center justify-center gap-1.5 sm:gap-2 min-h-11 px-3 sm:px-5 text-sm sm:text-base font-semibold rounded-lg active:scale-[0.97] transition-all shadow-sm ${
                     submitGate.canSubmit
                       ? "bg-sky-600 text-white hover:bg-sky-700 cursor-pointer"
                       : "bg-slate-200 text-slate-400 cursor-not-allowed"
                   }`}
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-4 h-4 flex-shrink-0" />
                   Nộp bài
                 </button>
               </>
@@ -3421,7 +3434,9 @@ function MobileQuestionNavigator({
                   <button
                     key={q.qId}
                     onClick={() => onJump(p.partNumber, q.qId)}
-                    className={`w-7 h-7 flex-shrink-0 rounded text-[11px] font-bold flex items-center justify-center transition-all ${btnCls} ${isCurrentPart ? "ring-2 ring-amber-400" : ""}`}
+                    // 36px thay vì 28px: dải này là cách duy nhất nhảy câu trên
+                    // mobile, mà 28px thì ngón tay bấm hay lệch sang ô bên cạnh.
+                    className={`w-9 h-9 flex-shrink-0 rounded text-xs font-bold flex items-center justify-center transition-all ${btnCls} ${isCurrentPart ? "ring-2 ring-amber-400" : ""}`}
                   >
                     {q.questionNumber}
                   </button>

@@ -18,6 +18,7 @@ import {
 import { examDraftStorage } from "../../../../lib/exam/examDraftStorage";
 import { useTranslation } from "react-i18next";
 import { PassageSplitLayout } from "../components/PassageSplitLayout";
+import { getAuthUser } from "../../../../utils/authStorage";
 
 // VSTEP Structure - 4 Skills, 7 Parts
 const VSTEP_STRUCTURE = {
@@ -271,6 +272,17 @@ export function TestTaking() {
   const [showSubmit, setShowSubmit] = useState(false);
   const [started, setStarted] = useState(false);
   const [showBottomNav, setShowBottomNav] = useState(true);
+  /** Bottom sheet danh sách phần (mobile) — dưới `sm` hàng nút phần bị ẩn. */
+  const [showPartSheet, setShowPartSheet] = useState(false);
+
+  /**
+   * Tên học viên trên thanh làm bài.
+   *
+   * Trước đây chỗ này HARDCODE "Nguyen Van Thuan", nên mọi học viên adults đang
+   * làm bài đều thấy tên người khác. Đọc từ session giống cách các layout học
+   * viên đang làm (`user?.uName`).
+   */
+  const studentName = ((getAuthUser()?.uName as string) || 'Học viên');
   const [autoSaving, setAutoSaving] = useState(false);
   const [resumeDraft, setResumeDraft] = useState<any>(null);
   const [playerSeconds, setPlayerSeconds] = useState(0);
@@ -682,15 +694,24 @@ export function TestTaking() {
         onDismiss={session.dismissWarning}
         timeRemaining={session.timeRemaining}
       />
-      <header className="fixed top-0 left-0 right-0 z-40 h-[64px] bg-[#CBD5E1] border-b border-slate-300 px-4 lg:px-6">
-        <div className="h-full max-w-[1600px] mx-auto grid grid-cols-3 items-center gap-3">
-          <div className="flex items-center gap-2 text-slate-800 text-sm font-semibold">
-            <BookOpen className="w-4 h-4" />
-            Nguyen Van Thuan
+      {/* Thanh trên.
+          `flex` chứ không `grid-cols-3`: ba cột chia đều trên màn 430px bóp cột
+          phải (chứa cả số câu đã trả lời lẫn nút Nộp bài) tới mức khó bấm.
+          Chiều cao bỏ cố định 64px vì nội dung có thể xuống hai dòng. */}
+      <header
+        className="fixed top-0 left-0 right-0 z-40 bg-[#CBD5E1] border-b border-slate-300 px-3 sm:px-4 lg:px-6"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
+        <div className="min-h-[56px] sm:h-[64px] max-w-[1600px] mx-auto flex items-center gap-2 sm:gap-3 py-2 sm:py-0">
+          {/* Tên học viên — ẩn trên mobile để nhường chỗ cho đồng hồ và Nộp bài.
+              Học viên biết mình là ai; đây chỉ là thông tin trang trí. */}
+          <div className="hidden sm:flex items-center gap-2 text-slate-800 text-sm font-semibold min-w-0 flex-1">
+            <BookOpen className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate">{studentName}</span>
           </div>
 
-          <div className="flex justify-center items-center gap-3">
-            <div className="px-4 py-1 rounded-md bg-blue-500 text-white font-mono font-bold text-lg tracking-wider">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+            <div className="px-2.5 sm:px-4 py-1 rounded-md bg-blue-500 text-white font-mono font-bold text-base sm:text-lg tracking-wider tabular-nums">
               {formatClock(session.timeRemaining)}
             </div>
             <SaveStatusIndicator
@@ -700,11 +721,15 @@ export function TestTaking() {
             />
           </div>
 
-          <div className="flex items-center justify-end gap-3">
-            <span className="text-xs font-semibold text-slate-700">{t("student.examTaking.answered", { answered: answeredCount, total: questions.length })}</span>
+          <div className="flex items-center justify-end gap-2 sm:gap-3 flex-1 min-w-0">
+            {/* Số câu đã trả lời: ẩn trên mobile vì thanh dưới đã hiển thị. */}
+            <span className="hidden sm:inline text-xs font-semibold text-slate-700 truncate">
+              {t("student.examTaking.answered", { answered: answeredCount, total: questions.length })}
+            </span>
+            {/* Nộp bài: min-h-11 = 44px, ngưỡng touch target tối thiểu. */}
             <button
               onClick={() => setShowSubmit(true)}
-              className="px-4 py-1.5 rounded-md text-white font-bold text-sm transition-opacity hover:opacity-90"
+              className="flex-shrink-0 inline-flex items-center justify-center min-h-11 px-3 sm:px-4 rounded-md text-white font-bold text-sm transition-opacity hover:opacity-90"
               style={{ background: "#3B82F6" }}
             >
               {t("student.examTaking.submit")}
@@ -926,9 +951,17 @@ export function TestTaking() {
       </main>
 
       {showBottomNav ? (
-        <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-300 bg-[#CBD5E1] px-3 py-2">
+        <div
+          className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-300 bg-[#CBD5E1] px-3 py-2"
+          // Tránh home indicator của iPhone đè lên các nút.
+          style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+        >
           <div className="max-w-[1600px] mx-auto flex flex-col gap-2">
-            <div className="flex flex-wrap gap-1">
+            {/* Danh sách phần: ẩn trên mobile.
+                VSTEP có 7 phần, mỗi nút kèm "(x/y)" — đổ hết vào một hàng
+                flex-wrap trên màn 430px thì chiếm 3-4 dòng, ăn gần nửa màn hình.
+                Trên mobile thay bằng nút mở bottom sheet ở hàng dưới. */}
+            <div className="hidden sm:flex flex-wrap gap-1">
               {sections.map((section) => {
                 const isActive = section.skill === activeSkill && section.part === activePart;
                 const key = `${section.skill}-${section.part}`;
@@ -949,29 +982,47 @@ export function TestTaking() {
               })}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {SKILL_ORDER.map((skill) => (
-                <div key={skill} className="px-3 py-1 rounded-md text-xs font-bold text-white" style={{ background: "#2563EB" }}>
-                  {SKILL_LABELS[skill]} - {SKILL_DURATION[skill]}
-                </div>
-              ))}
+            <div className="flex items-center gap-2">
+              {/* Chip thời lượng 4 skill: thông tin tham khảo, không phải điều
+                  khiển — ẩn trên mobile. */}
+              <div className="hidden lg:flex flex-wrap items-center gap-2">
+                {SKILL_ORDER.map((skill) => (
+                  <div key={skill} className="px-3 py-1 rounded-md text-xs font-bold text-white" style={{ background: "#2563EB" }}>
+                    {SKILL_LABELS[skill]} - {SKILL_DURATION[skill]}
+                  </div>
+                ))}
+              </div>
+
+              {/* Nút mở danh sách phần (chỉ mobile) — đường duy nhất tới danh
+                  sách phần khi nó bị ẩn ở trên. */}
+              <button
+                onClick={() => setShowPartSheet(true)}
+                className="sm:hidden flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 min-h-11 px-2 rounded-md bg-blue-100 text-blue-800 text-xs font-bold transition-colors hover:bg-blue-200"
+              >
+                <span className="truncate">
+                  {t("student.examTaking.part")} {activePart} · {answeredCount}/{questions.length}
+                </span>
+              </button>
+
               <button
                 onClick={goNextSection}
-                className="px-4 py-1.5 rounded-md text-white text-sm font-bold transition-opacity hover:opacity-90"
+                className="flex-shrink-0 inline-flex items-center justify-center min-h-11 px-3 sm:px-4 rounded-md text-white text-sm font-bold transition-opacity hover:opacity-90"
                 style={{ background: "#3B82F6" }}
               >
                 {t("student.examTaking.continue")}
               </button>
               <button
                 onClick={doAutoSave}
-                className="px-4 py-1.5 rounded-md text-white text-sm font-bold transition-opacity hover:opacity-90"
+                className="flex-shrink-0 inline-flex items-center justify-center min-h-11 px-3 sm:px-4 rounded-md text-white text-sm font-bold transition-opacity hover:opacity-90"
                 style={{ background: "#16A34A" }}
               >
                 {t("student.examTaking.save")}
               </button>
+              {/* "Ẩn menu" chỉ có nghĩa trên desktop; trên mobile thanh này đã
+                  gọn và ẩn nó đi chỉ làm học viên mất lối điều hướng. */}
               <button
                 onClick={() => setShowBottomNav(false)}
-                className="px-4 py-1.5 rounded-md text-blue-700 bg-blue-100 text-sm font-bold transition-colors hover:bg-blue-200"
+                className="hidden sm:inline-flex items-center justify-center min-h-11 px-4 rounded-md text-blue-700 bg-blue-100 text-sm font-bold transition-colors hover:bg-blue-200"
               >
                 {t("student.examTaking.hideMenu")}
               </button>
@@ -981,11 +1032,59 @@ export function TestTaking() {
       ) : (
         <button
           onClick={() => setShowBottomNav(true)}
-          className="fixed bottom-4 right-4 z-50 px-4 py-2 rounded-md text-white font-bold"
-          style={{ background: PURPLE }}
+          className="fixed right-4 z-50 min-h-11 px-4 rounded-md text-white font-bold"
+          style={{ background: PURPLE, bottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
         >
           {t("student.examTaking.showMenu")}
         </button>
+      )}
+
+      {/* Bottom sheet danh sách phần (mobile). */}
+      {showPartSheet && (
+        <div className="sm:hidden fixed inset-0 z-[60] flex items-end">
+          <div
+            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+            onClick={() => setShowPartSheet(false)}
+          />
+          <div
+            className="relative z-10 w-full max-h-[80vh] overflow-y-auto bg-white rounded-t-3xl p-4 shadow-2xl"
+            style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-bold text-slate-900">{t("student.examTaking.part")}</h3>
+              <button
+                onClick={() => setShowPartSheet(false)}
+                className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
+                aria-label="Đóng"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {sections.map((section) => {
+                const isActive = section.skill === activeSkill && section.part === activePart;
+                const key = `${section.skill}-${section.part}`;
+                const answeredSection = answeredBySection.get(key) ?? 0;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => { goToSection(section.skill, section.part); setShowPartSheet(false); }}
+                    className="min-h-11 px-3 rounded-lg text-xs font-semibold transition-colors text-left"
+                    style={{
+                      background: isActive ? "#F59E0B" : "#DBEAFE",
+                      color: isActive ? "#1F2937" : "#1E3A8A",
+                    }}
+                  >
+                    {SKILL_LABELS[section.skill]} · {t("student.examTaking.part")} {section.part}
+                    <span className="block text-[11px] font-normal opacity-80">
+                      {answeredSection}/{section.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       )}
 
       <SubmitDialog

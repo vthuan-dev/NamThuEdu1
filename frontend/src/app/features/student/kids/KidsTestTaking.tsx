@@ -481,34 +481,57 @@ export function KidsTestTaking() {
         </section>
       </main>
 
-      {/* Bottom nav */}
-      <div className="fixed bottom-0 left-0 right-0 z-30" style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(14px)', borderTop: '1.5px solid #FFE4E6', boxShadow: '0 -4px 16px rgba(251,113,133,0.06)' }}>
-        <div className={`${wrap} mx-auto px-4 sm:px-6 py-3 flex items-center gap-3`}>
+      {/* Bottom nav.
+          Nút "Nộp bài" LUÔN hiển thị, giống ThptBottomNav và TeensTestTaking:
+          trước đây nó chỉ có ở câu cuối, nên bạn nhỏ trả lời hết rồi quay lại
+          xem câu giữa thì không còn đường nộp — phải tự hiểu là cần bấm sang câu
+          cuối trước. Với trẻ em thì đó là ngõ cụt thật sự. */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-30"
+        style={{
+          background: 'rgba(255,255,255,0.92)',
+          backdropFilter: 'blur(14px)',
+          borderTop: '1.5px solid #FFE4E6',
+          boxShadow: '0 -4px 16px rgba(251,113,133,0.06)',
+          // Tránh home indicator của iPhone đè lên nút.
+          paddingBottom: 'max(0.25rem, env(safe-area-inset-bottom))',
+        }}
+      >
+        <div className={`${wrap} mx-auto px-3 sm:px-6 pt-3 pb-2 flex items-center gap-2 sm:gap-3`}>
+          {/* Icon-only trên màn hẹp để nhường chỗ cho nút Nộp bài. */}
           <button onClick={() => setCurrent(c => Math.max(0, c - 1))} disabled={current === 0}
-            className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors disabled:opacity-40">
-            <ArrowLeft className="w-4 h-4" /> Trước
-          </button>
-          
-          <button 
-            onClick={() => setIsMobileNavOpen(true)}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-3 rounded-2xl text-xs font-extrabold text-rose-700 bg-rose-50 hover:bg-rose-100 transition-colors border border-rose-100"
-          >
-            <span>🎈 Câu {current + 1}/{total}</span>
+            aria-label="Câu trước"
+            className="inline-flex items-center justify-center gap-2 min-h-11 px-3 sm:px-4 rounded-2xl font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors disabled:opacity-40 flex-shrink-0">
+            <ArrowLeft className="w-4 h-4" /> <span className="hidden sm:inline">Trước</span>
           </button>
 
-          {isLast ? (
-            <button onClick={() => setShowSubmit(true)}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-extrabold text-white transition-transform hover:scale-[1.02] active:scale-95"
-              style={{ background: 'linear-gradient(135deg, #16A34A, #22C55E)', boxShadow: '0 8px 20px rgba(22,163,74,0.3)' }}>
-              <PartyPopper className="w-4 h-4" /> Nộp bài
-            </button>
-          ) : (
+          <button
+            onClick={() => setIsMobileNavOpen(true)}
+            className="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 min-h-11 px-2 rounded-2xl text-xs font-extrabold text-rose-700 bg-rose-50 hover:bg-rose-100 transition-colors border border-rose-100"
+          >
+            <span className="truncate">🎈 Câu {current + 1}/{total}</span>
+          </button>
+
+          {!isLast && (
             <button onClick={() => setCurrent(c => Math.min(total - 1, c + 1))}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-extrabold text-white transition-transform hover:scale-[1.02] active:scale-95"
+              aria-label="Câu tiếp"
+              className="inline-flex items-center justify-center gap-2 min-h-11 px-3 sm:px-5 rounded-2xl font-extrabold text-white transition-transform hover:scale-[1.02] active:scale-95 flex-shrink-0"
               style={{ background: 'linear-gradient(135deg, #FB7185, #F97316)', boxShadow: '0 8px 20px rgba(251,113,133,0.3)' }}>
-              Tiếp <ArrowRight className="w-4 h-4" />
+              <span className="hidden sm:inline">Tiếp</span> <ArrowRight className="w-4 h-4" />
             </button>
           )}
+
+          {/* Ở câu cuối thì nút Nộp bài đầy màu (việc bé cần làm tiếp); ở câu
+              giữa thì nhạt hơn để không rủ bấm sớm, nhưng vẫn luôn với tới. */}
+          <button
+            onClick={() => setShowSubmit(true)}
+            className={`inline-flex items-center justify-center gap-1.5 min-h-11 px-3 sm:px-5 rounded-2xl font-extrabold transition-transform hover:scale-[1.02] active:scale-95 flex-shrink-0 ${
+              isLast ? 'text-white' : 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+            }`}
+            style={isLast ? { background: 'linear-gradient(135deg, #16A34A, #22C55E)', boxShadow: '0 8px 20px rgba(22,163,74,0.3)' } : undefined}
+          >
+            <PartyPopper className="w-4 h-4" /> <span>Nộp bài</span>
+          </button>
         </div>
       </div>
 
