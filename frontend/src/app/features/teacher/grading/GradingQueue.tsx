@@ -196,7 +196,12 @@ export function GradingQueue() {
     status: sub.sStatus,
     score: sub.sScore !== undefined && sub.sScore !== null ? Number(sub.sScore) : undefined,
     maxScore: sub.exam?.eTotal_score ?? 100,
-    scaleMax: sub.exam?.thpt_config?.scale_max ?? sub.exam?.eTotal_score ?? null,
+    // CHỈ đọc thpt_config.scale_max. KHÔNG dùng eTotal_score làm hệ số quy đổi:
+    // đó là tổng điểm THÔ của đề (các controller gán count($items) * 10 hoặc
+    // cứng 100), không phải thang hiển thị. Đề GENERAL có eTotal_score = 100
+    // nghĩa là "chấm theo phần trăm", nếu hiểu thành "thang 100" thì bài
+    // 37.50 sẽ hiện 37.50/100 thay vì 3.75/10.
+    scaleMax: sub.exam?.thpt_config?.scale_max ?? null,
     attemptNumber: sub.sAttempt ?? 1,
     sGemini_feedback: sub.sGemini_feedback,
     sTeacher_feedback: sub.sTeacher_feedback,

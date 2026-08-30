@@ -25,6 +25,15 @@ describe('thang điểm theo từng loại đề', () => {
     expect(ds).toEqual({ value: 3.4, max: 10, label: 'hệ 10' });
   });
 
+  it('GENERAL: bỏ qua scaleMax truyền vào, luôn hệ 10', () => {
+    // eTotal_score của đề GENERAL bằng 100 (tổng điểm thô), từng bị hiểu nhầm
+    // là "thang 100" khiến bài 37.50 hiện 37.50/100 thay vì 3.75/10. Thang phải
+    // suy ra từ DẠNG ĐỀ, không từ cột số nào khác.
+    expect(resolveScoreScale({ examType: 'GENERAL', scaleMax: 100 }).max).toBe(10);
+    expect(getSubmissionDisplayScore({ examType: 'GENERAL', score: 37.5, scaleMax: 100 }))
+      .toEqual({ value: 3.75, max: 10, label: 'hệ 10' });
+  });
+
   it('THPT: tôn trọng scale_max giáo viên đặt khác 10', () => {
     const ds = getSubmissionDisplayScore({ examType: 'THPT', score: 87, scaleMax: 100 });
     expect(ds?.value).toBe(87);

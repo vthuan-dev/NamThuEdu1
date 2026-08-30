@@ -78,6 +78,26 @@ class ScoreScaleTest extends TestCase
         $this->assertSame(9.0, ScoreScale::resolve('IELTS_ACADEMIC')['max']);
     }
 
+    public function test_general_exam_total_score_is_not_a_display_scale(): void
+    {
+        // Dữ liệu thật: đề GENERAL eId=136 có eTotal_score = 100. Đó là tổng điểm
+        // THÔ, không phải thang hiển thị. Nếu dùng nó làm thang thì bài 37.50 sẽ
+        // hiện 37.50/100 thay vì 3.75/10. Thang phải suy ra từ DẠNG ĐỀ.
+        $exam = new Exam();
+        $exam->eType = 'GENERAL';
+        $exam->eTitle = 'Đọc hiểu: Teenagers and Smartphones';
+        $exam->eTotal_score = 100;
+        $exam->thpt_config = null;
+
+        $submission = new Submission();
+        $submission->sScore = 37.50;
+        $submission->setRelation('exam', $exam);
+
+        $scale = ScoreScale::forSubmission($submission);
+        $this->assertSame(10.0, $scale['max']);
+        $this->assertSame(3.75, round(ScoreScale::normalizedTen($submission), 2));
+    }
+
     public function test_teacher_defined_scale_max_is_respected(): void
     {
         $this->assertSame(100.0, ScoreScale::resolve('THPT', '', 100)['max']);

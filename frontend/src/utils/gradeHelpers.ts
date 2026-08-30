@@ -125,10 +125,9 @@ export function isIeltsExam(examType?: string, examTitle?: string): boolean {
 /**
  * Thang điểm của một bài làm.
  *
- * `scaleMax` là hệ số quy đổi do giáo viên đặt trên đề (hiện chỉ THPT có ô này
- * trong trang soạn đề: `thpt_config.scale_max`). Các loại khác chưa có ô nhập
- * nên rơi về hệ 10, nhưng tham số vẫn được tôn trọng để khi thêm ô nhập thì
- * không phải sửa lại chỗ này.
+ * `scaleMax` chỉ áp dụng cho đề THPT — đó là `thpt_config.scale_max`, hệ số
+ * giáo viên tự đặt trong trang soạn đề. Đừng truyền `eTotal_score` vào đây:
+ * đó là tổng điểm THÔ của đề, không phải thang hiển thị.
  *
  * IELTS và VSTEP giữ thang chuẩn quốc tế (band 9 / band 10) — quy về hệ 10 sẽ
  * biến 7.0 band thành 7.8, vô nghĩa với giáo viên dạy IELTS.
@@ -152,9 +151,10 @@ export function resolveScoreScale(opts: {
     const max = scaleMax ?? DEFAULT_SCALE_MAX;
     return { max, divisor: 1, label: `hệ ${max}` };
   }
-  // GENERAL / Kids / Teens: sScore là phần trăm → quy về thang mong muốn.
-  const max = scaleMax ?? DEFAULT_SCALE_MAX;
-  return { max, divisor: 100 / max, label: `hệ ${max}` };
+  // GENERAL / Kids / Teens: sScore là phần trăm → luôn quy về hệ 10. Các loại đề
+  // này chưa có ô cho giáo viên đặt hệ số, nên không đọc scaleMax ở đây — cứ
+  // đọc là sớm hay muộn sẽ nhận phải một giá trị không phải thang hiển thị.
+  return { max: DEFAULT_SCALE_MAX, divisor: 100 / DEFAULT_SCALE_MAX, label: `hệ ${DEFAULT_SCALE_MAX}` };
 }
 
 /**

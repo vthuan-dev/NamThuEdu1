@@ -76,11 +76,15 @@ class ScoreScale
             return ['max' => (float) self::DEFAULT_SCALE_MAX, 'divisor' => 1.0];
         }
 
+        // CHỈ đọc thpt_config.scale_max. KHÔNG dùng eTotal_score: đó là tổng
+        // điểm THÔ của đề (AgeGroupContentController gán count($items) * 10,
+        // TeensExamController/TestController gán cứng 100), không phải thang
+        // hiển thị. Đề GENERAL có eTotal_score = 100 nghĩa là "chấm theo phần
+        // trăm" — hiểu thành "thang 100" thì điểm sẽ không được quy đổi.
         $scaleMax = null;
         if (is_array($exam->thpt_config)) {
             $scaleMax = $exam->thpt_config['scale_max'] ?? null;
         }
-        $scaleMax = $scaleMax ?? $exam->eTotal_score;
 
         return self::resolve($exam->eType, $exam->eTitle, $scaleMax);
     }
