@@ -55,6 +55,11 @@ interface Submission {
   status: "submitted" | "graded" | "partially_graded" | "grading_subjective" | "in_progress";
   score?: number;
   maxScore: number;
+  /**
+   * Hệ số quy đổi giáo viên đặt trên đề (hiện chỉ THPT có ô nhập:
+   * `thpt_config.scale_max`). null = dùng thang mặc định của loại đề.
+   */
+  scaleMax?: number | null;
   attemptNumber: number;
   sGemini_feedback?: string;
   sTeacher_feedback?: string;
@@ -191,6 +196,7 @@ export function GradingQueue() {
     status: sub.sStatus,
     score: sub.sScore !== undefined && sub.sScore !== null ? Number(sub.sScore) : undefined,
     maxScore: sub.exam?.eTotal_score ?? 100,
+    scaleMax: sub.exam?.thpt_config?.scale_max ?? sub.exam?.eTotal_score ?? null,
     attemptNumber: sub.sAttempt ?? 1,
     sGemini_feedback: sub.sGemini_feedback,
     sTeacher_feedback: sub.sTeacher_feedback,
@@ -198,6 +204,15 @@ export function GradingQueue() {
     sGraded_time: sub.sGraded_time,
     gradedTime: sub.sGraded_time ? new Date(sub.sGraded_time) : (sub.teacher_reviewed_at ? new Date(sub.teacher_reviewed_at) : undefined),
   });
+
+  /**
+   * Điểm quy về tỷ lệ 0-10 để so sánh được giữa các thang khác nhau.
+   * -1 cho bài chưa có điểm để chúng luôn nằm dưới cùng khi sắp tăng dần.
+   */
+  const displayValueOf = (s: Submission): number => {
+    const ds = getSubmissionDisplayScore(s);
+    return ds ? (ds.value / ds.max) * 10 : -1;
+  };
 
   const fetchSubmissions = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -325,8 +340,10 @@ export function GradingQueue() {
       if (sortField === "exam") {
         cmp = a.examTitle.localeCompare(b.examTitle, "vi", { sensitivity: "base" });
       } else if (sortField === "score") {
-        const scoreA = a.score !== undefined ? a.score / (a.maxScore / 10) : -1;
-        const scoreB = b.score !== undefined ? b.score / (b.maxScore / 10) : -1;
+        // Sắp xếp trên điểm ĐÃ quy đổi: bảng trộn nhiều thang (THPT hệ 10,
+        // GENERAL phần trăm, IELTS band 9) nên so sScore thô sẽ sai thứ tự.
+        const scoreA = displayValueOf(a);
+        const scoreB = displayValueOf(b);
         cmp = scoreA - scoreB;
       } else if (sortField === "time") {
         cmp = a.submissionTime.getTime() - b.submissionTime.getTime();
@@ -472,8 +489,8 @@ export function GradingQueue() {
         if (sortField === "exam") {
           cmp = a.examTitle.localeCompare(b.examTitle, "vi", { sensitivity: "base" });
         } else if (sortField === "score") {
-          const scoreA = a.score !== undefined ? a.score / (a.maxScore / 10) : -1;
-          const scoreB = b.score !== undefined ? b.score / (b.maxScore / 10) : -1;
+          const scoreA = displayValueOf(a);
+          const scoreB = displayValueOf(b);
           cmp = scoreA - scoreB;
         } else if (sortField === "time") {
           cmp = a.submissionTime.getTime() - b.submissionTime.getTime();
@@ -1172,9 +1189,14 @@ export function GradingQueue() {
                               const subs = selectedStudentData.submissions;
                               const pending = subs.filter((s) => !s.teacher_reviewed_at).length;
                               const reviewed = subs.length - pending;
-                              const scored = subs.filter((s) => typeof s.score === "number");
-                              const avg = scored.length > 0
-                                ? scored.reduce((sum, s) => sum + (s.score as number), 0) / scored.length
+                              // Trung bình phải tính trên điểm ĐÃ quy đổi. Trước
+                              // đây cộng thẳng sScore nên 37.50 (phần trăm) bị
+                              // cộng với 3.40 (hệ 10) → "TB: 20.45" vô nghĩa.
+                              const scoredDisplay = subs
+                                .map((s) => getSubmissionDisplayScore(s))
+                                .filter((d): d is NonNullable<typeof d> => d !== null);
+                              const avg = scoredDisplay.length > 0
+                                ? scoredDisplay.reduce((sum, d) => sum + d.value / d.max, 0) / scoredDisplay.length * 10
                                 : null;
                               return (
                                 <>
@@ -1193,7 +1215,7 @@ export function GradingQueue() {
                                   {avg !== null && (
                                     <span className="inline-flex items-center gap-1 text-violet-600 font-semibold whitespace-nowrap">
                                       <Target className="w-3.5 h-3.5" />
-                                      TB: {avg.toFixed(2)}
+                                      TB: {avg.toFixed(2)}/10
                                     </span>
                                   )}
                                 </>
@@ -1544,9 +1566,13 @@ export function GradingQueue() {
                                   {(() => {
                                     const ds = getSubmissionDisplayScore(sub);
                                     return ds ? (
-                                      <span className="text-sm font-bold text-slate-800">
-                                        {ds.value.toFixed(2)}<span className="text-slate-400 font-normal text-xs">/{ds.max}</span>
-                                      </span>
+                                      <div className="flex flex-col gap-0.5">
+                                        <span className="text-sm font-bold text-slate-800">
+                                          {ds.value.toFixed(2)}<span className="text-slate-400 font-normal text-xs">/{ds.max}</span>
+                                        </span>
+                                        {/* Bảng trộn nhiều thang nên phải nói rõ đang là thang nào. */}
+                                        <span className="text-[10px] text-slate-400 font-medium leading-none">{ds.label}</span>
+                                      </div>
                                     ) : (
                                       <span className="text-slate-300 text-sm">—</span>
                                     );

@@ -27,6 +27,7 @@ import {
   calcVstepAvg,
   isVstepExam,
   getSubmissionDisplayScore,
+  toRawScore,
   type SubmissionScoreUpdate,
 } from "../../../../utils/gradeHelpers";
 
@@ -40,6 +41,8 @@ interface ReviewSubmission {
   status: string;
   score?: number;
   maxScore: number;
+  /** Hệ số quy đổi của đề (THPT: `thpt_config.scale_max`). */
+  scaleMax?: number | null;
   attemptNumber: number;
   sGemini_feedback?: string;
   sTeacher_feedback?: string;
@@ -116,8 +119,20 @@ export function TeacherReviewModal({ submission, open, onClose, onReviewed }: Pr
     initialScoresRef.current = initial;  // snapshot for dirty-check
     setScores(initial);
 
-    // Tổng điểm hiện tại (đề Kids/General/Cambridge dùng tổng điểm thay vì 4 kỹ năng)
-    const totalStr = submission.score !== undefined && submission.score !== null ? String(submission.score) : "";
+    // Tổng điểm hiện tại (đề Kids/General/Cambridge dùng tổng điểm thay vì 4 kỹ năng).
+    // Phải điền điểm ĐÃ quy đổi — ô này hiển thị trên thang của đề (ví dụ hệ
+    // 10), trong khi `submission.score` là giá trị thô (đề GENERAL là phần
+    // trăm). Nếu điền thô thì giáo viên sẽ thấy 37.5 trong ô "/ 10".
+    const displayForInput = submission.score !== undefined && submission.score !== null
+      ? getSubmissionDisplayScore({
+          examType: submission.examType,
+          examTitle: submission.examTitle,
+          score: submission.score,
+          maxScore: submission.maxScore,
+          scaleMax: submission.scaleMax,
+        })
+      : null;
+    const totalStr = displayForInput ? String(displayForInput.value) : "";
     initialTotalRef.current = totalStr;
     setTotalInput(totalStr);
 
@@ -151,6 +166,7 @@ export function TeacherReviewModal({ submission, open, onClose, onReviewed }: Pr
         sGemini_feedback: submission.sGemini_feedback, // raw, never rounded
         score: submission.score,
         maxScore: submission.maxScore,
+        scaleMax: submission.scaleMax,
       })
     : null;
 
@@ -204,8 +220,15 @@ export function TeacherReviewModal({ submission, open, onClose, onReviewed }: Pr
         if (totalDirty && trimmed !== "") {
           const parsed = parseFloat(trimmed);
           if (!isNaN(parsed)) {
-            // Kẹp trong khoảng [0, max] để tránh điểm vượt khung.
-            rawScore = Math.max(0, Math.min(displayMaxScore, parsed));
+            // Kẹp trong khoảng [0, max] của THANG HIỂN THỊ, rồi quy đổi về giá
+            // trị thô trước khi gửi. Không quy đổi thì giáo viên nhập 8 cho đề
+            // GENERAL sẽ lưu sScore = 8, tức 8%, chứ không phải 8/10.
+            const clamped = Math.max(0, Math.min(displayMaxScore, parsed));
+            rawScore = toRawScore(clamped, {
+              examType: submission.examType,
+              examTitle: submission.examTitle,
+              scaleMax: submission.scaleMax,
+            });
             payload.score = rawScore;
           }
         }
@@ -385,7 +408,7 @@ export function TeacherReviewModal({ submission, open, onClose, onReviewed }: Pr
                       <div className="rounded-2xl bg-slate-50 border border-dashed border-slate-200 py-10 flex flex-col items-center justify-center gap-2.5">
                         <BarChart3 className="w-9 h-9 text-slate-350" />
                         <p className="text-sm font-medium text-slate-500">{t("teacher.grading.reviewModal.noAiScore")}</p>
-                        <p className="text-xs text-slate-400">{t("teacher.grading.reviewModal.onlyTotal")} {submission.score ?? "—"}/{submission.maxScore}</p>
+                        <p className="text-xs text-slate-400">{t("teacher.grading.reviewModal.onlyTotal")} {displayScore}/{displayMaxScore}</p>
                       </div>
                     )}
                   </div>

@@ -85,10 +85,81 @@ export function isVstepExam(examType?: string, examTitle?: string): boolean {
   );
 }
 
+// ─── Thang điểm theo từng loại đề ────────────────────────────────────────────
+// `submissions.sScore` KHÔNG có thang thống nhất — mỗi luồng chấm lưu một kiểu:
+//
+//   THPT    → điểm đã quy đổi sẵn theo `thpt_config.scale_max` (mặc định 10).
+//             ThptExamController::gradeThpt() làm round(raw / rawMax * scale_max).
+//   VSTEP   → band 0-10 nhân 10 (GradingController L499).
+//   IELTS   → band 0-9  nhân 10 (GradingController L608, có ghi chú "for
+//             compatibility with reports/sScore-based filters").
+//   Còn lại → PHẦN TRĂM 0-100 (StudentTestController L3563).
+//
+// Vì vậy không thể lấy một `maxScore` chung cho cả bảng. Trước đây UI dùng
+// `eTotal_score ?? 100`, mà `eTotal_score` null trên toàn bộ dữ liệu, nên mọi
+// dòng đều hiện "/100" — kể cả bài THPT vốn đã là thang 10 (3.40/10 bị hiện
+// thành 3.40/100, trông như 3.4%).
+//
+// Toàn bộ quy tắc quy đổi nằm ở đây để chỉ có MỘT nơi cần sửa.
+
+export interface ScoreScale {
+  /** Điểm tối đa của thang hiển thị. */
+  max: number;
+  /** Chia sScore thô cho số này để ra điểm hiển thị. */
+  divisor: number;
+  /** Nhãn ngắn hiện cạnh điểm, vì một bảng có thể trộn nhiều thang. */
+  label: string;
+}
+
+/** Thang mặc định khi đề không khai báo gì: hệ 10. */
+export const DEFAULT_SCALE_MAX = 10;
+
+/** Returns true cho đề IELTS (thang band 0-9, khác VSTEP). */
+export function isIeltsExam(examType?: string, examTitle?: string): boolean {
+  return (
+    String(examType ?? '').toUpperCase().startsWith('IELTS') ||
+    String(examTitle ?? '').toUpperCase().includes('IELTS')
+  );
+}
+
+/**
+ * Thang điểm của một bài làm.
+ *
+ * `scaleMax` là hệ số quy đổi do giáo viên đặt trên đề (hiện chỉ THPT có ô này
+ * trong trang soạn đề: `thpt_config.scale_max`). Các loại khác chưa có ô nhập
+ * nên rơi về hệ 10, nhưng tham số vẫn được tôn trọng để khi thêm ô nhập thì
+ * không phải sửa lại chỗ này.
+ *
+ * IELTS và VSTEP giữ thang chuẩn quốc tế (band 9 / band 10) — quy về hệ 10 sẽ
+ * biến 7.0 band thành 7.8, vô nghĩa với giáo viên dạy IELTS.
+ */
+export function resolveScoreScale(opts: {
+  examType?: string;
+  examTitle?: string;
+  scaleMax?: number | null;
+}): ScoreScale {
+  const { examType, examTitle } = opts;
+  const scaleMax = opts.scaleMax && opts.scaleMax > 0 ? opts.scaleMax : null;
+
+  if (isIeltsExam(examType, examTitle)) {
+    return { max: 9, divisor: 10, label: 'band IELTS' };
+  }
+  if (isVstepExam(examType, examTitle)) {
+    return { max: 10, divisor: 10, label: 'band VSTEP' };
+  }
+  if (String(examType ?? '').toUpperCase() === 'THPT') {
+    // Backend đã quy đổi sẵn về scale_max nên không chia thêm.
+    const max = scaleMax ?? DEFAULT_SCALE_MAX;
+    return { max, divisor: 1, label: `hệ ${max}` };
+  }
+  // GENERAL / Kids / Teens: sScore là phần trăm → quy về thang mong muốn.
+  const max = scaleMax ?? DEFAULT_SCALE_MAX;
+  return { max, divisor: 100 / max, label: `hệ ${max}` };
+}
+
 /**
  * Canonical display score for any submission.
- * - VSTEP: use sScore/10 from DB (authoritative). Falls back to avg of AI skill scores.
- * - Other: use sScore directly.
+ * Trả về điểm ĐÃ quy đổi sang thang hiển thị của đề, kèm nhãn thang.
  * Returns null when no score is available.
  */
 export function getSubmissionDisplayScore(
@@ -98,20 +169,39 @@ export function getSubmissionDisplayScore(
     sGemini_feedback?: string;
     score?: number;   // mapped from sScore
     maxScore?: number;
+    /** Hệ số quy đổi giáo viên đặt trên đề (THPT: thpt_config.scale_max). */
+    scaleMax?: number | null;
   }
-): { value: number; max: number } | null {
-  const { examType, examTitle, sGemini_feedback, score, maxScore = 100 } = opts;
+): { value: number; max: number; label: string } | null {
+  const { examType, examTitle, sGemini_feedback, score } = opts;
+  const scale = resolveScoreScale({ examType, examTitle, scaleMax: opts.scaleMax });
+
+  if (score !== undefined && score !== null) {
+    return { value: score / scale.divisor, max: scale.max, label: scale.label };
+  }
+
+  // VSTEP: chưa có sScore thì lấy trung bình điểm AI 4 kỹ năng (đã là 0-10).
   if (isVstepExam(examType, examTitle)) {
-    // 1st priority: sScore from DB (= backend computed value, authoritative)
-    if (score !== undefined && score !== null) return { value: score / 10, max: 10 };
-    // Fallback: average of AI skill scores in sGemini_feedback
-    const vs = parseVstepScores(sGemini_feedback);
-    const avg = calcVstepAvg(vs);
-    if (avg !== null) return { value: avg, max: 10 };
-    return null;
+    const avg = calcVstepAvg(parseVstepScores(sGemini_feedback));
+    if (avg !== null) return { value: avg, max: scale.max, label: scale.label };
   }
-  if (score !== undefined && score !== null) return { value: score, max: maxScore };
   return null;
+}
+
+/**
+ * Đảo chiều của `getSubmissionDisplayScore`: điểm giáo viên nhập trên thang
+ * hiển thị → giá trị thô để lưu vào `sScore`.
+ *
+ * Bắt buộc phải dùng khi lưu. Nếu chỉ đổi hiển thị mà không đổi chiều lưu thì
+ * giáo viên nhập 8 cho đề GENERAL sẽ ghi sScore = 8, tức 8%, chứ không phải
+ * 8/10.
+ */
+export function toRawScore(
+  displayValue: number,
+  opts: { examType?: string; examTitle?: string; scaleMax?: number | null }
+): number {
+  const scale = resolveScoreScale(opts);
+  return Math.round(displayValue * scale.divisor * 100) / 100;
 }
 
 /** Patch object passed from modal → queue when teacher saves a review. */
