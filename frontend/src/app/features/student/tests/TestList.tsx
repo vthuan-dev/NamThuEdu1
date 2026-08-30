@@ -8,6 +8,7 @@ import {
   useRealtimeAssignedTests,
   assignedTestsQueryOptions,
 } from "../../../../hooks/useRealtimeAssignedTests";
+import { hideSupersededExhausted } from "../../../../utils/assignmentDedupe";
 import {
   ClipboardList,
   Clock,
@@ -348,7 +349,21 @@ export function TestList() {
   const inProgress = filterKids((allTests?.in_progress || []).map((t: any) => ({ ...t, status: 'in_progress' })));
   const completed  = filterKids((allTests?.completed   || []).map((t: any) => ({ ...t, status: 'completed'   })));
 
-  const normalizedTests = mergeVstepIntoSingleTest([...pending, ...inProgress, ...completed]);
+  // Ẩn bản giao cũ đã cạn lượt khi cùng đề vừa được giao lại (xem
+  // utils/assignmentDedupe). Đặt SAU mergeVstepIntoSingleTest: bước gộp mới
+  // quyết định assignment nào là primary và do đó lượt của thẻ là bao nhiêu —
+  // lọc trước thì sẽ nhìn vào số lượt chưa đúng.
+  const normalizedTests = hideSupersededExhausted(
+    mergeVstepIntoSingleTest([...pending, ...inProgress, ...completed])
+      .map((t: any) => ({
+        ...t,
+        // hideSupersededExhausted đọc camelCase; payload ở trang này là
+        // snake_case nên map sang, giữ nguyên field gốc cho phần render.
+        examId: Number(t.exam_id),
+        attemptsUsed: Number(t.attempts_used || 0),
+        attemptsAllowed: Number(t.attempts_allowed || 0),
+      })),
+  );
 
   const overdueTests = normalizedTests.filter((t: any) => isOverdue(t));
 

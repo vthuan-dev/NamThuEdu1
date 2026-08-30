@@ -21,6 +21,7 @@ import {
   broadcastAssignmentsChanged,
 } from '../../../../hooks/useRealtimeAssignedTests';
 import { getVNTimestamp, isWithinLastHours } from '@/utils/dateUtils';
+import { hideSupersededExhausted } from '@/utils/assignmentDedupe';
 
 const BASE = '/hoc-vien';
 const TEAL = '#0D9488';
@@ -329,11 +330,15 @@ export function TeensTests() {
       attemptsAllowed: t.attempts_allowed ?? 0,
     }));
     const isPastDeadline = (d?: string | null) => !!d && new Date(d).getTime() < Date.now();
-    return [
+
+    // Lọc ngay tại nguồn, không phải ở tầng hiển thị: badge "Tổng số đề" và các
+    // ô thống kê đều đếm từ `assignedExams`, nên nếu chỉ ẩn lúc render thì số
+    // đếm sẽ lệch với số thẻ thực sự nhìn thấy.
+    return hideSupersededExhausted([
       ...map(groups.in_progress, 'in_progress'),
       ...map(groups.pending, 'pending'),
       ...map(groups.completed, 'completed'),
-    ].filter((t) => !isPastDeadline(t.deadline));
+    ].filter((t) => !isPastDeadline(t.deadline)));
   }, [assignedData]);
 
   const source = assignedExams;

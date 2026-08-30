@@ -18,6 +18,7 @@ import {
   useRealtimeAssignedTests,
   assignedTestsQueryOptions,
 } from '../../../../hooks/useRealtimeAssignedTests';
+import { hideSupersededExhausted } from '@/utils/assignmentDedupe';
 
 const BASE = '/hoc-vien';
 
@@ -313,11 +314,13 @@ export function KidsTests() {
       attemptsAllowed: t.attempts_allowed ?? null,
       submittedAt: t.submitted_at ?? null,
     }));
-    return [
+    // Ẩn bản giao cũ đã cạn lượt khi cùng đề vừa được giao lại — xem
+    // utils/assignmentDedupe. Kết quả cũ vẫn xem được ở tab Lịch sử thi.
+    return hideSupersededExhausted([
       ...map(groups.pending, 'pending'),
       ...map(groups.in_progress, 'in_progress'),
       ...map(groups.completed, 'completed'),
-    ].filter((t: any) => !isAdult(t.title) && !isPastDeadline(t.deadline));
+    ].filter((t: any) => !isAdult(t.title) && !isPastDeadline(t.deadline)));
   }, [assignedData, isPastDeadline]);
 
   const source = assignedExams;
