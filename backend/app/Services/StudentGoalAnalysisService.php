@@ -244,51 +244,64 @@ PROMPT;
             return [];
         }
 
-        try {
-            $resp = Http::withToken($apiKey)
-                ->withOptions(['verify' => config('services.groq.verify_ssl', true)])
-                ->timeout(45)
-                ->post(self::LLM_URL, [
-                    'model' => env('GROQ_MODEL', 'openai/gpt-oss-120b'),
-                    'temperature' => 0.3,
-                    'max_tokens' => 2500,
-                    'response_format' => ['type' => 'json_object'],
-                    'messages' => [
-                        ['role' => 'system', 'content' => $system],
-                        ['role' => 'user', 'content' => $user],
-                    ],
-                ]);
+        $primaryModel = env('GROQ_MODEL', 'openai/gpt-oss-120b');
+        $models = array_values(array_unique(array_filter([
+            $primaryModel,
+            'qwen/qwen3.6-27b',
+            'openai/gpt-oss-20b',
+            'qwen/qwen3.8-27b',
+        ])));
 
-            if (!$resp->successful()) {
-                Log::error('StudentGoalAnalysis Groq HTTP ' . $resp->status() . ': ' . $resp->body());
-                return [];
-            }
+        foreach ($models as $model) {
+            try {
+                $resp = Http::withToken($apiKey)
+                    ->withOptions(['verify' => config('services.groq.verify_ssl', true)])
+                    ->timeout(45)
+                    ->post(self::LLM_URL, [
+                        'model' => $model,
+                        'temperature' => 0.3,
+                        'max_tokens' => 2500,
+                        'messages' => [
+                            ['role' => 'system', 'content' => $system],
+                            ['role' => 'user',   'content' => $user],
+                        ],
+                    ]);
 
-            $content = $resp->json('choices.0.message.content') ?? '';
-
-            // ── Reasoning-model support ──────────────────────────────
-            $content = preg_replace('/<think>[\s\S]*?<\/think>/i', '', $content);
-            $content = trim($content);
-
-            if ($content === '' || $content === '{}') {
-                $reasoning = $resp->json('choices.0.message.reasoning') ?? '';
-                if ($reasoning) {
-                    $content = preg_replace('/<think>[\s\S]*?<\/think>/i', '', $reasoning);
-                    $content = trim($content);
+                if (!$resp->successful()) {
+                    Log::warning("StudentGoalAnalysis Groq ({$model}) HTTP " . $resp->status() . ': ' . $resp->body());
+                    continue;
                 }
-            }
 
-            if (!$content) {
-                return [];
-            }
+                $content = $resp->json('choices.0.message.content') ?? '';
 
-            // Extract JSON object
-            preg_match('/\{[\s\S]*\}/', $content, $matches);
-            $parsed = isset($matches[0]) ? json_decode($matches[0], true) : null;
-            return is_array($parsed) ? $parsed : [];
-        } catch (\Exception $e) {
-            Log::error('StudentGoalAnalysis Groq error: ' . $e->getMessage());
-            return [];
+                // ── Reasoning-model support ──────────────────────────────
+                $content = preg_replace('/<think>[\s\S]*?<\/think>/i', '', $content);
+                $content = trim($content);
+
+                if ($content === '' || $content === '{}') {
+                    $reasoning = $resp->json('choices.0.message.reasoning') ?? '';
+                    if ($reasoning) {
+                        $content = preg_replace('/<think>[\s\S]*?<\/think>/i', '', $reasoning);
+                        $content = trim($content);
+                    }
+                }
+
+                if (!$content) {
+                    continue;
+                }
+
+                // Extract JSON object
+                preg_match('/\{[\s\S]*\}/', $content, $matches);
+                $parsed = isset($matches[0]) ? json_decode($matches[0], true) : null;
+                if (is_array($parsed) && !empty($parsed)) {
+                    return $parsed;
+                }
+            } catch (\Throwable $e) {
+                Log::warning("StudentGoalAnalysis Groq model {$model} error: " . $e->getMessage());
+            }
         }
+
+        Log::error("All Groq models failed for StudentGoalAnalysis");
+        return [];
     }
 }

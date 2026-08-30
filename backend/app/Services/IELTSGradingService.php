@@ -603,7 +603,7 @@ PROMPT;
     //  PRIVATE: Helpers
     // ═══════════════════════════════════════════════════════════════════════
 
-    private function callGroqLLM(string $system, string $user, string $context, int $maxTokens = 900): array
+    private function callGroqLLM(string $system, string $user, string $context, int $maxTokens = 2500): array
     {
         $apiKey = config('services.groq.api_key');
         if (!$apiKey) {
@@ -611,50 +611,65 @@ PROMPT;
             return [];
         }
 
-        try {
-            $response = $this->http->post(self::LLM_URL, [
-                'headers' => [
-                    'Authorization' => "Bearer {$apiKey}",
-                    'Content-Type'  => 'application/json',
-                ],
-                'json' => [
-                    'model'       => env('GROQ_MODEL', 'openai/gpt-oss-120b'),
-                    'messages'    => [
-                        ['role' => 'system', 'content' => $system],
-                        ['role' => 'user',   'content' => $user],
+        $primaryModel = env('GROQ_MODEL', 'openai/gpt-oss-120b');
+        $models = array_values(array_unique(array_filter([
+            $primaryModel,
+            'qwen/qwen3.6-27b',
+            'openai/gpt-oss-20b',
+            'qwen/qwen3.8-27b',
+        ])));
+
+        foreach ($models as $model) {
+            try {
+                $response = $this->http->post(self::LLM_URL, [
+                    'headers' => [
+                        'Authorization' => "Bearer {$apiKey}",
+                        'Content-Type'  => 'application/json',
                     ],
-                    'temperature' => 0.3,
-                    'max_tokens'  => $maxTokens,
-                    'response_format' => ['type' => 'json_object'],
-                ],
-            ]);
+                    'json' => [
+                        'model'       => $model,
+                        'messages'    => [
+                            ['role' => 'system', 'content' => $system],
+                            ['role' => 'user',   'content' => $user],
+                        ],
+                        'temperature' => 0.3,
+                        'max_tokens'  => $maxTokens,
+                    ],
+                ]);
 
-            $body    = json_decode($response->getBody()->getContents(), true);
-            $content = $body['choices'][0]['message']['content'] ?? '';
+                $body    = json_decode($response->getBody()->getContents(), true);
+                $content = $body['choices'][0]['message']['content'] ?? '';
 
-            // ── Reasoning-model support ──────────────────────────────
-            $content = preg_replace('/<think>[\s\S]*?<\/think>/i', '', $content);
-            $content = trim($content);
+                // ── Reasoning-model support ──────────────────────────────
+                $content = preg_replace('/<think>[\s\S]*?<\/think>/i', '', $content);
+                $content = trim($content);
 
-            if ($content === '' || $content === '{}') {
-                $reasoning = $body['choices'][0]['message']['reasoning'] ?? '';
-                if ($reasoning) {
-                    $content = preg_replace('/<think>[\s\S]*?<\/think>/i', '', $reasoning);
-                    $content = trim($content);
+                if ($content === '' || $content === '{}') {
+                    $reasoning = $body['choices'][0]['message']['reasoning'] ?? '';
+                    if ($reasoning) {
+                        $content = preg_replace('/<think>[\s\S]*?<\/think>/i', '', $reasoning);
+                        $content = trim($content);
+                    }
                 }
+
+                Log::debug("IELTS Groq LLM raw ({$context}, model={$model}): " . substr($content, 0, 500));
+
+                // Extract JSON object from content
+                preg_match('/\{[\s\S]*\}/', $content, $matches);
+                $parsed = isset($matches[0]) ? json_decode($matches[0], true) : null;
+
+                if (is_array($parsed) && !empty($parsed['criteria'])) {
+                    return $parsed;
+                }
+
+                Log::warning("IELTS Groq LLM ({$model}) missing criteria for {$context}, trying next fallback model.");
+            } catch (\Throwable $e) {
+                Log::warning("IELTS Groq LLM model {$model} failed ({$context}): " . $e->getMessage() . ", trying next fallback.");
             }
-
-            Log::debug("IELTS Groq LLM raw ({$context}): " . substr($content, 0, 500));
-
-            // Extract JSON object from content
-            preg_match('/\{[\s\S]*\}/', $content, $matches);
-            $parsed = isset($matches[0]) ? json_decode($matches[0], true) : null;
-
-            return is_array($parsed) ? $parsed : [];
-        } catch (\Exception $e) {
-            Log::error("IELTS Groq LLM error ({$context}): " . $e->getMessage());
-            return [];
         }
+
+        Log::error("All IELTS Groq LLM models failed for {$context}");
+        return [];
     }
 
     private function decodeGeminiField(Submission $submission): array
