@@ -563,6 +563,10 @@ function VstepGradingDetailInternal() {
   const gradedCount = questions.filter((q) => q.autoGraded || q.points > 0).length;
   const manualCount = questions.filter((q) => !q.autoGraded && q.points === 0).length;
   const pct = maxScore ? Math.round((totalScore / maxScore) * 100) : 0;
+  // Phải tính điểm hệ 10 từ tỷ lệ THẬT, không chia từ `pct` đã làm tròn thành
+  // số nguyên: 39/104 = 37.5% → pct = 38 → 3.8, lệch với 3.75 mà danh sách
+  // chấm điểm hiển thị cho cùng bài này.
+  const scoreOnTen = maxScore ? (totalScore / maxScore) * 10 : 0;
   const scoreColor = pct >= 80 ? "#10B981" : pct >= 60 ? "#F59E0B" : "#EF4444";
 
   // VSTEP skill computed scores (override → AI → objective sum)
@@ -2163,7 +2167,7 @@ function VstepGradingDetailInternal() {
                   <div className="bg-white rounded-2xl border border-slate-100 p-5">
                     <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-4">{t("teacher.grading.detail.scoreSummary")}</p>
                     <div className="text-center mb-5">
-                      <div className="text-6xl font-black mb-0.5" style={{ color: scoreColor }}>{(pct / 10).toFixed(1)}</div>
+                      <div className="text-6xl font-black mb-0.5" style={{ color: scoreColor }}>{scoreOnTen.toFixed(2)}</div>
                       <div className="text-sm text-slate-400 mb-3">/ 10 điểm</div>
                       <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                         <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: scoreColor }} />

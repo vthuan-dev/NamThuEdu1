@@ -293,6 +293,7 @@ export function GradingStats() {
                       <p>
                         <span className="text-slate-400">Điểm TB:</span>{" "}
                         <span className="font-semibold text-amber-600 tabular-nums">{s.avg_score}</span>
+                        <span className="text-slate-400">/10</span>
                       </p>
                     )}
                   </div>

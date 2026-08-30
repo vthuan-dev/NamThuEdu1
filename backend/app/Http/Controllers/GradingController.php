@@ -13,6 +13,7 @@ use App\Models\TestAssignment;
 use App\Models\User;
 use App\Models\Classes;
 use App\Models\ClassCoTeacher;
+use App\Support\ScoreScale;
 
 class GradingController extends Controller
 {
@@ -1010,7 +1011,7 @@ class GradingController extends Controller
             ], 401);
         }
 
-        $submissionsQuery = Submission::query();
+        $submissionsQuery = Submission::with('exam');
         $this->applyTeacherSubmissionAccess($submissionsQuery, $user);
         $submissions = $submissionsQuery->get();
 
@@ -1060,7 +1061,13 @@ class GradingController extends Controller
         }
 
         // Score distribution (from graded submissions)
-        $scores = $gradedSubs->pluck('sScore')->filter();
+        // Phải quy về thang 10 trước khi phân nhóm: sScore của đề THPT đã là hệ 10
+        // nên bài 9.25/10 trước đây rơi vào nhóm "0-59" cùng với bài trượt.
+        // Nhãn nhóm giữ nguyên dạng phần trăm vì frontend đang đọc theo key này.
+        $scores = $gradedSubs
+            ->map(fn($sub) => ScoreScale::normalizedTen($sub))
+            ->filter(fn($v) => $v !== null)
+            ->map(fn($v) => $v * 10); // 0-10 -> 0-100 để khớp ngưỡng nhóm
         $scoreDist = [
             '90-100' => $scores->filter(fn($s) => $s >= 90)->count(),
             '80-89'  => $scores->filter(fn($s) => $s >= 80 && $s < 90)->count(),
@@ -1070,16 +1077,18 @@ class GradingController extends Controller
         ];
 
         // Top 5 students by average score (min 1 graded submission)
+        // Điểm TB trả về theo thang 10 — trước đây cộng thẳng sScore nên học viên
+        // làm đề GENERAL (phần trăm) luôn đứng trên học viên làm đề THPT (hệ 10).
         $topStudents = $gradedSubs->groupBy('user_id')
             ->map(function($group) {
                 $student = $group->first()->user;
-                $sc = $group->pluck('sScore')->filter();
+                $avg = ScoreScale::averageTen($group);
                 return [
                     'name'       => $student ? $student->uName : 'Unknown',
                     'avatar_url' => $student ? $student->avatar_url : null,
                     'user_id'    => $student ? $student->uId : null,
                     'count'      => $group->count(),
-                    'avg'        => $sc->count() ? round($sc->avg(), 1) : 0,
+                    'avg'        => $avg !== null ? round($avg, 1) : 0,
                 ];
             })
             ->sortByDesc('avg')
@@ -1107,7 +1116,7 @@ class GradingController extends Controller
             ->map(function($group) {
                 $student = $group->first()->user;
                 $graded  = $group->where('sStatus', 'graded');
-                $sc      = $graded->pluck('sScore')->filter();
+                $avg     = ScoreScale::averageTen($graded);
                 $lastAt  = $group->max('sSubmit_time');
                 return [
                     'user_id'         => $student ? $student->uId : null,
@@ -1115,7 +1124,7 @@ class GradingController extends Controller
                     'avatar_url'      => $student ? $student->avatar_url : null,
                     'submissions'     => $group->count(),
                     'graded'          => $graded->count(),
-                    'avg_score'       => $sc->count() ? round($sc->avg(), 1) : 0,
+                    'avg_score'       => $avg !== null ? round($avg, 1) : 0,
                     'last_submit_at'  => $lastAt ? (string) $lastAt : null,
                 ];
             })

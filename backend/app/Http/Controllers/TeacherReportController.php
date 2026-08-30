@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Classes;
 use App\Models\Exam;
 use App\Models\Submission;
+use App\Support\ScoreScale;
 
 /**
  * @OA\Tag(
@@ -203,13 +204,18 @@ class TeacherReportController extends Controller
             $class = Classes::find($student->class_id);
             
             // Get submissions
-            $submissions = Submission::where('user_id', $student->uId)
+            // `with('exam')` là bắt buộc: ScoreScale phải đọc eType và
+            // thpt_config của đề để biết sScore đang ở thang nào.
+            $submissions = Submission::with('exam')
+                                    ->where('user_id', $student->uId)
                                     ->whereIn('exam_id', $teacherExams)
                                     ->get();
 
             $gradedSubmissions = $submissions->where('sStatus', 'graded');
             $testsCompleted = $gradedSubmissions->count();
-            $avgScore = $gradedSubmissions->avg('sScore') ?? 0;
+            // Quy về thang 10 trước khi tính trung bình. Cộng thẳng sScore sẽ
+            // trộn phần trăm (đề GENERAL) với hệ 10 (đề THPT).
+            $avgScore = ScoreScale::averageTen($gradedSubmissions) ?? 0;
 
             // Calculate attendance rate (mock for now - would need attendance table)
             $attendanceRate = $testsCompleted > 0 ? min(95, 70 + ($testsCompleted * 2)) : 0;
@@ -217,9 +223,9 @@ class TeacherReportController extends Controller
             // Calculate trend
             $recentSubmissions = $gradedSubmissions->where('sSubmit_time', '>=', now()->subDays(15));
             $olderSubmissions = $gradedSubmissions->where('sSubmit_time', '<', now()->subDays(15));
-            
-            $recentAvg = $recentSubmissions->avg('sScore') ?? 0;
-            $olderAvg = $olderSubmissions->avg('sScore') ?? 0;
+
+            $recentAvg = ScoreScale::averageTen($recentSubmissions) ?? 0;
+            $olderAvg = ScoreScale::averageTen($olderSubmissions) ?? 0;
             
             $trend = 'stable';
             $trendValue = 0;
@@ -384,13 +390,14 @@ class TeacherReportController extends Controller
 
         $studentProgress = [];
         foreach ($students as $student) {
-            $submissions = Submission::where('user_id', $student->uId)
+            $submissions = Submission::with('exam')
+                                    ->where('user_id', $student->uId)
                                     ->whereIn('exam_id', $teacherExams)
                                     ->where('sSubmit_time', '>=', now()->subDays($days))
                                     ->get();
 
             $gradedSubmissions = $submissions->where('sStatus', 'graded');
-            $avgScore = $gradedSubmissions->avg('sScore') ?? 0;
+            $avgScore = ScoreScale::averageTen($gradedSubmissions) ?? 0;
 
             $studentProgress[] = [
                 'student_id' => $student->uId,
@@ -444,21 +451,23 @@ class TeacherReportController extends Controller
         $totalClasses = $teacherClasses->count();
         $totalExams = $teacherExams->count();
 
-        $submissions = Submission::whereIn('exam_id', $teacherExams)
+        $submissions = Submission::with('exam')
+                                ->whereIn('exam_id', $teacherExams)
                                 ->where('sSubmit_time', '>=', $startDate)
                                 ->get();
 
         $totalSubmissions = $submissions->count();
         $gradedSubmissions = $submissions->where('sStatus', 'graded');
-        $avgScore = $gradedSubmissions->avg('sScore') ?? 0;
+        $avgScore = ScoreScale::averageTen($gradedSubmissions) ?? 0;
 
         // Calculate growth (compare with previous period)
         $previousPeriodStart = $startDate->copy()->subDays($startDate->diffInDays(now()));
-        $previousSubmissions = Submission::whereIn('exam_id', $teacherExams)
+        $previousSubmissions = Submission::with('exam')
+                                        ->whereIn('exam_id', $teacherExams)
                                         ->whereBetween('sSubmit_time', [$previousPeriodStart, $startDate])
                                         ->get();
 
-        $previousAvgScore = $previousSubmissions->where('sStatus', 'graded')->avg('sScore') ?? 0;
+        $previousAvgScore = ScoreScale::averageTen($previousSubmissions->where('sStatus', 'graded')) ?? 0;
 
         return [
             'total_students' => $totalStudents,
@@ -532,7 +541,8 @@ class TeacherReportController extends Controller
                              ->whereNull('uDeleted_at')
                              ->pluck('uId');
 
-            $submissions = Submission::whereIn('exam_id', $teacherExams)
+            $submissions = Submission::with('exam')
+                                    ->whereIn('exam_id', $teacherExams)
                                     ->whereIn('user_id', $studentIds)
                                     ->where('sSubmit_time', '>=', now()->subDays($days))
                                     ->get();
@@ -544,7 +554,7 @@ class TeacherReportController extends Controller
                 'class_id' => $class->cId,
                 'class_name' => $class->cName,
                 'total_submissions' => $submissions->count(),
-                'avg_score' => round($gradedSubmissions->avg('sScore') ?? 0, 1),
+                'avg_score' => round(ScoreScale::averageTen($gradedSubmissions) ?? 0, 1),
                 'pending_count' => $pendingCount
             ];
         }
@@ -563,7 +573,8 @@ class TeacherReportController extends Controller
         $topStudents = [];
 
         foreach ($students as $student) {
-            $submissions = Submission::where('user_id', $student->uId)
+            $submissions = Submission::with('exam')
+                                    ->where('user_id', $student->uId)
                                     ->whereIn('exam_id', $teacherExams)
                                     ->where('sSubmit_time', '>=', now()->subDays($days))
                                     ->where('sStatus', 'graded')
@@ -577,7 +588,7 @@ class TeacherReportController extends Controller
                     'student_name' => $student->uName,
                     'class_name' => $class ? $class->cName : 'N/A',
                     'total_submissions' => $submissions->count(),
-                    'avg_score' => round($submissions->avg('sScore'), 1)
+                    'avg_score' => round(ScoreScale::averageTen($submissions) ?? 0, 1)
                 ];
             }
         }
@@ -601,13 +612,17 @@ class TeacherReportController extends Controller
                              ->whereNull('uDeleted_at')
                              ->pluck('uId');
 
-            $submissions = Submission::whereIn('exam_id', $teacherExams)
+            $submissions = Submission::with('exam')
+                                    ->whereIn('exam_id', $teacherExams)
                                     ->whereIn('user_id', $studentIds)
                                     ->get();
 
             $pendingCount = $submissions->whereIn('sStatus', ['submitted', 'partially_graded'])->count();
             $gradedSubmissions = $submissions->where('sStatus', 'graded');
-            $avgScore = $gradedSubmissions->avg('sScore') ?? 0;
+            // Ngưỡng "điểm TB thấp" dưới đây là 7.0 — chỉ đúng khi điểm đã quy
+            // về thang 10. Trước đây trung bình đề GENERAL là phần trăm nên
+            // mọi lớp có điểm > 7% đều thoát ngưỡng này.
+            $avgScore = ScoreScale::averageTen($gradedSubmissions) ?? 0;
 
             $reason = '';
             if ($pendingCount > 10) {
@@ -643,10 +658,15 @@ class TeacherReportController extends Controller
         for ($i = $days - 1; $i >= 0; $i--) {
             $date = now()->subDays($i)->toDateString();
             
-            $avgScore = Submission::whereIn('exam_id', $teacherExams)
+            // Phải lấy bản ghi về rồi quy đổi, không dùng ->avg() ở tầng SQL:
+            // thang điểm nằm trong `exams.eType`/`thpt_config` nên SQL không biết
+            // sScore đang là phần trăm hay hệ 10.
+            $daySubmissions = Submission::with('exam')
+                                 ->whereIn('exam_id', $teacherExams)
                                  ->whereDate('sSubmit_time', $date)
                                  ->where('sStatus', 'graded')
-                                 ->avg('sScore') ?? 0;
+                                 ->get();
+            $avgScore = ScoreScale::averageTen($daySubmissions) ?? 0;
 
             $trend[] = [
                 'date' => $date,
@@ -707,17 +727,23 @@ class TeacherReportController extends Controller
     {
         $halfDays = intdiv($days, 2);
         
-        $recentScore = Submission::where('user_id', $studentId)
-                                ->whereIn('exam_id', $teacherExams)
-                                ->where('sSubmit_time', '>=', now()->subDays($halfDays))
-                                ->where('sStatus', 'graded')
-                                ->avg('sScore') ?? 0;
+        $recentScore = ScoreScale::averageTen(
+            Submission::with('exam')
+                ->where('user_id', $studentId)
+                ->whereIn('exam_id', $teacherExams)
+                ->where('sSubmit_time', '>=', now()->subDays($halfDays))
+                ->where('sStatus', 'graded')
+                ->get()
+        ) ?? 0;
 
-        $previousScore = Submission::where('user_id', $studentId)
-                                  ->whereIn('exam_id', $teacherExams)
-                                  ->whereBetween('sSubmit_time', [now()->subDays($days), now()->subDays($halfDays)])
-                                  ->where('sStatus', 'graded')
-                                  ->avg('sScore') ?? 0;
+        $previousScore = ScoreScale::averageTen(
+            Submission::with('exam')
+                ->where('user_id', $studentId)
+                ->whereIn('exam_id', $teacherExams)
+                ->whereBetween('sSubmit_time', [now()->subDays($days), now()->subDays($halfDays)])
+                ->where('sStatus', 'graded')
+                ->get()
+        ) ?? 0;
 
         if ($recentScore > $previousScore + 0.5) {
             return 'improving';
@@ -807,8 +833,11 @@ class TeacherReportController extends Controller
             }
 
             // Last 3 graded submissions
+            // Ngưỡng low_score (< 5.0) và declining_trend (> 0.5) là ngưỡng hệ 10,
+            // nên phải quy đổi trước khi so. Đề GENERAL lưu phần trăm nên trước
+            // đây học viên 30% vẫn được coi là an toàn.
             $recentGraded = $allSubmissions->where('sStatus', 'graded')->take(3);
-            $recentAvg = $recentGraded->count() >= 3 ? $recentGraded->avg('sScore') : null;
+            $recentAvg = $recentGraded->count() >= 3 ? ScoreScale::averageTen($recentGraded) : null;
 
             // Reason: low_score (TB 3 bài gần nhất < 5.0)
             if ($recentAvg !== null && $recentAvg < 5.0) {
@@ -817,7 +846,7 @@ class TeacherReportController extends Controller
 
             // Reason: declining_trend
             $olderGraded = $allSubmissions->where('sStatus', 'graded')->slice(3, 3);
-            $olderAvg = $olderGraded->count() >= 2 ? $olderGraded->avg('sScore') : null;
+            $olderAvg = $olderGraded->count() >= 2 ? ScoreScale::averageTen($olderGraded) : null;
             if ($recentAvg !== null && $olderAvg !== null && ($olderAvg - $recentAvg) > 0.5) {
                 $reasons[] = 'declining_trend';
             }
@@ -872,13 +901,15 @@ class TeacherReportController extends Controller
                 ->pluck('uId');
             if ($studentIds->isEmpty()) continue;
 
-            $firstHalf = Submission::whereIn('exam_id', $teacherExams)
+            $firstHalf = Submission::with('exam')
+                ->whereIn('exam_id', $teacherExams)
                 ->whereIn('user_id', $studentIds)
                 ->where('sStatus', 'graded')
                 ->whereBetween('sSubmit_time', [$startPoint, $midPoint])
                 ->get();
 
-            $secondHalf = Submission::whereIn('exam_id', $teacherExams)
+            $secondHalf = Submission::with('exam')
+                ->whereIn('exam_id', $teacherExams)
                 ->whereIn('user_id', $studentIds)
                 ->where('sStatus', 'graded')
                 ->where('sSubmit_time', '>=', $midPoint)
@@ -887,8 +918,10 @@ class TeacherReportController extends Controller
             // Min sample size to be reliable
             if ($firstHalf->count() < 5 || $secondHalf->count() < 5) continue;
 
-            $avgFirst = round($firstHalf->avg('sScore'), 2);
-            $avgSecond = round($secondHalf->avg('sScore'), 2);
+            // Quy về thang 10 — không thì mức "tiến bộ" của lớp chỉ phản ánh việc
+            // lớp đó chuyển từ làm đề THPT (hệ 10) sang đề GENERAL (phần trăm).
+            $avgFirst = round(ScoreScale::averageTen($firstHalf) ?? 0, 2);
+            $avgSecond = round(ScoreScale::averageTen($secondHalf) ?? 0, 2);
             $improvement = round($avgSecond - $avgFirst, 1);
 
             $result[] = [
