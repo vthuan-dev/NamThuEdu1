@@ -11,7 +11,10 @@ export interface ToastProps {
   onClose: (id: string) => void;
 }
 
-export function Toast({ id, type, message, duration = 3500, onClose }: ToastProps) {
+// Mặc định 3000ms cho khớp `useToast.showToast` — trước đây chỗ này để 3500ms,
+// nên khi gọi mà không truyền duration thì thanh tiến trình và hiệu ứng shimmer
+// chạy theo 3500ms trong khi toast bị xoá ở 3000ms: thanh chưa đầy đã mất.
+export function Toast({ id, type, message, duration = 3000, onClose }: ToastProps) {
   const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
@@ -68,12 +71,13 @@ export function Toast({ id, type, message, duration = 3500, onClose }: ToastProp
         rounded-2xl border border-gray-200/80
         shadow-xl ${style.glow}
         transition-all duration-300 ease-out
-        min-w-[340px] max-w-[420px]
+        w-full sm:w-auto sm:min-w-[340px] sm:max-w-[420px]
         ${isExiting
           ? "animate-[slideOutLeft_300ms_ease-in_forwards] opacity-0 -translate-x-12"
           : "animate-[slideInLeft_400ms_cubic-bezier(0.16,1,0.3,1)]"
         }
       `}
+      role={type === "error" ? "alert" : "status"}
     >
       {/* Animated gradient top bar */}
       <div className="absolute top-0 left-0 right-0 h-1 overflow-hidden">

@@ -6,7 +6,6 @@ import Step1ExamType from './steps/Step1ExamType';
 import Step2AddQuestions from './steps/Step2AddQuestions';
 import Step3Preview from './steps/Step3Preview';
 import { createKidsExam, updateKidsExam, getKidsExam } from '../../../../../services/kidsExamApi';
-import { ToastProvider } from '../../../../../contexts/ToastContext';
 import { getFullMediaUrl } from '../../../../../utils/mediaUtils';
 
 /**
@@ -280,7 +279,7 @@ const CreateKidsExam: React.FC = () => {
   };
 
   return (
-    <ToastProvider>
+    <>
       <div className="kids-builder flex h-screen flex-col bg-[#F8FAFC]">
         {/* Header - Premium Flat Design */}
         <div className="border-b border-slate-200 bg-white shadow-sm z-10">
@@ -380,7 +379,7 @@ const CreateKidsExam: React.FC = () => {
           </div>
         </div>
       </div>
-    </ToastProvider>
+    </>
   );
 };
 
