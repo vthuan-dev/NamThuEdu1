@@ -151,9 +151,7 @@ export function CreateTeensExam() {
       const fd = new FormData();
       fd.append("audio", file, file.name);
       fd.append("questionId", `teens-listening-${gid}`);
-      const token = localStorage.getItem("auth_token");
-      const endpoint = token ? "/teacher/upload/audio" : "/test/upload/audio";
-      const { data: result } = await api.post(endpoint, fd, { headers: { "Content-Type": "multipart/form-data" } });
+      const { data: result } = await api.post("/teacher/upload/audio", fd, { headers: { "Content-Type": "multipart/form-data" } });
       if (result.success && result.data?.audioUrl) {
         updateGroup(gid, (g) => ({ ...g, audioUrl: result.data.audioUrl, uploading: false }));
         success("Đã tải audio lên.");
@@ -172,9 +170,7 @@ export function CreateTeensExam() {
       const fd = new FormData();
       fd.append("image", file, file.name);
       fd.append("questionId", `teens-listening-img-${gid}`);
-      const token = localStorage.getItem("auth_token");
-      const endpoint = token ? "/teacher/upload/image" : "/test/upload/image";
-      const { data: result } = await api.post(endpoint, fd, { headers: { "Content-Type": "multipart/form-data" } });
+      const { data: result } = await api.post("/teacher/upload/image", fd, { headers: { "Content-Type": "multipart/form-data" } });
       if (result.success && result.data?.imageUrl) {
         updateGroup(gid, (g) => ({ ...g, taskImage: result.data.imageUrl, imageUploading: false }));
         success("Đã tải ảnh đề lên.");

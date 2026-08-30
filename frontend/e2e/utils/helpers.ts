@@ -49,14 +49,24 @@ const USERS: Record<Role, SeedUser> = {
 
 /**
  * Seed auth state vào localStorage trước khi app load (addInitScript).
- * Khớp các key dùng trong utils/authStorage.ts (auth_token / auth_role / user).
+ *
+ * Phải ghi khoá CÓ tiền tố vai trò (`teacher_auth_token`…) đúng như
+ * utils/authStorage.ts sinh ra. Lý do: addInitScript chạy trước khi bundle app
+ * khởi động, tức trước khi authStorage thay Storage.prototype, nên khoá không
+ * tiền tố sẽ không được gắn tiền tố hộ. Ghi cả bộ không tiền tố kèm `auth_role`
+ * để nhánh dự phòng tương thích ngược trong readScoped cũng chấp nhận được.
  */
 export async function seedAuth(page: Page, role: Role): Promise<void> {
   const u = USERS[role];
   await page.addInitScript(
     ([token, roleName, userJson]) => {
+      const r = roleName as string;
+      localStorage.setItem(`${r}_auth_token`, token as string);
+      localStorage.setItem(`${r}_auth_role`, r);
+      localStorage.setItem(`${r}_user`, userJson as string);
+      // Bộ không tiền tố: chỉ để tương thích code cũ còn đọc trực tiếp.
       localStorage.setItem('auth_token', token as string);
-      localStorage.setItem('auth_role', roleName as string);
+      localStorage.setItem('auth_role', r);
       localStorage.setItem('user', userJson as string);
     },
     [u.token, u.role, JSON.stringify(u.user)] as const,

@@ -435,9 +435,7 @@ export const CreateVstepListening = ({
       const formData = new FormData();
       formData.append("audio", file, file.name);
       formData.append("questionId", `vstep-listening-${examId}-${key}`);
-      const token = localStorage.getItem("auth_token");
-      const endpoint = token ? "/teacher/upload/audio" : "/test/upload/audio";
-      const { data: result } = await api.post(endpoint, formData, {
+      const { data: result } = await api.post("/teacher/upload/audio", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       if (result.success) return result.data.audioUrl as string;

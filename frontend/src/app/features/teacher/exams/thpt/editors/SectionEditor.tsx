@@ -792,9 +792,7 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
       const fd = new FormData();
       fd.append('audio', file, file.name);
       fd.append('questionId', `thpt-listening-${section.id}`);
-      const token = localStorage.getItem('auth_token');
-      const endpoint = token ? '/teacher/upload/audio' : '/test/upload/audio';
-      const { data: result } = await api.post(endpoint, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const { data: result } = await api.post('/teacher/upload/audio', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       if (result.success && result.data?.audioUrl) {
         onChange({ ...section, audio_url: result.data.audioUrl });
       } else {
@@ -813,9 +811,7 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
       const fd = new FormData();
       fd.append('image', file, file.name);
       fd.append('questionId', `thpt-listening-img-${section.id}`);
-      const token = localStorage.getItem('auth_token');
-      const endpoint = token ? '/teacher/upload/image' : '/test/upload/image';
-      const { data: result } = await api.post(endpoint, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const { data: result } = await api.post('/teacher/upload/image', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       const url = result?.data?.imageUrl || result?.data?.url || result?.data?.path;
       if (result.success && url) {
         onChange({

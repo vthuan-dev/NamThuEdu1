@@ -1048,11 +1048,7 @@ export function CreateExam() {
         }))
       });
       
-      const token = getAuthToken();
-      const endpoint = token ? '/teacher/upload/audio' : '/test/upload/audio';
-      console.log('📡 Endpoint:', endpoint, '🔑 Has token:', !!token);
-
-      const { data: result, status: respStatus } = await api.post(endpoint, formData, {
+      const { data: result, status: respStatus } = await api.post('/teacher/upload/audio', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       console.log('📥 Response status:', respStatus, 'data:', result);

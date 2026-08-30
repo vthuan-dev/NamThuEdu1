@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { useTranslation } from "react-i18next";
 import axios from "axios";
 import { login } from "../../../../services/authApi";
+import { setAuthData, clearAuthData } from "../../../../utils/authStorage";
 import { Eye, EyeOff, AlertCircle, AlertTriangle } from "lucide-react";
 import "../../../../styles/loginAnimations.css";
 
@@ -67,20 +68,21 @@ function AdminLogin() {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+
+    // Dọn phiên admin cũ TRƯỚC khi đăng nhập để không lẫn dữ liệu người trước.
+    clearAuthData('admin');
+
     try {
       const response = await login({ phone: phone.trim(), password });
       const { access_token, user } = response.data;
       if (user.role !== "admin") {
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("auth_role");
-        localStorage.removeItem("user");
+        clearAuthData('admin');
         setError(t("auth.adminLogin.errors.notAdmin"));
         return;
       }
-      const storage = rememberMe ? localStorage : sessionStorage;
-      storage.setItem("auth_token", access_token);
-      storage.setItem("auth_role", user.role);
-      storage.setItem("user", JSON.stringify(user));
+      // setAuthData tự chọn ô lưu theo user.role, và tự chọn localStorage hay
+      // sessionStorage theo rememberMe.
+      setAuthData(access_token, user as unknown as Record<string, unknown>, rememberMe);
       
       // Success animation sequence
       setLoginSuccess(true);

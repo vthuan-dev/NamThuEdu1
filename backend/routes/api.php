@@ -125,16 +125,16 @@ Route::get('/public/stats', function () {
     ]);
 });
 
-// Test upload endpoint (gated behind auth to prevent public access)
-Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
-    Route::post('/test/upload/audio', [FileUploadController::class, 'uploadAudio']);
-    Route::post('/test/upload/image', [FileUploadController::class, 'uploadImage']);
+// ĐÃ XOÁ: nhóm /test/upload/* và /test/exams/*.
+//
+// Chúng chỉ có 'auth:sanctum' mà KHÔNG có 'role', nên mọi tài khoản đã đăng nhập
+// — kể cả học viên — đều gọi được. TestExamController còn hardcode
+// 'eTeacher_id' => 1, tức học viên tạo được đề đứng tên giáo viên id 1.
+//
+// Upload dùng /teacher/upload/{audio,image} (nhóm role:teacher) bên dưới.
+// Frontend từng fallback sang /test/upload/* khi không có token, nhưng fallback đó
+// vô nghĩa: route vẫn đòi auth:sanctum nên không token là 401. Đã bỏ ở FE.
 
-    // Test Exam Routes (dev only — requires auth)
-    Route::post('/test/exams', [App\Http\Controllers\TestExamController::class, 'store']);
-    Route::get('/test/exams/{id}', [App\Http\Controllers\TestExamController::class, 'show']);
-    Route::put('/test/exams/{id}', [App\Http\Controllers\TestExamController::class, 'update']);
-});
 
 /* ========= AUTHENTICATED ROUTES ========= */
 Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {

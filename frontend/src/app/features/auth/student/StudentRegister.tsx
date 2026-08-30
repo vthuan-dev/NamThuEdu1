@@ -9,6 +9,7 @@ import { useNavigate, Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeContext } from '../../../../contexts/ThemeContext';
 import { register, RegisterFormData } from '../../../../services/authApi';
+import { setAuthData } from '../../../../utils/authStorage';
 import { usePageTitle, PAGE_TITLES } from '../../../../hooks/usePageTitle';
 import { CheckCircle2, Sparkles, User, Phone, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
@@ -17,7 +18,7 @@ export function StudentRegister() {
   const { syncWithAuth } = useThemeContext();
   const { t } = useTranslation();
   usePageTitle(PAGE_TITLES.REGISTER);
-  
+
   const [step, setStep] = useState<1 | 2>(1);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -57,8 +58,10 @@ export function StudentRegister() {
       const response = await register(formData);
       const { access_token, user } = response.data;
 
-      localStorage.setItem('auth_token', access_token);
-      localStorage.setItem('auth_role', user.role);
+      // setAuthData ghi cả token, role VÀ user vào ô riêng của vai trò. Trước đây
+      // chỉ ghi auth_token + auth_role, thiếu 'user' nên ProtectedRoute không đọc
+      // được vai trò và đẩy người vừa đăng ký về lại trang đăng nhập.
+      setAuthData(access_token, user as unknown as Record<string, unknown>, true);
       syncWithAuth(user);
       
       // Show success step briefly
