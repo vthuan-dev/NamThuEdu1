@@ -725,7 +725,9 @@ export function AdultsDashboard() {
             { icon: BookOpenCheck, label: 'Đề thi',    sub: 'Thi thử & đánh giá',      href: '/hoc-vien/bai-tap',    color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
             { icon: History,       label: 'Lịch sử',   sub: 'Kết quả bài đã làm',      href: '/hoc-vien/lich-su',   color: '#0284C7', bg: '#F0F9FF', border: '#BAE6FD' },
             { icon: ClipboardList, label: 'Bài tập',   sub: pendingAssignments.length > 0 ? `${pendingAssignments.length} đang chờ` : 'Bài được giao', href: '/hoc-vien/bai-tap', color: '#EA580C', bg: '#FFF7ED', border: '#FED7AA' },
-            { icon: TrendingUp,    label: 'Tiến độ',   sub: 'Xem lịch sử học',         href: '/hoc-vien/tien-do',   color: PURPLE,    bg: PURPLE_LIGHT, border: '#C4B5FD' },
+            // Xem chú thích cùng chỗ trong TeensDashboard: "Xem lịch sử học"
+            // trùng nghĩa với thẻ Lịch sử ở trên.
+            { icon: TrendingUp,    label: 'Tiến độ',   sub: 'Biểu đồ kỹ năng',         href: '/hoc-vien/tien-do',   color: PURPLE,    bg: PURPLE_LIGHT, border: '#C4B5FD' },
           ] as const).map((a) => {
             const Icon = a.icon;
             return (

@@ -448,7 +448,11 @@ export function TeensDashboard() {
           {([
             { icon: ClipboardList, label: 'Bài tập',   sub: pendingAssignments.length > 0 ? `${pendingAssignments.length} đang chờ` : 'Bài được giao', href: '/hoc-vien/bai-tap',  color: '#EA580C', bg: '#FFF7ED', border: '#FED7AA' },
             { icon: BookOpenCheck, label: 'Luyện tập', sub: 'Ôn luyện theo kỹ năng',   href: '/hoc-vien/luyen-tap', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-            { icon: TrendingUp,    label: 'Tiến độ',   sub: 'Xem lịch sử học',         href: '/hoc-vien/tien-do',   color: INDIGO,    bg: INDIGO_LIGHT, border: '#99F6E4' },
+            // Nhãn phụ trước đây là "Xem lịch sử học" nên trùng nghĩa với thẻ
+            // Lịch sử ngay bên cạnh, khiến người dùng bấm Tiến độ để mong ra
+            // trang kết quả. Trang `/tien-do` là biểu đồ kỹ năng và đường điểm,
+            // không phải danh sách bài đã làm.
+            { icon: TrendingUp,    label: 'Tiến độ',   sub: 'Biểu đồ kỹ năng',         href: '/hoc-vien/tien-do',   color: INDIGO,    bg: INDIGO_LIGHT, border: '#99F6E4' },
             { icon: Target,        label: 'Lịch sử',   sub: 'Kết quả bài đã làm',      href: '/hoc-vien/lich-su',   color: '#0284C7', bg: '#F0F9FF', border: '#BAE6FD' },
           ] as const).map(a => {
             const Icon = a.icon;
