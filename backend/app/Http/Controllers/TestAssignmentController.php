@@ -179,6 +179,9 @@ class TestAssignmentController extends Controller
 
         $assignment = TestAssignment::create([
             'exam_id' => $examId,
+            // Ghi lại người giao: đây là căn cứ duy nhất để sau này biết ai có
+            // quyền chấm bài nộp của assignment này khi đề không thuộc về họ.
+            'taTeacher_id' => $request->user()->uId,
             'taTarget_type' => $request->taTarget_type,
             'taTarget_id' => $request->taTarget_id,
             'taDeadline' => $request->taDeadline,
@@ -710,6 +713,8 @@ class TestAssignmentController extends Controller
                     // Submission cũ vẫn gắn assignment cũ → không "hết lượt" giả.
                     $assignment = TestAssignment::create([
                         'exam_id'        => $request->exam_id,
+                        // Xem chú thích ở store(): người giao là căn cứ phân quyền chấm.
+                        'taTeacher_id'   => $user->uId,
                         'taTarget_type'  => $target['type'],
                         'taTarget_id'    => $target['id'],
                         'taDeadline'     => $request->taDeadline,

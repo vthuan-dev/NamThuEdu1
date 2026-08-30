@@ -16,6 +16,11 @@ class TestAssignment extends Model
 
     protected $fillable = [
         'exam_id',
+        // Người giao đề. Cột này có trong schema từ migration
+        // 2026_03_22_150000 nhưng chưa từng nằm trong $fillable, nên mọi giá trị
+        // truyền vào create() đều bị Laravel lặng lẽ bỏ qua và cột luôn NULL.
+        // Hệ quả: phân quyền xem bài nộp không có cách nào biết ai đã giao đề.
+        'taTeacher_id',
         'taTarget_type',
         'taTarget_id',
         'taDeadline',
@@ -48,6 +53,12 @@ class TestAssignment extends Model
     public function submissions()
     {
         return $this->hasMany(Submission::class, 'assignment_id', 'taId');
+    }
+
+    /** Giáo viên đã giao đề này. NULL với assignment tạo trước khi cột được ghi. */
+    public function assigner()
+    {
+        return $this->belongsTo(User::class, 'taTeacher_id', 'uId');
     }
 
     /**

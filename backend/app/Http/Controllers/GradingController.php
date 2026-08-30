@@ -2072,6 +2072,15 @@ class GradingController extends Controller
                 $q->whereHas('exam', function ($eq) use ($teacherId) {
                     $eq->where('eTeacher_id', $teacherId);
                 });
+                // Đề không thuộc GV nhưng học viên là người GV này đã từng giao
+                // bài cho: không có nhánh này thì bài lẻ của chính họ không bao giờ
+                // được gắn assignment và vĩnh viễn nằm ở tab "Tự luyện".
+                $q->orWhereIn('user_id', function ($sub) use ($teacherId) {
+                    $sub->select('taTarget_id')
+                        ->from('test_assignments')
+                        ->where('taTeacher_id', $teacherId)
+                        ->where('taTarget_type', 'student');
+                });
                 if (!empty($managedClassIds)) {
                     $q->orWhereHas('user', function ($uq) use ($managedClassIds) {
                         $uq->whereIn('class_id', $managedClassIds);
@@ -2166,6 +2175,23 @@ class GradingController extends Controller
                 $q->where('eTeacher_id', $teacherId);
             });
 
+            // 5) Assignment do CHÍNH giáo viên này giao.
+            //
+            // Nhánh này là nhánh duy nhất không phụ thuộc vào việc ai sở hữu đề
+            // hay học viên có lớp hay không. Thiếu nó thì giáo viên giao một đề
+            // trong ngân hàng dùng chung (eTeacher_id = người khác) cho học viên
+            // chưa được gán lớp sẽ KHÔNG BAO GIỜ thấy bài học viên nộp: nhánh 1
+            // sai chủ đề, còn nhánh 2/3/4 đều cần users.class_id mà storeStudent
+            // không gán (xem UserController L584).
+            //
+            // taTeacher_id NULL với assignment tạo trước thay đổi này, nên nhánh
+            // này chỉ cứu bài giao từ nay trở đi.
+            $outer->orWhereIn('assignment_id', function ($sub) use ($teacherId) {
+                $sub->select('taId')
+                    ->from('test_assignments')
+                    ->where('taTeacher_id', $teacherId);
+            });
+
             if (!empty($classIds)) {
                 // 2) Học viên thuộc lớp GV quản lý
                 $outer->orWhereHas('user', function ($q) use ($classIds) {
@@ -2217,6 +2243,17 @@ class GradingController extends Controller
             ?? Exam::where('eId', $submission->exam_id)->value('eTeacher_id');
         if ((int) $examTeacherId === $teacherId) {
             return true;
+        }
+
+        // 5) Assignment do chính GV này giao. Phải đồng bộ với nhánh 5 trong
+        // applyTeacherSubmissionAccess: nếu danh sách trả về bài mà hàm này từ
+        // chối thì giáo viên thấy bài nhưng bấm vào lại bị 403.
+        if ($submission->assignment_id) {
+            $assignerId = TestAssignment::where('taId', $submission->assignment_id)
+                ->value('taTeacher_id');
+            if ($assignerId && (int) $assignerId === $teacherId) {
+                return true;
+            }
         }
 
         $classIds = $this->teacherManagedClassIds($teacherId);
