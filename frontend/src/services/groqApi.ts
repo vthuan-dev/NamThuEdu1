@@ -12,7 +12,7 @@ export interface ParsedQuestion {
 }
 
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
-const GROQ_MODEL = import.meta.env.VITE_GROQ_MODEL || 'llama-3.3-70b-versatile';
+const GROQ_MODEL = import.meta.env.VITE_GROQ_MODEL || 'openai/gpt-oss-120b';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_TRANSCRIBE_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
 const GROQ_WHISPER_MODEL = 'whisper-large-v3-turbo';
@@ -62,6 +62,7 @@ interface GroqResponse {
   choices: {
     message: {
       content: string;
+      reasoning?: string;
     };
   }[];
 }
@@ -81,7 +82,7 @@ const callGroqAPI = async (messages: GroqMessage[]): Promise<string> => {
         model: GROQ_MODEL,
         messages,
         temperature: 0.7,
-        max_tokens: 1000,
+        max_tokens: 2500,
       }),
     });
 
@@ -90,7 +91,12 @@ const callGroqAPI = async (messages: GroqMessage[]): Promise<string> => {
     }
 
     const data: GroqResponse = await response.json();
-    return data.choices[0].message.content;
+    let content = data.choices[0]?.message?.content || '';
+    content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    if (!content && data.choices[0]?.message?.reasoning) {
+      content = data.choices[0].message.reasoning.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    }
+    return content;
   } catch (error) {
     console.error('Groq API error:', error);
     throw error;

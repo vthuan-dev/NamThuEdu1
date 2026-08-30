@@ -59,7 +59,7 @@ jobs:
           # Key là build-time (Vite inline vào bundle). Thêm secret VITE_GROQ_API_KEY
           # trong: GitHub repo → Settings → Secrets and variables → Actions.
           VITE_GROQ_API_KEY: ${{ secrets.VITE_GROQ_API_KEY }}
-          VITE_GROQ_MODEL: llama-3.3-70b-versatile
+          VITE_GROQ_MODEL: openai/gpt-oss-120b
         run: pnpm run build
 
       - name: Package dist
