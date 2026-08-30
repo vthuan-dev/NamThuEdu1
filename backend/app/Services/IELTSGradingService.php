@@ -631,7 +631,24 @@ PROMPT;
 
             $body    = json_decode($response->getBody()->getContents(), true);
             $content = $body['choices'][0]['message']['content'] ?? '';
-            $parsed  = json_decode($content, true);
+
+            // ── Reasoning-model support ──────────────────────────────
+            $content = preg_replace('/<think>[\s\S]*?<\/think>/i', '', $content);
+            $content = trim($content);
+
+            if ($content === '' || $content === '{}') {
+                $reasoning = $body['choices'][0]['message']['reasoning'] ?? '';
+                if ($reasoning) {
+                    $content = preg_replace('/<think>[\s\S]*?<\/think>/i', '', $reasoning);
+                    $content = trim($content);
+                }
+            }
+
+            Log::debug("IELTS Groq LLM raw ({$context}): " . substr($content, 0, 500));
+
+            // Extract JSON object from content
+            preg_match('/\{[\s\S]*\}/', $content, $matches);
+            $parsed = isset($matches[0]) ? json_decode($matches[0], true) : null;
 
             return is_array($parsed) ? $parsed : [];
         } catch (\Exception $e) {

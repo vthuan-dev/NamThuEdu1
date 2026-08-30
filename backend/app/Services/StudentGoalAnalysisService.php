@@ -264,11 +264,27 @@ PROMPT;
                 return [];
             }
 
-            $content = $resp->json('choices.0.message.content');
+            $content = $resp->json('choices.0.message.content') ?? '';
+
+            // ── Reasoning-model support ──────────────────────────────
+            $content = preg_replace('/<think>[\s\S]*?<\/think>/i', '', $content);
+            $content = trim($content);
+
+            if ($content === '' || $content === '{}') {
+                $reasoning = $resp->json('choices.0.message.reasoning') ?? '';
+                if ($reasoning) {
+                    $content = preg_replace('/<think>[\s\S]*?<\/think>/i', '', $reasoning);
+                    $content = trim($content);
+                }
+            }
+
             if (!$content) {
                 return [];
             }
-            $parsed = json_decode($content, true);
+
+            // Extract JSON object
+            preg_match('/\{[\s\S]*\}/', $content, $matches);
+            $parsed = isset($matches[0]) ? json_decode($matches[0], true) : null;
             return is_array($parsed) ? $parsed : [];
         } catch (\Exception $e) {
             Log::error('StudentGoalAnalysis Groq error: ' . $e->getMessage());

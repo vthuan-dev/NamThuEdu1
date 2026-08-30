@@ -874,8 +874,8 @@ Transcript to analyze:
     {
         $models = [
             config('services.groq.model', 'openai/gpt-oss-120b'),
-            'llama-3.1-8b-instant',
-            'gemma2-9b-it',
+            'openai/gpt-oss-20b',
+            'qwen/qwen3.6-27b',
         ];
         // Loại trùng giữ thứ tự
         $models = array_values(array_unique(array_filter($models)));
@@ -933,7 +933,20 @@ Transcript to analyze:
         }
 
         $body = $response->json();
-        $text = $body['choices'][0]['message']['content'] ?? null;
+        $text = $body['choices'][0]['message']['content'] ?? '';
+
+        // ── Reasoning-model support ──────────────────────────────
+        $text = preg_replace('/<think>[\s\S]*?<\/think>/i', '', $text);
+        $text = trim($text);
+
+        if ($text === '' || $text === '{}') {
+            $reasoning = $body['choices'][0]['message']['reasoning'] ?? '';
+            if ($reasoning) {
+                $text = preg_replace('/<think>[\s\S]*?<\/think>/i', '', $reasoning);
+                $text = trim($text);
+            }
+        }
+
         if (!$text) {
             throw new \Exception('Groq không trả về kết quả.');
         }
@@ -941,6 +954,14 @@ Transcript to analyze:
         // Một số model trả kèm code fence dù đã bật response_format json
         $text = preg_replace('/^```json\s*/i', '', trim($text));
         $text = preg_replace('/\s*```$/i', '', $text);
+
+        // Extract JSON object if embedded in other text
+        if (json_decode($text, true) === null && json_last_error() !== JSON_ERROR_NONE) {
+            preg_match('/\{[\s\S]*\}/', $text, $matches);
+            if (isset($matches[0])) {
+                $text = $matches[0];
+            }
+        }
 
         $parsed = json_decode($text, true);
         if (json_last_error() !== JSON_ERROR_NONE) {

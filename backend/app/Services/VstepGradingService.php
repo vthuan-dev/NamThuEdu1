@@ -708,7 +708,7 @@ PROMPT;
         return max(0.0, min(10.0, (float) ($result['overall'] ?? 5.0)));
     }
 
-    private function callGroqLLMFull(string $system, string $user, string $context, int $maxTokens = 500): array
+    private function callGroqLLMFull(string $system, string $user, string $context, int $maxTokens = 2000): array
     {
         $apiKey = config('services.groq.api_key');
         $model  = config('services.groq.model', 'openai/gpt-oss-120b');
@@ -736,8 +736,26 @@ PROMPT;
             ]);
 
             $body    = json_decode($response->getBody()->getContents(), true);
-            $content = $body['choices'][0]['message']['content'] ?? '{}';
-            Log::debug("Groq LLM raw ({$context}): " . substr($content, 0, 300));
+            $content = $body['choices'][0]['message']['content'] ?? '';
+
+            // ── Reasoning-model support ──────────────────────────────
+            // Models like gpt-oss-120b / qwen3 may:
+            //  a) wrap their thinking in <think>…</think> tags, OR
+            //  b) put the JSON in a separate "reasoning" field with empty "content".
+            // Strip <think> blocks first, then fall back to reasoning field.
+            $content = preg_replace('/<think>[\s\S]*?<\/think>/i', '', $content);
+            $content = trim($content);
+
+            if ($content === '' || $content === '{}') {
+                // Try the reasoning field (some models put the real answer there)
+                $reasoning = $body['choices'][0]['message']['reasoning'] ?? '';
+                if ($reasoning) {
+                    $content = preg_replace('/<think>[\s\S]*?<\/think>/i', '', $reasoning);
+                    $content = trim($content);
+                }
+            }
+
+            Log::debug("Groq LLM raw ({$context}): " . substr($content, 0, 500));
 
             preg_match('/\{[\s\S]*\}/', $content, $matches);
             $parsed = isset($matches[0]) ? json_decode($matches[0], true) : null;
