@@ -510,6 +510,38 @@ class UserController extends Controller
         }
     }
 
+    /**
+     * Suy ra nhóm tuổi từ ngày sinh — CHỈ dùng khi giáo viên không chọn gì.
+     *
+     * Ngưỡng: kids 6-12, teens 13-17, adults 18+. Ngày sinh trống, hoặc tuổi
+     * dưới 6 (dữ liệu nhập sai), trả về `teens` — khớp default của cột
+     * `users.age_group` trong migration nên hành vi nhất quán ở mọi đường tạo.
+     *
+     * Hàm này KHÔNG được dùng để ghi đè lựa chọn của giáo viên; xem chú thích
+     * trong createSingleStudent để biết vì sao.
+     */
+    private function deriveAgeGroupFromDoB($dateOfBirth): string
+    {
+        if (!$dateOfBirth) {
+            return 'teens';
+        }
+
+        try {
+            $age = \Carbon\Carbon::parse($dateOfBirth)->age;
+        } catch (\Exception $e) {
+            return 'teens';
+        }
+
+        if ($age >= 6 && $age <= 12) {
+            return 'kids';
+        }
+        if ($age >= 18) {
+            return 'adults';
+        }
+
+        return 'teens';
+    }
+
     private function createSingleStudent(Request $request, $user)
     {
         // Validation for single student
@@ -532,19 +564,20 @@ class UserController extends Controller
         }
 
         try {
-            $ageGroup = $request->age_group;
-            
-            // Auto-calculate age_group from DoB if provided
-            if ($request->studentDoB) {
-                $age = \Carbon\Carbon::parse($request->studentDoB)->age;
-                if ($age >= 6 && $age <= 12) {
-                    $ageGroup = 'kids';
-                } elseif ($age >= 13 && $age <= 17) {
-                    $ageGroup = 'teens';
-                } elseif ($age >= 18) {
-                    $ageGroup = 'adults';
-                }
-            }
+            // Nhóm tuổi: LỰA CHỌN CỦA GIÁO VIÊN LÀ QUYẾT ĐỊNH CUỐI.
+            //
+            // Trước đây nhánh dưới suy ra nhóm tuổi từ ngày sinh rồi GHI ĐÈ giá
+            // trị giáo viên gửi lên. Vì `age_group` là required nên nó luôn có
+            // mặt — tức là hễ nhập ngày sinh thì ô "Chọn độ tuổi học viên" trở
+            // thành vô nghĩa: chọn Thiếu niên + ngày sinh người trưởng thành thì
+            // học viên lặng lẽ thành Người lớn, không một cảnh báo nào.
+            //
+            // Hệ quả không chỉ là nhãn sai: applyAgeGroupExamFilter lọc đề theo
+            // age_group, nên học viên bị gán sai sẽ không thấy đề dành cho mình.
+            //
+            // Ngày sinh chỉ còn dùng để suy ra khi giáo viên KHÔNG chọn gì.
+            $ageGroup = $request->age_group ?: $this->deriveAgeGroupFromDoB($request->studentDoB);
+
 
             // Class system đã deprecated — không tạo class nữa, học viên chỉ
             // còn thuộc age_group. Không gán class_id để tránh ràng buộc cũ.
@@ -668,19 +701,11 @@ class UserController extends Controller
             }
 
             try {
-                $ageGroup = $data['age_group'];
-                
-                // Auto-calculate age_group from DoB if provided
-                if (isset($data['studentDoB'])) {
-                    $age = \Carbon\Carbon::parse($data['studentDoB'])->age;
-                    if ($age >= 6 && $age <= 12) {
-                        $ageGroup = 'kids';
-                    } elseif ($age >= 13 && $age <= 17) {
-                        $ageGroup = 'teens';
-                    } elseif ($age >= 18) {
-                        $ageGroup = 'adults';
-                    }
-                }
+                // Cùng quy tắc như createSingleStudent: lựa chọn của giáo viên
+                // thắng, ngày sinh chỉ để suy ra khi không có lựa chọn.
+                $ageGroup = ($data['age_group'] ?? null)
+                    ?: $this->deriveAgeGroupFromDoB($data['studentDoB'] ?? null);
+
 
                 // Class system đã deprecated — bỏ logic find/create class.
                 // Học viên chỉ thuộc age_group, không thuộc class cố định.

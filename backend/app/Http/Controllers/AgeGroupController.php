@@ -66,15 +66,23 @@ class AgeGroupController extends Controller
             'age_group' => 'nullable|in:kids,teens,adults',
         ]);
 
-        // If date_of_birth provided, calculate age_group automatically
+        // Ngày sinh luôn được lưu nếu gửi lên.
         if (isset($validated['date_of_birth'])) {
             $user->date_of_birth = $validated['date_of_birth'];
-            $user->age_group = $this->calculateAgeGroup($validated['date_of_birth']);
-        } 
-        // Otherwise, allow manual age_group setting
-        elseif (isset($validated['age_group'])) {
-            $user->age_group = $validated['age_group'];
         }
+
+        // Ưu tiên age_group tường minh, ngày sinh chỉ dùng để suy ra.
+        //
+        // Trước đây nhánh date_of_birth đứng trước và dùng if/elseif, nên khi
+        // client gửi cả hai thì age_group bị bỏ qua hoàn toàn — cùng họ lỗi với
+        // createSingleStudent: người dùng chọn một nhóm tuổi rồi nhận về nhóm
+        // khác mà không hiểu tại sao.
+        if (isset($validated['age_group'])) {
+            $user->age_group = $validated['age_group'];
+        } elseif (isset($validated['date_of_birth'])) {
+            $user->age_group = $this->calculateAgeGroup($validated['date_of_birth']);
+        }
+
 
         $user->theme_updated_at = now();
         $user->save();
