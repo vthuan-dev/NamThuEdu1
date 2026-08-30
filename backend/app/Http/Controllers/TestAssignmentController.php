@@ -135,6 +135,34 @@ class TestAssignmentController extends Controller
             ], 400);
         }
 
+        // Validate lịch mở làm bài và hạn chót
+        $now = now();
+        $startTime = $request->taStart_time ? new \Carbon\Carbon($request->taStart_time) : $now;
+        $deadline = $request->taDeadline ? new \Carbon\Carbon($request->taDeadline) : null;
+
+        // 1) Không cho phép mở làm bài ở quá khứ (nhỏ hơn 1 phút trước để tránh lệch đồng hồ nhỏ)
+        if ($request->taStart_time && new \Carbon\Carbon($request->taStart_time) < $now->copy()->subMinute()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Thời điểm mở làm bài không được ở quá khứ.'
+            ], 400);
+        }
+
+        // 2) Hạn chót tối thiểu = giờ mở + thời lượng đề + 10 phút dự phòng
+        if ($deadline) {
+            $duration = (int) ($exam->eDuration_minutes ?? 0);
+            // Khoảng đệm cố định: 10 phút
+            $minDeadline = $startTime->copy()->addMinutes($duration + 10);
+            if ($deadline < $minDeadline) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $duration > 0
+                        ? "Hạn chót quá sớm. Đề thi dài {$duration} phút, hạn chót phải cách thời điểm mở tối thiểu " . ($duration + 10) . " phút (sớm nhất là " . $minDeadline->format('Y-m-d H:i') . ")."
+                        : "Hạn chót phải sau thời điểm mở làm bài ít nhất 10 phút."
+                ], 400);
+            }
+        }
+
         // Lấy age_group từ exam (nguồn chính), fallback request. null/'all' = phổ quát.
         $rawAgeGroup = $exam->age_group ?? $request->age_group ?? null;
         $requiredAgeGroup = ($rawAgeGroup && $rawAgeGroup !== 'all') ? $rawAgeGroup : null;
@@ -662,6 +690,33 @@ class TestAssignmentController extends Controller
                     'status' => 'error',
                     'message' => 'Đề "' . $exam->eTitle . '" chưa được xuất bản. Vui lòng xuất bản đề trước khi giao cho học viên.'
                 ], 422);
+            }
+
+            // Validate lịch mở làm bài và hạn chót
+            $now = now();
+            $startTime = $request->taStart_time ? new \Carbon\Carbon($request->taStart_time) : $now;
+            $deadline = $request->taDeadline ? new \Carbon\Carbon($request->taDeadline) : null;
+
+            // 1) Không cho phép mở làm bài ở quá khứ
+            if ($request->taStart_time && new \Carbon\Carbon($request->taStart_time) < $now->copy()->subMinute()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Thời điểm mở làm bài không được ở quá khứ.'
+                ], 400);
+            }
+
+            // 2) Hạn chót tối thiểu
+            if ($deadline) {
+                $duration = (int) ($exam->eDuration_minutes ?? 0);
+                $minDeadline = $startTime->copy()->addMinutes($duration + 10);
+                if ($deadline < $minDeadline) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => $duration > 0
+                            ? "Hạn chót quá sớm. Đề thi dài {$duration} phút, hạn chót phải cách thời điểm mở tối thiểu " . ($duration + 10) . " phút (sớm nhất là " . $minDeadline->format('Y-m-d H:i') . ")."
+                            : "Hạn chót phải sau thời điểm mở làm bài ít nhất 10 phút."
+                    ], 400);
+                }
             }
 
             // Ưu tiên age_group từ exam, fallback request body (legacy).

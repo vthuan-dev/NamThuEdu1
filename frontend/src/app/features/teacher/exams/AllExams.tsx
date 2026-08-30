@@ -1417,7 +1417,13 @@ export function AllExams() {
                         onClick={(e) => {
                           e.stopPropagation();
                           setAssignExams([
-                            { eId: exam.eId, eTitle: exam.eTitle, eType: exam.eType, ageGroup: getAgeGroup(exam) },
+                            {
+                              eId: exam.eId,
+                              eTitle: exam.eTitle,
+                              eType: exam.eType,
+                              ageGroup: getAgeGroup(exam),
+                              durationMinutes: exam.eDuration,
+                            },
                           ]);
                         }}
                         className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-colors bg-indigo-600 text-white hover:bg-indigo-700 whitespace-nowrap"

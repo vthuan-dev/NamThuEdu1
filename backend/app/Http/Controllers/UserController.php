@@ -300,7 +300,10 @@ class UserController extends Controller
             ], 401);
         }
 
-        $query = User::where('uRole', 'student')
+        // with('class'): $mapStudent đọc $student->class->cName, thiếu eager load
+        // thì mỗi học viên sinh thêm một query lấy tên lớp (N+1).
+        $query = User::with('class:cId,cName')
+                    ->where('uRole', 'student')
                     ->whereNull('uDeleted_at');
 
         // Search by name or phone
@@ -352,6 +355,11 @@ class UserController extends Controller
                 'uCreated_at' => $student->uCreated_at,
                 'avatar_url' => $student->avatar_url,
                 'age_group' => $student->age_group,
+                // Lớp của học viên. Payload trước đây chỉ có age_group, nên phía
+                // giao đề không có cách nào biết một lớp gồm những ai — chỉ đọc
+                // được con số current_student_count từ /teacher/classes.
+                'class_id' => $student->class_id,
+                'class_name' => $student->class->cName ?? null,
             ];
         };
 

@@ -301,9 +301,10 @@ export function CreateThptExam() {
         eTitle: examTitle,
         eType: 'thpt',
         ageGroup: ageGroup,
+        durationMinutes: config.total_duration_minutes,
       },
     ];
-  }, [examId, examTitle, ageGroup]);
+  }, [examId, examTitle, ageGroup, config.total_duration_minutes]);
 
   /**
    * Snapshot dữ liệu lúc tải từ server (baseline) để so sánh phát hiện thay đổi.
