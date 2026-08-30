@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, X } from 'lucide-react';
 import { api } from '../../../../../services/api';
 import { useToast } from '../../../../../hooks/useToast';
 import { useExamSession } from '../../../../../hooks/exam/useExamSession';
@@ -15,7 +15,7 @@ import {
 import { examDraftStorage } from '../../../../../lib/exam/examDraftStorage';
 import type { ThptAnswers, ThptConfig } from './types';
 import { ThptTopBar } from './components/ThptTopBar';
-import { ThptPartNavigator } from './components/ThptPartNavigator';
+import { ThptPartNavigator, countThptProgress } from './components/ThptPartNavigator';
 import { ThptBottomNav } from './components/ThptBottomNav';
 import { SectionView } from './views/SectionView';
 import { parseVNDate } from '../../../../../utils/dateUtils';
@@ -149,6 +149,14 @@ export function StudentThptExamPage() {
   const navDragRef = useRef(false);
   // Khi panel Tiến độ được kéo ra thành floating, thu gọn cột giữ chỗ để nội dung mở rộng full.
   const [navFloating, setNavFloating] = useState(false);
+  /**
+   * Bottom sheet bảng Tiến độ trên mobile.
+   *
+   * Dưới `lg`, cột Tiến độ bị ẩn. Trước đây nó vẫn render nhưng vì layout là
+   * `flex-col lg:flex-row` nên nằm SAU toàn bộ câu hỏi trong DOM — học viên phải
+   * cuộn qua hết đề mới tới được bảng dùng để nhảy câu và soát câu còn sót.
+   */
+  const [navSheetOpen, setNavSheetOpen] = useState(false);
 
   useEffect(() => {
     if (!navDragging) return;
@@ -473,8 +481,14 @@ export function StudentThptExamPage() {
   // ThptExamController::startSubmission nhánh restart.
   const canRestart = attemptsAllowed <= 0 || attemptsUsed < attemptsAllowed;
 
+  // Dùng CHÍNH hàm mà bảng Tiến độ dùng, không đếm lại theo cách khác — hai phép
+  // đếm song song sẽ lệch nhau và học viên không biết tin số nào.
+  const progress = countThptProgress(config, session.answers as ThptAnswers);
+
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
+    // -mx-4 sm:-mx-8 phá khỏi padding của layout học viên để thanh trên và nền
+    // chạy hết bề ngang màn hình. Cùng cách TeensTestTaking đang dùng.
+    <div className="min-h-screen flex flex-col bg-slate-50 -mx-4 sm:-mx-8">
       <OfflineBanner online={session.online} pendingCount={session.pendingCount} />
       <TimeWarningBanner
         level={session.warningLevel}
@@ -488,7 +502,9 @@ export function StudentThptExamPage() {
         onRestart={canRestart ? handleRestart : undefined}
       />
 
-      <main data-thpt-main className="flex-1 max-w-7xl w-full mx-auto px-6 pt-6 pb-24 flex flex-col lg:flex-row gap-6">
+      {/* Trang đã full-bleed (-mx ở div gốc) nên tự cấp padding ngang lại.
+          pb-28 chừa chỗ cho thanh dưới + safe-area. */}
+      <main data-thpt-main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-28 flex flex-col lg:flex-row gap-6">
         <div className="min-w-0 flex-1">
           {activeSection && (
             <SectionErrorBoundary resetKey={activeSection.id} label={`phần "${activeSection.title}"`}>
@@ -524,9 +540,11 @@ export function StudentThptExamPage() {
           </div>
         )}
 
-        {/* Cột giữ chỗ: khi panel nổi thì thu gọn (w-0) để nội dung chiếm full bề ngang */}
+        {/* Cột giữ chỗ: khi panel nổi thì thu gọn (w-0) để nội dung chiếm full bề ngang.
+            `hidden lg:block`: dưới lg, bảng Tiến độ chuyển sang bottom sheet — để
+            nguyên ở đây thì nó nằm sau toàn bộ câu hỏi, phải cuộn hết đề mới thấy. */}
         <div
-          className={navFloating ? 'w-0 flex-none overflow-visible' : 'w-full lg:flex-none lg:w-[var(--nav-w)]'}
+          className={`hidden lg:block ${navFloating ? 'w-0 flex-none overflow-visible' : 'w-full lg:flex-none lg:w-[var(--nav-w)]'}`}
           style={navFloating ? undefined : { ['--nav-w' as any]: `${navW}px` }}
         >
           {/* Panel Tiến độ cũng bọc boundary: lỗi ở đây không được làm mất
@@ -543,6 +561,42 @@ export function StudentThptExamPage() {
         </div>
       </main>
 
+      {/* Bottom sheet bảng Tiến độ (mobile). Bấm số câu là nhảy phần và đóng luôn
+          — nếu để sheet mở thì nó che đúng câu học viên vừa chọn. */}
+      {navSheetOpen && (
+        <div className="lg:hidden fixed inset-0 z-[60] flex items-end">
+          <div
+            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+            onClick={() => setNavSheetOpen(false)}
+          />
+          <div
+            className="relative z-10 w-full max-h-[80vh] overflow-y-auto bg-white rounded-t-3xl p-4 shadow-2xl"
+            style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-bold text-slate-900">Tiến độ làm bài</h3>
+              <button
+                type="button"
+                onClick={() => setNavSheetOpen(false)}
+                className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors cursor-pointer"
+                aria-label="Đóng"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <SectionErrorBoundary resetKey={activeSection?.id ?? activeIdx} label="bảng Tiến độ">
+              <ThptPartNavigator
+                config={config}
+                answers={session.answers as ThptAnswers}
+                activeIdx={activeIdx}
+                onSectionChange={(idx) => { setActiveIdx(idx); setNavSheetOpen(false); }}
+                mode="sheet"
+              />
+            </SectionErrorBoundary>
+          </div>
+        </div>
+      )}
+
       <ThptBottomNav
         activePart={activeIdx}
         totalParts={sections.length}
@@ -552,7 +606,11 @@ export function StudentThptExamPage() {
         onNext={() => setActiveIdx((i) => Math.min(sections.length - 1, i + 1))}
         onSubmit={() => handleSubmit(false)}
         isSubmitting={isSubmitting}
+        onOpenProgress={() => setNavSheetOpen(true)}
+        answeredCount={progress.answered}
+        totalQuestions={progress.total}
       />
+      {/* Đặt SAU thanh dưới trong DOM nhưng nó là fixed nên vị trí không đổi. */}
       <SaveStatusIndicator
         status={session.saveStatus}
         lastSavedAt={session.lastSavedAt}

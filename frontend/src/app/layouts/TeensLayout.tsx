@@ -17,6 +17,7 @@ import {
   LogOut, Menu, X, Clock, User, ChevronDown,
 } from 'lucide-react';
 import { NotificationDropdown } from '../components/student/NotificationDropdown';
+import { isExamTakingPath } from '../../utils/examRoutes';
 
 // ─── Teens theme tokens (Teal/Cyan — distinct from Adults' purple) ───────────
 const TEAL = '#0D9488';
@@ -180,16 +181,24 @@ export function TeensLayout() {
       ? location.pathname === '/hoc-vien'
       : location.pathname === path || location.pathname.startsWith(path + '/');
 
+  // Ẩn chrome khi đang làm bài. Route thi nằm trong nhóm con của layout này,
+  // nên trên mobile header (h-16) xếp chồng lên thanh riêng của trang thi, ăn
+  // ~120px chiều cao mà không mang thông tin nào cần cho việc làm bài. Quan
+  // trọng hơn: menu điều hướng giữa bài thi khiến học viên dễ bấm ra ngoài và
+  // mất phiên, còn DailyMotivationPopup (z-[9998]) thì che cả đề lẫn nút Nộp bài.
+  const takingExam = isExamTakingPath(location.pathname);
+
   return (
     <div
       className="min-h-screen flex flex-col"
       style={{ background: 'linear-gradient(160deg, #F0FDFA 0%, #ECFEFF 40%, #F8FAFC 100%)' }}
     >
       <LogoutOverlay show={loggingOut} />
-      <NotificationPermissionBanner push={push} />
-      <PwaInstallBanner pwa={pwa} />
+      {!takingExam && <NotificationPermissionBanner push={push} />}
+      {!takingExam && <PwaInstallBanner pwa={pwa} />}
 
-      {/* Top Navbar */}
+      {/* Top Navbar — ẩn khi đang làm bài (ThptTopBar đã có nút Quay lại + đồng hồ) */}
+      {!takingExam && (
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200">
         <div className="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 gap-4">
@@ -384,6 +393,7 @@ export function TeensLayout() {
           </div>
         )}
       </header>
+      )}
 
       {/* Overlay for mobile menu */}
       {menuOpen && (
@@ -393,14 +403,26 @@ export function TeensLayout() {
         />
       )}
 
-      {/* Main Content */}
-      <main className="flex-1 min-w-0" style={{ paddingBottom: '80px' }}>
+      {/* Main Content.
+          Khi làm bài: bỏ padding-bottom 80px vì trang thi có thanh dưới riêng và
+          tự tính khoảng đệm (kèm safe-area) — cộng thêm 80px ở đây sẽ hở một dải
+          trắng dưới cùng.
+
+          CỐ Ý giữ lớp bọc `px-4 sm:px-8` cho cả hai trường hợp: các trang làm bài
+          (TeensTestTaking, KidsTestTaking…) dùng `-mx-4 sm:-mx-8` để cho thanh
+          tiêu đề chạy hết bề ngang. Bỏ lớp bọc thì margin âm đó tràn ra ngoài
+          viewport và sinh cuộn ngang. */}
+      <main className="flex-1 min-w-0" style={takingExam ? undefined : { paddingBottom: '80px' }}>
         <div className="mx-auto max-w-screen-2xl px-4 sm:px-8">
           <Outlet />
         </div>
       </main>
-      <ExamReminderPopup />
-      <DailyMotivationPopup accent="#0D9488" accentMid="#14B8A6" accentSoft="#F0FDFA" />
+      {/* Hai popup này nổi trên mọi thứ (z-[200] và z-[9998]) nên tuyệt đối
+          không được xuất hiện giữa bài thi. */}
+      {!takingExam && <ExamReminderPopup />}
+      {!takingExam && (
+        <DailyMotivationPopup accent="#0D9488" accentMid="#14B8A6" accentSoft="#F0FDFA" />
+      )}
 
       {/* Result Detail Modal */}
       {activeSubmissionId !== null && (

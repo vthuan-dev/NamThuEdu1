@@ -3,7 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover là điều kiện để env(safe-area-inset-*) trả về giá trị
+         thật. Không có nó, mọi xử lý safe-area (thanh nộp bài ở trang làm bài)
+         đều nhận 0 và nút bị home indicator của iPhone đè lên. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#F97316" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="mobile-web-app-capable" content="yes" />

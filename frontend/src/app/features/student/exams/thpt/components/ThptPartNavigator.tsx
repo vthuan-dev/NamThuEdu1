@@ -9,6 +9,13 @@ interface Props {
   onSectionChange: (idx: number) => void;
   /** Báo cho cha biết panel đang nổi (đã kéo ra khỏi vị trí mặc định) để cha thu gọn cột giữ chỗ. */
   onFloatingChange?: (floating: boolean) => void;
+  /**
+   * `sidebar` (mặc định, desktop): cột bên, kéo-thả được.
+   * `sheet` (mobile): nội dung trần để nhúng trong bottom sheet — KHÔNG kéo-thả
+   * (chỉ có handler chuột nên trên điện thoại vô dụng), và lưới câu giảm số cột
+   * để từng ô đủ to cho ngón tay.
+   */
+  mode?: 'sidebar' | 'sheet';
 }
 
 interface QItem {
@@ -92,7 +99,28 @@ function sectionQuestions(s: ThptSection, answers: ThptAnswers): QItem[] {
   }
 }
 
-export function ThptPartNavigator({ config, answers, activeIdx, onSectionChange, onFloatingChange }: Props) {
+/**
+ * Tổng số câu và số câu đã trả lời của cả đề.
+ *
+ * Xuất ra ngoài để thanh dưới (`ThptBottomNav`) hiển thị "12/40 câu" bằng CHÍNH
+ * phép đếm mà bảng Tiến độ dùng. Nếu mỗi chỗ tự đếm một kiểu thì hai con số sẽ
+ * lệch nhau và học viên không biết tin số nào — đúng loại lỗi đã từng xảy ra khi
+ * panel này hardcode [1,2,3,4] cho bài matching.
+ */
+export function countThptProgress(
+  config: ThptConfig,
+  answers: ThptAnswers,
+): { answered: number; total: number } {
+  const sections = asArray<ThptSection>(config?.sections);
+  const perSection = sections.map((s) => sectionQuestions(s, answers));
+  return {
+    total: perSection.reduce((sum, arr) => sum + arr.length, 0),
+    answered: perSection.reduce((sum, arr) => sum + arr.filter((x) => x.answered).length, 0),
+  };
+}
+
+export function ThptPartNavigator({ config, answers, activeIdx, onSectionChange, onFloatingChange, mode = 'sidebar' }: Props) {
+  const isSheet = mode === 'sheet';
   const sections = asArray<ThptSection>(config?.sections);
   const perSection = sections.map((s) => sectionQuestions(s, answers));
   const total = perSection.reduce((sum, arr) => sum + arr.length, 0);
@@ -138,21 +166,31 @@ export function ThptPartNavigator({ config, answers, activeIdx, onSectionChange,
   return (
     <aside
       data-thpt-nav
-      className={`rounded-2xl bg-white border border-slate-200 p-4 ${pos ? 'fixed z-50 w-[280px]' : 'sticky top-24 self-start max-h-[calc(100vh-7rem)] overflow-y-auto'}`}
-      style={pos ? { left: pos.x, top: pos.y, boxShadow: '0 12px 40px rgba(15,23,42,0.18)' } : undefined}
+      className={
+        isSheet
+          ? 'rounded-none bg-white p-0'
+          : `rounded-2xl bg-white border border-slate-200 p-4 ${pos ? 'fixed z-50 w-[280px]' : 'sticky top-24 self-start max-h-[calc(100vh-7rem)] overflow-y-auto'}`
+      }
+      style={!isSheet && pos ? { left: pos.x, top: pos.y, boxShadow: '0 12px 40px rgba(15,23,42,0.18)' } : undefined}
     >
+      {/* Trong sheet, tiêu đề và nút đóng do sheet ở trang cha lo; ở đây chỉ cần
+          dòng đếm tiến độ, và tuyệt đối không được có tay kéo. */}
       <div
-        onMouseDown={onDragStart}
-        className={`flex items-center justify-between mb-3 -mx-1 px-1 select-none ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-        title="Kéo để di chuyển bảng"
+        onMouseDown={isSheet ? undefined : onDragStart}
+        className={
+          isSheet
+            ? 'flex items-center justify-between mb-3'
+            : `flex items-center justify-between mb-3 -mx-1 px-1 select-none ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`
+        }
+        title={isSheet ? undefined : 'Kéo để di chuyển bảng'}
       >
         <div className="flex items-center gap-1.5">
-          <GripVertical className="w-4 h-4 text-slate-300" />
+          {!isSheet && <GripVertical className="w-4 h-4 text-slate-300" />}
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Tiến độ</h3>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold text-slate-700">{answered}/{total}</span>
-          {pos && (
+          {!isSheet && pos && (
             <button
               onClick={() => setPos(null)}
               className="text-[11px] font-semibold text-slate-400 hover:text-teal-600 transition-colors"
@@ -167,7 +205,9 @@ export function ThptPartNavigator({ config, answers, activeIdx, onSectionChange,
         <div className="h-full bg-teal-500 transition-all duration-300" style={{ width: `${total ? (answered / total) * 100 : 0}%` }} />
       </div>
 
-      <div className="space-y-2 max-h-[calc(100vh-14rem)] overflow-y-auto pr-1">
+      {/* Trong sheet, chiều cao do sheet cha giới hạn nên không đặt max-h riêng
+          (hai lần cuộn lồng nhau rất khó dùng trên điện thoại). */}
+      <div className={isSheet ? 'space-y-3' : 'space-y-2 max-h-[calc(100vh-14rem)] overflow-y-auto pr-1'}>
         {sections.map((s, idx) => {
           const items = perSection[idx];
           const cnt = items.filter((x) => x.answered).length;
@@ -193,13 +233,15 @@ export function ThptPartNavigator({ config, answers, activeIdx, onSectionChange,
                   </span>
                 </div>
               </button>
-              <div className="grid grid-cols-8 gap-1 mt-1 px-1">
+              <div className={`grid gap-1 mt-1 px-1 ${isSheet ? 'grid-cols-6 gap-2' : 'grid-cols-8'}`}>
                 {items.map((it) => (
                   <button
                     key={it.qn}
                     type="button"
                     onClick={() => onSectionChange(idx)}
-                    className={`aspect-square text-[10px] font-bold rounded transition-all cursor-pointer ${
+                    className={`text-[10px] font-bold rounded transition-all cursor-pointer ${
+                      isSheet ? 'min-h-10 text-xs' : 'aspect-square'
+                    } ${
                       it.answered ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                     }`}
                     title={`Câu ${it.qn}`}

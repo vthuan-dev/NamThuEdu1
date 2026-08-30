@@ -482,6 +482,25 @@ export function TeensTestTaking() {
   const [mobileActiveTab, setMobileActiveTab] = useState<'question' | 'passage'>('question');
   const [isMobilePassageModalOpen, setIsMobilePassageModalOpen] = useState(false);
 
+  /**
+   * Chiều cao thật của thanh tiêu đề, để tab switcher dính ngay bên dưới nó.
+   *
+   * Trước đây offset là `top-[120px]` hardcode (64px header layout + 56px tiêu
+   * đề). Con số đó sai theo hai cách: header layout nay đã ẩn khi làm bài, và
+   * tiêu đề cao hơn 56px khi tên đề xuống hai dòng trên màn hẹp. Đo bằng
+   * ResizeObserver nên tự đúng ở mọi bề rộng.
+   */
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  const [headerH, setHeaderH] = useState(56);
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setHeaderH(el.offsetHeight));
+    ro.observe(el);
+    setHeaderH(el.offsetHeight);
+    return () => ro.disconnect();
+  }, [started]);
+
   // Khi đổi câu hỏi hiện tại, tự động chuyển tab về hiển thị câu hỏi trên mobile
   useEffect(() => {
     setMobileActiveTab('question');
@@ -758,7 +777,14 @@ export function TeensTestTaking() {
         timeRemaining={session.timeRemaining}
       />
       {/* Header */}
-      <div className="sticky top-16 z-30 -mx-4 sm:-mx-8 px-4 sm:px-8 py-3 bg-white/90 backdrop-blur-md border-b border-slate-200">
+      {/* Header.
+          `top-0` chứ không phải `top-16`: header của layout học viên đã được ẩn
+          khi vào route làm bài (xem utils/examRoutes), nên chừa 64px cho nó sẽ
+          để hở một dải trắng ở đỉnh khi cuộn. */}
+      <div
+        ref={headerRef}
+        className="sticky top-0 z-30 -mx-4 sm:-mx-8 px-4 sm:px-8 py-3 bg-white/90 backdrop-blur-md border-b border-slate-200"
+      >
         <div className="flex items-center gap-4">
           <div className="min-w-0 flex-1">
             <h1 className="text-sm sm:text-base font-bold text-slate-900 truncate">{exam?.eTitle ?? 'Bài thi'}</h1>
@@ -784,7 +810,14 @@ export function TeensTestTaking() {
 
       {/* Tab Switcher cho Mobile (đọc hiểu / ảnh đề listening) */}
       {isBlockMode && (
-        <div className="lg:hidden flex border-b border-slate-200 bg-white sticky top-[120px] z-20 -mx-4 px-4">
+        // Tab switcher dính NGAY dưới thanh tiêu đề. Trước đây hardcode
+        // `top-[120px]` (= 64px header layout + 56px tiêu đề) — sai ngay khi ẩn
+        // header, và cũng sai khi tiêu đề xuống hai dòng trên màn hẹp. Đo chiều
+        // cao thật thay vì đoán.
+        <div
+          className="lg:hidden flex border-b border-slate-200 bg-white sticky z-20 -mx-4 px-4"
+          style={{ top: headerH }}
+        >
           <button 
             onClick={() => setMobileActiveTab('question')}
             className={`flex-1 py-3 text-center text-sm font-bold border-b-2 transition-colors ${mobileActiveTab === 'question' ? 'border-teal-600 text-teal-600 font-extrabold' : 'border-transparent text-slate-500'}`}
@@ -1193,35 +1226,50 @@ export function TeensTestTaking() {
         </aside>
       </div>
 
-      {/* Bottom bar (mobile) */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
-        <div className="px-4 py-3 flex items-center gap-3">
+      {/* Bottom bar (mobile).
+          Nút "Nộp" LUÔN hiển thị, giống ThptBottomNav: trước đây nó chỉ có ở câu
+          cuối, nên học viên trả lời xong nhưng đang xem lại câu giữa thì không
+          có cách nào nộp mà không tự bấm sang câu cuối trước. */}
+      <div
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]"
+        // Tránh home indicator của iPhone đè lên nút Nộp.
+        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+      >
+        <div className="px-3 pt-2 flex items-center gap-2">
           <button onClick={() => setCurrent(c => Math.max(0, c - 1))} disabled={current === 0}
-            className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-semibold text-slate-600 bg-slate-100 disabled:opacity-40">
+            aria-label="Câu trước"
+            className="inline-flex items-center justify-center min-h-11 px-3 rounded-xl font-semibold text-slate-600 bg-slate-100 disabled:opacity-40 flex-shrink-0">
             <ArrowLeft className="w-4 h-4" />
           </button>
-          
-          <button 
+
+          <button
             onClick={() => setIsMobileNavOpen(true)}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+            className="flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 min-h-11 px-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
           >
-            <ListChecks className="w-4 h-4 text-teal-600" />
-            <span>Câu {current + 1}/{total} ({answeredCount} câu)</span>
+            <ListChecks className="w-4 h-4 text-teal-600 flex-shrink-0" />
+            <span className="truncate">Câu {current + 1}/{total} ({answeredCount} câu)</span>
           </button>
 
-          {isLast ? (
-            <button onClick={() => setShowSubmit(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white transition-transform active:scale-95"
-              style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
-              <Send className="w-4 h-4" /> Nộp
-            </button>
-          ) : (
+          {!isLast && (
             <button onClick={() => setCurrent(c => Math.min(total - 1, c + 1))}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white transition-transform active:scale-95"
+              aria-label="Câu tiếp"
+              className="inline-flex items-center justify-center min-h-11 px-3 rounded-xl font-bold text-white transition-transform active:scale-95 flex-shrink-0"
               style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
-              Tiếp <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4" />
             </button>
           )}
+
+          {/* Ở câu cuối thì nút Nộp đầy màu (hành động mong đợi); ở câu giữa thì
+              nhẹ hơn để không mời gọi bấm sớm, nhưng vẫn luôn với tới được. */}
+          <button
+            onClick={() => setShowSubmit(true)}
+            className={`inline-flex items-center justify-center gap-1.5 min-h-11 px-3 rounded-xl font-bold transition-transform active:scale-95 flex-shrink-0 ${
+              isLast ? 'text-white' : 'text-teal-700 bg-teal-50 border border-teal-200'
+            }`}
+            style={isLast ? { background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` } : undefined}
+          >
+            <Send className="w-4 h-4" /> Nộp
+          </button>
         </div>
       </div>
 
@@ -1229,7 +1277,10 @@ export function TeensTestTaking() {
       {isBlockMode && mobileActiveTab === 'question' && (
         <button
           onClick={() => setIsMobilePassageModalOpen(true)}
-          className="lg:hidden fixed bottom-20 right-4 z-40 w-12 h-12 rounded-full bg-teal-600 hover:bg-teal-700 text-white shadow-lg flex items-center justify-center transition-transform active:scale-90"
+          className="lg:hidden fixed right-4 z-40 w-12 h-12 rounded-full bg-teal-600 hover:bg-teal-700 text-white shadow-lg flex items-center justify-center transition-transform active:scale-90"
+          // bottom-20 cũ không tính safe-area nên trên iPhone nút này nằm sát
+          // (hoặc đè) thanh dưới. Cộng thêm phần inset.
+          style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom))' }}
           title={isImageBlock ? 'Xem ảnh đề' : 'Xem đoạn văn'}
         >
           {isImageBlock ? <ImageIcon className="w-5 h-5" /> : <BookOpen className="w-5 h-5" />}
