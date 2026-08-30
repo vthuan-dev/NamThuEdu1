@@ -22,7 +22,6 @@ import {
   Trash2,
   Pin,
   FileText,
-  Target,
   GraduationCap,
   ArrowUp,
   ArrowDown,
@@ -1194,15 +1193,6 @@ export function GradingQueue() {
                               const subs = selectedStudentData.submissions;
                               const pending = subs.filter((s) => !s.teacher_reviewed_at).length;
                               const reviewed = subs.length - pending;
-                              // Trung bình phải tính trên điểm ĐÃ quy đổi. Trước
-                              // đây cộng thẳng sScore nên 37.50 (phần trăm) bị
-                              // cộng với 3.40 (hệ 10) → "TB: 20.45" vô nghĩa.
-                              const scoredDisplay = subs
-                                .map((s) => getSubmissionDisplayScore(s))
-                                .filter((d): d is NonNullable<typeof d> => d !== null);
-                              const avg = scoredDisplay.length > 0
-                                ? scoredDisplay.reduce((sum, d) => sum + d.value / d.max, 0) / scoredDisplay.length * 10
-                                : null;
                               return (
                                 <>
                                   {sourceTab === "assigned" && pending > 0 && (
@@ -1215,12 +1205,6 @@ export function GradingQueue() {
                                     <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold whitespace-nowrap">
                                       <CheckCircle2 className="w-3.5 h-3.5" />
                                       {reviewed} đã duyệt
-                                    </span>
-                                  )}
-                                  {avg !== null && (
-                                    <span className="inline-flex items-center gap-1 text-violet-600 font-semibold whitespace-nowrap">
-                                      <Target className="w-3.5 h-3.5" />
-                                      TB: {avg.toFixed(2)}/10
                                     </span>
                                   )}
                                 </>
