@@ -37,11 +37,27 @@ const resolveIcon = (name: string, fallback: LucideIcon = FileText): LucideIcon 
   return typeof found === 'object' || typeof found === 'function' ? (found as LucideIcon) ?? fallback : fallback;
 };
 
-// Ảnh banner cho từng nhóm tuổi (đặt trong public/images).
-const AGE_GROUP_IMAGE: Record<string, string> = {
-  kids: '/images/agecard-kids.png',
-  teens: '/images/agecard-teens.png',
-  adults: '/images/agecard-adults.png',
+/**
+ * Ảnh banner cho từng nhóm tuổi (đặt trong public/images).
+ *
+ * Ba thẻ này nằm ngay trong khung nhìn đầu tiên nên phải hiện gần như tức thì.
+ * Bản PNG gốc là 1024x1024 và nặng 404–554 KB mỗi ảnh (tổng ~1.4 MB) trong khi ô
+ * hiển thị chỉ cao 112px, nên ưu tiên WebP đã resize; PNG chỉ còn là fallback cho
+ * trình duyệt không hỗ trợ WebP. Xem `optimize_agecard_images.cjs` để tạo lại.
+ */
+const AGE_GROUP_IMAGE: Record<string, { webp: string; png: string }> = {
+  kids: {
+    webp: '/images/agecard-kids-400.webp 400w, /images/agecard-kids-800.webp 800w',
+    png: '/images/agecard-kids.png',
+  },
+  teens: {
+    webp: '/images/agecard-teens-400.webp 400w, /images/agecard-teens-800.webp 800w',
+    png: '/images/agecard-teens.png',
+  },
+  adults: {
+    webp: '/images/agecard-adults-400.webp 400w, /images/agecard-adults-800.webp 800w',
+    png: '/images/agecard-adults.png',
+  },
 };
 
 export function CreateExamSetup() {
@@ -138,14 +154,25 @@ export function CreateExamSetup() {
                         <Check className="h-3.5 w-3.5 text-white" />
                       </span>
                     )}
-                    {/* Ảnh banner */}
+                    {/* Ảnh banner — tải sớm vì nằm trong khung nhìn đầu tiên */}
                     <div className="h-28 w-full overflow-hidden bg-slate-50">
-                      <img
-                        src={img}
-                        alt={g.label}
-                        loading="lazy"
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                      />
+                      <picture>
+                        <source
+                          type="image/webp"
+                          srcSet={img?.webp}
+                          sizes="(min-width: 1024px) 200px, (min-width: 640px) 30vw, 90vw"
+                        />
+                        <img
+                          src={img?.png}
+                          alt={`Nhóm ${g.label} — ${g.range}`}
+                          width={1024}
+                          height={1024}
+                          loading="eager"
+                          fetchPriority="high"
+                          decoding="async"
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                      </picture>
                     </div>
                     {/* Nội dung */}
                     <div className="p-5">
