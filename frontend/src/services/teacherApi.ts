@@ -900,6 +900,17 @@ export const teacherApi = {
     },
 
     /**
+     * Alias for getAll
+     */
+    async getAssignments(params?: {
+      exam_id?: number;
+      target_type?: 'class' | 'student';
+      target_id?: number;
+    }): Promise<ApiResponse<TestAssignment[]>> {
+      return this.getAll(params);
+    },
+
+    /**
      * Assign an exam to a target (class or student)
      * @param examId - Exam ID
      * @param targetType - Target type (class or student)

@@ -86,7 +86,7 @@ export function TeacherAssignmentManagement({ onSelectSubmission }: { onSelectSu
     else setLoading(true);
 
     try {
-      const res: any = await teacherApi.assignments.getAssignments();
+      const res: any = await teacherApi.assignments.getAll();
       const list = res?.data ?? res ?? [];
       setAssignments(Array.isArray(list) ? list : []);
     } catch (err: any) {
