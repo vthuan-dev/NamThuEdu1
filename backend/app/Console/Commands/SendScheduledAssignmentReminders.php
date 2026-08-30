@@ -58,11 +58,35 @@ class SendScheduledAssignmentReminders extends Command
                 continue;
             }
 
+            // Bỏ qua các học viên đã nộp / hoàn thành đề này (theo assignment_id hoặc theo exam_id)
+            $completedStudentIds = \App\Models\Submission::whereIn('user_id', $students->pluck('uId'))
+                ->where(function ($q) use ($assignment) {
+                    $q->where('assignment_id', $assignment->taId)
+                        ->orWhere('exam_id', $assignment->exam_id);
+                })
+                ->whereIn('sStatus', [
+                    'submitted',
+                    'graded',
+                    'auto_submitted',
+                    'grading_subjective',
+                    'partially_graded',
+                    'ai_graded',
+                ])
+                ->pluck('user_id')
+                ->all();
+
+            $pendingStudents = $students->filter(fn($s) => !in_array($s->uId, $completedStudentIds));
+            if ($pendingStudents->isEmpty()) {
+                $assignment->taNotified_at = $now;
+                $assignment->save();
+                continue;
+            }
+
             $examTitle = $assignment->exam->eTitle ?? 'Bài tập';
             $whenText = $anchor->format('H:i d/m/Y');
             $message = "Bài tập \"{$examTitle}\" sẽ diễn ra lúc {$whenText}. Hãy chuẩn bị nhé!";
 
-            foreach ($students as $student) {
+            foreach ($pendingStudents as $student) {
                 AssignmentReminder::create([
                     'assignment_id' => $assignment->taId,
                     'student_id'    => $student->uId,
@@ -73,7 +97,7 @@ class SendScheduledAssignmentReminders extends Command
 
             try {
                 $pushService->sendToUsers(
-                    $students->pluck('uId')->toArray(),
+                    $pendingStudents->pluck('uId')->toArray(),
                     '⏰ Sắp đến giờ làm bài',
                     $message,
                     ['url' => '/hoc-vien/bai-tap']

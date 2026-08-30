@@ -2283,24 +2283,23 @@ class StudentTestController extends Controller
             $daysUntil = now()->diffInDays($deadline, false);
             $isUrgent = $daysUntil <= 1;
 
-            // Skip if student has any active submission for this assignment
+            // Skip if student has any active or completed submission for this assignment or exam
             // (in_progress belongs to /tests/in-progress; finished belongs to /tests completed)
-            //
-            // Phải đủ CẢ 6 trạng thái đã nộp. Thiếu grading_subjective /
-            // partially_graded / ai_graded thì bài đã nộp đang chờ chấm chủ quan
-            // vẫn hiện ở "sắp tới" như chưa làm. getNotifications dùng đủ 6.
             $hasActivity = Submission::where('user_id', $studentId)
-                ->where('assignment_id', $assignment->taId)
+                ->where(function ($q) use ($assignment) {
+                    $q->where('assignment_id', $assignment->taId)
+                        ->orWhere('exam_id', $assignment->exam_id);
+                })
                 ->whereIn('sStatus', [
                     'in_progress',
                     'submitted',
                     'graded',
+                    'auto_submitted',
                     'grading_subjective',
                     'partially_graded',
                     'ai_graded',
                 ])
                 ->exists();
-
 
             if ($hasActivity) {
                 return null;
@@ -2457,7 +2456,20 @@ class StudentTestController extends Controller
         $urgent = $request->boolean('urgent', false);
         $limit = (int) $request->input('limit', 20);
 
-        $notifications = [];
+        // Lấy tất cả submission của học viên này đã nộp / hoàn thành (cả theo assignment_id và theo exam_id)
+        $completedSubmissions = Submission::where('user_id', $studentId)
+            ->whereIn('sStatus', [
+                'submitted',
+                'graded',
+                'auto_submitted',
+                'grading_subjective',
+                'partially_graded',
+                'ai_graded',
+            ])
+            ->get(['sId', 'exam_id', 'assignment_id']);
+
+        $completedAssignmentIds = $completedSubmissions->pluck('assignment_id')->filter()->flip();
+        $completedExamIds = $completedSubmissions->pluck('exam_id')->filter()->flip();
 
         // Assignments with deadline within 24 hours
         $urgentAssignments = TestAssignment::where(function ($q) use ($studentId, $classIds) {
@@ -2470,28 +2482,18 @@ class StudentTestController extends Controller
             ->whereNotNull('taDeadline')
             ->where('taDeadline', '>=', now())
             ->where('taDeadline', '<=', now()->addDay())
-            // Đã hoàn thành thì đừng nhắc nữa. Trước đây query chỉ lọc theo
-            // deadline nên học viên nộp bài xong vẫn nhận "Bài thi sắp hết hạn —
-            // hãy hoàn thành ngay", trong khi thẻ bài ngay bên cạnh hiện "Hoàn
-            // thành". Dùng completed statuses giống chỗ khác (in_progress KHÔNG
-            // tính là xong — bài dở vẫn nên được nhắc).
-            ->whereDoesntHave('submissions', function ($q) use ($studentId) {
-                $q->where('user_id', $studentId)
-                    ->whereIn('sStatus', [
-                        'submitted',
-                        'graded',
-                        'auto_submitted',
-                        'grading_subjective',
-                        'partially_graded',
-                        'ai_graded',
-                    ]);
-            })
             ->with(['exam'])
             ->get();
 
         foreach ($urgentAssignments as $assignment) {
             if (!$assignment->exam)
                 continue;
+
+            // Đã hoàn thành (dù qua assignment_id này hay trực tiếp qua exam_id của đề) thì TUYỆT ĐỐI không nhắc sắp hết hạn
+            if ($completedAssignmentIds->has($assignment->taId) || $completedExamIds->has($assignment->exam_id)) {
+                continue;
+            }
+
             $hoursLeft = (int) now()->diffInHours($assignment->taDeadline, false);
             $notifications[] = [
                 'id' => 'assignment_' . $assignment->taId,
@@ -2616,15 +2618,25 @@ class StudentTestController extends Controller
             ->take(5)
             ->get();
 
-        $startedAssignmentIds = Submission::where('user_id', $studentId)
-            ->pluck('assignment_id')
-            ->filter()
-            ->flip();
+        $allStudentSubmissions = Submission::where('user_id', $studentId)
+            ->whereIn('sStatus', [
+                'in_progress',
+                'submitted',
+                'graded',
+                'auto_submitted',
+                'grading_subjective',
+                'partially_graded',
+                'ai_graded',
+            ])
+            ->get(['sId', 'exam_id', 'assignment_id']);
+
+        $startedAssignmentIds = $allStudentSubmissions->pluck('assignment_id')->filter()->flip();
+        $startedExamIds = $allStudentSubmissions->pluck('exam_id')->filter()->flip();
 
         foreach ($newAssignments as $assignment) {
             if (!$assignment->exam)
                 continue;
-            if ($startedAssignmentIds->has($assignment->taId))
+            if ($startedAssignmentIds->has($assignment->taId) || $startedExamIds->has($assignment->exam_id))
                 continue;
             $notifications[] = [
                 'id' => 'new_' . $assignment->taId,
