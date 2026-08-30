@@ -28,6 +28,7 @@ import { studentApi } from "../../../../services/studentApi";
 import { api } from "../../../../services/api";
 import { usePageTitle } from "../../../../hooks/usePageTitle";
 import { useExamSession } from "../../../../hooks/exam/useExamSession";
+import { useConfirm } from "../../../../contexts/ConfirmContext";
 import { PassageSplitLayout } from "../components/PassageSplitLayout";
 import { sanitizePassageHtml } from "../../../../utils/examUtils";
 import { RichText } from "../../../../components/ui/RichText";
@@ -165,6 +166,7 @@ function SubmitDialog({
 export function StudentVstepExamPage() {
   const { examId } = useParams<{ examId: string }>();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const location = useLocation();
 
   /* ── Query params (from ExamLobby flow) ─────────────────── */
@@ -975,11 +977,18 @@ export function StudentVstepExamPage() {
       // ─── Nếu có chunk thất bại → CHẶN submit, alert user, để user retry ──
       if (failedChunks.length > 0) {
         const lostCount = failedChunks.reduce((s, c) => s + c.length, 0);
-        const ok = window.confirm(
-          `Có ${lostCount} câu trả lời chưa lưu được lên server (mạng yếu hoặc server lỗi).\n\n` +
-          `• Bấm OK để thử nộp bài (server sẽ lưu lại từ những gì đã có).\n` +
-          `• Bấm Cancel để dừng và kiểm tra mạng rồi nộp lại.`
-        );
+        // Nội dung cũ phải hướng dẫn theo tên nút của trình duyệt ("Bấm OK để…",
+        // "Bấm Cancel để…") vì window.confirm không cho đặt nhãn. Giờ nhãn nút
+        // nói thẳng hành động nên không cần giải thích.
+        const ok = await confirm({
+          tone: 'warning',
+          title: 'Một số câu chưa lưu được',
+          message:
+            'Mạng yếu hoặc server lỗi nên chưa đẩy được hết câu trả lời lên. Bạn có thể dừng để kiểm tra mạng rồi nộp lại, hoặc nộp ngay với phần server đã nhận được.',
+          highlight: `${lostCount} câu trả lời có thể không được tính nếu nộp ngay.`,
+          confirmLabel: 'Vẫn nộp bài',
+          cancelLabel: 'Dừng để kiểm tra mạng',
+        });
         if (!ok) {
           setSubmitting(false);
           return;
@@ -1137,7 +1146,9 @@ export function StudentVstepExamPage() {
   };
 
   /* ── Next part ──────────────────────────────────────────── */
-  const goNext = () => {
+  // async vì hộp xác nhận chuyển kỹ năng trả promise. Hàm này chỉ được dùng làm
+  // onClick nên không có chỗ gọi nào cần giá trị trả về.
+  const goNext = async () => {
     const idx = examPartOrder.findIndex((o) => o.skill === current.skill && o.part === current.partNumber);
     const next = examPartOrder[idx + 1];
     if (!next) return;
@@ -1155,17 +1166,29 @@ export function StudentVstepExamPage() {
       }
       if (unanswered.length > 0) {
         const nums = unanswered.slice(0, 15).join(", ") + (unanswered.length > 15 ? ` ... (${unanswered.length} câu)` : "");
-        window.alert(
-          `⚠️ Bạn còn ${unanswered.length} câu chưa trả lời trong phần ${SKILL_META[current.skill].label}:\n\nCâu: ${nums}\n\nVui lòng hoàn thành tất cả câu hỏi trước khi chuyển sang phần tiếp theo.`
-        );
+        // Đây là chặn cứng, không phải câu hỏi — chỉ có một lối đi tiếp là quay
+        // lại làm bài, nên dùng confirm với một nút thay vì alert.
+        await confirm({
+          tone: 'warning',
+          title: `Còn ${unanswered.length} câu chưa trả lời`,
+          message: `Bạn cần hoàn thành hết phần ${SKILL_META[current.skill].label} trước khi chuyển sang phần tiếp theo.`,
+          highlight: `Câu: ${nums}`,
+          confirmLabel: 'Quay lại làm bài',
+          cancelLabel: 'Đóng',
+        });
         return;
       }
       // All answered — confirm skill change (cannot go back)
       const curMeta = SKILL_META[current.skill];
       const nextMeta = SKILL_META[next.skill];
-      const ok = window.confirm(
-        `✅ Bạn đã hoàn thành "${curMeta.label}".\n\nBạn sắp chuyển sang "${nextMeta.label}". Sau khi chuyển, bạn sẽ KHÔNG THỂ quay lại phần "${curMeta.label}" nữa.\n\nBạn có chắc chắn muốn tiếp tục?`
-      );
+      const ok = await confirm({
+        tone: 'warning',
+        title: `Chuyển sang "${nextMeta.label}"?`,
+        message: `Bạn đã hoàn thành "${curMeta.label}".`,
+        highlight: `Sau khi chuyển, bạn KHÔNG THỂ quay lại phần "${curMeta.label}" nữa.`,
+        confirmLabel: 'Chuyển phần',
+        cancelLabel: 'Ở lại phần này',
+      });
       if (!ok) return;
     }
     navigate2(next.skill, next.part);
@@ -1284,7 +1307,16 @@ export function StudentVstepExamPage() {
               </Link>
             ) : (
               <button
-                onClick={() => { if (confirm("Bạn có chắc muốn thoát? Tiến độ sẽ được lưu lại.")) navigate(`${STUDENT_BASE_PATH}/de-thi`); }}
+                onClick={async () => {
+                  const ok = await confirm({
+                    tone: 'question',
+                    title: 'Thoát bài thi?',
+                    message: 'Tiến độ của bạn được lưu lại, bạn có thể quay lại làm tiếp.',
+                    confirmLabel: 'Thoát',
+                    cancelLabel: 'Tiếp tục làm',
+                  });
+                  if (ok) navigate(`${STUDENT_BASE_PATH}/de-thi`);
+                }}
                 className="p-2 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0"
               >
                 <ArrowLeft className="w-5 h-5 text-slate-600" />

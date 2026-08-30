@@ -129,3 +129,25 @@
   from { transform: scaleX(1); }
   to { transform: scaleX(0); }
 }
+
+/* ConfirmDialog — lớp nền mờ dần, panel trượt lên kèm nảy nhẹ.
+   Thiếu hai keyframes này thì `animate-[...]` trong component im lặng không làm
+   gì và hộp thoại bật ra đột ngột. */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes confirmIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Người dùng bật "giảm chuyển động" trong hệ điều hành thì bỏ hiệu ứng trượt —
+   hộp thoại vẫn hiện, chỉ không nhảy. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes confirmIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+}

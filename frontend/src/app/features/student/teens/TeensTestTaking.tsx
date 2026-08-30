@@ -23,6 +23,7 @@ import {
 import { studentApi } from '../../../../services/studentApi';
 import { api } from '../../../../services/api';
 import { useExamSession } from '../../../../hooks/exam/useExamSession';
+import { useConfirm } from '../../../../contexts/ConfirmContext';
 import {
   SaveStatusIndicator,
   OfflineBanner,
@@ -451,6 +452,7 @@ export function TeensTestTaking() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const assignmentId = Number(id);
 
   const autoStart = useMemo(() => new URLSearchParams(location.search).get('autostart') === '1', [location.search]);
@@ -1420,7 +1422,15 @@ export function TeensTestTaking() {
         open={showActiveSessionModal}
         onContinue={() => setShowActiveSessionModal(false)}
         onRestart={async () => {
-          if (!window.confirm("Bạn có chắc chắn muốn hủy phiên làm bài hiện tại và làm lại từ đầu? Tất cả câu trả lời của phiên này sẽ bị xóa.")) return;
+          const ok = await confirm({
+            tone: 'danger',
+            title: 'Làm lại từ đầu?',
+            message: 'Phiên làm bài hiện tại sẽ bị huỷ và bắt đầu lại.',
+            highlight: 'Toàn bộ câu trả lời của phiên này sẽ bị xoá.',
+            confirmLabel: 'Huỷ và làm lại',
+            cancelLabel: 'Giữ phiên này',
+          });
+          if (!ok) return;
           setIsRestarting(true);
           try {
             const examKey = exam?.id ?? exam?.eId ?? assignmentId;

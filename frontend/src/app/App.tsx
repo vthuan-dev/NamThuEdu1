@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { router } from "./routes";
 import "../i18n";
 import { ToastProvider } from "../contexts/ToastContext";
+import { ConfirmProvider } from "../contexts/ConfirmContext";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -42,7 +43,11 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <RouterProvider router={router} />
+        {/* ConfirmProvider nằm trong ToastProvider: sau khi xác nhận thường có
+            một toast báo kết quả, nên hộp thoại phải gọi được toast. */}
+        <ConfirmProvider>
+          <RouterProvider router={router} />
+        </ConfirmProvider>
       </ToastProvider>
     </QueryClientProvider>
   );

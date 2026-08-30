@@ -23,6 +23,7 @@ import {
 } from '../../../../components/exam';
 import { examDraftStorage } from '../../../../lib/exam/examDraftStorage';
 import { useToast } from '../../../../hooks/useToast';
+import { useConfirm } from '../../../../contexts/ConfirmContext';
 
 const BASE = '/hoc-vien';
 
@@ -122,6 +123,7 @@ export function KidsTestTaking() {
   const navigate = useNavigate();
   const assignmentId = Number(id);
   const toast = useToast();
+  const confirm = useConfirm();
 
   const autoStart = useMemo(() => new URLSearchParams(location.search).get('autostart') === '1', [location.search]);
   // direct=1 → `id` là examId, bắt đầu trực tiếp không cần assignment (đề chưa được giao)
@@ -624,7 +626,16 @@ export function KidsTestTaking() {
         open={showActiveSessionModal}
         onContinue={() => setShowActiveSessionModal(false)}
         onRestart={async () => {
-          if (!window.confirm("Con có chắc chắn muốn hủy phiên làm bài hiện tại và làm lại từ đầu? Tất cả câu trả lời của phiên này sẽ bị xóa.")) return;
+          // Giữ cách gọi "Con" như toàn bộ giao diện Kids.
+          const ok = await confirm({
+            tone: 'danger',
+            title: 'Làm lại từ đầu nhé?',
+            message: 'Bài con đang làm sẽ được bắt đầu lại từ câu đầu tiên.',
+            highlight: 'Các câu con đã làm sẽ bị xoá hết.',
+            confirmLabel: 'Làm lại',
+            cancelLabel: 'Tiếp tục bài cũ',
+          });
+          if (!ok) return;
           setIsRestarting(true);
           try {
             const examKey = exam?.id ?? exam?.eId ?? assignmentId;

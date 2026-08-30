@@ -22,6 +22,7 @@ import { api } from "../../../../../services/api";
 import { usePageTitle } from "../../../../../hooks/usePageTitle";
 import { useToastContext } from "../../../../../contexts/ToastContext";
 import { useExamSession } from "../../../../../hooks/exam/useExamSession";
+import { useConfirm } from "../../../../../contexts/ConfirmContext";
 import {
   SaveStatusIndicator,
   OfflineBanner,
@@ -195,6 +196,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
   const { examId: examIdParam } = useParams<{ examId: string }>();
   const examId = Number(examIdParam);
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [searchParams] = useSearchParams();
   const toast = useToastContext();
   const userStr = typeof window !== "undefined" ? localStorage.getItem("user") : null;
@@ -665,11 +667,24 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
 
     void (async () => {
       const saved = await session.flushNow().then(() => true).catch(() => false);
-      const ok = window.confirm(
-        saved
-          ? "Bạn đang làm bài và đáp án tạm thời đã được lưu. Bạn có chắc muốn rời khỏi trang làm bài không?"
-          : "Bạn đang làm bài nhưng hệ thống chưa xác nhận lưu đáp án mới nhất. Bạn vẫn muốn rời khỏi trang làm bài không?"
-      );
+      // Sắc thái đọc theo kết quả flush: chưa xác nhận lưu là rủi ro mất bài,
+      // nên dùng warning kèm ô nhấn mạnh; đã lưu thì chỉ là câu hỏi bình thường.
+      const ok = saved
+        ? await confirm({
+            tone: 'question',
+            title: 'Rời trang làm bài?',
+            message: 'Đáp án tạm thời đã được lưu, bạn có thể quay lại làm tiếp.',
+            confirmLabel: 'Rời trang',
+            cancelLabel: 'Tiếp tục làm',
+          })
+        : await confirm({
+            tone: 'warning',
+            title: 'Rời trang khi chưa lưu xong?',
+            message: 'Hệ thống chưa xác nhận lưu được đáp án mới nhất của bạn.',
+            highlight: 'Một số câu vừa làm có thể bị mất.',
+            confirmLabel: 'Vẫn rời trang',
+            cancelLabel: 'Ở lại thử lưu tiếp',
+          });
       if (ok) {
         routeBlocker.proceed();
       } else {

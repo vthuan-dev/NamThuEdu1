@@ -17,6 +17,7 @@ import {
 import { usePageTitle, PAGE_TITLES } from '../../../../hooks/usePageTitle';
 import { ExamNewsFeed } from './components/ExamNewsFeed';
 import { NextGoalCard } from '../components/NextGoalCard';
+import { useConfirm } from '../../../../contexts/ConfirmContext';
 
 // ─── Design tokens (Teal/Cyan — Teens theme, distinct from Adults' purple) ──────
 const INDIGO       = '#0D9488';
@@ -160,6 +161,7 @@ export function TeensDashboard() {
   const [gam, setGam] = useState<GamificationData | null>(null);
   const [inProgress, setInProgress] = useState<InProgressTest[]>([]);
   const [upcoming, setUpcoming] = useState<UpcomingTest[]>([]);
+  const confirm = useConfirm();
   const [reminders, setReminders] = useState<TeacherReminder[]>([]);
   const [pendingAssignments, setPendingAssignments] = useState<TestAssignment[]>([]);
   const [skillStats, setSkillStats] = useState<Record<string, { attempts: number; average_score: number; best_score: number }> | null>(null);
@@ -291,7 +293,15 @@ export function TeensDashboard() {
   };
 
   const handleResetSession = async (examId: number, type: string, submissionId: number) => {
-    if (!window.confirm('Bạn có chắc chắn muốn hủy phiên làm bài hiện tại và làm lại từ đầu? Mọi câu trả lời chưa nộp sẽ bị xóa.')) return;
+    const ok = await confirm({
+      tone: 'danger',
+      title: 'Làm lại từ đầu?',
+      message: 'Phiên làm bài hiện tại sẽ bị huỷ và bắt đầu lại.',
+      highlight: 'Mọi câu trả lời chưa nộp sẽ bị xoá.',
+      confirmLabel: 'Huỷ và làm lại',
+      cancelLabel: 'Giữ phiên này',
+    });
+    if (!ok) return;
     setIsResetting(true);
     try {
       const typeUpper = String(type || '').toUpperCase();

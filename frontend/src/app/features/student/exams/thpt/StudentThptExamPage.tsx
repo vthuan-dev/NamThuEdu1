@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { Loader2, AlertCircle, X } from 'lucide-react';
 import { api } from '../../../../../services/api';
 import { useToast } from '../../../../../hooks/useToast';
+import { useConfirm } from '../../../../../contexts/ConfirmContext';
 import { useExamSession } from '../../../../../hooks/exam/useExamSession';
 import {
   SaveStatusIndicator,
@@ -120,6 +121,7 @@ export function StudentThptExamPage() {
   const assignmentId = searchParams.get('assignmentId');
   const navigate = useNavigate();
   const toast = useToast();
+  const confirm = useConfirm();
 
   const [examTitle, setExamTitle] = useState('Đề thi');
   const [config, setConfig] = useState<ThptConfig | null>(null);
@@ -276,9 +278,14 @@ export function StudentThptExamPage() {
 
   const handleRestart = async (opts?: { skipConfirm?: boolean }) => {
     if (!opts?.skipConfirm) {
-      const ok = window.confirm(
-        'Bạn có chắc chắn muốn hủy phiên làm bài hiện tại và làm lại từ đầu? Tất cả câu trả lời của phiên này sẽ bị xóa.',
-      );
+      const ok = await confirm({
+        tone: 'danger',
+        title: 'Làm lại từ đầu?',
+        message: 'Phiên làm bài hiện tại sẽ bị huỷ và bắt đầu lại.',
+        highlight: 'Toàn bộ câu trả lời của phiên này sẽ bị xoá.',
+        confirmLabel: 'Huỷ và làm lại',
+        cancelLabel: 'Giữ phiên này',
+      });
       if (!ok) return;
     }
     try {
@@ -310,14 +317,27 @@ export function StudentThptExamPage() {
 
   const handleSubmit = useCallback(async (auto = false) => {
     if (!submissionId || !examId || isSubmitting) return;
-    if (!auto && !window.confirm('Bạn chắc chắn muốn nộp bài? Sau khi nộp sẽ không sửa được.')) return;
+    if (!auto) {
+      const ok = await confirm({
+        tone: 'submit',
+        title: 'Nộp bài thi?',
+        message: 'Sau khi nộp bạn sẽ không sửa được câu trả lời nữa.',
+      });
+      if (!ok) return;
+    }
     setIsSubmitting(true);
 
     // Cảnh báo nếu state rỗng — trường hợp bug FE wipe answers vô tình.
     if (Object.keys(session.answers).length === 0) {
-      const proceed = window.confirm(
-        'Hệ thống không thấy câu trả lời nào trong bộ nhớ trình duyệt. Bạn có chắc chắn muốn nộp bài rỗng không?',
-      );
+      const proceed = await confirm({
+        tone: 'warning',
+        title: 'Chưa thấy câu trả lời nào',
+        message:
+          'Hệ thống không đọc được câu trả lời nào trong bộ nhớ trình duyệt. Nếu bạn đã làm bài, hãy thoát và tải lại trang trước khi nộp.',
+        highlight: 'Nộp lúc này rất có thể được 0 điểm.',
+        confirmLabel: 'Vẫn nộp bài rỗng',
+        cancelLabel: 'Quay lại',
+      });
       if (!proceed) {
         setIsSubmitting(false);
         return;
@@ -629,12 +649,19 @@ export function StudentThptExamPage() {
         attemptsAllowed={attemptsAllowed}
         onContinue={() => setShowActiveSessionModal(false)}
         onRestart={async () => {
-          const warning = attemptsAllowed > 0
-            ? `\n\nLưu ý: làm lại từ đầu sẽ tính là 1 lượt. Bạn còn ${Math.max(0, attemptsAllowed - attemptsUsed)} lượt sau lần này.`
-            : '';
-          const ok = window.confirm(
-            'Bạn có chắc chắn muốn hủy phiên làm bài hiện tại và làm lại từ đầu? Tất cả câu trả lời của phiên này sẽ bị xóa.' + warning,
-          );
+          // Số lượt còn lại là thông tin quyết định, trước đây bị nối vào cuối
+          // chuỗi bằng `\n\n` — cách duy nhất để xuống dòng trong window.confirm.
+          // Hộp thoại riêng cho phép đặt nó vào ô nhấn mạnh để không bị đọc vội.
+          const ok = await confirm({
+            tone: 'danger',
+            title: 'Làm lại từ đầu?',
+            message: 'Phiên làm bài hiện tại sẽ bị huỷ và toàn bộ câu trả lời của phiên này sẽ bị xoá.',
+            highlight: attemptsAllowed > 0
+              ? `Làm lại tính là 1 lượt. Bạn còn ${Math.max(0, attemptsAllowed - attemptsUsed)} lượt sau lần này.`
+              : undefined,
+            confirmLabel: 'Huỷ và làm lại',
+            cancelLabel: 'Giữ phiên này',
+          });
           if (!ok) return;
           setIsRestarting(true);
           try {
