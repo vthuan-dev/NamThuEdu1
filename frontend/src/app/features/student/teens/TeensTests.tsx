@@ -4,7 +4,7 @@
  * CHỈ hiển thị đề đã được giáo viên giao (assignment qua getTests).
  * Không browse full bank teens/THPT.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -15,6 +15,11 @@ import {
 } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
 import { usePageTitle, PAGE_TITLES } from '../../../../hooks/usePageTitle';
+import {
+  useRealtimeAssignedTests,
+  assignedTestsQueryOptions,
+  broadcastAssignmentsChanged,
+} from '../../../../hooks/useRealtimeAssignedTests';
 import { getVNTimestamp, isWithinLastHours } from '@/utils/dateUtils';
 
 const BASE = '/hoc-vien';
@@ -91,8 +96,16 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
   const isCompleted = !isExpired && item.status === 'completed';
   const inProgress = item.status === 'in_progress';
 
-  const dot = isCompleted ? '#10B981' : inProgress ? '#F59E0B' : '#94A3B8';
-  const statusText = isCompleted ? 'Hoàn thành' : inProgress ? 'Đang làm' : 'Chưa làm';
+  // Trạng thái: cả ba dùng CHUNG một hình thức chip.
+  //
+  // Trước đây "Chưa làm" là chữ xám nhạt kèm dấu tròn xám, trong khi "Làm dở"
+  // là chip đỏ có viền — nên trạng thái phổ biến nhất lại là trạng thái mờ nhất
+  // và khó đọc nhất. Nay ba trạng thái cùng cấu trúc, chỉ khác màu.
+  const statusChip = isCompleted
+    ? { label: 'Đã xong', cls: 'text-emerald-700 bg-emerald-50 ring-emerald-200', dot: 'bg-emerald-500' }
+    : inProgress
+      ? { label: 'Làm dở', cls: 'text-amber-700 bg-amber-50 ring-amber-200', dot: 'bg-amber-500' }
+      : { label: 'Chưa làm', cls: 'text-slate-600 bg-slate-100 ring-slate-200', dot: 'bg-slate-400' };
 
   // Đề "tổng hợp" (THPT-config: có cả Nghe/Nói/Đọc…) dùng player riêng theo
   // thpt_config; các đề thường (questions[]) dùng engine teens cũ.
@@ -131,14 +144,9 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
 
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-xl bg-white ring-1 ring-slate-200/70 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all duration-300 hover:-translate-y-0.5 hover:ring-teal-300/70 hover:shadow-[0_12px_26px_-14px_rgba(13,148,136,0.3)]">
-      {isNewAssign && (
-        <span
-          className="absolute top-3 -right-7 rotate-45 z-20 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[9px] font-extrabold uppercase tracking-wider px-8 py-0.5 shadow-md animate-pulse"
-          title="Giáo viên vừa giao trong 1 giờ gần đây"
-        >
-          Mới
-        </span>
-      )}
+      {/* Dải ruy băng "Mới" ở góc đã được gỡ: nó trùng nghĩa với pill "Mới giao"
+          bên dưới, và vì nằm chéo ở góc phải trên nên che mất chữ trạng thái
+          ("Chưa làm") — đúng chỗ mắt cần đọc đầu tiên. Một chỉ dấu "mới" là đủ. */}
       {/* Orb trang trí — hình tròn mờ tông teal/cyan, đậm hơn khi hover (đồng bộ thẻ adults) */}
       <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full opacity-40 group-hover:opacity-70 transition-opacity duration-300 pointer-events-none"
         style={{ background: 'radial-gradient(circle, rgba(45,212,191,0.35), transparent 70%)' }} />
@@ -154,17 +162,12 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
           <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-teal-50 text-teal-700 ring-1 ring-teal-100 flex-shrink-0">
             <SkillIcon className="w-4 h-4" />
           </div>
-          {inProgress ? (
-            <span className="inline-flex items-center gap-1 text-[10.5px] font-bold flex-shrink-0 rounded-full px-2 py-0.5 text-rose-600 bg-rose-50 ring-1 ring-rose-200 animate-pulse">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-              Làm dở
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-[10.5px] font-medium text-slate-500 flex-shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: dot }} />
-              {statusText}
-            </span>
-          )}
+          <span
+            className={`inline-flex items-center gap-1.5 text-[10.5px] font-semibold flex-shrink-0 rounded-full px-2 py-0.5 ring-1 ${statusChip.cls}`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${statusChip.dot} ${inProgress ? 'animate-pulse' : ''}`} />
+            {statusChip.label}
+          </span>
         </div>
 
         {/* Title — chiếm trọn chiều ngang */}
@@ -187,9 +190,9 @@ function ExamCard({ item, showAssignedBadge }: { item: TeensExamItem; showAssign
               <Gift className="w-2.5 h-2.5" /> GV giao
             </span>
           )}
-          {isWithinLastHours(item.assignedAt, 1) && (
+          {isNewAssign && (
             <span
-              className="inline-flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wide text-white rounded-full px-2 py-0.5 shadow-sm animate-pulse"
+              className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-white rounded-full px-2 py-0.5 shadow-sm"
               style={{ background: 'linear-gradient(135deg, #F43F5E 0%, #F97316 100%)', boxShadow: '0 2px 8px rgba(244,63,94,0.35)' }}
               title="Giáo viên vừa giao trong 1 giờ gần đây"
             >
@@ -283,11 +286,21 @@ export function TeensTests() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'duration' | 'questions'>('newest');
 
-  // Chỉ đề giáo viên giao
+  // Chỉ đề giáo viên giao.
+  //
+  // Realtime: danh sách phải tự cập nhật khi giáo viên vừa giao đề, không bắt
+  // học viên F5. Chuông thông báo poll 10s nên trước đây học viên nhận được
+  // thông báo "Bài thi mới được giao" trong khi khung bên dưới vẫn trống —
+  // nghịch lý khó chịu hơn cả việc không có thông báo.
+  const TESTS_QUERY_KEY = ['student', 'tests', 'teens-assigned'] as const;
   const { data: assignedData, isLoading: assignedLoading } = useQuery({
-    queryKey: ['student', 'tests', 'teens-assigned'],
+    queryKey: TESTS_QUERY_KEY,
     queryFn: () => studentApi.getTests({}),
+    ...assignedTestsQueryOptions,
   });
+
+  useRealtimeAssignedTests(TESTS_QUERY_KEY);
+
 
     const assignedExams: TeensExamItem[] = useMemo(() => {
     const groups = (assignedData as any)?.data?.data;
@@ -325,6 +338,25 @@ export function TeensTests() {
 
   const source = assignedExams;
   const isLoading = assignedLoading;
+
+  // Khi poll của tab này phát hiện đề mới, báo sang các tab khác cùng origin để
+  // chúng invalidate ngay thay vì chờ hết chu kỳ poll riêng. So sánh theo tập
+  // key thay vì độ dài: nếu một đề hết hạn bị loại đúng lúc một đề mới được
+  // giao thì độ dài không đổi mà nội dung đã khác.
+  const knownKeysRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const keys = new Set(assignedExams.map((e) => e.key));
+    const known = knownKeysRef.current;
+    knownKeysRef.current = keys;
+
+    // Lần chạy đầu chỉ ghi nhận hiện trạng — mọi đề đều "mới" với ref rỗng,
+    // báo đi sẽ tạo một vòng invalidate vô ích ngay khi mở trang.
+    if (known === null) return;
+
+    const hasNew = assignedExams.some((e) => !known.has(e.key));
+    if (hasNew) broadcastAssignmentsChanged();
+  }, [assignedExams]);
+
 
   const visible = useMemo(() => {
     let result = source;

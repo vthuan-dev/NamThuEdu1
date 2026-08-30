@@ -14,6 +14,10 @@ import {
 } from 'lucide-react';
 import { studentApi } from '../../../../services/studentApi';
 import { usePageTitle, PAGE_TITLES } from '../../../../hooks/usePageTitle';
+import {
+  useRealtimeAssignedTests,
+  assignedTestsQueryOptions,
+} from '../../../../hooks/useRealtimeAssignedTests';
 
 const BASE = '/hoc-vien';
 
@@ -268,11 +272,16 @@ export function KidsTests() {
   usePageTitle(PAGE_TITLES.STUDENT_TESTS);
   const [search, setSearch] = useState('');
 
-  // Chỉ đề giáo viên giao
+  // Chỉ đề giáo viên giao. Realtime giống TeensTests: push → BroadcastChannel →
+  // poll, để đề vừa giao hiện ra mà không cần F5.
+  const KIDS_TESTS_QUERY_KEY = ['student', 'tests', 'kids-assigned'] as const;
   const { data: assignedData, isLoading: assignedLoading } = useQuery({
-    queryKey: ['student', 'tests', 'kids-assigned'],
+    queryKey: KIDS_TESTS_QUERY_KEY,
     queryFn: () => studentApi.getTests({}),
+    ...assignedTestsQueryOptions,
   });
+
+  useRealtimeAssignedTests(KIDS_TESTS_QUERY_KEY);
 
   const isPastDeadline = useCallback((d: string | null | undefined) => {
     if (!d) return false;

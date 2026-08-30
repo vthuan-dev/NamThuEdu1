@@ -5,6 +5,10 @@ import { useTranslation } from "react-i18next";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePageTitle, PAGE_TITLES } from "../../../../hooks";
 import {
+  useRealtimeAssignedTests,
+  assignedTestsQueryOptions,
+} from "../../../../hooks/useRealtimeAssignedTests";
+import {
   ClipboardList,
   Clock,
   AlertCircle,
@@ -297,13 +301,20 @@ export function TestList() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [showFilters, setShowFilters] = useState(false);
 
+  // Realtime giống Teens/Kids. Khác biệt: queryKey ở đây phụ thuộc filter
+  // status/type, nên phải dựng động rồi truyền đúng key đó cho hook — invalidate
+  // sai key thì danh sách đang xem sẽ không được làm mới.
+  const TESTS_QUERY_KEY = ['student', 'tests', status, type] as const;
   const { data, isLoading } = useQuery({
-    queryKey: ['student', 'tests', status, type],
+    queryKey: TESTS_QUERY_KEY,
     queryFn: () => studentApi.getTests({ 
       status: status === 'all' ? undefined : status,
       type: type === 'all' ? undefined : type,
     }),
+    ...assignedTestsQueryOptions,
   });
+
+  useRealtimeAssignedTests(TESTS_QUERY_KEY);
 
   // Hide VSTEP/IELTS/TOEIC for kids (Cambridge YL audience).
   // Dùng getAuthUser() để đọc CẢ localStorage lẫn sessionStorage (login không "ghi nhớ").
