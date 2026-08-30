@@ -395,13 +395,13 @@ PROMPT;
         $user = "Task {$taskNum} prompt:\n{$taskPrompt}\n\nStudent response:\n{$studentResponse}";
 
         $context = "writing task {$taskNum}";
-        $result  = $this->callGroqLLMFull($system, $user, $context, 900);
+        $result  = $this->callGroqLLMFull($system, $user, $context, 2500);
 
         // Retry once if criteria is missing (rate limit / truncation)
         if (empty($result['criteria'])) {
             Log::info("VstepGrading: retrying {$context} (missing criteria)");
             sleep(2);
-            $result = $this->callGroqLLMFull($system, $user, $context, 900);
+            $result = $this->callGroqLLMFull($system, $user, $context, 2500);
         }
 
         $score  = max(0.0, min(10.0, (float) ($result['overall'] ?? 5.0)));
@@ -614,7 +614,7 @@ OUTPUT FORMAT — respond ONLY with valid JSON (no markdown, no extra text):
 PROMPT;
 
         $user   = "Part {$partNum} transcript (auto-generated from audio):{$ctx}\n\nTranscript:\n{$transcript}";
-        $result = $this->callGroqLLMFull($system, $user, "speaking part {$partNum}", 700);
+        $result = $this->callGroqLLMFull($system, $user, "speaking part {$partNum}", 2000);
 
         $score    = max(0.0, min(10.0, (float) ($result['overall'] ?? 5.0)));
         $criteria = [];

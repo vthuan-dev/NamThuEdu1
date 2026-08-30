@@ -374,12 +374,12 @@ PROMPT;
 
         $user    = "Task {$taskNum} prompt:\n{$prompt}\n\nStudent response:\n{$response}";
         $context = "ielts writing task {$taskNum}";
-        $result  = $this->callGroqLLM($system, $user, $context, 900);
+        $result  = $this->callGroqLLM($system, $user, $context, 2500);
 
         if (empty($result['criteria'])) {
             Log::info("IELTSGrading: retrying {$context} (missing criteria)");
             sleep(2);
-            $result = $this->callGroqLLM($system, $user, $context, 900);
+            $result = $this->callGroqLLM($system, $user, $context, 2500);
         }
 
         $band = $this->roundToHalfBand((float) ($result['overall'] ?? 5.0));
