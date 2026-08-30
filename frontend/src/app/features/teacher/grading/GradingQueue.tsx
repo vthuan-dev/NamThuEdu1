@@ -34,6 +34,7 @@ import { useToastContext } from "../../../../contexts/ToastContext";
 import { api } from "../../../../services/api";
 import { getAssetUrl } from "../../../../utils/apiConfig";
 import { TeacherReviewModal } from "./TeacherReviewModal";
+import { TeacherAssignmentManagement } from "./components/TeacherAssignmentManagement";
 import { getSubmissionDisplayScore, type SubmissionScoreUpdate } from "../../../../utils/gradeHelpers";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -149,7 +150,7 @@ export function GradingQueue() {
   const [filterExam, setFilterExam]     = useState("");   // theo đề thi (examId)
   const [filterClass, setFilterClass]   = useState("");   // theo lớp (classId)
   const [filterRole, setFilterRole]     = useState("");   // theo role học viên (age_group)
-  const [sourceTab, setSourceTab]       = useState<'assigned' | 'practice'>('assigned');
+  const [sourceTab, setSourceTab]       = useState<'assigned' | 'assignments'>('assigned');
   const [reviewTab, setReviewTab]       = useState<ReviewTab>("all");
   type SortField = "exam" | "time" | "status" | "score" | "gradedTime";
   const [sortField, setSortField] = useState<SortField | null>("time");
@@ -747,53 +748,23 @@ export function GradingQueue() {
       <div className="flex-1 overflow-y-auto" style={{ background: "#EEEEF3" }}>
         <div className="px-8 py-6 space-y-5">
 
-          {/* ── Stats ── */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {(sourceTab === 'practice'
-              ? [
-                  { label: 'Tổng bài tự luyện', showBar: false, value: stats.total,  icon: Inbox,   color: "#6366F1", bg: "#EEF2FF" },
-                  { label: 'Đã chấm',           showBar: false, value: submissions.filter(s => ['graded','partially_graded'].includes(s.status)).length, icon: CheckCircle2, color: "#10B981", bg: "#D1FAE5" },
-                  { label: 'Chờ chấm',          showBar: false, value: submissions.filter(s => s.status === 'submitted').length, icon: Clock, color: "#F59E0B", bg: "#FEF3C7" },
-                  { label: 'Đang chấm AI',       showBar: false, value: submissions.filter(s => s.status === 'grading_subjective').length, icon: Award, color: "#8B5CF6", bg: "#EDE9FE" },
-                ]
-              : [
-                  { label: t("teacher.grading.queuePage.statsCards.total"),      showBar: false, value: stats.total,              icon: Inbox,       color: "#6366F1", bg: "#EEF2FF" },
-                  { label: t("teacher.grading.queuePage.statsCards.pending"),    showBar: false, value: stats.pending,            icon: Clock,       color: "#F59E0B", bg: "#FEF3C7" },
-                  { label: t("teacher.grading.queuePage.statsCards.reviewed"),   showBar: false, value: stats.reviewed,           icon: UserCheck,   color: "#10B981", bg: "#D1FAE5" },
-                  { label: t("teacher.grading.queuePage.statsCards.reviewRate"), showBar: true,  value: `${stats.reviewRate}%`,   icon: Award,       color: "#8B5CF6", bg: "#EDE9FE" },
-                ]
-            ).map(({ label, value, showBar, icon: Icon, color, bg }) => (
-              <div key={label} className="bg-white rounded-xl border border-slate-100 px-3.5 py-3 hover:shadow-sm transition-all">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: bg }}>
-                    <Icon className="w-[18px] h-[18px]" style={{ color }} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-slate-500 text-[11px] truncate">{label}</p>
-                    <p className="text-xl font-bold text-slate-800 leading-tight">{value}</p>
-                  </div>
-                </div>
-                {showBar && (
-                  <div className="mt-2 h-1 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${stats.reviewRate}%` }} />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* ── Toolbar: tabs + search + filter ── */}
-          <div className="bg-white rounded-2xl border border-slate-100">
-            {/* Source tabs: Đề đã giao / Tự luyện + refresh inline */}
+          {/* ── Top Tabs: Đề đã giao (Cần chấm) / Quản lý đề giao ── */}
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm">
+            {/* Source tabs: Đề đã giao / Quản lý đề giao + refresh inline */}
             <div className="relative z-10 flex items-center gap-0 px-5 pt-2 border-b border-slate-100 group/tabguide">
               {([
-                { key: 'assigned', label: 'Đề đã giao', hint: 'GV giao — cần chấm' },
-                { key: 'practice', label: 'Tự luyện',   hint: 'HV tự ôn tập' },
+                { key: 'assigned', label: 'Đề đã giao', hint: 'Bài nộp — cần chấm & xét duyệt' },
+                { key: 'assignments', label: 'Quản lý đề giao', hint: 'Tiến độ làm bài & nhắc nhở' },
               ] as const).map(({ key, label, hint }) => (
                 <button
                   key={key}
-                  onClick={() => { setSourceTab(key); setReviewTab('all'); setSubmissions([]); setLoading(true); }}
-                  className={`flex flex-col items-start px-4 py-2 border-b-2 transition-all ${
+                  onClick={() => {
+                    setSourceTab(key);
+                    if (key === 'assigned') {
+                      setReviewTab('all');
+                    }
+                  }}
+                  className={`flex flex-col items-start px-4 py-2 border-b-2 transition-all cursor-pointer ${
                     sourceTab === key
                       ? 'border-violet-600'
                       : 'border-transparent hover:border-slate-300'
@@ -805,7 +776,7 @@ export function GradingQueue() {
                         ? 'font-extrabold text-violet-700'
                         : 'font-medium text-slate-400 hover:text-slate-600'
                     }`}>{label}</span>
-                    {sourceTab === key && !loading && submissions.length > 0 && (
+                    {key === 'assigned' && !loading && submissions.length > 0 && (
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700">
                         {submissions.length}
                       </span>
@@ -816,6 +787,7 @@ export function GradingQueue() {
                   }`}>{hint}</span>
                 </button>
               ))}
+
               {/* Hover guide icon */}
               <div className="relative ml-1 pb-1 group/helpicon" onMouseEnter={() => setShowHint(false)}>
                 <button type="button" className={`relative w-5 h-5 flex items-center justify-center transition-colors ${showHint ? 'text-violet-500' : 'text-slate-300 hover:text-violet-500'}`}>
@@ -826,20 +798,11 @@ export function GradingQueue() {
                   </span>
                 </button>
 
-                {/* Note nhắc nhở — tự hiện sau 3s, ẩn khi hover vào icon */}
-                {showHint && (
-                  <div className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 whitespace-nowrap">
-                    <div className="relative bg-violet-600 text-white text-[12px] font-semibold px-3 py-1.5 rounded-lg shadow-lg animate-bounce">
-                      Rê chuột vào để xem hướng dẫn
-                      <span className="absolute right-full top-1/2 -translate-y-1/2 border-[5px] border-transparent border-r-violet-600" />
-                    </div>
-                  </div>
-                )}
                 {/* Popover */}
                 <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 hidden group-hover/helpicon:block w-[320px]">
                   <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden">
                     <div className="px-4 py-3 bg-violet-50 border-b border-violet-100">
-                      <p className="text-xs font-bold text-violet-700 uppercase tracking-wider">Hướng dẫn — Danh sách chấm điểm</p>
+                      <p className="text-xs font-bold text-violet-700 uppercase tracking-wider">Hướng dẫn — Quản lý & Chấm điểm</p>
                     </div>
                     <div className="p-4 space-y-3">
                       <div className="flex gap-3">
@@ -847,183 +810,205 @@ export function GradingQueue() {
                           <ClipboardCheck className="w-4 h-4 text-violet-600" />
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-slate-800 mb-0.5">Đề đã giao</p>
+                          <p className="text-xs font-bold text-slate-800 mb-0.5">Đề đã giao (Cần chấm)</p>
                           <p className="text-[11px] text-slate-500 leading-relaxed">
-                            Bài làm từ đề GV giao. Cách chấm tuỳ loại câu hỏi:
+                            Danh sách bài làm học viên đã nộp: chấm trắc nghiệm tự động, xét duyệt điểm bài tự luận (Writing/Speaking do AI chấm).
                           </p>
-                          <ul className="mt-1.5 space-y-1 text-[11px] text-slate-500">
-                            <li className="flex items-start gap-1.5">
-                              <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
-                              <span><span className="font-semibold text-slate-600">Trắc nghiệm / có đáp án sẵn</span> — hệ thống tự chấm ngay, không cần AI.</span>
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                              <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0" />
-                              <span><span className="font-semibold text-violet-600">Writing / Speaking</span> — AI chấm tự động. GV cần <span className="font-semibold text-violet-600">Xét duyệt</span> để kiểm tra lại, thêm nhận xét và xác nhận.</span>
-                            </li>
-                          </ul>
                         </div>
                       </div>
                       <div className="flex gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-sky-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <BookOpenCheck className="w-4 h-4 text-sky-600" />
+                        <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <BookOpenCheck className="w-4 h-4 text-amber-600" />
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-slate-800 mb-0.5">Tự luyện</p>
-                          <p className="text-[11px] text-slate-500 leading-relaxed">Bài làm từ đề học viên tự luyện tập ngoài giờ. <span className="font-semibold text-sky-600">Không cần xét duyệt</span> — chỉ theo dõi tiến độ và xem chi tiết bài làm khi cần.</p>
+                          <p className="text-xs font-bold text-slate-800 mb-0.5">Quản lý đề giao</p>
+                          <p className="text-[11px] text-slate-500 leading-relaxed">Theo dõi chi tiết các đợt giao đề cho Lớp / Cá nhân: xem học viên nào đã làm, học viên nào chưa làm, và gửi thông báo nhắc nhở khi đề còn hạn.</p>
                         </div>
-                      </div>
-                      <div className="pt-2 border-t border-slate-100">
-                        <p className="text-[10px] text-slate-400 leading-relaxed">💡 <span className="font-semibold">Mẹo:</span> Nhấn vào từng tab để chuyển danh sách. Nhấn <span className="font-semibold">👁 Xem chi tiết</span> để xem toàn bộ bài làm, hoặc <span className="font-semibold">Xét duyệt</span> để xem lại và xác nhận điểm.</p>
                       </div>
                     </div>
                   </div>
-                  {/* Arrow */}
                   <div className="flex justify-center -mt-px">
                     <div className="border-4 border-transparent border-b-white" style={{ marginTop: -7 }} />
                   </div>
                 </div>
               </div>
-              <div className="ml-auto flex items-center gap-2 pb-1">
-                {lastUpdated && (
-                  <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                    {isPolling && <RefreshCw className="w-3 h-3 animate-spin text-violet-400" />}
-                    {t("teacher.grading.queuePage.updatedAt")} {lastUpdated.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                  </span>
-                )}
-                <button
-                  onClick={() => fetchSubmissions(false)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-slate-500 hover:bg-slate-100 transition-colors"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" /> {t("teacher.grading.queuePage.refresh")}
-                </button>
-              </div>
-            </div>
-            {/* Review sub-tabs — only for assigned */}
-            {sourceTab === 'assigned' && (
-            <div className="flex items-center gap-1 px-5 pt-3 border-b border-slate-100">
-              {TABS.map(({ key, label, count, icon: Icon }) => (
-                <button
-                  key={key}
-                  onClick={() => setReviewTab(key)}
-                  className={`flex items-center gap-1.5 px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-all border-b-2 ${
-                    reviewTab === key
-                      ? "border-violet-600 text-violet-700 bg-violet-50"
-                      : "border-transparent text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {label}
-                  <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
-                    reviewTab === key ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-500"
-                  }`}>{count}</span>
-                </button>
-              ))}
-              </div>
-            )}
-            {/* Practice tab: simple count line */}
-            {sourceTab === 'practice' && (
-              <div className="px-5 py-2.5 border-b border-slate-100 flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-500">Tất cả bài tự luyện</span>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">{submissions.length}</span>
-              </div>
-            )}
 
-            {/* Search + filter */}
-            <div className="flex items-center flex-wrap gap-3 px-5 py-3">
-              <div className="relative flex-1 min-w-[200px] max-w-xs">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder={t("teacher.grading.searchPlaceholder")}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
-                />
-              </div>
-
-              {/* Lọc theo đề thi */}
-              <div className="relative">
-                <select
-                  value={filterExam}
-                  onChange={(e) => setFilterExam(e.target.value)}
-                  className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 appearance-none max-w-[180px] truncate"
-                  title="Lọc theo đề thi"
-                >
-                  <option value="">Tất cả đề thi</option>
-                  {examOptions.map((e) => (
-                    <option key={e.id} value={e.id}>{e.title}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-              </div>
-
-              {/* Lọc theo lớp */}
-              <div className="relative">
-                <select
-                  value={filterClass}
-                  onChange={(e) => setFilterClass(e.target.value)}
-                  className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 appearance-none max-w-[160px] truncate"
-                  title="Lọc theo lớp"
-                >
-                  <option value="">Tất cả lớp</option>
-                  {classOptions.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-              </div>
-
-              {/* Lọc theo role học viên */}
-              <div className="relative">
-                <select
-                  value={filterRole}
-                  onChange={(e) => setFilterRole(e.target.value)}
-                  className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 appearance-none"
-                  title="Lọc theo nhóm học viên"
-                >
-                  <option value="">Tất cả học viên</option>
-                  {roleOptions.map((r) => (
-                    <option key={r.key} value={r.key}>{r.label}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-              </div>
-
-
-              {/* Xóa bộ lọc */}
-              {(filterExam || filterClass || filterRole || filterStatus || searchQuery) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFilterExam(""); setFilterClass(""); setFilterRole("");
-                    setFilterStatus(""); setSearchQuery("");
-                  }}
-                  className="px-3 py-2 rounded-xl text-xs font-semibold text-violet-600 hover:bg-violet-50 transition-colors"
-                >
-                  Xóa lọc
-                </button>
+              {sourceTab === 'assigned' && (
+                <div className="ml-auto flex items-center gap-2 pb-1">
+                  {lastUpdated && (
+                    <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                      {isPolling && <RefreshCw className="w-3 h-3 animate-spin text-violet-400" />}
+                      {t("teacher.grading.queuePage.updatedAt")} {lastUpdated.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => fetchSubmissions(false)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs text-slate-500 hover:bg-slate-100 transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> {t("teacher.grading.queuePage.refresh")}
+                  </button>
+                </div>
               )}
             </div>
+
+            {/* Review sub-tabs — only for assigned */}
+            {sourceTab === 'assigned' && (
+              <div className="flex items-center gap-1 px-5 pt-3 border-b border-slate-100">
+                {TABS.map(({ key, label, count, icon: Icon }) => (
+                  <button
+                    key={key}
+                    onClick={() => setReviewTab(key)}
+                    className={`flex items-center gap-1.5 px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-all border-b-2 cursor-pointer ${
+                      reviewTab === key
+                        ? "border-violet-600 text-violet-700 bg-violet-50"
+                        : "border-transparent text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {label}
+                    <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
+                      reviewTab === key ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-500"
+                    }`}>{count}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Search + filter for assigned tab */}
+            {sourceTab === 'assigned' && (
+              <div className="flex items-center flex-wrap gap-3 px-5 py-3">
+                <div className="relative flex-1 min-w-[200px] max-w-xs">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder={t("teacher.grading.searchPlaceholder")}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                  />
+                </div>
+
+                {/* Lọc theo đề thi */}
+                <div className="relative">
+                  <select
+                    value={filterExam}
+                    onChange={(e) => setFilterExam(e.target.value)}
+                    className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 appearance-none max-w-[180px] truncate"
+                    title="Lọc theo đề thi"
+                  >
+                    <option value="">Tất cả đề thi</option>
+                    {examOptions.map((e) => (
+                      <option key={e.id} value={e.id}>{e.title}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                </div>
+
+                {/* Lọc theo lớp */}
+                <div className="relative">
+                  <select
+                    value={filterClass}
+                    onChange={(e) => setFilterClass(e.target.value)}
+                    className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 appearance-none max-w-[160px] truncate"
+                    title="Lọc theo lớp"
+                  >
+                    <option value="">Tất cả lớp</option>
+                    {classOptions.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                </div>
+
+                {/* Lọc theo role học viên */}
+                <div className="relative">
+                  <select
+                    value={filterRole}
+                    onChange={(e) => setFilterRole(e.target.value)}
+                    className="pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 appearance-none"
+                    title="Lọc theo nhóm học viên"
+                  >
+                    <option value="">Tất cả học viên</option>
+                    {roleOptions.map((r) => (
+                      <option key={r.key} value={r.key}>{r.label}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                </div>
+
+                {/* Xóa bộ lọc */}
+                {(filterExam || filterClass || filterRole || filterStatus || searchQuery) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterExam(""); setFilterClass(""); setFilterRole("");
+                      setFilterStatus(""); setSearchQuery("");
+                    }}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold text-violet-600 hover:bg-violet-50 transition-colors"
+                  >
+                    Xóa lọc
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* ── Loading / Error ── */}
+          {/* ── View Switching: Assignment Management vs Grading Queue ── */}
+          {sourceTab === 'assignments' ? (
+            <TeacherAssignmentManagement
+              onSelectSubmission={(subId) => {
+                setSourceTab('assigned');
+                const targetSub = submissions.find(s => s.id === String(subId));
+                if (targetSub) {
+                  setReviewTarget(targetSub);
+                }
+              }}
+            />
+          ) : (
+            <>
+              {/* ── Stats ── */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {[
+                  { label: t("teacher.grading.queuePage.statsCards.total"),      showBar: false, value: stats.total,              icon: Inbox,       color: "#6366F1", bg: "#EEF2FF" },
+                  { label: t("teacher.grading.queuePage.statsCards.pending"),    showBar: false, value: stats.pending,            icon: Clock,       color: "#F59E0B", bg: "#FEF3C7" },
+                  { label: t("teacher.grading.queuePage.statsCards.reviewed"),   showBar: false, value: stats.reviewed,           icon: UserCheck,   color: "#10B981", bg: "#D1FAE5" },
+                  { label: t("teacher.grading.queuePage.statsCards.reviewRate"), showBar: true,  value: `${stats.reviewRate}%`,   icon: Award,       color: "#8B5CF6", bg: "#EDE9FE" },
+                ].map(({ label, value, showBar, icon: Icon, color, bg }) => (
+                  <div key={label} className="bg-white rounded-xl border border-slate-100 px-3.5 py-3 hover:shadow-sm transition-all">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: bg }}>
+                        <Icon className="w-[18px] h-[18px]" style={{ color }} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-slate-500 text-[11px] truncate">{label}</p>
+                        <p className="text-xl font-bold text-slate-800 leading-tight">{value}</p>
+                      </div>
+                    </div>
+                    {showBar && (
+                      <div className="mt-2 h-1 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${stats.reviewRate}%` }} />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
 
+              {/* ── Loading / Error ── */}
+              {loading && (
+                <div className="flex items-center justify-center py-20">
+                  <div className="w-10 h-10 rounded-full border-3 border-violet-200 border-t-violet-600 animate-spin" />
+                </div>
+              )}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+                  <p className="text-red-700 text-sm">{error}</p>
+                </div>
+              )}
 
-          {loading && (
-            <div className="flex items-center justify-center py-20">
-              <div className="w-10 h-10 rounded-full border-3 border-violet-200 border-t-violet-600 animate-spin" />
-            </div>
-          )}
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
-              <p className="text-red-700 text-sm">{error}</p>
-            </div>
-          )}
-
-          {/* ── Split Layout: Students List (Left) & Submissions List (Right) ── */}
-          {!loading && !error && (
-            <div className="flex flex-col lg:flex-row gap-6 items-start">
+              {/* ── Split Layout: Students List (Left) & Submissions List (Right) ── */}
+              {!loading && !error && (
+                <div className="flex flex-col lg:flex-row gap-6 items-start">
                             {/* Left Panel: Student List Sidebar (320px) */}
               <div className="w-full lg:w-[320px] lg:flex-shrink-0 bg-white border border-slate-100 rounded-2xl p-4 flex flex-col gap-3 shadow-sm">
                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1 flex items-center gap-1.5">
@@ -1769,6 +1754,8 @@ export function GradingQueue() {
                 )}
               </div>
             </div>
+          )}
+            </>
           )}
         </div>
       </div>

@@ -985,11 +985,13 @@ export const teacherApi = {
     /**
      * Send reminders to students who haven't completed assignment
      * @param id - Assignment ID
+     * @param payload - Optional { student_id?: number, message?: string }
      * @returns Success response
      */
-    async sendReminders(id: number): Promise<ApiResponse<void>> {
-      const response = await api.post<ApiResponse<void>>(
-        `/teacher/assignments/${id}/reminders`
+    async sendReminders(id: number, payload?: { student_id?: number; message?: string }): Promise<ApiResponse<any>> {
+      const response = await api.post<ApiResponse<any>>(
+        `/teacher/assignments/${id}/reminders`,
+        payload || {}
       );
       
       return response.data;

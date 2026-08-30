@@ -316,11 +316,22 @@ class TestAssignmentController extends Controller
             $targetStudents = $this->getTargetStudents($assignment);
             $totalStudents = $targetStudents->count();
 
-            $completedCount = \App\Models\Submission::where('assignment_id', $assignment->taId)
+            $submissions = \App\Models\Submission::where('assignment_id', $assignment->taId)
                 ->whereIn('user_id', $targetStudents->pluck('uId'))
-                ->whereIn('sStatus', ['submitted', 'graded'])
-                ->distinct('user_id')
-                ->count('user_id');
+                ->get();
+
+            $completedCount = $submissions->whereIn('sStatus', [
+                'submitted', 'graded', 'auto_submitted',
+                'grading_subjective', 'partially_graded', 'ai_graded'
+            ])->pluck('user_id')->unique()->count();
+
+            $inProgressCount = $submissions->where('sStatus', 'in_progress')
+                ->pluck('user_id')->unique()->diff($submissions->whereIn('sStatus', [
+                    'submitted', 'graded', 'auto_submitted',
+                    'grading_subjective', 'partially_graded', 'ai_graded'
+                ])->pluck('user_id'))->count();
+
+            $notStartedCount = max(0, $totalStudents - $completedCount - $inProgressCount);
 
             if ($assignment->taTarget_type === 'class') {
                 $cls = Classes::find($assignment->taTarget_id);
@@ -330,9 +341,18 @@ class TestAssignmentController extends Controller
                 $targetName = $stu->uName ?? ('Học viên #' . $assignment->taTarget_id);
             }
 
+            $isOverdue = $assignment->taDeadline && now()->gt($assignment->taDeadline);
+            $isUpcoming = $assignment->taStart_time && now()->lt($assignment->taStart_time);
+
             $assignment->setAttribute('target_name', $targetName);
             $assignment->setAttribute('total_students', $totalStudents);
             $assignment->setAttribute('completed_students', $completedCount);
+            $assignment->setAttribute('in_progress_students', $inProgressCount);
+            $assignment->setAttribute('not_started_students', $notStartedCount);
+            $assignment->setAttribute('is_overdue', (bool) $isOverdue);
+            $assignment->setAttribute('is_upcoming', (bool) $isUpcoming);
+            $assignment->setAttribute('is_active', !$isOverdue && !$isUpcoming);
+            $assignment->setAttribute('can_send_reminder', !$isOverdue);
             $assignment->setAttribute('completion_rate', $totalStudents > 0
                 ? round(($completedCount / $totalStudents) * 100)
                 : 0);
@@ -543,6 +563,12 @@ class TestAssignmentController extends Controller
         // Build progress data
         $completed = [];
         $notCompleted = [];
+        $inProgress = [];
+        $completedStatuses = [
+            'submitted', 'graded', 'auto_submitted',
+            'grading_subjective', 'partially_graded', 'ai_graded'
+        ];
+
         // keyBy giu ban ghi DAU TIEN cho moi user_id -> vi da orderByDesc(sId),
         // day chinh la phien nop moi nhat cua hoc vien do.
         $submissionMap = $submissions->keyBy('user_id');
@@ -551,7 +577,9 @@ class TestAssignmentController extends Controller
             $studentData = [
                 'uId' => $student->uId,
                 'uName' => $student->uName,
+                'uEmail' => $student->uEmail,
                 'uPhone' => $student->uPhone,
+                'avatar_url' => $student->uAvatar ?? null,
             ];
 
             if (isset($submissionMap[$student->uId])) {
@@ -561,10 +589,24 @@ class TestAssignmentController extends Controller
                     'sScore' => $submission->sScore,
                     'sStatus' => $submission->sStatus,
                     'sSubmit_time' => $submission->sSubmit_time,
+                    'sGraded_time' => $submission->sGraded_time,
                     'sAttempt' => $submission->sAttempt,
                 ];
-                $completed[] = $studentData;
+
+                if (in_array($submission->sStatus, $completedStatuses, true)) {
+                    $studentData['status'] = 'completed';
+                    $completed[] = $studentData;
+                } elseif ($submission->sStatus === 'in_progress') {
+                    $studentData['status'] = 'in_progress';
+                    $inProgress[] = $studentData;
+                    $notCompleted[] = $studentData;
+                } else {
+                    $studentData['status'] = 'pending';
+                    $notCompleted[] = $studentData;
+                }
             } else {
+                $studentData['status'] = 'not_started';
+                $studentData['submission'] = null;
                 $notCompleted[] = $studentData;
             }
         }
@@ -572,11 +614,22 @@ class TestAssignmentController extends Controller
         // Calculate statistics
         $totalStudents = count($targetStudents);
         $completedCount = count($completed);
+        $inProgressCount = count($inProgress);
+        $notCompletedCount = count($notCompleted);
         $completionRate = $totalStudents > 0 ? round(($completedCount / $totalStudents) * 100, 2) : 0;
 
         // Check deadline status
-        $isOverdue = $assignment->taDeadline && now() > $assignment->taDeadline;
+        $isOverdue = $assignment->taDeadline && now()->gt($assignment->taDeadline);
+        $isUpcoming = $assignment->taStart_time && now()->lt($assignment->taStart_time);
         $timeRemaining = $assignment->taDeadline ? $assignment->taDeadline->diffForHumans() : null;
+
+        if ($assignment->taTarget_type === 'class') {
+            $cls = Classes::find($assignment->taTarget_id);
+            $targetName = $cls->cName ?? ('Lớp #' . $assignment->taTarget_id);
+        } else {
+            $stu = User::where('uId', $assignment->taTarget_id)->first();
+            $targetName = $stu->uName ?? ('Học viên #' . $assignment->taTarget_id);
+        }
 
         return response()->json([
             'status' => 'success',
@@ -587,22 +640,33 @@ class TestAssignmentController extends Controller
                         'eId' => $assignment->exam->eId,
                         'eTitle' => $assignment->exam->eTitle,
                         'eType' => $assignment->exam->eType,
-                        'eDuration_minutes' => $assignment->exam->eDuration_minutes,
+                        'eSkill' => $assignment->exam->eSkill,
+                        'eDuration_minutes' => $assignment->exam->eDuration_minutes ?? $assignment->exam->eDuration ?? 60,
+                        'total_questions' => $assignment->exam->getQuestionsCount(),
                     ],
                     'taTarget_type' => $assignment->taTarget_type,
                     'taTarget_id' => $assignment->taTarget_id,
+                    'target_name' => $targetName,
+                    'taCreated_at' => $assignment->taCreated_at,
+                    'taStart_time' => $assignment->taStart_time,
                     'taDeadline' => $assignment->taDeadline,
                     'taMax_attempt' => $assignment->taMax_attempt,
-                    'is_overdue' => $isOverdue,
+                    'taInstructions' => $assignment->taInstructions,
+                    'is_overdue' => (bool) $isOverdue,
+                    'is_upcoming' => (bool) $isUpcoming,
+                    'is_active' => !$isOverdue && !$isUpcoming,
+                    'can_send_reminder' => !$isOverdue,
                     'time_remaining' => $timeRemaining,
                 ],
                 'statistics' => [
                     'total_students' => $totalStudents,
                     'completed_count' => $completedCount,
-                    'not_completed_count' => $totalStudents - $completedCount,
+                    'in_progress_count' => $inProgressCount,
+                    'not_completed_count' => $notCompletedCount,
                     'completion_rate' => $completionRate,
                 ],
                 'completed' => $completed,
+                'in_progress' => $inProgress,
                 'not_completed' => $notCompleted,
             ]
         ]);
@@ -902,14 +966,45 @@ class TestAssignmentController extends Controller
             ], 404);
         }
 
-        $message = $request->input('message');
+        // Kiểm tra thời hạn: Nếu đề đã quá hạn thì không cho gửi nhắc nhở
+        if ($assignment->taDeadline && now()->gt($assignment->taDeadline)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Đề thi đã quá hạn nộp bài, không thể gửi nhắc nhở.'
+            ], 422);
+        }
+
+        $examTitle = $assignment->exam->eTitle ?? 'Bài tập';
+        $deadlineText = $assignment->taDeadline
+            ? ' trước ' . \Carbon\Carbon::parse($assignment->taDeadline)->format('H:i d/m/Y')
+            : '';
+        $defaultMessage = "Bài tập \"{$examTitle}\" vẫn chưa được hoàn thành. Bạn hãy vào làm bài{$deadlineText} nhé!";
+        $message = $request->input('message') ?: $defaultMessage;
 
         // Get students who haven't fully completed (no submission yet OR still in_progress)
-        $targetStudents     = $this->getTargetStudents($assignment);
+        $targetStudents = $this->getTargetStudents($assignment);
+        $completedStatuses = [
+            'submitted', 'graded', 'auto_submitted',
+            'grading_subjective', 'partially_graded', 'ai_graded'
+        ];
+
         $finishedStudentIds = \App\Models\Submission::where('assignment_id', $id)
-            ->whereIn('sStatus', ['submitted', 'graded'])
+            ->whereIn('sStatus', $completedStatuses)
             ->pluck('user_id');
+
         $incompleteStudents = $targetStudents->whereNotIn('uId', $finishedStudentIds);
+
+        // Hỗ trợ gửi nhắc nhở riêng cho 1 học viên
+        $singleStudentId = $request->input('student_id');
+        if ($singleStudentId) {
+            $incompleteStudents = $incompleteStudents->where('uId', $singleStudentId);
+            if ($incompleteStudents->isEmpty()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Học viên đã hoàn thành bài thi hoặc không nằm trong danh sách giao đề.'
+                ], 422);
+            }
+        }
 
         $remindersSent = 0;
         $incompleteStudentIds = [];
@@ -936,13 +1031,10 @@ class TestAssignmentController extends Controller
         if (!empty($incompleteStudentIds)) {
             try {
                 $pushService = new PushNotificationService();
-                $deadlineText = $assignment->taDeadline
-                    ? ' · Hạn: ' . \Carbon\Carbon::parse($assignment->taDeadline)->format('d/m/Y')
-                    : '';
                 $pushService->sendToUsers(
                     $incompleteStudentIds,
                     '⏰ Nhắc nhở bài tập',
-                    $assignment->exam->eTitle . $deadlineText,
+                    $message,
                     ['url' => '/hoc-vien/bai-tap']
                 );
             } catch (\Exception $e) {
@@ -952,7 +1044,7 @@ class TestAssignmentController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Reminders sent successfully',
+            'message' => "Đã gửi nhắc nhở thành công cho {$remindersSent} học viên.",
             'data' => [
                 'reminders_sent'   => $remindersSent,
                 'assignment_title' => $assignment->exam->eTitle,
