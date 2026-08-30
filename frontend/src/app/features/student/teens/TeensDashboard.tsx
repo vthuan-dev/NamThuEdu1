@@ -268,10 +268,16 @@ export function TeensDashboard() {
       duration: t.duration ?? null, deadline: t.deadline, daysUntil: Number(t.days_until ?? 999),
       isUrgent: Boolean(t.is_urgent), fromTeacher: false, teacherName: null, message: null,
     }));
-  const allReminderItems = [...teacherItems, ...upcomingItems].sort((a, b) => {
-    if (a.fromTeacher !== b.fromTeacher) return a.fromTeacher ? -1 : 1;
-    return a.daysUntil - b.daysUntil;
-  });
+  const allReminderItems = [...teacherItems, ...upcomingItems]
+    // Chặn quá hạn một lần ở đây thay vì tin cả hai endpoint. `daysUntil` âm là
+    // đã qua hạn; `upcomingTests` lọc sẵn server-side còn `getReminders` mới lọc
+    // từ commit này, nhưng thẻ đang mở sẵn trên máy học viên vẫn giữ dữ liệu cũ
+    // tới lần tải lại, và một nhắc nhở hết hạn giữa lúc xem thì cũng nên tắt.
+    .filter(i => i.deadline === null || i.daysUntil >= 0)
+    .sort((a, b) => {
+      if (a.fromTeacher !== b.fromTeacher) return a.fromTeacher ? -1 : 1;
+      return a.daysUntil - b.daysUntil;
+    });
   const visibleReminders = allReminderItems.slice(0, 3);
   const totalReminders = allReminderItems.length;
 

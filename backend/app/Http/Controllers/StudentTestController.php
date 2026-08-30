@@ -2876,20 +2876,44 @@ class StudentTestController extends Controller
             ->whereHas('assignment.exam', function ($q) use ($ageGroup) {
                 $this->applyAgeGroupExamFilter($q, $ageGroup);
             })
+            // Đề đã quá hạn thì nhắc nhở vô nghĩa: học viên bấm "Làm bài" cũng bị
+            // chặn ở phòng chờ. `taDeadline` null nghĩa là không giới hạn hạn nộp
+            // nên vẫn nhắc.
+            ->whereHas('assignment', function ($q) {
+                $q->whereNull('taDeadline')
+                    ->orWhere('taDeadline', '>=', now());
+            })
             ->orderByDesc('updated_at')
             ->get();
 
-        // Exclude assignments the student has already finished.
-        $finishedAssignmentIds = Submission::where('user_id', $studentId)
-            ->whereIn('sStatus', ['submitted', 'graded'])
-            ->whereNotNull('assignment_id')
-            ->pluck('assignment_id')
-            ->flip();
+        // Số lượt đã dùng cho từng assignment, để bỏ nhắc nhở khi hết lượt.
+        //
+        // Trước đây chỗ này chỉ loại assignment "đã có bài nộp" với hai trạng thái
+        // submitted/graded. Cách đó sai hai đầu: thiếu grading_subjective,
+        // partially_graded, ai_graded và auto_submitted nên bài đã nộp đang chờ
+        // chấm chủ quan vẫn bị nhắc như chưa làm; và ngược lại nó ẩn luôn nhắc
+        // nhở của đề cho nhiều lượt mà học viên mới làm một lượt.
+        //
+        // Đếm lượt rồi so với taMax_attempt khớp đúng điều kiện mà
+        // `startAssignment` dùng để chặn (xem L471-481), nên thẻ nhắc nhở chỉ còn
+        // hiện khi học viên thật sự bấm vào được.
+        $assignmentIds = $reminders->pluck('assignment_id')->filter()->unique();
+        $attemptsUsed = Submission::where('user_id', $studentId)
+            ->whereIn('assignment_id', $assignmentIds)
+            ->selectRaw('assignment_id, COUNT(*) as c')
+            ->groupBy('assignment_id')
+            ->pluck('c', 'assignment_id');
 
-        $items = $reminders->filter(function ($r) use ($finishedAssignmentIds) {
+        $items = $reminders->filter(function ($r) use ($attemptsUsed) {
             if (!$r->assignment || !$r->assignment->exam)
                 return false;
-            return !$finishedAssignmentIds->has($r->assignment_id);
+
+            // taMax_attempt 0 hoặc null: coi như 1 lượt, khớp mặc định của
+            // bulkAssign (`taMax_attempt ?? 1`).
+            $max = (int) ($r->assignment->taMax_attempt ?: 1);
+            $used = (int) ($attemptsUsed[$r->assignment_id] ?? 0);
+
+            return $used < $max;
         })->map(function ($r) {
             $a = $r->assignment;
             $exam = $a->exam;

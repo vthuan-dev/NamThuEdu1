@@ -515,6 +515,9 @@ export function AdultsDashboard() {
     }));
 
   const allReminderItems = [...teacherItems, ...upcomingItems]
+    // Xem chú thích cùng chỗ trong TeensDashboard: chặn quá hạn ở một điểm
+    // thay vì tin cả hai endpoint đều đã lọc.
+    .filter(i => i.deadline === null || i.daysUntil >= 0)
     .sort((a, b) => {
       // Teacher-sent items first, then by deadline urgency.
       if (a.fromTeacher !== b.fromTeacher) return a.fromTeacher ? -1 : 1;
