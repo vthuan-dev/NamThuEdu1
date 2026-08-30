@@ -65,6 +65,8 @@ export function TeacherAssignmentManagement({ onSelectSubmission }: { onSelectSu
   const [targetFilter, setTargetFilter] = useState<'all' | 'class' | 'student'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'overdue' | 'completed'>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'deadline' | 'completion'>('newest');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 6;
 
   // Selected assignment for detail progress modal
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
@@ -79,6 +81,11 @@ export function TeacherAssignmentManagement({ onSelectSubmission }: { onSelectSu
 
   const [activeDetailTab, setActiveDetailTab] = useState<'not_completed' | 'completed'>('not_completed');
   const [sendingReminder, setSendingReminder] = useState<number | 'all' | null>(null);
+
+  // Reset current page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, targetFilter, statusFilter, sortBy]);
 
   // Load assignments
   const loadAssignments = async (isManualRefresh = false) => {
@@ -179,6 +186,13 @@ export function TeacherAssignmentManagement({ onSelectSubmission }: { onSelectSu
       return 0;
     });
   }, [assignments, search, targetFilter, statusFilter, sortBy]);
+
+  // Paginated assignments
+  const totalPages = Math.ceil(filteredAssignments.length / ITEMS_PER_PAGE);
+  const paginatedAssignments = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredAssignments.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredAssignments, currentPage, ITEMS_PER_PAGE]);
 
   // Overall statistics
   const stats = useMemo(() => {
@@ -362,150 +376,204 @@ export function TeacherAssignmentManagement({ onSelectSubmission }: { onSelectSu
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredAssignments.map((item) => {
-            const total = item.total_students || 0;
-            const completed = item.completed_students || 0;
-            const inProgress = item.in_progress_students || 0;
-            const notStarted = Math.max(0, total - completed - inProgress);
-            const rate = item.completion_rate ?? (total > 0 ? Math.round((completed / total) * 100) : 0);
-            const isTargetClass = item.taTarget_type === 'class';
-            const canRemind = item.can_send_reminder && notStarted + inProgress > 0;
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {paginatedAssignments.map((item) => {
+              const total = item.total_students || 0;
+              const completed = item.completed_students || 0;
+              const inProgress = item.in_progress_students || 0;
+              const notStarted = Math.max(0, total - completed - inProgress);
+              const rate = item.completion_rate ?? (total > 0 ? Math.round((completed / total) * 100) : 0);
+              const isTargetClass = item.taTarget_type === 'class';
+              const canRemind = item.can_send_reminder && notStarted + inProgress > 0;
 
-            return (
-              <div
-                key={item.taId}
-                className="bg-white rounded-2xl border border-slate-200/80 hover:border-violet-300 hover:shadow-md transition-all duration-200 flex flex-col justify-between overflow-hidden group"
-              >
-                <div className="p-5 space-y-4">
-                  {/* Top Bar: Exam Type & Deadline Status */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-violet-100 text-violet-700 tracking-wide uppercase">
-                        {item.exam?.eType || 'ĐỀ THI'}
-                      </span>
-                      {item.exam?.eSkill && (
-                        <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-600">
-                          {item.exam.eSkill}
+              return (
+                <div
+                  key={item.taId}
+                  className="bg-white rounded-2xl border border-slate-200/80 hover:border-violet-300 hover:shadow-md transition-all duration-200 flex flex-col justify-between overflow-hidden group"
+                >
+                  <div className="p-5 space-y-4">
+                    {/* Top Bar: Exam Type & Deadline Status */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-violet-100 text-violet-700 tracking-wide uppercase">
+                          {item.exam?.eType || 'ĐỀ THI'}
                         </span>
-                      )}
-                    </div>
-                    <div>{getDeadlineBadge(item)}</div>
-                  </div>
-
-                  {/* Exam Title */}
-                  <div>
-                    <h3 className="text-[15px] font-bold text-slate-900 line-clamp-2 leading-snug group-hover:text-violet-700 transition-colors">
-                      {item.exam?.eTitle || 'Đề không có tiêu đề'}
-                    </h3>
-                  </div>
-
-                  {/* Target Info */}
-                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${isTargetClass ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                      {isTargetClass ? <Users className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] text-slate-400 font-semibold uppercase">{isTargetClass ? 'Giao cho Lớp' : 'Giao cho Học viên'}</p>
-                      <p className="font-bold text-slate-800 truncate">{item.target_name || (isTargetClass ? `Lớp #${item.taTarget_id}` : `Học viên #${item.taTarget_id}`)}</p>
-                    </div>
-                    <span className="text-xs font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200/60">
-                      {total} HV
-                    </span>
-                  </div>
-
-                  {/* Progress Bar & Breakdown */}
-                  <div className="space-y-1.5 pt-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-slate-600">Tiến độ nộp bài:</span>
-                      <span className="font-bold text-violet-700">{completed}/{total} HV ({rate}%)</span>
-                    </div>
-
-                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden flex">
-                      {completed > 0 && (
-                        <div
-                          style={{ width: `${(completed / total) * 100}%` }}
-                          className="bg-emerald-500 transition-all duration-300"
-                          title={`Đã nộp: ${completed} HV`}
-                        />
-                      )}
-                      {inProgress > 0 && (
-                        <div
-                          style={{ width: `${(inProgress / total) * 100}%` }}
-                          className="bg-amber-400 transition-all duration-300"
-                          title={`Đang làm: ${inProgress} HV`}
-                        />
-                      )}
-                      {notStarted > 0 && (
-                        <div
-                          style={{ width: `${(notStarted / total) * 100}%` }}
-                          className="bg-slate-200 transition-all duration-300"
-                          title={`Chưa làm: ${notStarted} HV`}
-                        />
-                      )}
-                    </div>
-
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
-                      <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Đã nộp: <b>{completed}</b>
-                      </span>
-                      {inProgress > 0 && (
-                        <span className="flex items-center gap-1 text-amber-600">
-                          <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> Đang làm: <b>{inProgress}</b>
-                        </span>
-                      )}
-                      <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-slate-300 inline-block" /> Chưa làm: <b>{notStarted}</b>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Deadline & Time Info */}
-                  <div className="text-[11px] text-slate-500 space-y-0.5 border-t border-slate-100 pt-2.5">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Thời gian giao:</span>
-                      <span className="font-medium text-slate-700">{formatDate(item.taCreated_at)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Hạn nộp bài:</span>
-                      <span className="font-semibold text-slate-800">{formatDate(item.taDeadline)}</span>
-                    </div>
-                    {item.taMax_attempt && item.taMax_attempt > 1 && (
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Số lần làm tối đa:</span>
-                        <span className="font-medium text-slate-700">{item.taMax_attempt} lần</span>
+                        {item.exam?.eSkill && (
+                          <span className="px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-600">
+                            {item.exam.eSkill}
+                          </span>
+                        )}
                       </div>
-                    )}
+                      <div>{getDeadlineBadge(item)}</div>
+                    </div>
+
+                    {/* Exam Title */}
+                    <div>
+                      <h3 className="text-[15px] font-bold text-slate-900 line-clamp-2 leading-snug group-hover:text-violet-700 transition-colors">
+                        {item.exam?.eTitle || 'Đề không có tiêu đề'}
+                      </h3>
+                    </div>
+
+                    {/* Target Info */}
+                    <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${isTargetClass ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        {isTargetClass ? <Users className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] text-slate-400 font-semibold uppercase">{isTargetClass ? 'Giao cho Lớp' : 'Giao cho Học viên'}</p>
+                        <p className="font-bold text-slate-800 truncate">{item.target_name || (isTargetClass ? `Lớp #${item.taTarget_id}` : `Học viên #${item.taTarget_id}`)}</p>
+                      </div>
+                      <span className="text-xs font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200/60">
+                        {total} HV
+                      </span>
+                    </div>
+
+                    {/* Progress Bar & Breakdown */}
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-slate-600">Tiến độ nộp bài:</span>
+                        <span className="font-bold text-violet-700">{completed}/{total} HV ({rate}%)</span>
+                      </div>
+
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden flex">
+                        {completed > 0 && (
+                          <div
+                            style={{ width: `${(completed / total) * 100}%` }}
+                            className="bg-emerald-500 transition-all duration-300"
+                            title={`Đã nộp: ${completed} HV`}
+                          />
+                        )}
+                        {inProgress > 0 && (
+                          <div
+                            style={{ width: `${(inProgress / total) * 100}%` }}
+                            className="bg-amber-400 transition-all duration-300"
+                            title={`Đang làm: ${inProgress} HV`}
+                          />
+                        )}
+                        {notStarted > 0 && (
+                          <div
+                            style={{ width: `${(notStarted / total) * 100}%` }}
+                            className="bg-slate-200 transition-all duration-300"
+                            title={`Chưa làm: ${notStarted} HV`}
+                          />
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Đã nộp: <b>{completed}</b>
+                        </span>
+                        {inProgress > 0 && (
+                          <span className="flex items-center gap-1 text-amber-600">
+                            <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> Đang làm: <b>{inProgress}</b>
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-slate-300 inline-block" /> Chưa làm: <b>{notStarted}</b>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Deadline & Time Info */}
+                    <div className="text-[11px] text-slate-500 space-y-0.5 border-t border-slate-100 pt-2.5">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Thời gian giao:</span>
+                        <span className="font-medium text-slate-700">{formatDate(item.taCreated_at)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Hạn nộp bài:</span>
+                        <span className="font-semibold text-slate-800">{formatDate(item.taDeadline)}</span>
+                      </div>
+                      {item.taMax_attempt && item.taMax_attempt > 1 && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Số lần làm tối đa:</span>
+                          <span className="font-medium text-slate-700">{item.taMax_attempt} lần</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Card Actions Footer */}
+                  <div className="p-3 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <button
+                      onClick={() => openDetailModal(item.taId)}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white hover:bg-violet-50 text-violet-700 border border-violet-200/80 hover:border-violet-300 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                      Xem tiến độ ({completed}/{total})
+                    </button>
+
+                    <button
+                      onClick={() => handleSendReminder(item.taId)}
+                      disabled={!canRemind || sendingReminder === 'all'}
+                      title={!item.can_send_reminder ? 'Đề thi đã hết hạn, không thể gửi nhắc nhở' : notStarted + inProgress === 0 ? 'Tất cả học viên đã nộp bài' : 'Gửi thông báo nhắc nhở đến tất cả học viên chưa làm'}
+                      className={`inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                        canRemind
+                          ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm cursor-pointer active:scale-95'
+                          : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                      }`}
+                    >
+                      <Bell className={`w-3.5 h-3.5 ${sendingReminder === 'all' ? 'animate-bounce' : ''}`} />
+                      <span>Nhắc nhở {notStarted + inProgress > 0 ? `(${notStarted + inProgress})` : ''}</span>
+                    </button>
                   </div>
                 </div>
+              );
+            })}
+          </div>
 
-                {/* Card Actions Footer */}
-                <div className="p-3 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between gap-2">
-                  <button
-                    onClick={() => openDetailModal(item.taId)}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white hover:bg-violet-50 text-violet-700 border border-violet-200/80 hover:border-violet-300 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
-                  >
-                    <Users className="w-3.5 h-3.5" />
-                    Xem tiến độ ({completed}/{total})
-                  </button>
-
-                  <button
-                    onClick={() => handleSendReminder(item.taId)}
-                    disabled={!canRemind || sendingReminder === 'all'}
-                    title={!item.can_send_reminder ? 'Đề thi đã hết hạn, không thể gửi nhắc nhở' : notStarted + inProgress === 0 ? 'Tất cả học viên đã nộp bài' : 'Gửi thông báo nhắc nhở đến tất cả học viên chưa làm'}
-                    className={`inline-flex items-center justify-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
-                      canRemind
-                        ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm cursor-pointer active:scale-95'
-                        : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
-                    }`}
-                  >
-                    <Bell className={`w-3.5 h-3.5 ${sendingReminder === 'all' ? 'animate-bounce' : ''}`} />
-                    <span>Nhắc nhở {notStarted + inProgress > 0 ? `(${notStarted + inProgress})` : ''}</span>
-                  </button>
-                </div>
+          {/* ── Pagination Controls ── */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm mt-4">
+              <p className="text-xs text-slate-500 font-medium">
+                Hiển thị <span className="font-semibold text-slate-700">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> - <span className="font-semibold text-slate-700">{Math.min(currentPage * ITEMS_PER_PAGE, filteredAssignments.length)}</span> trên <span className="font-semibold text-slate-700">{filteredAssignments.length}</span> đợt giao
+              </p>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                >
+                  Trước
+                </button>
+                {Array.from({ length: totalPages }).map((_, idx) => {
+                  const p = idx + 1;
+                  if (totalPages > 7) {
+                    if (p !== 1 && p !== totalPages && Math.abs(p - currentPage) > 1) {
+                      if (p === 2 && currentPage > 3) return <span key={p} className="px-1 text-slate-400 text-xs">...</span>;
+                      if (p === totalPages - 1 && currentPage < totalPages - 2) return <span key={p} className="px-1 text-slate-400 text-xs">...</span>;
+                      return null;
+                    }
+                  }
+                  const isCurrent = p === currentPage;
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setCurrentPage(p)}
+                      className={`w-8 h-8 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        isCurrent
+                          ? "bg-violet-600 text-white shadow-sm"
+                          : "text-slate-600 hover:bg-slate-50 border border-transparent hover:border-slate-200"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                >
+                  Sau
+                </button>
               </div>
-            );
-          })}
+            </div>
+          )}
         </div>
       )}
 
