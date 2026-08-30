@@ -422,10 +422,13 @@ export function AddStudent() {
             <div>
               <label className={labelCls}>{t('teacher.students.addStudent.gender')}</label>
               <div className="flex items-center gap-4 h-[42px]">
+                {/* Chỉ Nam/Nữ: cột `users.uGender` là boolean, không biểu diễn
+                    được giá trị thứ ba. Trước đây form có thêm "Khác" nhưng
+                    backend không lưu giới tính, nên lựa chọn đó chưa từng có
+                    tác dụng. */}
                 {[
                   { value: "male",   label: t('teacher.students.addStudent.genderOptions.male') },
                   { value: "female", label: t('teacher.students.addStudent.genderOptions.female') },
-                  { value: "other",  label: t('teacher.students.addStudent.genderOptions.other') },
                 ].map((opt) => (
                   <label key={opt.value} className="flex items-center gap-1.5 cursor-pointer">
                     <input

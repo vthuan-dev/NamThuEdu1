@@ -553,6 +553,8 @@ class UserController extends Controller
             'studentEmail' => 'nullable|email|max:255',
             'studentDoB' => 'nullable|date|before:today',
             'age_group' => 'required|in:kids,teens,adults',
+            'gender' => 'nullable|in:male,female',
+            'address' => 'nullable|string|max:255',
             'avatar' => 'nullable|image|mimes:jpeg,jpg,png,gif,webp,bmp,svg|max:20480',
         ]);
 
@@ -607,6 +609,12 @@ class UserController extends Controller
                 'uName' => $request->studentName,
                 'uEmail' => $request->studentEmail ?? null,
                 'uDoB' => $request->studentDoB ?? null,
+                // Form gửi 'male'/'female' nhưng cột `uGender` là boolean
+                // (1 = Nam, xem UserController::exportStudents). Hai trường này
+                // trước đây không hề được đọc: form vẫn gửi lên, backend vẫn
+                // bỏ qua, nên giáo viên nhập xong mở lại thấy trống.
+                'uGender' => $request->filled('gender') ? ($request->gender === 'male') : null,
+                'uAddress' => $request->address ?? null,
                 'avatar_url' => $avatarPath,
                 'age_group' => $ageGroup,
                 'theme_preference' => 'auto',

@@ -121,4 +121,44 @@ class StudentAgeGroupTest extends TestCase
         $this->assertSame('teens',  User::where('uPhone', '0900000011')->value('age_group'));
         $this->assertSame('adults', User::where('uPhone', '0900000012')->value('age_group'));
     }
+
+    /**
+     * Giới tính và địa chỉ: form vẫn gửi lên nhưng createSingleStudent chưa hề
+     * đọc, nên giáo viên nhập xong mở lại thấy trống. `uGender` là cột boolean
+     * (1 = Nam) nên chuỗi 'male'/'female' phải được quy đổi.
+     *
+     * @test
+     */
+    public function luu_gioi_tinh_va_dia_chi(): void
+    {
+        $this->createStudent([
+            'gender'  => 'female',
+            'address' => 'Số 1, Phường A, Thành phố Cần Thơ',
+        ])->assertStatus(200);
+
+        $student = User::where('uPhone', '0900000001')->first();
+        $this->assertFalse($student->uGender);
+        $this->assertSame('Số 1, Phường A, Thành phố Cần Thơ', $student->uAddress);
+    }
+
+    /** @test */
+    public function gioi_tinh_nam_luu_thanh_true(): void
+    {
+        $this->createStudent(['gender' => 'male'])->assertStatus(200);
+
+        $this->assertTrue(User::where('uPhone', '0900000001')->first()->uGender);
+    }
+
+    /**
+     * Không gửi giới tính thì để trống, không được mặc định thành Nam.
+     *
+     * @test
+     */
+    public function khong_gui_gioi_tinh_thi_de_trong(): void
+    {
+        $this->createStudent([])->assertStatus(200);
+
+        $this->assertNull(User::where('uPhone', '0900000001')->value('uGender'));
+    }
 }
+
