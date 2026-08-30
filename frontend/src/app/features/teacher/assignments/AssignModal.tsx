@@ -330,12 +330,31 @@ export function AssignModal({ open, exams, onClose, onAssigned }: AssignModalPro
 
     let ok = 0;
     let fail = 0;
+    // Lý do bị bỏ qua, gom từ data.errors của backend.
+    const skipReasons: string[] = [];
+
     for (const exam of exams) {
       try {
-        await api.post("/teacher/assignments/bulk", { ...payload, exam_id: exam.eId });
-        ok++;
-      } catch {
+        const res = await api.post("/teacher/assignments/bulk", { ...payload, exam_id: exam.eId });
+
+        // PHẢI đọc success_count, không được chỉ dựa vào "request không ném lỗi".
+        // Backend bỏ qua từng target lệch age_group rồi vẫn trả 2xx khi giao được
+        // một phần — nếu chỉ đếm theo exception thì giáo viên thấy toast thành
+        // công trong khi một số học viên không hề nhận được đề.
+        const data = res?.data?.data ?? {};
+        const successCount = Number(data.success_count ?? 0);
+        const errors: string[] = Array.isArray(data.errors) ? data.errors : [];
+
+        if (successCount > 0) {
+          ok++;
+        } else {
+          fail++;
+        }
+        skipReasons.push(...errors);
+      } catch (e: any) {
         fail++;
+        const msg = e?.response?.data?.message;
+        if (msg) skipReasons.push(msg);
       }
     }
 
@@ -347,10 +366,16 @@ export function AssignModal({ open, exams, onClose, onAssigned }: AssignModalPro
       toast.success(
         `Đã giao ${ok} đề cho ${targetLabel}` + (fail ? ` (${fail} đề lỗi)` : ""),
       );
+      // Có target bị bỏ qua thì phải nói ra — thường là lệch nhóm tuổi, và giáo
+      // viên không có cách nào tự đoán được.
+      if (skipReasons.length > 0) {
+        toast.warning(skipReasons[0]);
+      }
       onAssigned();
       onClose();
     } else {
-      toast.error("Giao bài thất bại. Vui lòng thử lại.");
+      // Hiện đúng lý do backend trả về thay vì câu chung chung.
+      toast.error(skipReasons[0] ?? "Giao bài thất bại. Vui lòng thử lại.");
     }
   };
 

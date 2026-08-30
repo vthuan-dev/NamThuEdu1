@@ -767,6 +767,27 @@ class TestAssignmentController extends Controller
                 \Log::warning('Push notification failed on bulkAssign: ' . $e->getMessage());
             }
 
+            // KHÔNG trả 201 khi không giao được cho ai.
+            //
+            // Trước đây mọi trường hợp đều trả 201 + status 'success', kể cả khi
+            // TẤT CẢ target bị bỏ qua (lệch age_group, không tồn tại...). Phía
+            // giáo viên chỉ bắt exception của lời gọi HTTP, nên 201 = thành công
+            // → toast "Đã giao 1 đề cho 1 học viên" trong khi DB không có dòng
+            // nào. Đây là nguyên nhân "giao đề lúc được lúc không": học viên bị
+            // ghi sai age_group sẽ lặng lẽ trượt mọi lần giao.
+            //
+            // Giao được một phần vẫn là 201 — có assignment thật được tạo; số bị
+            // bỏ qua nằm trong `errors` để UI hiển thị.
+            if ($results['success_count'] === 0) {
+                return response()->json([
+                    'status'  => 'error',
+                    'data'    => $results,
+                    'message' => !empty($results['errors'])
+                        ? $results['errors'][0]
+                        : 'Không giao được bài cho đối tượng nào.',
+                ], 422);
+            }
+
             return response()->json([
                 'status'  => 'success',
                 'data'    => $results,
