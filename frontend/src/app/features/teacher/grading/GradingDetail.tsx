@@ -2,6 +2,7 @@ import { Fragment, useState, useMemo, useEffect, useRef, useLayoutEffect, Suspen
 import { lazyWithReload } from "../../../../utils/lazyWithReload";
 import { api } from "../../../../services/api";
 import { getFullMediaUrl } from "../../../../utils/mediaUtils";
+import { sanitizePassageHtml } from "../../../../utils/examUtils";
 
 // Lazy-load các khung chấm điểm theo loại đề. Bọc lazyWithReload để tự reload
 // 1 lần khi chunk 404 (deploy mới đổi hash). Khai báo ở module scope để không
@@ -1046,10 +1047,23 @@ function VstepGradingDetailInternal() {
 
                 {/* Prompt — Study4-style clean task brief, parses prompt like student exam */}
                 {(() => {
-                  const text = q.text || "";
-                  const timeMatch = text.match(/(\d+)\s*minutes?/i);
-                  const wordsMatch = text.match(/(?:at\s+least\s+)?(\d+)(?:\s*[-–—]\s*(\d+))?\s*words?/i);
-                  const criteriaMatch = text.match(/(?:evaluated|assessed|graded|judged)[^.]*?(?:terms?\s+of|on|by)\s+([^.]+)/i);
+                  const rawPrompt = q.text || "";
+                  const promptIsHtml = /<\/?[a-z][\s\S]*>/i.test(rawPrompt);
+
+                  const cleanText = promptIsHtml
+                    ? rawPrompt
+                        .replace(/<[^>]+>/g, " ")
+                        .replace(/&nbsp;/gi, " ")
+                        .replace(/&#39;/gi, "'")
+                        .replace(/&quot;/gi, '"')
+                        .replace(/&amp;/gi, "&")
+                        .replace(/\s+/g, " ")
+                        .trim()
+                    : rawPrompt;
+
+                  const timeMatch = cleanText.match(/(\d+)\s*minutes?/i);
+                  const wordsMatch = cleanText.match(/(?:at\s+least\s+)?(\d+)(?:\s*[-–—]\s*(\d+))?\s*words?/i);
+                  const criteriaMatch = cleanText.match(/(?:evaluated|assessed|graded|judged)[^.]*?(?:terms?\s+of|on|by)\s+([^.]+)/i);
 
                   const minutes = timeMatch ? timeMatch[1] : null;
                   const wordsRange = wordsMatch ? (wordsMatch[2] ? `${wordsMatch[1]}–${wordsMatch[2]}` : `≥ ${wordsMatch[1]}`) : null;
@@ -1061,7 +1075,7 @@ function VstepGradingDetailInternal() {
                   type SegType = "time" | "intro" | "context" | "stimulus" | "task" | "requirement";
                   interface Seg { type: SegType; text: string }
 
-                  const paras = text.split(/\n\s*\n|\n/).map((l) => l.trim()).filter(Boolean);
+                  const paras = cleanText.split(/\n\s*\n|\n/).map((l) => l.trim()).filter(Boolean);
                   const segs: Seg[] = [];
                   let stimulusMode = false;
                   const ATTRIBUTION = /^(IELTS|Cambridge|British Council|IDP|TEST\s+\d+|Source:|Adapted from|—|–)/i;
@@ -1241,7 +1255,14 @@ function VstepGradingDetailInternal() {
 
                       {/* Body — segmented like student exam view */}
                       <div className="px-5 py-4 space-y-4">
-                        {renderBlocks.map((block, i) => renderBlock(block, i))}
+                        {promptIsHtml ? (
+                          <article
+                            className="vstep-writing-prompt prose prose-sm max-w-none text-slate-800 leading-relaxed [&_p]:mb-3 [&_p:last-child]:mb-0 [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-blue-900"
+                            dangerouslySetInnerHTML={{ __html: sanitizePassageHtml(rawPrompt) }}
+                          />
+                        ) : (
+                          renderBlocks.map((block, i) => renderBlock(block, i))
+                        )}
                       </div>
 
                       {/* Criteria footer */}
