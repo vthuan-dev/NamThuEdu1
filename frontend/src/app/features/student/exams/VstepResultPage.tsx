@@ -790,7 +790,15 @@ export function VstepResultPage() {
             {isOpen && (
               <div className="divide-y divide-slate-100 border-t border-slate-100">
                 {rows.map((ans, idx) => {
-                  const qText = ans.question?.qContent?.replace(/<[^>]*>/g, "").slice(0, 80) ?? `Câu ${idx + 1}`;
+                  const qText = ans.question?.qContent
+                    ? ans.question.qContent
+                        .replace(/<[^>]*>/g, "")
+                        .replace(/&nbsp;/gi, " ")
+                        .replace(/&#39;/gi, "'")
+                        .replace(/&quot;/gi, '"')
+                        .replace(/&amp;/gi, "&")
+                        .slice(0, 80)
+                    : `Câu ${idx + 1}`;
                   const correctAns = examQMap[ans.question?.qId] ?? "—";
                   const userAns = ans.saAnswer_text ?? "—";
                   

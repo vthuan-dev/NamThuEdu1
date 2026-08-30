@@ -326,9 +326,20 @@ export function ExamDetail() {
                               {getTaskTypeName(question.qType)}
                             </h4>
                           </div>
-                          <p className="text-gray-600 text-sm mb-2">
-                            {question.qContent || 'Không có mô tả'}
-                          </p>
+                          <div className="text-gray-600 text-sm mb-2">
+                            {question.qContent ? (
+                              /<\/?[a-z][\s\S]*>/i.test(question.qContent) ? (
+                                <div
+                                  className="prose prose-sm max-w-none text-gray-600 [&_p]:mb-1 [&_p:last-child]:mb-0"
+                                  dangerouslySetInnerHTML={{ __html: question.qContent }}
+                                />
+                              ) : (
+                                question.qContent
+                              )
+                            ) : (
+                              'Không có mô tả'
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">

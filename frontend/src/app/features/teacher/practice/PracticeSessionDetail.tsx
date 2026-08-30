@@ -278,7 +278,9 @@ export function PracticeSessionDetail() {
                         <span className="w-6 h-6 rounded-lg bg-purple-100 text-purple-700 text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
                           {idx + 1}
                         </span>
-                        <p className="flex-1 text-sm text-gray-800 font-medium line-clamp-2">{q.qContent}</p>
+                        <p className="flex-1 text-sm text-gray-800 font-medium line-clamp-2">
+                          {q.qContent ? q.qContent.replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/&#39;/gi, "'").replace(/&quot;/gi, '"').replace(/&amp;/gi, "&").replace(/\s+/g, " ").trim() : ""}
+                        </p>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-xs text-gray-400">{q.qPoints} điểm</span>
                           {expandedQ === q.qId ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
@@ -292,7 +294,9 @@ export function PracticeSessionDetail() {
                               {a.aIs_correct
                                 ? <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                                 : <XCircle className="w-4 h-4 text-gray-300 shrink-0 mt-0.5" />}
-                              <span className={a.aIs_correct ? "text-emerald-700 font-medium" : "text-gray-600"}>{a.aContent}</span>
+                              <span className={a.aIs_correct ? "text-emerald-700 font-medium" : "text-gray-600"}>
+                                {a.aContent ? a.aContent.replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/&#39;/gi, "'").replace(/&quot;/gi, '"').replace(/&amp;/gi, "&").replace(/\s+/g, " ").trim() : ""}
+                              </span>
                             </div>
                           ))}
                         </div>

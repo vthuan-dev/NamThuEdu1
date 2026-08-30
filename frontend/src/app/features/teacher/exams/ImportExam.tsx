@@ -467,7 +467,8 @@ export const ImportExam: React.FC = () => {
                       onClick={() => setExpandedId(expanded ? null : q._id)}>
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-sm font-medium text-gray-800 line-clamp-2">
-                          <span className="text-indigo-600 font-bold mr-1">#{idx + 1}</span>{q.qContent}
+                          <span className="text-indigo-600 font-bold mr-1">#{idx + 1}</span>
+                          {q.qContent ? q.qContent.replace(/<[^>]+>/g, " ").replace(/&nbsp;/gi, " ").replace(/&#39;/gi, "'").replace(/&quot;/gi, '"').replace(/&amp;/gi, "&").replace(/\s+/g, " ").trim() : ""}
                         </p>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           {q.correct_answer && (

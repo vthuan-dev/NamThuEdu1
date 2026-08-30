@@ -22,6 +22,7 @@ import { useToastContext } from "../../../../contexts/ToastContext";
 import { api } from "../../../../services/api";
 import { gradingApi } from "../../../../services/gradingApi";
 import { getFullMediaUrl } from "../../../../utils/mediaUtils";
+import { sanitizePassageHtml } from "../../../../utils/examUtils";
 import {
   ChevronLeft, Save, Loader2, AlertCircle, CheckCircle2,
   Headphones, BookOpen, PenLine, Mic, Award, Sparkles,
@@ -890,8 +891,19 @@ function QuestionRow({
         >
           {q.number}
         </div>
-        <div className="flex-1 min-w-0 text-sm text-slate-900">
-          {q.text || <em className="text-slate-400">Câu hỏi không có nội dung</em>}
+        <div className="flex-1 min-w-0 text-sm text-slate-900 leading-relaxed">
+          {q.text ? (
+            /<\/?[a-z][\s\S]*>/i.test(q.text) ? (
+              <div
+                className="prose prose-sm max-w-none text-slate-900 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:pl-3 [&_blockquote]:italic"
+                dangerouslySetInnerHTML={{ __html: sanitizePassageHtml(q.text) }}
+              />
+            ) : (
+              q.text
+            )
+          ) : (
+            <em className="text-slate-400">Câu hỏi không có nội dung</em>
+          )}
         </div>
         {q.reviewStatus === "accepted" && (
           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700">AI</span>
