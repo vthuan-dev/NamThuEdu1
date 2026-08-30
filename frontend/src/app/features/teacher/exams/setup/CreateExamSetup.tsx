@@ -17,14 +17,18 @@ import {
 } from './examCatalog';
 
 /**
- * Wizard "Tạo đề thi" V3 — gộp toàn bộ về MỘT trang.
+ * Wizard "Tạo đề thi" — toàn bộ trên MỘT trang.
  *
- * Thay cho flow 3 bước (nhóm → loại → xác nhận), giờ tất cả nằm trên một trang
- * với progressive disclosure:
- *  - Cột trái: 3 khối chọn xếp dọc (Nhóm học viên → Loại đề → Kỹ năng), khối sau
- *    chỉ hiện khi đã chọn xong khối trước.
- *  - Cột phải: thẻ preview cập nhật trực tiếp + nút "Bắt đầu tạo đề" (bỏ hẳn bước
- *    xác nhận riêng).
+ * Bố cục:
+ *  - Cột trái: chỉ bước 1 (chọn nhóm học viên) với 3 thẻ ảnh lớn.
+ *  - Cột phải (aside): bước 2 (loại đề) → bước 3 (kỹ năng) → chi tiết đề →
+ *    nút "Bắt đầu tạo đề", xếp dọc trong một panel dính (sticky).
+ *
+ * Trước đây bước 2 và 3 nằm dưới bước 1 ở cột trái. Sau khi chọn nhóm, chúng
+ * xuất hiện bên dưới — thường là ngoài khung nhìn — và cách xa nút bấm ở cột
+ * phải, nên giáo viên hay không nhận ra là còn phải chọn tiếp. Dồn cả chuỗi
+ * chọn → xem lại → bấm vào cùng một cột giúp mọi thao tác còn lại nằm gọn
+ * trong tầm mắt.
  *
  * Nhóm chỉ có 1 loại đề (Kids/Teens) sẽ tự chọn loại đó ngay → tối thiểu số click.
  * Áp dụng chung cho mọi loại đề vì đọc từ AGE_GROUP_CATALOG.
@@ -42,7 +46,7 @@ const resolveIcon = (name: string, fallback: LucideIcon = FileText): LucideIcon 
  *
  * Ba thẻ này nằm ngay trong khung nhìn đầu tiên nên phải hiện gần như tức thì.
  * Bản PNG gốc là 1024x1024 và nặng 404–554 KB mỗi ảnh (tổng ~1.4 MB) trong khi ô
- * hiển thị chỉ cao 112px, nên ưu tiên WebP đã resize; PNG chỉ còn là fallback cho
+ * hiển thị chỉ cao 144px, nên ưu tiên WebP đã resize; PNG chỉ còn là fallback cho
  * trình duyệt không hỗ trợ WebP. Xem `optimize_agecard_images.cjs` để tạo lại.
  */
 const AGE_GROUP_IMAGE: Record<string, { webp: string; png: string }> = {
@@ -130,225 +134,196 @@ export function CreateExamSetup() {
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-6xl gap-12 px-8 py-12 lg:grid-cols-[1fr_420px]">
-        {/* ── Cột trái: các khối chọn ────────────────────────── */}
-        <div className="space-y-10">
-          {/* Bước 1 — Nhóm học viên */}
-          <section>
-            <StepHeader index={1} done={!!ageGroup} title="Đề thi dành cho ai?" hint="Chọn nhóm để gợi ý loại đề phù hợp" />
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-              {AGE_GROUP_CATALOG.map((g) => {
-                const isSel = ageGroup?.key === g.key;
-                const img = AGE_GROUP_IMAGE[g.key];
-                return (
-                  <button
-                    key={g.key}
-                    type="button"
-                    onClick={() => handlePickAgeGroup(g)}
-                    className={`group relative overflow-hidden rounded-2xl border bg-white text-left transition-all cursor-pointer ${
-                      isSel ? 'border-slate-900 ring-1 ring-slate-900' : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
-                    }`}
-                  >
-                    {isSel && (
-                      <span className="absolute right-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 shadow-sm">
-                        <Check className="h-3.5 w-3.5 text-white" />
-                      </span>
-                    )}
-                    {/* Ảnh banner — tải sớm vì nằm trong khung nhìn đầu tiên */}
-                    <div className="h-28 w-full overflow-hidden bg-slate-50">
-                      <picture>
-                        <source
-                          type="image/webp"
-                          srcSet={img?.webp}
-                          sizes="(min-width: 1024px) 200px, (min-width: 640px) 30vw, 90vw"
-                        />
-                        <img
-                          src={img?.png}
-                          alt={`Nhóm ${g.label} — ${g.range}`}
-                          width={1024}
-                          height={1024}
-                          loading="eager"
-                          fetchPriority="high"
-                          decoding="async"
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        />
-                      </picture>
-                    </div>
-                    {/* Nội dung */}
-                    <div className="p-5">
-                      <h3 className="text-lg font-semibold text-slate-900">{g.label}</h3>
-                      <p className="text-[13px] text-slate-500">{g.range}</p>
-                      <p className="mt-2 text-[12px] text-slate-400">
-                        {g.examTypes.length === 1 ? '1 loại đề chuyên dụng' : `${g.examTypes.length} loại đề`}
-                      </p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* Bước 2 — Loại đề */}
-          {ageGroup && (
-            <section className="ce-reveal">
-              <StepHeader
-                index={2}
-                done={!!examType}
-                title="Loại đề bạn muốn tạo?"
-                hint="Mỗi loại có giao diện soạn riêng tối ưu cho cấu trúc đề"
-              />
-              <div className="space-y-4">
-                {ageGroup.examTypes.map((t) => {
-                  const Icon = resolveIcon(t.iconName);
-                  const isSel = examType?.value === t.value;
-                  return (
-                    <button
-                      key={t.value}
-                      type="button"
-                      onClick={() => handlePickType(t)}
-                      className={`flex w-full items-start gap-5 rounded-2xl border bg-white p-6 text-left transition-all cursor-pointer ${
-                        isSel ? 'border-slate-900 ring-1 ring-slate-900' : 'border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      <div
-                        className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl"
-                        style={{ backgroundColor: `${t.themeColor}1A`, color: t.themeColor }}
-                      >
-                        <Icon className="h-8 w-8" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-lg font-semibold text-slate-900">{t.name}</h3>
-                          {t.badge && (
-                            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                              {t.badge}
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1 text-sm text-slate-500">{t.description}</p>
-                        <div className="mt-3 flex flex-wrap items-center gap-5 text-[12px] text-slate-400">
-                          <span className="inline-flex items-center gap-1.5">
-                            <Icons.Clock className="h-4 w-4" />
-                            {t.duration}
-                          </span>
-                          {t.needsSkill && (
-                            <span className="inline-flex items-center gap-1.5">
-                              <Icons.Layers className="h-4 w-4" />
-                              {t.skills?.filter((s) => s.value !== 'mixed').length ?? 0} kỹ năng
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div
-                        className={`mt-1 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
-                          isSel ? 'border-slate-900 bg-slate-900' : 'border-slate-300'
-                        }`}
-                      >
-                        {isSel && <Check className="h-3.5 w-3.5 text-white" />}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          {/* Bước 3 — Kỹ năng (chỉ khi loại đề cần) */}
-          {examType && needsSkill && (
-            <section className="ce-reveal">
-              <StepHeader index={3} done={!!skill} title="Chọn nội dung / kỹ năng" hint="Có thể tạo full đề hoặc luyện từng kỹ năng" />
-              <div className="flex flex-wrap gap-2.5">
-                {examType.skills!.map((s) => {
-                  const active = skill === s.value;
-                  return (
-                    <button
-                      key={s.value}
-                      type="button"
-                      onClick={() => setSkill(s.value)}
-                      title={s.description}
-                      className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer ${
-                        active
-                          ? 'border-slate-900 bg-slate-900 text-white'
-                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                      }`}
-                    >
-                      {s.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-        </div>
-
-        {/* ── Cột phải: preview sống + CTA ─────────────────────────────────── */}
-        <aside className="h-fit lg:sticky lg:top-24">
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            {examType ? (
-              <>
-                {/* Banner tinted nhẹ */}
-                <div className="flex items-start gap-4 border-b border-slate-100 p-6" style={{ background: `${examType.themeColor}0D` }}>
-                  <div
-                    className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl text-white"
-                    style={{ backgroundColor: examType.themeColor }}
-                  >
-                    {(() => {
-                      const Icon = resolveIcon(examType.iconName);
-                      return <Icon className="h-7 w-7" />;
-                    })()}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-lg font-semibold text-slate-900">{examType.name}</h3>
-                      {selectedSkill && skill !== 'mixed' && (
-                        <span
-                          className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-white"
-                          style={{ backgroundColor: examType.themeColor }}
-                        >
-                          {selectedSkill.label}
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-1 text-[13px] text-slate-500">{examType.tagline ?? examType.description}</p>
-                  </div>
-                </div>
-
-                {/* Highlights */}
-                <div className="space-y-4 p-6">
-                  {ageGroup && (
-                    <PreviewItem iconName="Users" label="Đối tượng" value={`${ageGroup.label} · ${ageGroup.range}`} color={examType.themeColor} />
+      <main className="mx-auto grid max-w-6xl items-start gap-8 px-8 py-12 lg:grid-cols-[1fr_360px]">
+        {/* ── Cột trái: bước 1 — chọn nhóm học viên ──────────────────────────── */}
+        <section>
+          <StepHeader index={1} done={!!ageGroup} title="Đề thi dành cho ai?" hint="Chọn nhóm để gợi ý loại đề phù hợp" />
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+            {AGE_GROUP_CATALOG.map((g) => {
+              const isSel = ageGroup?.key === g.key;
+              const img = AGE_GROUP_IMAGE[g.key];
+              return (
+                <button
+                  key={g.key}
+                  type="button"
+                  onClick={() => handlePickAgeGroup(g)}
+                  className={`group relative overflow-hidden rounded-2xl border bg-white text-left transition-all cursor-pointer ${
+                    isSel ? 'border-slate-900 ring-1 ring-slate-900' : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
+                  }`}
+                >
+                  {isSel && (
+                    <span className="absolute right-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 shadow-sm">
+                      <Check className="h-3.5 w-3.5 text-white" />
+                    </span>
                   )}
-                  <PreviewItem iconName="Clock" label="Thời lượng" value={examType.duration} color={examType.themeColor} />
-                  {examType.highlights?.map((h) => (
-                    <PreviewItem key={h.label} iconName={h.iconName} label={h.label} value={h.value} color={examType.themeColor} />
-                  ))}
-                </div>
-              </>
-            ) : (
+                  {/* Ảnh banner — tải sớm vì nằm trong khung nhìn đầu tiên */}
+                  <div className="h-36 w-full overflow-hidden bg-slate-50">
+                    <picture>
+                      <source
+                        type="image/webp"
+                        srcSet={img?.webp}
+                        sizes="(min-width: 1024px) 240px, (min-width: 640px) 30vw, 90vw"
+                      />
+                      <img
+                        src={img?.png}
+                        alt={`Nhóm ${g.label} — ${g.range}`}
+                        width={1024}
+                        height={1024}
+                        loading="eager"
+                        fetchPriority="high"
+                        decoding="async"
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                    </picture>
+                  </div>
+                  {/* Nội dung */}
+                  <div className="p-5">
+                    <h3 className="text-lg font-semibold text-slate-900">{g.label}</h3>
+                    <p className="text-[13px] text-slate-500">{g.range}</p>
+                    <p className="mt-2 text-[12px] text-slate-400">
+                      {g.examTypes.length === 1 ? '1 loại đề chuyên dụng' : `${g.examTypes.length} loại đề`}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/*
+          ── Cột phải: panel tác vụ ────────────────────────────────────────────
+
+          Chứa bước 2, bước 3, phần chi tiết và nút bấm — tức toàn bộ việc còn
+          lại sau khi đã chọn nhóm. Cỡ chữ và khoảng đệm ở đây nhỏ hơn thẻ bên
+          trái vì khung chỉ rộng 360px và phải chứa tối đa 2 loại đề + 5 kỹ năng
+          + 5 dòng chi tiết mà vẫn giữ được nút bấm trong khung nhìn.
+        */}
+        <aside className="lg:sticky lg:top-24">
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            {!ageGroup ? (
               <div className="px-6 py-14 text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
-                  <FileText className="h-8 w-8 text-slate-400" />
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
+                  <FileText className="h-7 w-7 text-slate-400" />
                 </div>
-                <p className="mt-4 text-sm font-medium text-slate-500">Chưa có gì để xem trước</p>
-                <p className="mt-1 text-[13px] text-slate-400">Chọn nhóm và loại đề để xem chi tiết</p>
+                <p className="mt-4 text-sm font-medium text-slate-500">Chưa chọn nhóm học viên</p>
+                <p className="mt-1 text-[12px] text-slate-400">Chọn một nhóm ở bên trái để xem loại đề phù hợp</p>
+              </div>
+            ) : (
+              /* Giới hạn chiều cao phần chọn để nút bấm bên dưới không bị đẩy ra khỏi khung nhìn */
+              <div className="max-h-[calc(100vh-16rem)] overflow-y-auto">
+                {/* Bước 2 — Loại đề */}
+                <section className="ce-reveal border-b border-slate-100 p-4">
+                  <AsideStep index={2} done={!!examType} title="Loại đề" />
+                  <div className="mt-3 space-y-2">
+                    {ageGroup.examTypes.map((t) => {
+                      const Icon = resolveIcon(t.iconName);
+                      const isSel = examType?.value === t.value;
+                      return (
+                        <button
+                          key={t.value}
+                          type="button"
+                          onClick={() => handlePickType(t)}
+                          className={`flex w-full items-center gap-2.5 rounded-xl border p-2.5 text-left transition-colors cursor-pointer ${
+                            isSel ? 'border-slate-900 bg-slate-50' : 'border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <div
+                            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg"
+                            style={{ backgroundColor: `${t.themeColor}1A`, color: t.themeColor }}
+                          >
+                            <Icon className="h-[18px] w-[18px]" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="truncate text-[13px] font-semibold text-slate-900">{t.name}</span>
+                              {t.badge && (
+                                <span className="flex-shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-500">
+                                  {t.badge}
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-400">
+                              <Icons.Clock className="h-3 w-3 flex-shrink-0" />
+                              {t.duration}
+                            </p>
+                          </div>
+                          <div
+                            className={`flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
+                              isSel ? 'border-slate-900 bg-slate-900' : 'border-slate-300'
+                            }`}
+                          >
+                            {isSel && <Check className="h-2.5 w-2.5 text-white" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                {/* Bước 3 — Kỹ năng (chỉ khi loại đề cần) */}
+                {examType && needsSkill && (
+                  <section className="ce-reveal border-b border-slate-100 p-4">
+                    <AsideStep index={3} done={!!skill} title="Nội dung / kỹ năng" />
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {examType.skills!.map((s) => {
+                        const active = skill === s.value;
+                        return (
+                          <button
+                            key={s.value}
+                            type="button"
+                            onClick={() => setSkill(s.value)}
+                            title={s.description}
+                            className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-colors cursor-pointer ${
+                              active
+                                ? 'border-slate-900 bg-slate-900 text-white'
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                            }`}
+                          >
+                            {s.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
+
+                {/* Chi tiết đề đã chọn */}
+                {examType && (
+                  <section className="ce-reveal p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Chi tiết</p>
+                    <p className="mt-1.5 text-[12px] leading-relaxed text-slate-500">
+                      {examType.tagline ?? examType.description}
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      <SpecRow iconName="Users" label="Đối tượng" value={`${ageGroup.label} · ${ageGroup.range}`} />
+                      {selectedSkill && skill !== 'mixed' && (
+                        <SpecRow iconName="ListChecks" label="Kỹ năng" value={selectedSkill.label} />
+                      )}
+                      <SpecRow iconName="Clock" label="Thời lượng" value={examType.duration} />
+                      {examType.highlights?.map((h) => (
+                        <SpecRow key={h.label} iconName={h.iconName} label={h.label} value={h.value} />
+                      ))}
+                    </div>
+                  </section>
+                )}
               </div>
             )}
 
             {/* CTA */}
-            <div className="border-t border-slate-100 p-6">
+            <div className="border-t border-slate-100 p-4">
               <button
                 type="button"
                 onClick={handleConfirm}
                 disabled={!ready}
-                className={`flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-[15px] font-semibold transition-colors ${
+                className={`flex w-full items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-semibold transition-colors ${
                   ready ? 'bg-slate-900 text-white hover:bg-slate-800 cursor-pointer' : 'cursor-not-allowed bg-slate-100 text-slate-400'
                 }`}
               >
                 Bắt đầu tạo đề
-                <ChevronRight className="h-5 w-5" />
+                <ChevronRight className="h-4 w-4" />
               </button>
               {!ready && missingHint && (
-                <p className="mt-2.5 text-center text-[12px] text-slate-400">{missingHint}</p>
+                <p className="mt-2 text-center text-[11px] text-slate-400">{missingHint}</p>
               )}
             </div>
           </div>
@@ -358,7 +333,7 @@ export function CreateExamSetup() {
   );
 }
 
-// ── Section header với số bước ────────────────────────────────────────────────
+// ── Section header với số bước (cột trái) ────────────────────────────────────
 function StepHeader({
   index,
   title,
@@ -387,27 +362,32 @@ function StepHeader({
   );
 }
 
-function PreviewItem({
-  iconName,
-  label,
-  value,
-  color,
-}: {
-  iconName: string;
-  label: string;
-  value: string;
-  color: string;
-}) {
+// ── Nhãn bước thu nhỏ, dùng trong aside ─────────────────────────────────────
+function AsideStep({ index, title, done }: { index: number; title: string; done?: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div
+        className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold transition-colors ${
+          done ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white'
+        }`}
+      >
+        {done ? <Check className="h-3 w-3" /> : index}
+      </div>
+      <h2 className="text-[13px] font-semibold text-slate-900">{title}</h2>
+    </div>
+  );
+}
+
+// ── Dòng thông số nhãn-trái / giá trị-phải, gọn hơn thẻ icon cũ ──────────────
+function SpecRow({ iconName, label, value }: { iconName: string; label: string; value: string }) {
   const Icon = resolveIcon(iconName);
   return (
-    <div className="flex items-start gap-3.5">
-      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: `${color}1A`, color }}>
-        <Icon className="h-5 w-5" />
-      </div>
-      <div className="min-w-0">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
-        <div className="mt-0.5 text-sm font-semibold leading-snug text-slate-900">{value}</div>
-      </div>
+    <div className="flex items-start justify-between gap-3">
+      <span className="flex flex-shrink-0 items-center gap-1.5 text-[11px] text-slate-400">
+        <Icon className="h-3.5 w-3.5" />
+        {label}
+      </span>
+      <span className="text-right text-[11px] font-semibold leading-snug text-slate-700">{value}</span>
     </div>
   );
 }
