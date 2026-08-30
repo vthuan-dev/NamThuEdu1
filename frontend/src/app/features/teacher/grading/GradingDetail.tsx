@@ -370,7 +370,11 @@ function VstepGradingDetailInternal() {
             detail: "Chấm điểm bài thi xong",
           });
         });
-        toast.success("Đã lưu điểm bài thi thành công!");
+        // Nêu rõ bài nào vừa được lưu: giáo viên thường mở liên tiếp nhiều bài,
+        // toast chung chung không cho biết thao tác vừa rồi áp lên bài nào.
+        toast.success(
+          `Đã duyệt bài #${submissionId} của ${student.name} — ${scoreOnTen.toFixed(2)}/10`
+        );
         navigate("/giao-vien/cham-diem");
       })
       .catch((err: any) => {

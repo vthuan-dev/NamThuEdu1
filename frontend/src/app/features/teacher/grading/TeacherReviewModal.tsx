@@ -22,6 +22,7 @@ import {
   Award,
 } from "lucide-react";
 import { api } from "../../../../services/api";
+import { useToastContext } from "../../../../contexts/ToastContext";
 import {
   parseVstepScores,
   calcVstepAvg,
@@ -99,6 +100,7 @@ export function TeacherReviewModal({ submission, open, onClose, onReviewed }: Pr
   const aiScores = parseVstepScores(submission?.sGemini_feedback);
 
   const navigate = useNavigate();
+  const toast = useToastContext();
 
   const [scores, setScores] = useState<Record<string, string>>({});
   const [totalInput, setTotalInput] = useState("");   // tổng điểm cho đề không theo 4 kỹ năng (Kids/General/Cambridge)
@@ -235,6 +237,24 @@ export function TeacherReviewModal({ submission, open, onClose, onReviewed }: Pr
       }
 
       await api.post(`/teacher/submissions/${submission.id}/grade`, payload);
+
+      // Điểm hiển thị trong toast: nếu giáo viên vừa sửa thì lấy giá trị mới đã
+      // quy đổi về THANG HIỂN THỊ, còn duyệt y nguyên thì lấy điểm đang hiện.
+      // rawScore là giá trị THÔ gửi lên server nên không dùng trực tiếp được.
+      const savedScore =
+        rawScore !== undefined
+          ? (skillMode
+              ? (totalOverride as number)
+              : Math.max(0, Math.min(displayMaxScore, parseFloat(totalInput.trim()))))
+          : displayData?.value ?? null;
+      const scoreText =
+        savedScore !== null && !isNaN(savedScore)
+          ? `${savedScore.toFixed(2)}/${displayMaxScore}`
+          : "chưa có điểm";
+
+      toast.success(
+        `Đã duyệt bài #${submission.id} của ${submission.studentName} — ${scoreText}`
+      );
 
       const now = new Date().toISOString();
       onReviewed({
