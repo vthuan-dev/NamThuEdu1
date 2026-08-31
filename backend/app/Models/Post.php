@@ -30,6 +30,7 @@ class Post extends Model
         'pRejected_by',
         'pRejected_at',
         'pReject_reason',
+        'pDeleted_at',
     ];
 
     protected $casts = [
