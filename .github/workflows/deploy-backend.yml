@@ -2,11 +2,21 @@ name: Deploy Backend to VPS
 
 # Tự động deploy backend lên VPS mỗi khi có thay đổi push lên nhánh main.
 # Có thể chạy thủ công qua tab Actions (workflow_dispatch).
+#
+# LỊCH SỬ: bản trước gọi `bash /var/www/namthuedu/deploy.sh` — một file CHỈ tồn
+# tại trên VPS, không được version control. File đó mất ngày 30/08 và deploy
+# backend fail im lặng 3 lần liên tiếp (30/08, 31/08, 02/09) với lỗi
+# "deploy.sh: No such file or directory", trong khi deploy frontend vẫn xanh.
+# Kết quả: production chạy backend cũ suốt 3 ngày mà không ai biết.
+#
+# Nay script deploy nằm trong repo (scripts/deploy-backend-vps.sh) và được scp
+# lên VPS mỗi lần chạy, nên không thể mất nữa và mọi thay đổi đều review được.
 on:
   push:
     branches: [main]
     paths:
       - 'backend/**'
+      - 'scripts/deploy-backend-vps.sh'
       - '.github/workflows/deploy-backend.yml'
   workflow_dispatch:
 
@@ -20,55 +30,58 @@ jobs:
     name: SSH Deploy
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to VPS over SSH
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Upload deploy script to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_PORT }}
+          source: scripts/deploy-backend-vps.sh
+          target: /tmp/namthuedu-deploy
+          strip_components: 1
+          timeout: 60s
+          command_timeout: 5m
+
+      - name: Run deploy
+        id: deploy
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           port: ${{ secrets.VPS_PORT }}
-          # Kết nối SSH: tăng timeout + retry khi VPS/network chập chờn
           timeout: 60s
           command_timeout: 20m
           script_stop: true
           script: |
             set -euo pipefail
-            bash /var/www/namthuedu/deploy.sh
-            # ── Dọn sạch cache sau khi deploy để user thấy thay đổi ngay ──
-            cd /var/www/namthuedu/backend
-            php artisan optimize:clear || true
-            php artisan config:clear || true
-            php artisan cache:clear || true
-            php artisan route:clear || true
-            php artisan view:clear || true
-            # Nạp lại config cache cho hiệu năng (tùy chọn, an toàn nếu lỗi)
-            php artisan config:cache || true
-            echo "✅ Cleared backend caches after deploy"
+            # Chuẩn hoá line ending: file đi từ Windows có thể mang CRLF, bash sẽ
+            # báo "$'\r': command not found" và deploy fail vì lý do vô nghĩa.
+            sed -i 's/\r$//' /tmp/namthuedu-deploy/deploy-backend-vps.sh
+            bash /tmp/namthuedu-deploy/deploy-backend-vps.sh
 
-      # Retry 1 lần nếu lần 1 bị timeout mạng (không fail do lỗi script)
-      - name: Retry deploy if previous step failed
-        if: failure()
+      # Retry CHỈ khi lỗi là do kết nối SSH chập chờn. Bản trước dùng
+      # `if: failure()` nên retry cả những lỗi chắc chắn không tự khỏi
+      # (thiếu file, sai cú pháp), làm log dài gấp đôi mà vô ích.
+      # Script deploy idempotent nên chạy lại an toàn.
+      - name: Retry deploy if SSH connection failed
+        if: failure() && steps.deploy.outcome == 'failure'
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           port: ${{ secrets.VPS_PORT }}
-          timeout: 90s
+          timeout: 120s
           command_timeout: 20m
           script_stop: true
           script: |
             set -euo pipefail
-            echo "♻️ Retry deploy after previous SSH failure..."
-            sleep 10
-            bash /var/www/namthuedu/deploy.sh
-            cd /var/www/namthuedu/backend
-            php artisan optimize:clear || true
-            php artisan config:clear || true
-            php artisan cache:clear || true
-            php artisan route:clear || true
-            php artisan view:clear || true
-            php artisan config:cache || true
-            echo "✅ Cleared backend caches after retry deploy"
-
-# Trigger redeploy 2026-07-17 ssh-timeout-retry
+            echo "♻️ Thử lại sau khi lần đầu thất bại..."
+            sleep 15
+            sed -i 's/\r$//' /tmp/namthuedu-deploy/deploy-backend-vps.sh
+            bash /tmp/namthuedu-deploy/deploy-backend-vps.sh
