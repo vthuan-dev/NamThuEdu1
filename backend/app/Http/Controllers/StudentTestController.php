@@ -4174,6 +4174,13 @@ class StudentTestController extends Controller
                     ->sortBy('qSection_order')
                     ->values();
 
+                // Section không có câu hỏi thì học viên không làm được gì với nó.
+                // Đề bán phần (giáo viên chỉ soạn 1-2 section) trước đây vẫn trả về
+                // đủ 7 section nên hiện ra các thẻ rỗng không audio, không câu hỏi.
+                if ($sectionQuestions->isEmpty()) {
+                    continue;
+                }
+
                 // Regenerate audio URL from filename so stored port/host never causes breakage
                 $storedAudio = $block->content ?? '';
                 $audioFilename = $storedAudio ? basename(parse_url($storedAudio, PHP_URL_PATH)) : '';
@@ -4206,10 +4213,15 @@ class StudentTestController extends Controller
                 ];
             }
 
+            // Part không còn section nào có nội dung thì không hiển thị tab cho part đó.
+            if (empty($sections)) {
+                continue;
+            }
+
             $parts[] = [
                 'partNumber' => $partNumber,
                 'partName' => "Part {$partNumber}",
-                'sectionCount' => $sectionCount,
+                'sectionCount' => count($sections),
                 'questionsPerSection' => $qPerSection,
                 'sections' => $sections,
             ];

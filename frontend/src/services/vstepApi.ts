@@ -99,24 +99,41 @@ export interface VstepListeningPartData {
   }[];
 }
 
+export interface VstepListeningQuestionPayload {
+  questionNumber: number;
+  questionText: string;
+  options: {
+    A: string;
+    B: string;
+    C: string;
+    D: string;
+  };
+  correctAnswer: 'A' | 'B' | 'C' | 'D';
+  explanation?: string;
+}
+
+/**
+ * Payload xuất bản đề Listening.
+ *
+ * Nội dung audio/câu hỏi đã được ghi qua saveVstepListeningSection, nên payload
+ * này chủ yếu mang tiêu đề và ảnh chụp cấu trúc để backend đối chiếu.
+ *
+ * `audioUrl` optional và có thêm `sections` vì 1 part có thể gồm nhiều audio
+ * (Part 2/3 mỗi part 3 section) — gọp về 1 audioUrl duy nhất sẽ mất dữ liệu.
+ */
 export interface VstepListeningExamData {
   title: string;
   parts: {
     partNumber: number;
     partName: string;
-    audioUrl: string;
-    questions: {
-      questionNumber: number;
-      questionText: string;
-      options: {
-        A: string;
-        B: string;
-        C: string;
-        D: string;
-      };
-      correctAnswer: 'A' | 'B' | 'C' | 'D';
-      explanation?: string;
+    audioUrl?: string;
+    sections?: {
+      sectionNumber: number;
+      sectionName?: string;
+      audioUrl: string;
+      questions: VstepListeningQuestionPayload[];
     }[];
+    questions?: VstepListeningQuestionPayload[];
   }[];
 }
 
@@ -191,6 +208,21 @@ export const saveVstepListeningSection = async (
   const response = await api.post(
     `/teacher/exams/${examId}/vstep/listening/parts/${partNumber}/sections/${sectionNumber}`,
     data
+  );
+  return response.data;
+};
+
+/**
+ * Xoá 1 SECTION khỏi đề (audio + câu hỏi). Dùng khi giáo viên bỏ bớt phần đã thêm,
+ * tránh để lại "câu hỏi ma" trong DB.
+ */
+export const deleteVstepListeningSection = async (
+  examId: string,
+  partNumber: number,
+  sectionNumber: number
+) => {
+  const response = await api.delete(
+    `/teacher/exams/${examId}/vstep/listening/parts/${partNumber}/sections/${sectionNumber}`
   );
   return response.data;
 };

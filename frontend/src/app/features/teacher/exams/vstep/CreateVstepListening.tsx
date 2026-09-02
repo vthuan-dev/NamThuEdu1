@@ -12,15 +12,19 @@ import {
   ChevronDown,
   ChevronRight,
   AlertTriangle,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { useToastContext } from "../../../../../contexts/ToastContext";
 import { useTranslation } from "react-i18next";
 import {
   saveVstepListeningSection,
   saveVstepListeningSectionAudio,
+  deleteVstepListeningSection,
   publishVstepListeningExam,
   loadVstepListeningExam,
 } from "../../../../../services/vstepApi";
+import { teacherApi } from "../../../../../services/teacherApi";
 import { transcribeAudio } from "../../../../../services/groqApi";
 import { api } from "../../../../../services/api";
 import { RichTextInput } from "../../../../../components/ui/RichTextInput";
@@ -141,6 +145,14 @@ export const CreateVstepListening = ({
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   // Track lần load đầu để skip auto-save khi chỉ load data
   const isInitialLoad = useRef(true);
+  // Auto-save chạy trong setTimeout nên closure có thể giữ examId cũ (ID tạm).
+  // Ref này luôn trỏ tới ID mới nhất sau khi ensureExam() đổi sang ID thật.
+  const examIdRef = useRef(examId);
+  useEffect(() => {
+    examIdRef.current = examId;
+  }, [examId]);
+  // Giữ promise tạo đề đang chạy để nhiều lệnh lưu song song không tạo trùng đề.
+  const ensureExamPromise = useRef<Promise<string> | null>(null);
 
   // Part 2 & 3 (3 sections each) default expanded; Part 1 (8 sections) collapsed
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(() => {
@@ -149,6 +161,27 @@ export const CreateVstepListening = ({
       const layout = VSTEP_LISTENING_LAYOUT[p as 2 | 3];
       for (let s = 1; s <= layout.sectionCount; s++) init.add(`${p}-${s}`);
     });
+    return init;
+  });
+
+  /**
+   * Section đang được soạn — key `${part}-${section}`.
+   *
+   * Full Test luôn mở đủ 7 section vì đề chuẩn cần đủ 35 câu. Đề đơn kỹ năng
+   * mặc định chỉ 1 section — giáo viên tự thêm phần cần dạy, thay vì bị bắt
+   * điền trọn 3 part mới được lưu (đúng cách Writing dùng activeTasks và
+   * Speaking dùng activeParts).
+   */
+  const [activeSections, setActiveSections] = useState<Set<string>>(() => {
+    const init = new Set<string>();
+    if (isFullTest) {
+      PART_LIST.forEach((p) => {
+        const layout = VSTEP_LISTENING_LAYOUT[p as 1 | 2 | 3];
+        for (let s = 1; s <= layout.sectionCount; s++) init.add(sectionKey(p, s));
+      });
+    } else {
+      init.add(sectionKey(1, 1));
+    }
     return init;
   });
 
@@ -194,25 +227,140 @@ export const CreateVstepListening = ({
     });
   };
 
-  const setAllExpanded = (partNumber: number, expanded: boolean) => {
+  const isSectionActive = (partNumber: number, sectionNumber: number) =>
+    activeSections.has(sectionKey(partNumber, sectionNumber));
+
+  /** Các section của 1 part mà giáo viên đang thực sự soạn. */
+  const activeSectionNumbers = (partNumber: number) => {
     const layout = VSTEP_LISTENING_LAYOUT[partNumber as 1 | 2 | 3];
+    const list: number[] = [];
+    for (let s = 1; s <= layout.sectionCount; s++) {
+      if (activeSections.has(sectionKey(partNumber, s))) list.push(s);
+    }
+    return list;
+  };
+
+  const setAllExpanded = (partNumber: number, expanded: boolean) => {
     setExpandedKeys((prev) => {
       const next = new Set(prev);
-      for (let s = 1; s <= layout.sectionCount; s++) {
+      activeSectionNumbers(partNumber).forEach((s) => {
         const k = sectionKey(partNumber, s);
         if (expanded) next.add(k);
         else next.delete(k);
-      }
+      });
       return next;
     });
   };
 
   const isPartFullySaved = (partNumber: number) => {
-    const layout = VSTEP_LISTENING_LAYOUT[partNumber as 1 | 2 | 3];
-    for (let s = 1; s <= layout.sectionCount; s++) {
-      if (!savedSections.has(sectionKey(partNumber, s))) return false;
+    const active = activeSectionNumbers(partNumber);
+    if (active.length === 0) return false;
+    return active.every((s) => savedSections.has(sectionKey(partNumber, s)));
+  };
+
+  /**
+   * Đảm bảo đề đã tồn tại trong DB trước khi lưu.
+   *
+   * Editor sinh ID tạm `vstep-listening-<timestamp>` khi giáo viên vào trang tạo
+   * mới, và mọi endpoint lưu đều tra theo eId — nên nếu không tạo đề thật trước,
+   * lần lưu đầu tiên sẽ nhận 404. Reading đã có helper tương tự; Listening trước
+   * đây bị thiếu, đó là lý do "bấm lưu mà không có gì xảy ra".
+   */
+  const ensureExam = async (): Promise<string> => {
+    if (!examIdRef.current.startsWith("vstep-")) return examIdRef.current;
+
+    // Upload audio và nút Lưu có thể cùng gọi ensureExam trong vài trăm ms.
+    // Không dùng chung 1 promise thì mỗi lệnh sẽ tạo 1 đề riêng và dữ liệu bị
+    // chia đôi giữa 2 đề khác nhau.
+    if (ensureExamPromise.current) return ensureExamPromise.current;
+
+    ensureExamPromise.current = (async () => {
+      const res = await teacherApi.exams.create({
+        eTitle: examTitle,
+        eType: "VSTEP",
+        eSkill: "listening",
+        eScope: "skill",
+        eDuration_minutes: 40,
+        eIs_private: false,
+        eSource_type: "manual",
+      } as any);
+
+      if (res.status === "success" && res.data) {
+        const newId = String((res.data as any).eId);
+        setExamId(newId);
+        examIdRef.current = newId;
+        if (!isFullTest) {
+          navigate(`/giao-vien/de-thi/vstep/listening/sua/${newId}`, {
+            replace: true,
+          });
+        }
+        return newId;
+      }
+      throw new Error("Không thể tạo đề thi trong cơ sở dữ liệu.");
+    })();
+
+    try {
+      return await ensureExamPromise.current;
+    } catch (err) {
+      // Cho phép thử lại sau khi lỗi (mạng, quyền...).
+      ensureExamPromise.current = null;
+      throw err;
     }
-    return true;
+  };
+
+  /** Thêm 1 section vào danh sách đang soạn và mở sẵn để nhập ngay. */
+  const addSection = (partNumber: number, sectionNumber: number) => {
+    const key = sectionKey(partNumber, sectionNumber);
+    setActiveSections((prev) => new Set(prev).add(key));
+    setExpandedKeys((prev) => new Set(prev).add(key));
+    setCurrentPart(partNumber as 1 | 2 | 3);
+  };
+
+  /**
+   * Bỏ 1 section khỏi đề. Nếu section đã lưu vào DB thì gọi API xoá trước —
+   * chỉ ẩn trên UI sẽ để lại câu hỏi mồ côi mà học viên vẫn phải làm.
+   */
+  const removeSection = async (partNumber: number, sectionNumber: number) => {
+    const key = sectionKey(partNumber, sectionNumber);
+    const totalActive = activeSections.size;
+
+    if (totalActive <= 1) {
+      error("Đề phải còn ít nhất 1 phần. Không thể bỏ phần cuối cùng.");
+      return;
+    }
+
+    if (savedSections.has(key) && !examId.startsWith("vstep-")) {
+      try {
+        await deleteVstepListeningSection(examId, partNumber, sectionNumber);
+      } catch (err: any) {
+        error(
+          err.response?.data?.message ||
+            `Không xoá được phần này: ${err.message}`
+        );
+        return;
+      }
+    }
+
+    // Reset nội dung để lần thêm lại bắt đầu từ trạng thái trắng.
+    updateSection(partNumber, sectionNumber, () =>
+      buildEmptySection(partNumber as 1 | 2 | 3, sectionNumber)
+    );
+    setSavedSections((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+    setActiveSections((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+    success(`Đã bỏ ${buildEmptySection(partNumber as 1 | 2 | 3, sectionNumber).sectionName}`);
   };
 
   // ─── Debounced auto-save (questions + transcript) ───────────────────────
@@ -220,7 +368,7 @@ export const CreateVstepListening = ({
   // hoặc chưa có ít nhất 1 câu hỏi hoàn thành.
   const scheduleSectionAutoSave = (partNumber: number, sectionNumber: number) => {
     if (isInitialLoad.current) return;
-    if (!examId || examId.startsWith("vstep-")) return;
+    if (!examIdRef.current || examIdRef.current.startsWith("vstep-")) return;
 
     const key = sectionKey(partNumber, sectionNumber);
     if (autoSaveTimers.current[key]) clearTimeout(autoSaveTimers.current[key]);
@@ -244,7 +392,7 @@ export const CreateVstepListening = ({
 
       setAutoSavingKey(key);
       try {
-        await saveVstepListeningSection(examId, partNumber, sectionNumber, {
+        await saveVstepListeningSection(examIdRef.current, partNumber, sectionNumber, {
           sectionName: section.sectionName,
           audioUrl: section.audioUrl,
           audioDuration: section.audioDuration || 1,
@@ -271,23 +419,27 @@ export const CreateVstepListening = ({
     }, 1500);
   };
 
-  // Check if all questions in part are filled (regardless of save state)
+  // Đủ câu trên CÁC SECTION ĐANG SOẠN (không tính section giáo viên không chọn).
   const isPartFullyFilled = (partNumber: number) => {
     const layout = VSTEP_LISTENING_LAYOUT[partNumber as 1 | 2 | 3];
-    const totalExpected = layout.sectionCount * layout.questionsPerSection;
+    const active = activeSectionNumbers(partNumber);
+    if (active.length === 0) return false;
+    const totalExpected = active.length * layout.questionsPerSection;
     const part = parts.find((p) => p.partNumber === partNumber);
     if (!part) return false;
     const filledCount = part.sections.reduce(
       (acc, s) =>
         acc +
-        s.questions.filter(
-          (q) =>
-            q.questionText.trim() &&
-            q.options.A &&
-            q.options.B &&
-            q.options.C &&
-            q.options.D
-        ).length,
+        (active.includes(s.sectionNumber)
+          ? s.questions.filter(
+              (q) =>
+                q.questionText.trim() &&
+                q.options.A &&
+                q.options.B &&
+                q.options.C &&
+                q.options.D
+            ).length
+          : 0),
       0
     );
     return filledCount >= totalExpected;
@@ -408,6 +560,26 @@ export const CreateVstepListening = ({
         });
         setSavedSections(newSaved);
 
+        // Đề đơn kỹ năng: chỉ hiện các section thật sự có dữ liệu. Hiện đủ 7
+        // khung trống sẽ khiến giáo viên tưởng bắt buộc điền hết mới lưu được.
+        if (!isFullTest) {
+          const active = new Set<string>();
+          newParts.forEach((p) => {
+            p.sections.forEach((s) => {
+              const hasContent =
+                (s.audioUrl && !s.audioUrl.startsWith("blob:")) ||
+                s.transcript?.trim() ||
+                s.questions.some((q) => q.questionText.trim());
+              if (hasContent) active.add(sectionKey(p.partNumber, s.sectionNumber));
+            });
+          });
+          if (active.size === 0) active.add(sectionKey(1, 1));
+          setActiveSections(active);
+          // Nhảy tới part đầu tiên có nội dung để giáo viên thấy ngay việc mình đã làm.
+          const firstPart = Number([...active][0]?.split("-")[0] || 1);
+          setCurrentPart(firstPart as 1 | 2 | 3);
+        }
+
         success(t("vstep.listening.toast.loadSuccess"));
       })
       .catch((err) => {
@@ -509,6 +681,16 @@ export const CreateVstepListening = ({
     const key = sectionKey(partNumber, sectionNumber);
     const blobUrl = URL.createObjectURL(file);
 
+    // Tạo bản ghi đề trước khi upload để audio được ghi ngay vào DB — trước đây
+    // bước auto-save bị bỏ qua vì examId vẫn là chuỗi tạm "vstep-listening-*".
+    let targetExamId = examId;
+    try {
+      targetExamId = await ensureExam();
+    } catch (err: any) {
+      error(err.message || "Không tạo được đề thi để lưu audio.");
+      return;
+    }
+
     setAudioFiles((prev) => ({ ...prev, [key]: file }));
     updateSection(partNumber, sectionNumber, (s) => ({
       ...s,
@@ -541,12 +723,12 @@ export const CreateVstepListening = ({
     // Auto-persist audio metadata to DB (only when real exam ID exists)
     console.log("🔍 Auto-save check:", {
       serverUrl,
-      examId,
-      isPlaceholderId: examId?.startsWith("vstep-"),
+      examId: targetExamId,
+      isPlaceholderId: targetExamId?.startsWith("vstep-"),
       partNumber,
       sectionNumber,
     });
-    if (serverUrl && examId && !examId.startsWith("vstep-")) {
+    if (serverUrl && targetExamId && !targetExamId.startsWith("vstep-")) {
       try {
         const latestPart = partsRef.current.find((p) => p.partNumber === partNumber);
         const latestSection = latestPart?.sections.find(
@@ -557,7 +739,7 @@ export const CreateVstepListening = ({
             ? Math.floor(audio.duration)
             : latestSection?.audioDuration || 1;
         console.log("📤 Auto-saving audio to DB:", {
-          examId,
+          examId: targetExamId,
           partNumber,
           sectionNumber,
           audioUrl: serverUrl,
@@ -565,7 +747,7 @@ export const CreateVstepListening = ({
           transcriptLen: (transcript || "").length,
         });
         const resp = await saveVstepListeningSectionAudio(
-          examId,
+          targetExamId,
           partNumber,
           sectionNumber,
           {
@@ -773,7 +955,8 @@ export const CreateVstepListening = ({
 
     setSavingKey(key);
     try {
-      await saveVstepListeningSection(examId, partNumber, sectionNumber, {
+      const targetExamId = await ensureExam();
+      await saveVstepListeningSection(targetExamId, partNumber, sectionNumber, {
         sectionName: section.sectionName,
         audioUrl: section.audioUrl,
         audioDuration: section.audioDuration || 1,
@@ -795,20 +978,14 @@ export const CreateVstepListening = ({
       setSavedSections((prev) => {
         const next = new Set(prev);
         next.add(key);
-
-        // Notify Full Test parent when all sections of all parts are saved
-        if (isFullTest && onComplete) {
-          const totalSections = PART_LIST.reduce(
-            (acc, pn) =>
-              acc + VSTEP_LISTENING_LAYOUT[pn as 1 | 2 | 3].sectionCount,
-            0
-          );
-          if (next.size >= totalSections) {
-            setTimeout(() => onComplete(), 300);
-          }
-        }
         return next;
       });
+
+      // Full Test: báo hoàn thành ngay khi có nội dung, giống Reading/Writing/
+      // Speaking. Chờ đủ 7 section khiến Listening thành nút thắt của cả đề.
+      if (isFullTest && onComplete) {
+        setTimeout(() => onComplete(), 300);
+      }
     } catch (err: any) {
       error(
         err.response?.data?.message || `Lỗi lưu section: ${err.message}`
@@ -818,60 +995,138 @@ export const CreateVstepListening = ({
     }
   };
 
+  /**
+   * Xuất bản đề.
+   *
+   * Chỉ xét các section giáo viên đang soạn, và chỉ cần 1 section hoàn chỉnh là
+   * cho xuất bản (đề bán phần) — giống Writing/Speaking. Section dở dang bị loại
+   * khỏi payload kèm cảnh báo, không chặn cả quá trình như trước.
+   */
   const handlePublish = async () => {
-    // Validate all sections
-    const missing: string[] = [];
+    const readySections: {
+      partNumber: number;
+      partName: string;
+      section: ListeningSection;
+      questions: Question[];
+    }[] = [];
+    const skipped: string[] = [];
+
     parts.forEach((p) => {
       p.sections.forEach((s) => {
+        if (!isSectionActive(p.partNumber, s.sectionNumber)) return;
+
         if (!s.audioUrl || s.audioUrl.startsWith("blob:")) {
-          missing.push(`Part ${p.partNumber} - ${s.sectionName}: chưa có audio`);
-        } else if (
-          s.questions.some(
-            (q) =>
-              !q.questionText.trim() ||
-              !q.options.A ||
-              !q.options.B ||
-              !q.options.C ||
-              !q.options.D
-          )
-        ) {
-          missing.push(
-            `Part ${p.partNumber} - ${s.sectionName}: chưa đủ câu hỏi`
-          );
+          skipped.push(`${s.sectionName}: chưa có audio`);
+          return;
         }
+        const filledQs = s.questions.filter(
+          (q) =>
+            q.questionText.trim() &&
+            q.options.A &&
+            q.options.B &&
+            q.options.C &&
+            q.options.D
+        );
+        if (filledQs.length === 0) {
+          skipped.push(`${s.sectionName}: chưa có câu hỏi hoàn thành`);
+          return;
+        }
+        readySections.push({
+          partNumber: p.partNumber,
+          partName: p.partName,
+          section: s,
+          questions: filledQs,
+        });
       });
     });
-    if (missing.length > 0) {
+
+    if (readySections.length === 0) {
       error(
-        missing[0] +
-          (missing.length > 1 ? ` (và ${missing.length - 1} lỗi khác)` : "")
+        skipped[0]
+          ? `Chưa xuất bản được — ${skipped[0]}`
+          : "Đề chưa có phần nào hoàn chỉnh (cần audio + ít nhất 1 câu hỏi)."
       );
       return;
     }
 
     setIsPublishing(true);
     try {
-      // Aggregate parts for legacy publish endpoint
-      const examData = {
+      const targetExamId = await ensureExam();
+
+      // Gộp theo part nhưng GIỮ audio của từng section — trước đây payload chỉ
+      // lấy sections[0].audioUrl nên Part 2/3 mất audio của section 2 và 3.
+      const partMap = new Map<
+        number,
+        {
+          partNumber: number;
+          partName: string;
+          audioUrl: string;
+          sections: {
+            sectionNumber: number;
+            sectionName: string;
+            audioUrl: string;
+            questions: {
+              questionNumber: number;
+              questionText: string;
+              options: Question["options"];
+              correctAnswer: Question["correctAnswer"];
+              explanation: string;
+            }[];
+          }[];
+        }
+      >();
+
+      readySections.forEach(({ partNumber, partName, section, questions }) => {
+        if (!partMap.has(partNumber)) {
+          partMap.set(partNumber, {
+            partNumber,
+            partName,
+            audioUrl: section.audioUrl,
+            sections: [],
+          });
+        }
+        partMap.get(partNumber)!.sections.push({
+          sectionNumber: section.sectionNumber,
+          sectionName: section.sectionName,
+          audioUrl: section.audioUrl,
+          questions: questions.map((q) => ({
+            questionNumber: q.questionNumber,
+            questionText: q.questionText,
+            options: q.options,
+            correctAnswer: q.correctAnswer,
+            explanation: q.explanation || "",
+          })),
+        });
+      });
+
+      const publishParts = [...partMap.values()]
+        .sort((a, b) => a.partNumber - b.partNumber)
+        .map((p) => ({
+          ...p,
+          questions: p.sections.flatMap((s) => s.questions),
+        }));
+
+      await publishVstepListeningExam(targetExamId, {
         title: examTitle,
-        parts: parts.map((p) => ({
-          partNumber: p.partNumber,
-          partName: p.partName,
-          audioUrl: p.sections[0]?.audioUrl || "",
-          questions: p.sections.flatMap((s) =>
-            s.questions.map((q) => ({
-              questionNumber: q.questionNumber,
-              questionText: q.questionText,
-              options: q.options,
-              correctAnswer: q.correctAnswer,
-            }))
-          ),
-        })),
-      };
-      await publishVstepListeningExam(examId, examData);
-      success(t("vstep.listening.toast.publishSuccess"));
+        parts: publishParts,
+      });
+
+      const totalQuestions = publishParts.reduce(
+        (acc, p) => acc + p.questions.length,
+        0
+      );
+      success(
+        `✅ Đã xuất bản đề — ${readySections.length} phần, ${totalQuestions} câu hỏi`
+      );
+      if (skipped.length > 0) {
+        error(
+          `Bỏ qua ${skipped.length} phần chưa hoàn chỉnh: ${skipped[0]}${
+            skipped.length > 1 ? ` (và ${skipped.length - 1} phần khác)` : ""
+          }`
+        );
+      }
       if (!isFullTest) {
-        setTimeout(() => navigate("/giao-vien/luyen-tap"), 1500);
+        setTimeout(() => navigate("/giao-vien/de-thi"), 1500);
       }
     } catch (err: any) {
       error(
@@ -913,7 +1168,8 @@ export const CreateVstepListening = ({
                   <p className="text-sm text-gray-500 mt-1">
                     {t("vstep.listening.subtitle")}
                     <span className="ml-2 text-xs text-green-600 font-medium">
-                      • {t("vstep.listening.examIdLabel")}: {examId}
+                      • {t("vstep.listening.examIdLabel")}:{" "}
+                      {examId.startsWith("vstep-") ? "chưa lưu" : examId}
                     </span>
                   </p>
                 </div>
@@ -942,17 +1198,20 @@ export const CreateVstepListening = ({
               const isActive = currentPart === pn;
               const isFilled = isPartFullyFilled(pn);
               const partData = parts.find((p) => p.partNumber === pn);
-              const savedCount =
-                partData?.sections.filter((_, i) =>
-                  savedSections.has(sectionKey(pn, i + 1))
-                ).length || 0;
-              const totalQs =
-                layout.sectionCount * layout.questionsPerSection;
+              const activeNums = activeSectionNumbers(pn);
+              const savedCount = activeNums.filter((s) =>
+                savedSections.has(sectionKey(pn, s))
+              ).length;
+              // Đếm theo section ĐANG SOẠN, không phải theo layout đầy đủ — đề bán
+              // phần không nên bị hiển thị là "0/3" như thể đang thiếu.
+              const totalQs = activeNums.length * layout.questionsPerSection;
 
               // Cảnh báo: có câu hỏi nhưng thiếu audio file
               const sectionsWithQs =
-                partData?.sections.filter((s) =>
-                  s.questions.some((q) => q.questionText.trim())
+                partData?.sections.filter(
+                  (s) =>
+                    activeNums.includes(s.sectionNumber) &&
+                    s.questions.some((q) => q.questionText.trim())
                 ) || [];
               const missingAudioCount = sectionsWithQs.filter(
                 (s) => !s.audioUrl || s.audioUrl.startsWith("blob:")
@@ -986,8 +1245,13 @@ export const CreateVstepListening = ({
                       )}
                     </div>
                     <div className="text-xs text-gray-500">
-                      {savedCount}/{layout.sectionCount} sections • {totalQs}{" "}
-                      câu
+                      {activeNums.length === 0 ? (
+                        <span className="text-gray-400">chưa thêm phần nào</span>
+                      ) : (
+                        <>
+                          {savedCount}/{activeNums.length} phần đã lưu • {totalQs} câu
+                        </>
+                      )}
                     </div>
                   </div>
                   {isFilled && (
@@ -1012,37 +1276,86 @@ export const CreateVstepListening = ({
         ) : (
           <div className={`max-w-[1400px] mx-auto px-6 py-6 ${isFullTest ? 'pb-32' : ''}`}>
             {/* Part header + expand controls */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">
-                  {currentLayout.partTitle}
-                </h2>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {currentLayout.partDesc} • Tổng{" "}
-                  {currentLayout.sectionCount * currentLayout.questionsPerSection}{" "}
-                  câu hỏi
-                </p>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    {currentLayout.partTitle}
+                  </h2>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {currentLayout.partDesc} • Đang soạn{" "}
+                    {activeSectionNumbers(currentPart).length}/
+                    {currentLayout.sectionCount} phần •{" "}
+                    {activeSectionNumbers(currentPart).length *
+                      currentLayout.questionsPerSection}{" "}
+                    câu hỏi
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <button
+                    onClick={() => setAllExpanded(currentPart, true)}
+                    className="text-blue-600 hover:underline"
+                  >
+                    Mở tất cả
+                  </button>
+                  <span className="text-gray-300">|</span>
+                  <button
+                    onClick={() => setAllExpanded(currentPart, false)}
+                    className="text-gray-600 hover:underline"
+                  >
+                    Thu gọn
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-sm">
-                <button
-                  onClick={() => setAllExpanded(currentPart, true)}
-                  className="text-blue-600 hover:underline"
-                >
-                  Mở tất cả
-                </button>
-                <span className="text-gray-300">|</span>
-                <button
-                  onClick={() => setAllExpanded(currentPart, false)}
-                  className="text-gray-600 hover:underline"
-                >
-                  Thu gọn
-                </button>
-              </div>
+
+              {/* Chọn phần cần soạn — Full Test luôn cần đủ 7 phần nên ẩn khối này */}
+              {!isFullTest && (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  {(() => {
+                    const available = Array.from(
+                      { length: currentLayout.sectionCount },
+                      (_, i) => i + 1
+                    ).filter((s) => !isSectionActive(currentPart, s));
+
+                    if (available.length === 0) {
+                      return (
+                        <p className="text-xs text-gray-400">
+                          Đã thêm toàn bộ {currentLayout.sectionCount} phần của
+                          Part {currentPart}.
+                        </p>
+                      );
+                    }
+
+                    return (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-gray-500">
+                          Thêm phần vào đề:
+                        </span>
+                        {available.map((s) => (
+                          <button
+                            key={s}
+                            id={`add-listening-section-${currentPart}-${s}`}
+                            onClick={() => addSection(currentPart, s)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-dashed border-blue-300 text-blue-600 text-xs font-medium hover:bg-blue-50 transition-colors"
+                          >
+                            <Plus className="w-3 h-3" />
+                            {currentLayout.label} {s}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
 
             {/* Section Cards */}
             <div className="space-y-3">
-              {currentPartData.sections.map((section) => {
+              {currentPartData.sections
+                .filter((section) =>
+                  isSectionActive(currentPart, section.sectionNumber)
+                )
+                .map((section) => {
                 const key = sectionKey(currentPart, section.sectionNumber);
                 const isExpanded = expandedKeys.has(key);
                 const isSaved = savedSections.has(key);
@@ -1069,49 +1382,67 @@ export const CreateVstepListening = ({
                     key={key}
                     className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
                   >
-                    {/* Header (clickable) */}
-                    <button
-                      onClick={() => toggleExpand(key)}
-                      className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 transition-colors"
-                    >
-                      {isExpanded ? (
-                        <ChevronDown className="w-5 h-5 text-gray-400" />
-                      ) : (
-                        <ChevronRight className="w-5 h-5 text-gray-400" />
-                      )}
-                      <FileAudio className="w-5 h-5 text-blue-600" />
-                      <div className="flex-1 text-left">
-                        <div className="font-semibold text-gray-900">
-                          {section.sectionName}{" "}
-                          <span className="text-gray-400 font-normal text-sm">
-                            (Q{startQ}
-                            {endQ !== startQ ? `-${endQ}` : ""})
-                          </span>
-                        </div>
-                        <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2 flex-wrap">
-                          {section.audioUrl ? (
-                            section.audioUrl.startsWith("blob:") ? (
-                              <span className="text-amber-600">
-                                ⚠ Audio chưa lưu server
-                              </span>
+                    {/* Header — nút toggle và nút bỏ phần phải tách riêng vì HTML
+                        không cho phép lồng <button> trong <button>. */}
+                    <div className="flex items-center gap-1 pr-3 hover:bg-gray-50 transition-colors">
+                      <button
+                        onClick={() => toggleExpand(key)}
+                        className="flex-1 flex items-center gap-3 p-4 text-left"
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="w-5 h-5 text-gray-400" />
+                        ) : (
+                          <ChevronRight className="w-5 h-5 text-gray-400" />
+                        )}
+                        <FileAudio className="w-5 h-5 text-blue-600" />
+                        <div className="flex-1 text-left">
+                          <div className="font-semibold text-gray-900">
+                            {section.sectionName}{" "}
+                            <span className="text-gray-400 font-normal text-sm">
+                              (Q{startQ}
+                              {endQ !== startQ ? `-${endQ}` : ""})
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                            {section.audioUrl ? (
+                              section.audioUrl.startsWith("blob:") ? (
+                                <span className="text-amber-600">
+                                  ⚠ Audio chưa lưu server
+                                </span>
+                              ) : (
+                                <span className="text-green-600">✓ Audio OK</span>
+                              )
                             ) : (
-                              <span className="text-green-600">✓ Audio OK</span>
-                            )
-                          ) : (
-                            <span className="text-gray-400">Chưa có audio</span>
-                          )}
-                          <span className="text-gray-300">•</span>
-                          <span>
-                            {filledQsCount}/{totalQs} câu hoàn thành
-                          </span>
+                              <span className="text-gray-400">Chưa có audio</span>
+                            )}
+                            <span className="text-gray-300">•</span>
+                            <span>
+                              {filledQsCount}/{totalQs} câu hoàn thành
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                      {isSaved ? (
-                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                      ) : (
-                        <span className="text-xs text-gray-400">Chưa lưu</span>
+                        {isSaved ? (
+                          <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                        ) : (
+                          <span className="text-xs text-gray-400">Chưa lưu</span>
+                        )}
+                      </button>
+
+                      {/* Full Test cần đủ 7 phần nên không cho bỏ phần ở chế độ đó */}
+                      {!isFullTest && (
+                        <button
+                          id={`remove-listening-section-${currentPart}-${section.sectionNumber}`}
+                          onClick={() =>
+                            removeSection(currentPart, section.sectionNumber)
+                          }
+                          title={`Bỏ ${section.sectionName} khỏi đề`}
+                          aria-label={`Bỏ ${section.sectionName} khỏi đề`}
+                          className="p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       )}
-                    </button>
+                    </div>
 
                     {/* Body — 2 cột: trái = audio+transcript, phải = questions */}
                     {isExpanded && (

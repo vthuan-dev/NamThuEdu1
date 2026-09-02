@@ -337,6 +337,7 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         // New section-based endpoints (Part 1: 8 sections, Part 2/3: 3 sections each)
         Route::post('/exams/{examId}/vstep/listening/parts/{partNumber}/sections/{sectionNumber}/audio', [ExamController::class, 'saveVstepListeningSectionAudio']);
         Route::post('/exams/{examId}/vstep/listening/parts/{partNumber}/sections/{sectionNumber}', [ExamController::class, 'saveVstepListeningSection']);
+        Route::delete('/exams/{examId}/vstep/listening/parts/{partNumber}/sections/{sectionNumber}', [ExamController::class, 'deleteVstepListeningSection']);
         // Legacy single-audio endpoint (kept for backwards compat)
         Route::post('/exams/{examId}/vstep/listening/parts/{partNumber}/audio', [ExamController::class, 'saveVstepListeningAudio']);
         Route::post('/exams/{examId}/vstep/listening/publish', [ExamController::class, 'publishVstepListeningExam']);

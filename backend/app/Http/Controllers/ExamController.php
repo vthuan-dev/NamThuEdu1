@@ -2053,6 +2053,49 @@ class ExamController extends Controller
     }
 
     /**
+     * Tra cứu đề VSTEP Listening cho các endpoint save/load/delete.
+     *
+     * Editor Listening tự sinh ID tạm dạng "vstep-listening-<timestamp>" khi giáo
+     * viên vào trang tạo mới, nên $examId có thể là:
+     *  - số      → khoá chính eId. KHÔNG auto-create: ID số không tồn tại nghĩa là
+     *              đề đã bị xoá hoặc link sai, tạo mới sẽ che mất lỗi thật.
+     *  - chuỗi   → exam_code do frontend sinh. Tạo đề nháp nếu chưa có, để lần lưu
+     *              đầu tiên không thất bại (cùng cách saveVstepWritingTask đang làm).
+     *
+     * @param  bool  $autoCreate  false khi chỉ đọc (load) hoặc xoá.
+     * @return \App\Models\Exam|null
+     */
+    private function resolveListeningExam($examId, $user, bool $autoCreate = false)
+    {
+        if (is_numeric($examId)) {
+            return Exam::where('eId', $examId)->first();
+        }
+
+        $exam = Exam::where('exam_code', $examId)
+            ->where('eType', 'VSTEP')
+            ->where('eSkill', 'listening')
+            ->first();
+
+        if ($exam || !$autoCreate) {
+            return $exam;
+        }
+
+        return Exam::create([
+            'exam_code'         => $examId,
+            'eTitle'            => 'Đề VSTEP Listening mới',
+            'eType'             => 'VSTEP',
+            'eSkill'            => 'listening',
+            'eScope'            => 'skill',
+            'eTeacher_id'       => $user->uId,
+            'eDuration_minutes' => 40,
+            'eIs_private'       => true,
+            'eSource_type'      => 'manual',
+            'age_group'         => 'adults',
+            'eStatus'           => 'draft',
+        ]);
+    }
+
+    /**
      * POST /api/teacher/exams/{examId}/ielts/listening/sections/{sectionNumber}/audio
      * Upload audio file for IELTS listening section
      */
@@ -2197,6 +2240,10 @@ class ExamController extends Controller
     public function saveVstepListeningSectionAudio(Request $request, $examId, $partNumber, $sectionNumber)
     {
         $user = $request->user();
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
+        }
+
         $partNumber = (int) $partNumber;
         $sectionNumber = (int) $sectionNumber;
 
@@ -2221,7 +2268,7 @@ class ExamController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Dữ liệu không hợp lệ.', 'errors' => $validator->errors()], 400);
         }
 
-        $exam = Exam::where('eId', $examId)->first();
+        $exam = $this->resolveListeningExam($examId, $user, true);
         if (!$exam) {
             return response()->json(['status' => 'error', 'message' => 'Không tìm thấy đề thi.'], 404);
         }
@@ -2283,6 +2330,10 @@ class ExamController extends Controller
     public function saveVstepListeningSection(Request $request, $examId, $partNumber, $sectionNumber)
     {
         $user = $request->user();
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
+        }
+
         $partNumber = (int) $partNumber;
         $sectionNumber = (int) $sectionNumber;
 
@@ -2318,7 +2369,7 @@ class ExamController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Dữ liệu không hợp lệ.', 'errors' => $validator->errors()], 400);
         }
 
-        $exam = Exam::where('eId', $examId)->first();
+        $exam = $this->resolveListeningExam($examId, $user, true);
         if (!$exam) {
             return response()->json(['status' => 'error', 'message' => 'Không tìm thấy đề thi.'], 404);
         }
@@ -2677,7 +2728,15 @@ class ExamController extends Controller
 
     /**
      * POST /api/teacher/exams/{examId}/vstep/listening/publish
-     * Xuất bản đề VSTEP Listening hoàn chỉnh
+     * Xuất bản đề VSTEP Listening.
+     *
+     * Cho phép xuất bản đề BÁN PHẦN (tối thiểu 1 section đã lưu), giống cách
+     * Writing (min 1 task) và Speaking (min 1 part) đang làm — giáo viên hoàn toàn
+     * có thể chỉ luyện riêng "Part 2 - Conversation 1" cho lớp của mình.
+     *
+     * Nội dung câu hỏi/audio đã được ghi qua saveVstepListeningSection, nên payload
+     * ở đây chỉ dùng để đặt tiêu đề; việc kiểm tra "đề có gì chưa" đọc trực tiếp
+     * từ DB thay vì tin vào payload.
      */
     public function publishVstepListeningExam(Request $request, $examId)
     {
@@ -2692,11 +2751,13 @@ class ExamController extends Controller
 
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
-            'parts' => 'required|array|size:3',
+            'parts' => 'required|array|min:1|max:3',
             'parts.*.partNumber' => 'required|integer|min:1|max:3',
             'parts.*.partName' => 'required|string',
-            'parts.*.audioUrl' => 'required|string',
-            'parts.*.questions' => 'required|array',
+            // audioUrl/questions đã nằm trong DB từ bước lưu section. Để 'nullable'
+            // nhằm tránh chặn oan đề bán phần (part chỉ có 1/3 section có audio).
+            'parts.*.audioUrl' => 'nullable|string',
+            'parts.*.questions' => 'nullable|array',
         ]);
 
         if ($validator->fails()) {
@@ -2709,16 +2770,33 @@ class ExamController extends Controller
 
         DB::beginTransaction();
         try {
-            // Find exam
-            $exam = Exam::where('eId', $examId)
-                       
-                       ->first();
+            $exam = $this->resolveListeningExam($examId, $user);
 
             if (!$exam) {
+                DB::rollBack();
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Không tìm thấy đề thi.'
+                    'message' => 'Không tìm thấy đề thi. Vui lòng lưu ít nhất 1 section trước khi xuất bản.'
                 ], 404);
+            }
+
+            // Chỉ đếm câu hỏi Listening. Đếm toàn bộ exam sẽ sai với đề Full test
+            // (bị cộng dồn cả Reading/Writing/Speaking).
+            $listeningQuestions = Question::where('exam_id', $exam->eId)
+                ->where('qSkill', 'listening')
+                ->get();
+            $questionCount = $listeningQuestions->count();
+
+            if ($questionCount < 1) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Đề Nghe chưa có câu hỏi nào. Vui lòng lưu ít nhất 1 section (audio + câu hỏi) trước khi xuất bản.',
+                    'data' => [
+                        'current_questions' => $questionCount,
+                        'required_questions' => 1,
+                    ]
+                ], 400);
             }
 
             // Update exam title and status (theo cài đặt auto-duyệt)
@@ -2729,35 +2807,74 @@ class ExamController extends Controller
                 'eStatus' => $moderationStatus,
             ]);
 
-            // Verify all 3 parts exist with correct question counts
-            $questionCount = Question::where('exam_id', $exam->eId)->count();
-            if ($questionCount < 35) {
-                DB::rollBack();
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Đề thi chưa đủ 35 câu hỏi (Part 1: 8, Part 2: 12, Part 3: 15).',
-                    'data' => [
-                        'current_questions' => $questionCount,
-                        'required_questions' => 35,
-                    ]
-                ], 400);
-            }
+            // Thống kê thực tế để mô tả đúng đề bán phần.
+            $partNumbers = $listeningQuestions
+                ->pluck('qPart')
+                ->filter()
+                ->unique()
+                ->sort()
+                ->values();
+            $sectionCount = $listeningQuestions
+                ->map(function ($q) {
+                    return ($q->qPart ?? 0) . '-' . ($q->qData['section_number'] ?? 1);
+                })
+                ->unique()
+                ->count();
 
-            // Create practice session
-            $practiceSession = DB::table('practice_sessions')->insertGetId([
+            // Đề đủ 35 câu = 40 phút. Đề bán phần chia theo tỉ lệ, sàn 5 phút để
+            // học viên không bị hết giờ ngay khi vừa mở audio.
+            $fullQuestionCount = array_sum(array_map(
+                fn($layout) => $layout['sectionCount'] * $layout['questionsPerSection'],
+                self::LISTENING_LAYOUT
+            ));
+            $duration = $questionCount >= $fullQuestionCount
+                ? 40
+                : max(5, (int) ceil(40 * $questionCount / max(1, $fullQuestionCount)));
+
+            $partLabel = $partNumbers->isEmpty()
+                ? ''
+                : 'Part ' . $partNumbers->implode(', ');
+            $description = trim(sprintf(
+                'Đề luyện tập VSTEP Listening - %s%s section, %d câu hỏi',
+                $partLabel ? $partLabel . ' · ' : '',
+                $sectionCount,
+                $questionCount
+            ));
+
+            // Xuất bản lại đề đã publish trước đó không được sinh thêm buổi luyện
+            // tập trùng tên trong danh sách của học viên.
+            $sessionData = [
                 'ps_title' => $request->title,
-                'ps_description' => 'Đề luyện tập VSTEP Listening - 3 Parts, 35 câu hỏi',
+                'ps_description' => $description,
                 'ps_type' => 'skill_based',
                 'ps_purpose' => 'practice',
                 'ps_target_skill' => 'listening',
                 'ps_difficulty' => 'medium',
-                'ps_duration_minutes' => 40,
+                'ps_duration_minutes' => $duration,
+                'ps_question_count' => $questionCount,
                 'ps_teacher_id' => $user->uId,
-                'ps_exam_id' => $exam->eId,
                 'ps_is_active' => true,
-                'ps_created_at' => now(),
                 'ps_updated_at' => now(),
-            ]);
+            ];
+
+            $existingSession = DB::table('practice_sessions')
+                ->where('ps_exam_id', $exam->eId)
+                ->where('ps_target_skill', 'listening')
+                ->first();
+
+            if ($existingSession) {
+                DB::table('practice_sessions')
+                    ->where('ps_id', $existingSession->ps_id)
+                    ->update($sessionData);
+                $practiceSession = $existingSession->ps_id;
+            } else {
+                $practiceSession = DB::table('practice_sessions')->insertGetId(
+                    $sessionData + [
+                        'ps_exam_id' => $exam->eId,
+                        'ps_created_at' => now(),
+                    ]
+                );
+            }
 
             DB::commit();
 
@@ -2769,7 +2886,9 @@ class ExamController extends Controller
                     'exam_title' => $exam->eTitle,
                     'practice_session_id' => $practiceSession,
                     'total_questions' => $questionCount,
-                    'parts' => 3,
+                    'sections' => $sectionCount,
+                    'parts' => $partNumbers->count(),
+                    'duration_minutes' => $duration,
                 ]
             ]);
 
@@ -2784,7 +2903,10 @@ class ExamController extends Controller
 
     /**
      * GET /api/teacher/exams/{examId}/vstep/listening/load
-     * Load existing VSTEP Listening exam
+     * Load existing VSTEP Listening exam.
+     *
+     * $examId có thể là eId (số) hoặc exam_code (chuỗi tạm do editor sinh ra) —
+     * cần cả 2 để editor load lại được đề vừa auto-create ở lần lưu đầu tiên.
      */
     public function loadVstepListeningExam(Request $request, $examId)
     {
@@ -2797,10 +2919,11 @@ class ExamController extends Controller
             ], 401);
         }
 
-        $isAdmin = $user->uRole === 'admin';
+        $examQuery = is_numeric($examId)
+            ? Exam::where('eId', $examId)
+            : Exam::where('exam_code', $examId)->where('eType', 'VSTEP')->where('eSkill', 'listening');
 
-        $exam = Exam::where('eId', $examId)
-                   ->when(false, fn($q) => $q)
+        $exam = $examQuery
                    ->with([
                        'contentBlocks' => function($q) {
                            $q->orderBy('display_order');
@@ -3846,6 +3969,108 @@ class ExamController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Lỗi khi xoá Part: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * DELETE /api/teacher/exams/{examId}/vstep/listening/parts/{partNumber}/sections/{sectionNumber}
+     *
+     * Xoá 1 section Listening (audio block + questions) khi giáo viên bỏ bớt phần
+     * đã thêm. Không đụng kỹ năng khác và không đụng section còn lại của cùng part.
+     */
+    public function deleteVstepListeningSection(Request $request, $examId, $partNumber, $sectionNumber)
+    {
+        $user = $request->user();
+
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Bạn không có quyền truy cập.'
+            ], 401);
+        }
+
+        $partNumber = (int) $partNumber;
+        $sectionNumber = (int) $sectionNumber;
+
+        if (!isset(self::LISTENING_LAYOUT[$partNumber])) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Part number không hợp lệ. Chỉ có Part 1, 2, 3.'
+            ], 400);
+        }
+
+        $layout = self::LISTENING_LAYOUT[$partNumber];
+        if ($sectionNumber < 1 || $sectionNumber > $layout['sectionCount']) {
+            return response()->json([
+                'status' => 'error',
+                'message' => "Part {$partNumber} chỉ có {$layout['sectionCount']} section.",
+            ], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            $exam = $this->resolveListeningExam($examId, $user);
+
+            if (!$exam) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Không tìm thấy đề thi.'
+                ], 404);
+            }
+
+            $blocks = $this->findAllListeningSectionBlocks((int) $exam->eId, $partNumber, $sectionNumber);
+            $blockIds = $blocks->pluck('id')->all();
+
+            // Nhận diện question thuộc section theo đúng thứ tự ưu tiên mà
+            // saveVstepListeningSection đang dùng, để không bỏ sót data legacy.
+            $qStart = $layout['questionStart'];
+            $qPerSec = $layout['questionsPerSection'];
+            $questions = Question::where('exam_id', $exam->eId)
+                ->where('qSkill', 'listening')
+                ->where('qPart', $partNumber)
+                ->get()
+                ->filter(function ($q) use ($blockIds, $sectionNumber, $qStart, $qPerSec) {
+                    if ($q->content_block_id && in_array($q->content_block_id, $blockIds)) return true;
+                    $qSec = $q->qData['section_number'] ?? null;
+                    if ($qSec !== null) return $qSec == $sectionNumber;
+                    $qNum = $q->qData['question_number'] ?? $q->qSection_order ?? 0;
+                    $relIdx = max(0, $qNum - $qStart);
+                    return (intdiv($relIdx, max(1, $qPerSec)) + 1) == $sectionNumber;
+                });
+
+            foreach ($questions as $q) {
+                Answer::where('question_id', $q->qId)->delete();
+                $q->delete();
+            }
+
+            foreach ($blocks as $block) {
+                $block->delete();
+            }
+
+            $remaining = Question::where('exam_id', $exam->eId)
+                ->where('qSkill', 'listening')
+                ->count();
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => "Đã xoá Part {$partNumber} - Section {$sectionNumber} thành công",
+                'data' => [
+                    'exam_id' => $exam->eId,
+                    'part_number' => $partNumber,
+                    'section_number' => $sectionNumber,
+                    'deleted_questions' => $questions->count(),
+                    'remaining_listening_questions' => $remaining,
+                ]
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Lỗi khi xoá section: ' . $e->getMessage()
             ], 500);
         }
     }
