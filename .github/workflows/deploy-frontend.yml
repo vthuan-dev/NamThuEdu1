@@ -7,6 +7,7 @@ on:
     branches: [main]
     paths:
       - 'frontend/**'
+      - 'scripts/deploy-frontend-vps.sh'
       - '.github/workflows/deploy-frontend.yml'
   workflow_dispatch:
 
@@ -77,6 +78,22 @@ jobs:
           timeout: 120s
           command_timeout: 15m
 
+      - name: Upload deploy script to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_PORT }}
+          source: scripts/deploy-frontend-vps.sh
+          target: /tmp/namthuedu-deploy
+          strip_components: 1
+          timeout: 60s
+          command_timeout: 5m
+
+      # Script nằm trong repo (scripts/deploy-frontend-vps.sh), không phải file
+      # chỉ tồn tại trên VPS. Backend từng dùng cách cũ và deploy fail im lặng
+      # 3 ngày khi file trên server bị mất.
       - name: Swap & reload nginx
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -84,7 +101,15 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           port: ${{ secrets.VPS_PORT }}
-          script: bash /var/www/namthuedu-fe/deploy-fe.sh
+          timeout: 60s
+          command_timeout: 10m
+          script_stop: true
+          script: |
+            set -euo pipefail
+            # File đi từ Windows có thể mang CRLF, bash sẽ báo
+            # "$'\r': command not found" và deploy fail vì lý do vô nghĩa.
+            sed -i 's/\r$//' /tmp/namthuedu-deploy/deploy-frontend-vps.sh
+            bash /tmp/namthuedu-deploy/deploy-frontend-vps.sh
 
 # Trigger redeploy 2026-07-17 speaking-audio-fix
 
