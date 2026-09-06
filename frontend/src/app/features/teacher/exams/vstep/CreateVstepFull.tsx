@@ -43,6 +43,7 @@ export const CreateVstepFull = () => {
   const isResuming = !!urlExamId && !urlExamId.startsWith("vstep-full-");
   const [step, setStep] = useState<0 | 1>(navState.title || isResuming ? 1 : 0);
   const [isCreating, setIsCreating] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   // Basic info state — pre-populate từ navigation state nếu có
   const [examTitle, setExamTitle] = useState(navState.title || "");
@@ -257,7 +258,11 @@ export const CreateVstepFull = () => {
       error(t('vstep.full.actions.completeAll', { completed: completedSkills.size }));
       return;
     }
+    setIsPublishing(true);
     try {
+      if (realExamId && !realExamId.startsWith('vstep-full-')) {
+        await teacherApi.exams.publish(Number(realExamId));
+      }
       success(t('vstep.full.actions.publishSuccess'));
       // Chuyển sang trang chi tiết đề thi vừa tạo
       if (realExamId && !realExamId.startsWith('vstep-full-')) {
@@ -267,6 +272,8 @@ export const CreateVstepFull = () => {
       }
     } catch (err: any) {
       error(err.message || t('vstep.full.actions.publishError'));
+    } finally {
+      setIsPublishing(false);
     }
   };
 
@@ -589,18 +596,24 @@ export const CreateVstepFull = () => {
             {/* Right: Publish Button */}
             <button
               onClick={handlePublishAll}
-              disabled={completedSkills.size < 4}
+              disabled={completedSkills.size < 4 || isPublishing}
               className={`
                 flex items-center gap-2.5 px-8 py-3 rounded-lg font-semibold transition-all duration-200 cursor-pointer
-                ${completedSkills.size === 4
+                ${completedSkills.size === 4 && !isPublishing
                   ? "bg-gradient-to-r from-emerald-600 to-green-600 text-white hover:from-emerald-700 hover:to-green-700 shadow-md hover:shadow-lg"
                   : "bg-gray-200 text-gray-500 cursor-not-allowed"
                 }
               `}
             >
-              <Save className="w-5 h-5" />
+              {isPublishing ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Save className="w-5 h-5" />
+              )}
               <span>
-                {completedSkills.size === 4
+                {isPublishing
+                  ? "Đang xuất bản..."
+                  : completedSkills.size === 4
                   ? t('vstep.full.actions.publish')
                   : t('vstep.full.progress.remaining', { count: 4 - completedSkills.size })}
               </span>

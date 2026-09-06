@@ -363,6 +363,68 @@ export const CreateVstepListening = ({
     success(`Đã bỏ ${buildEmptySection(partNumber as 1 | 2 | 3, sectionNumber).sectionName}`);
   };
 
+  /** Chuyển nhanh phạm vi đề theo preset (Part 1 / Part 2 / Part 3 / Full 3 Part) */
+  const applyPreset = (preset: 'part1' | 'part2' | 'part3' | 'full') => {
+    const newActive = new Set<string>();
+    const newExpanded = new Set<string>();
+
+    if (preset === 'part1') {
+      newActive.add(sectionKey(1, 1));
+      newExpanded.add(sectionKey(1, 1));
+      setCurrentPart(1);
+    } else if (preset === 'part2') {
+      for (let s = 1; s <= 3; s++) {
+        newActive.add(sectionKey(2, s));
+        newExpanded.add(sectionKey(2, s));
+      }
+      setCurrentPart(2);
+    } else if (preset === 'part3') {
+      for (let s = 1; s <= 3; s++) {
+        newActive.add(sectionKey(3, s));
+        newExpanded.add(sectionKey(3, s));
+      }
+      setCurrentPart(3);
+    } else if (preset === 'full') {
+      PART_LIST.forEach((p) => {
+        const layout = VSTEP_LISTENING_LAYOUT[p as 1 | 2 | 3];
+        for (let s = 1; s <= layout.sectionCount; s++) {
+          newActive.add(sectionKey(p, s));
+          newExpanded.add(sectionKey(p, s));
+        }
+      });
+    }
+
+    setActiveSections(newActive);
+    setExpandedKeys(newExpanded);
+    success(
+      `Đã chuyển phạm vi đề sang: ${
+        preset === 'part1'
+          ? 'Part 1 (8 câu)'
+          : preset === 'part2'
+          ? 'Part 2 (12 câu)'
+          : preset === 'part3'
+          ? 'Part 3 (15 câu)'
+          : 'Toàn bộ 3 Part (35 câu)'
+      }`
+    );
+  };
+
+  const isPresetActive = (preset: 'part1' | 'part2' | 'part3' | 'full') => {
+    if (preset === 'part1') {
+      return activeSections.size === 1 && activeSections.has(sectionKey(1, 1));
+    }
+    if (preset === 'part2') {
+      return activeSections.size === 3 && [1, 2, 3].every((s) => activeSections.has(sectionKey(2, s)));
+    }
+    if (preset === 'part3') {
+      return activeSections.size === 3 && [1, 2, 3].every((s) => activeSections.has(sectionKey(3, s)));
+    }
+    if (preset === 'full') {
+      return activeSections.size === 7;
+    }
+    return false;
+  };
+
   // ─── Debounced auto-save (questions + transcript) ───────────────────────
   // Trigger sau khi user chỉnh data, debounce 1.5s. Skip nếu chưa upload audio
   // hoặc chưa có ít nhất 1 câu hỏi hoàn thành.
@@ -1053,6 +1115,27 @@ export const CreateVstepListening = ({
     try {
       const targetExamId = await ensureExam();
 
+      // Tự động lưu tất cả section hợp lệ vào CSDL trước khi xuất bản nếu chưa được lưu
+      for (const item of readySections) {
+        const secKey = sectionKey(item.partNumber, item.section.sectionNumber);
+        if (!savedSections.has(secKey)) {
+          await saveVstepListeningSection(targetExamId, item.partNumber, item.section.sectionNumber, {
+            sectionName: item.section.sectionName,
+            audioUrl: item.section.audioUrl,
+            audioDuration: item.section.audioDuration || 1,
+            transcript: item.section.transcript,
+            questions: item.questions.map((q) => ({
+              questionNumber: q.questionNumber,
+              questionText: q.questionText,
+              options: q.options,
+              correctAnswer: q.correctAnswer,
+              explanation: q.explanation || "",
+            })),
+          });
+          setSavedSections((prev) => new Set(prev).add(secKey));
+        }
+      }
+
       // Gộp theo part nhưng GIỮ audio của từng section — trước đây payload chỉ
       // lấy sections[0].audioUrl nên Part 2/3 mất audio của section 2 và 3.
       const partMap = new Map<
@@ -1275,6 +1358,71 @@ export const CreateVstepListening = ({
           </div>
         ) : (
           <div className={`max-w-[1400px] mx-auto px-6 py-6 ${isFullTest ? 'pb-32' : ''}`}>
+            {/* Quick Presets for Single-Skill Listening */}
+            {!isFullTest && (
+              <div className="bg-white rounded-lg shadow-sm border border-blue-100 p-3.5 mb-4 flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-gray-900 block">
+                      Chọn nhanh cấu trúc đề nghe:
+                    </span>
+                    <span className="text-[11px] text-gray-500">
+                      Cho phép bạn tạo đề luyện tập theo từng phần nhỏ hoặc đề thi đầy đủ
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => applyPreset("part1")}
+                    className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-all ${
+                      isPresetActive("part1")
+                        ? "bg-blue-600 text-white shadow-xs font-semibold"
+                        : "bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200"
+                    }`}
+                  >
+                    Chỉ Part 1 (8 câu)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyPreset("part2")}
+                    className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-all ${
+                      isPresetActive("part2")
+                        ? "bg-blue-600 text-white shadow-xs font-semibold"
+                        : "bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200"
+                    }`}
+                  >
+                    Chỉ Part 2 (12 câu)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyPreset("part3")}
+                    className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-all ${
+                      isPresetActive("part3")
+                        ? "bg-blue-600 text-white shadow-xs font-semibold"
+                        : "bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200"
+                    }`}
+                  >
+                    Chỉ Part 3 (15 câu)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyPreset("full")}
+                    className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-all ${
+                      isPresetActive("full")
+                        ? "bg-blue-600 text-white shadow-xs font-semibold"
+                        : "bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200"
+                    }`}
+                  >
+                    Đầy đủ 3 Part (35 câu)
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Part header + expand controls */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
               <div className="flex items-center justify-between">
@@ -1351,6 +1499,27 @@ export const CreateVstepListening = ({
 
             {/* Section Cards */}
             <div className="space-y-3">
+              {activeSectionNumbers(currentPart).length === 0 && !isFullTest && (
+                <div className="bg-white rounded-xl border border-dashed border-blue-200 p-8 text-center my-2 shadow-xs">
+                  <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3">
+                    <Headphones className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-base font-semibold text-gray-900">
+                    {currentLayout.partTitle} chưa có phần nào trong đề
+                  </h3>
+                  <p className="text-sm text-gray-500 max-w-md mx-auto mt-1 mb-5">
+                    Bạn có thể chọn thêm các phần của {currentLayout.partTitle} ({currentLayout.partDesc}) vào bài thi này.
+                  </p>
+                  <button
+                    onClick={() => addSection(currentPart, 1)}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm transition-colors shadow-xs"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Bắt đầu soạn {currentLayout.label} 1
+                  </button>
+                </div>
+              )}
+
               {currentPartData.sections
                 .filter((section) =>
                   isSectionActive(currentPart, section.sectionNumber)

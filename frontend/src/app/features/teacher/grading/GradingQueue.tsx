@@ -278,10 +278,11 @@ export function GradingQueue() {
     reviewRate:   submissions.length ? Math.round((reviewedList.length / submissions.length) * 100) : 0,
   };
 
-  // For practice tab: no review workflow — always show all
-  const baseList = sourceTab === 'practice'
-    ? submissions
-    : (reviewTab === "pending" ? pendingReview : reviewTab === "reviewed" ? reviewedList : submissions);
+  const baseList = reviewTab === "pending"
+    ? pendingReview
+    : reviewTab === "reviewed"
+    ? reviewedList
+    : submissions;
 
   // ─── Tùy chọn cho bộ lọc (rút gọn từ dữ liệu đã tải) ───────────────────────
   const examOptions = useMemo(() => {
