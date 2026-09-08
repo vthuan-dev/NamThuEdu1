@@ -15,6 +15,7 @@ import {
   AGE_GROUP_META,
   formatSkillLabel,
   formatLevelLabel,
+  formatExamDateTime,
 } from "./examClassify";
 
 interface Props {
@@ -60,7 +61,7 @@ export function ExamQuickViewModal({ exam, onClose, onPreview }: Props) {
     { icon: Layers, label: "Loại đề", value: typeMeta.label },
     { icon: ListChecks, label: "Kỹ năng", value: formatSkillLabel(skill, false) || "Tổng hợp" },
     { icon: FileText, label: "Độ khó", value: formatLevelLabel(level, false) || "—" },
-    { icon: Calendar, label: "Ngày tạo", value: formatDate(getExamCreatedAt(exam)) },
+    { icon: Calendar, label: "Ngày tạo", value: formatExamDateTime(getExamCreatedAt(exam), false) },
   ];
 
   return (

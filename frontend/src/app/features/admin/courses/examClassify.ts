@@ -202,6 +202,31 @@ export function formatLevelLabel(rawLevel?: string | null, includePrefix = true)
 }
 
 /**
+ * Format thời gian tạo đề thi dạng tiếng Việt rõ ràng:
+ * "Tạo lúc: 14:30 · 08/09/2026" (nếu có giờ) hoặc "Tạo ngày: 08/09/2026"
+ */
+export function formatExamDateTime(raw?: string | null, includePrefix = true): string {
+  if (!raw) return "—";
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw;
+
+  const dateStr = d.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+  const hasTime = raw.includes(":") || raw.includes("T");
+  const timeStr = hasTime
+    ? d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
+    : "";
+
+  const full = timeStr ? `${timeStr} · ${dateStr}` : dateStr;
+  if (!includePrefix) return full;
+  return timeStr ? `Tạo lúc: ${full}` : `Tạo ngày: ${full}`;
+}
+
+/**
  * Đường dẫn "Xem trước đề" (UI học viên) cho admin, route theo loại đề.
  * Tương ứng adminPreviewRoutes (/admin/de-thi/xem/*).
  */
