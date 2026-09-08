@@ -160,6 +160,17 @@ export function AdminCoursesPage() {
     return { total, published, pending, draft };
   }, [activeTeacher, exams]);
 
+  const stats = useMemo(() => {
+    const total = exams.length;
+    const published = exams.filter((e) => getExamStatus(e) === "published").length;
+    const pending = exams.filter((e) => getExamStatus(e) === "pending").length;
+    const draft = exams.filter((e) => {
+      const s = getExamStatus(e);
+      return s !== "published" && s !== "pending";
+    }).length;
+    return { total, published, pending, draft };
+  }, [exams]);
+
   // Dropdown options cho HoverDropdown trên thanh công cụ
   const teacherDropdownOptions: HoverDropdownOption[] = useMemo(() => [
     { value: "all", label: "Tất cả giáo viên", count: teacherOptions.length },
@@ -203,17 +214,6 @@ export function AdminCoursesPage() {
     });
     return counts;
   }, [exams, statusFilter]);
-
-  const stats = useMemo(() => {
-    const total = exams.length;
-    const published = exams.filter((e) => getExamStatus(e) === "published").length;
-    const pending = exams.filter((e) => getExamStatus(e) === "pending").length;
-    const draft = exams.filter((e) => {
-      const s = getExamStatus(e);
-      return s !== "published" && s !== "pending";
-    }).length;
-    return { total, published, pending, draft };
-  }, [exams]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
