@@ -33,6 +33,14 @@ export const containsHtml = (str?: string | null): boolean => {
 };
 
 /**
+ * Kiểm tra xem chuỗi có chứa thẻ HTML hoặc thực thể HTML (&nbsp;, &amp;, ...) hay không.
+ */
+export const hasHtmlOrEntities = (str?: string | null): boolean => {
+  if (!str) return false;
+  return /<\/?[a-z][\s\S]*>|&(?:nbsp|amp|lt|gt|quot|#\d+);/i.test(str);
+};
+
+/**
  * Sanitize chuỗi HTML, CHỈ giữ lại các thẻ inline an toàn (đậm/nghiêng/gạch
  * chân/sup/sub). Loại bỏ mọi thẻ khối, script, style, sự kiện on* — an toàn XSS
  * và loại được style rác do Word/PDF chèn vào.
@@ -47,6 +55,24 @@ export const sanitizeInlineHtml = (html?: string | null): string => {
     // Cho phép class trên <span> để giữ tương thích với formatErrorSentence,
     // nhưng loại bỏ style inline (nguồn gốc style rác từ Word).
     ALLOWED_ATTR: ["class"],
+  });
+};
+
+/**
+ * Sanitize nội dung văn bản có cấu trúc HTML (bài đọc, notice, email, đoạn văn).
+ * Giữ lại các thẻ khối và inline an toàn (div, p, br, b, strong, i, em, u, table, lists...)
+ * loại bỏ script, thẻ độc hại và sự kiện on*.
+ */
+export const sanitizeRichContent = (html?: string | null): string => {
+  if (!html) return "";
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [
+      "b", "strong", "i", "em", "u", "s", "sup", "sub", "br", "span",
+      "p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote",
+      "ul", "ol", "li", "table", "thead", "tbody", "tr", "th", "td",
+      "pre", "code", "font", "hr"
+    ],
+    ALLOWED_ATTR: ["class", "style", "color", "size", "align"],
   });
 };
 

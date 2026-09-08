@@ -2,7 +2,13 @@ import { useMemo, useState, useEffect, useRef, type ReactNode } from 'react';
 import { CheckCircle2, XCircle, Headphones, Mic, Sparkles, Loader2, FileText, PenLine, Highlighter } from 'lucide-react';
 import type { ThptAnswers, ThptSection, ViewMode } from '../types';
 import { ThptSpeakingRecorder } from '../components/ThptSpeakingRecorder';
-import { splitPhoneticWord, formatErrorSentence, isSuffixComparisonGroup } from '../../../../../../utils/examUtils';
+import {
+  splitPhoneticWord,
+  formatErrorSentence,
+  isSuffixComparisonGroup,
+  hasHtmlOrEntities,
+  sanitizeRichContent,
+} from '../../../../../../utils/examUtils';
 import { useTextHighlight } from '../../../../../../hooks/exam/useTextHighlight';
 
 const THEME = {
@@ -85,6 +91,34 @@ const TYPE_LABEL: Record<string, string> = {
   matching: 'Nối câu',
   sentence_transformation: 'Viết lại câu',
 };
+
+/**
+ * Hiển thị ngữ cảnh câu hỏi (Notice / Email / Thông báo...).
+ * Nếu chuỗi chứa thẻ HTML hoặc thực thể (&nbsp;...), render dạng HTML đã sanitize thay vì text thô.
+ */
+function FormattedContext({ content }: { content?: string }) {
+  if (!content) return null;
+  const isHtml = hasHtmlOrEntities(content);
+
+  if (isHtml) {
+    return (
+      <div
+        className="text-sm text-slate-800 leading-relaxed font-sans whitespace-pre-wrap break-words [&_b]:font-bold [&_strong]:font-bold [&_p]:mb-1.5 [&_div]:min-h-[1.25em]"
+        dangerouslySetInnerHTML={{ __html: sanitizeRichContent(content) }}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {content.split(/\n\s*\n/).filter(Boolean).map((p: string, i: number) => (
+        <p key={i} className="whitespace-pre-wrap text-sm text-slate-800 font-sans leading-relaxed break-words">
+          {p}
+        </p>
+      ))}
+    </div>
+  );
+}
 
 interface Props {
   section: ThptSection;
@@ -739,11 +773,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                   <div className="text-[11px] font-bold uppercase tracking-wider text-teal-700">
                     {item.context_style ?? 'Notice'}
                   </div>
-                  {item.context.split(/\n\s*\n/).filter(Boolean).map((p: string, i: number) => (
-                    <pre key={i} className="whitespace-pre-wrap text-sm text-slate-800 font-mono leading-relaxed">
-                      {p}
-                    </pre>
-                  ))}
+                  <FormattedContext content={item.context} />
                 </div>
                 <div className="space-y-2">
                   {usedRows<any>(item.statements, (s) => s?.text).map(({ row: s, i: si }) => (

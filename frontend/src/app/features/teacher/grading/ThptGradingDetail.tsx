@@ -45,7 +45,12 @@ import {
   type SentenceInsertionQuestion,
   type SaveQuestionPayload,
 } from '../../../../services/thptGradingApi';
-import { splitPhoneticWord, isSuffixComparisonGroup } from '../../../../utils/examUtils';
+import {
+  splitPhoneticWord,
+  isSuffixComparisonGroup,
+  hasHtmlOrEntities,
+  sanitizeRichContent,
+} from '../../../../utils/examUtils';
 
 interface Props {
   submissionId: number;
@@ -1656,6 +1661,30 @@ function TextReview({
   );
 }
 
+function FormattedContext({ content }: { content?: string }) {
+  if (!content) return null;
+  const isHtml = hasHtmlOrEntities(content);
+
+  if (isHtml) {
+    return (
+      <div
+        className="text-sm text-slate-800 leading-relaxed font-sans whitespace-pre-wrap break-words [&_b]:font-bold [&_strong]:font-bold [&_p]:mb-1.5 [&_div]:min-h-[1.25em]"
+        dangerouslySetInnerHTML={{ __html: sanitizeRichContent(content) }}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {content.split(/\n\s*\n/).filter(Boolean).map((p: string, i: number) => (
+        <p key={i} className="whitespace-pre-wrap text-sm text-slate-800 font-sans leading-relaxed break-words">
+          {p}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 function TfGroupReview({
   q,
   sid,
@@ -1681,9 +1710,7 @@ function TfGroupReview({
               <p className="text-xs italic text-slate-500 mb-1">{q.context_paragraph_ref}</p>
             )}
             {q.context && (
-              <pre className="whitespace-pre-wrap text-sm text-slate-800 font-mono leading-relaxed">
-                {q.context}
-              </pre>
+              <FormattedContext content={q.context} />
             )}
           </div>
         )}
