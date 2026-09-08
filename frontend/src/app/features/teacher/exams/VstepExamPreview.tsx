@@ -11,7 +11,6 @@ import {
   Clock,
   Eye,
   EyeOff,
-  Save,
   AlertCircle,
   Volume2,
   Volume1,
@@ -609,17 +608,9 @@ export function VstepExamPreview({ admin = false, backTo }: { admin?: boolean; b
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="hidden sm:inline-flex text-sm text-slate-600">
+            <span className="text-sm text-slate-600">
               Đã trả lời <span className="font-bold text-slate-900">{stats.answered}</span>/{stats.total}
             </span>
-            <button
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-              disabled
-              title="Chế độ preview - không nộp được"
-            >
-              <Save className="w-4 h-4" />
-              Nộp bài
-            </button>
           </div>
         </div>
       </header>
