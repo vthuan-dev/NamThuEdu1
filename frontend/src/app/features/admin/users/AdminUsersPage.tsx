@@ -34,8 +34,11 @@ function displayId(user: AdminUser) {
   return user.uId || user.id || 0;
 }
 
+const DEFAULT_AVATAR = "/images/default-user-avatar.jpg";
+const FALLBACK_PININTEREST_AVATAR = "https://i.pinimg.com/736x/bc/43/98/bc439871417621836a0eeea768d60944.jpg";
+
 function displayAvatar(user: AdminUser) {
-  return getFullMediaUrl(user.avatar_url || user.avatar);
+  return getFullMediaUrl(user.avatar_url || user.avatar) || DEFAULT_AVATAR;
 }
 
 function displayCreatedAt(user: AdminUser) {
@@ -987,38 +990,32 @@ export function AdminUsersPage() {
                     )}
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        {avatarUrl ? (
-                          <img
-                            src={avatarUrl}
-                            alt={name}
-                            className="h-9 w-9 flex-shrink-0 rounded-xl object-cover border border-slate-150 transform hover:scale-[1.08] transition-transform"
-                            onError={(e) => {
-                              const img = e.currentTarget;
+                        <img
+                          src={avatarUrl}
+                          alt={name}
+                          className="h-9 w-9 flex-shrink-0 rounded-xl object-cover border border-slate-150 transform hover:scale-[1.08] transition-transform"
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            if (img.src !== FALLBACK_PININTEREST_AVATAR && !img.src.includes("736x/bc/43/98")) {
+                              img.src = FALLBACK_PININTEREST_AVATAR;
+                            } else {
                               img.style.display = "none";
                               const fb = img.nextElementSibling as HTMLElement | null;
                               if (fb) fb.style.display = "flex";
-                            }}
-                          />
-                        ) : null}
+                            }
+                          }}
+                        />
                         <div
                           className="h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-white text-xs font-bold"
                           style={{
                             background: pickGradient(id),
-                            display: avatarUrl ? "none" : "flex",
+                            display: "none",
                           }}
                         >
                           {initials(name)}
                         </div>
                         <div className="min-w-0">
                           <p className="font-semibold text-slate-800 text-sm truncate">{name}</p>
-                          {(() => {
-                            const created = formatCreatedAt(displayCreatedAt(u));
-                            return created ? (
-                              <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                                Tham gia {created.date}
-                              </p>
-                            ) : null;
-                          })()}
                         </div>
                       </div>
                     </td>
