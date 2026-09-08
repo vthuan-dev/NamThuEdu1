@@ -21,6 +21,7 @@ import { ExamCard } from "./ExamCard";
 import { ExamQuickViewModal } from "./ExamQuickViewModal";
 import { ExamPreviewModal } from "./ExamPreviewModal";
 import { TeacherStatsModal } from "./TeacherStatsModal";
+import { HoverDropdown, type HoverDropdownOption } from "./HoverDropdown";
 import {
   classifyAgeGroup,
   classifyExamType,
@@ -153,6 +154,31 @@ export function AdminCoursesPage() {
     }).length;
     return { total, published, pending, draft };
   }, [activeTeacher, exams]);
+
+  // Dropdown options cho HoverDropdown trên thanh công cụ
+  const teacherDropdownOptions: HoverDropdownOption[] = useMemo(() => [
+    { value: "all", label: "Tất cả giáo viên", count: teacherOptions.length },
+    ...teacherOptions.map((t) => ({
+      value: String(t.id),
+      label: t.name,
+      count: `${t.count} đề`,
+    })),
+  ], [teacherOptions]);
+
+  const ageDropdownOptions: HoverDropdownOption[] = useMemo(() => [
+    { value: "all", label: "Tất cả nhóm tuổi" },
+    { value: "kids", label: "Kids (6-12)" },
+    { value: "teens", label: "Teens (13-17)" },
+    { value: "adults", label: "Adults (18+)" },
+    { value: "other", label: "Chưa phân loại" },
+  ], []);
+
+  const statusDropdownOptions: HoverDropdownOption[] = useMemo(() => [
+    { value: "all", label: "Tất cả trạng thái" },
+    { value: "published", label: "Đã xuất bản" },
+    { value: "pending", label: "Chờ duyệt" },
+    { value: "draft", label: "Nháp" },
+  ], []);
 
   // Đếm số đề theo từng loại đề (cho badge trên tab)
   const typeCounts = useMemo(() => {
@@ -335,42 +361,28 @@ export function AdminCoursesPage() {
             className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none transition-colors focus:border-slate-800 focus:ring-2 focus:ring-slate-100"
           />
         </div>
-        <select
+        <HoverDropdown
           value={teacherFilter}
-          onChange={(e) => setTeacherFilter(e.target.value)}
-          aria-label="Lọc theo giáo viên"
-          className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition-colors focus:border-slate-800 focus:ring-2 focus:ring-slate-100"
-        >
-          <option value="all">Tất cả giáo viên ({teacherOptions.length})</option>
-          {teacherOptions.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name} ({t.count} đề)
-            </option>
-          ))}
-        </select>
-        <select
+          onChange={setTeacherFilter}
+          options={teacherDropdownOptions}
+          ariaLabel="Lọc theo giáo viên"
+          searchable={teacherOptions.length > 5}
+          menuMinWidth="min-w-[220px]"
+        />
+        <HoverDropdown
           value={ageFilter}
-          onChange={(e) => setAgeFilter(e.target.value as "all" | AgeGroupKey)}
-          aria-label="Lọc theo nhóm tuổi"
-          className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition-colors focus:border-slate-800 focus:ring-2 focus:ring-slate-100"
-        >
-          <option value="all">Tất cả nhóm tuổi</option>
-          <option value="kids">Kids (6-12)</option>
-          <option value="teens">Teens (13-17)</option>
-          <option value="adults">Adults (18+)</option>
-          <option value="other">Chưa phân loại</option>
-        </select>
-        <select
+          onChange={(val) => setAgeFilter(val as "all" | AgeGroupKey)}
+          options={ageDropdownOptions}
+          ariaLabel="Lọc theo nhóm tuổi"
+          menuMinWidth="min-w-[170px]"
+        />
+        <HoverDropdown
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          aria-label="Lọc theo trạng thái"
-          className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition-colors focus:border-slate-800 focus:ring-2 focus:ring-slate-100"
-        >
-          <option value="all">Tất cả trạng thái</option>
-          <option value="published">Đã xuất bản</option>
-          <option value="pending">Chờ duyệt</option>
-          <option value="draft">Nháp</option>
-        </select>
+          onChange={setStatusFilter}
+          options={statusDropdownOptions}
+          ariaLabel="Lọc theo trạng thái"
+          menuMinWidth="min-w-[170px]"
+        />
       </div>
 
       {/* ── Active Teacher Highlight Banner ── */}
