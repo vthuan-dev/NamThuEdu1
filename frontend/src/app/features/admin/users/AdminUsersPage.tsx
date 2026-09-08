@@ -7,6 +7,7 @@ import {
 import { adminApi, AdminUser } from "@/services/adminApi";
 import { AdminTableSkeleton } from "../components/AdminPageSkeleton";
 import { getFullMediaUrl } from "@/utils/mediaUtils";
+import { parseVNDate } from "@/utils/dateUtils";
 import { AdminCredentialsModal } from "./AdminCredentialsModal";
 
 type AgeFilter = "all" | "kids" | "teens" | "adults";
@@ -35,6 +36,28 @@ function displayId(user: AdminUser) {
 
 function displayAvatar(user: AdminUser) {
   return getFullMediaUrl(user.avatar_url || user.avatar);
+}
+
+function displayCreatedAt(user: AdminUser) {
+  return user.uCreated_at || user.created_at;
+}
+
+function formatCreatedAt(dateStr?: string | null) {
+  const d = parseVNDate(dateStr);
+  if (!d) return null;
+  const date = d.toLocaleDateString("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  const time = d.toLocaleTimeString("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return { date, time };
 }
 
 /** Lấy 2 ký tự đầu để hiển thị avatar fallback */
@@ -884,7 +907,7 @@ export function AdminUsersPage() {
       {/* ── Table / Grid Layout ── */}
       <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
         {loading ? (
-          <AdminTableSkeleton rows={7} cols={activeTab === "students" ? 6 : 5} />
+          <AdminTableSkeleton rows={7} cols={activeTab === "students" ? 7 : 6} />
         ) : error ? (
           <div className="p-8 text-center text-rose-600 font-semibold">{error}</div>
         ) : filtered.length === 0 ? (
@@ -897,7 +920,7 @@ export function AdminUsersPage() {
             </p>
           </div>
         ) : (
-          <table className="w-full min-w-[860px] border-collapse">
+          <table className="w-full min-w-[920px] border-collapse">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr className="text-left text-xs uppercase tracking-wider text-slate-400 font-bold">
                 {activeTab === "students" ? (
@@ -922,6 +945,7 @@ export function AdminUsersPage() {
                 <th className="px-5 py-3.5">{activeTab === "teachers" ? "Giáo viên" : "Học viên"}</th>
                 <th className="px-5 py-3.5">Số điện thoại</th>
                 {activeTab === "students" && <th className="px-5 py-3.5">Phân loại</th>}
+                <th className="px-5 py-3.5">Thời gian tạo</th>
                 <th className="px-5 py-3.5">Trạng thái</th>
                 <th className="px-5 py-3.5 text-right">Thao tác</th>
               </tr>
@@ -987,11 +1011,14 @@ export function AdminUsersPage() {
                         </div>
                         <div className="min-w-0">
                           <p className="font-semibold text-slate-800 text-sm truncate">{name}</p>
-                          {u.created_at && (
-                            <p className="text-[10px] text-slate-400 font-medium mt-0.5">
-                              Tham gia {new Date(u.created_at).toLocaleDateString("vi-VN")}
-                            </p>
-                          )}
+                          {(() => {
+                            const created = formatCreatedAt(displayCreatedAt(u));
+                            return created ? (
+                              <p className="text-[10px] text-slate-400 font-medium mt-0.5">
+                                Tham gia {created.date}
+                              </p>
+                            ) : null;
+                          })()}
                         </div>
                       </div>
                     </td>
@@ -1012,6 +1039,18 @@ export function AdminUsersPage() {
                         })()}
                       </td>
                     )}
+                    <td className="px-5 py-3.5 text-xs text-slate-600 whitespace-nowrap">
+                      {(() => {
+                        const created = formatCreatedAt(displayCreatedAt(u));
+                        if (!created) return <span className="text-slate-400">N/A</span>;
+                        return (
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-slate-800">{created.date}</span>
+                            <span className="text-[11px] text-slate-400 font-medium">{created.time}</span>
+                          </div>
+                        );
+                      })()}
+                    </td>
                     <td className="px-5 py-3.5">
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold border ${
