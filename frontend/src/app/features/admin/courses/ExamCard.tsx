@@ -36,7 +36,15 @@ interface Props {
  * ExamCard — thẻ hiển thị 1 đề thi trong lưới quản lý đề của admin.
  * Accent màu theo loại đề; menu thao tác: Xem nhanh / Duyệt / Từ chối / Xóa.
  */
-export function ExamCard({ exam, busy = false, onView, onApprove, onReject, onDelete }: Props) {
+export function ExamCard({
+  exam,
+  busy = false,
+  onView,
+  onApprove,
+  onReject,
+  onDelete,
+  onSelectTeacher,
+}: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 

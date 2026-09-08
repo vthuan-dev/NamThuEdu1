@@ -1,14 +1,16 @@
 import { useState, useMemo } from "react";
-import { X, Search, Users, CheckCircle2, Clock, FileEdit, ArrowRight, Sparkles } from "lucide-react";
+import { X, Search, Users, CheckCircle2, Clock, FileEdit, ArrowRight, Sparkles, RefreshCw } from "lucide-react";
 import type { TeacherExamStat } from "@/services/adminApi";
 import { getFullMediaUrl } from "@/utils/mediaUtils";
 
 interface Props {
-  isOpen: boolean;
+  open?: boolean;
+  isOpen?: boolean;
   onClose: () => void;
   stats: TeacherExamStat[];
   loading?: boolean;
-  onSelectTeacher: (teacherId: number, teacherName: string) => void;
+  onSelectTeacher: (teacherId: number, teacherName?: string) => void;
+  onRefresh?: () => void;
 }
 
 function initials(name: string) {
@@ -18,7 +20,16 @@ function initials(name: string) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export function TeacherStatsModal({ isOpen, onClose, stats, loading = false, onSelectTeacher }: Props) {
+export function TeacherStatsModal({
+  open,
+  isOpen,
+  onClose,
+  stats,
+  loading = false,
+  onSelectTeacher,
+  onRefresh,
+}: Props) {
+  const isVisible = open ?? isOpen ?? false;
   const [search, setSearch] = useState("");
 
   const filteredStats = useMemo(() => {
@@ -39,7 +50,7 @@ export function TeacherStatsModal({ isOpen, onClose, stats, loading = false, onS
     return stats.filter((t) => (Number(t.total_exams) || 0) > 0).length;
   }, [stats]);
 
-  if (!isOpen) return null;
+  if (!isVisible) return null;
 
   return (
     <div
@@ -64,12 +75,24 @@ export function TeacherStatsModal({ isOpen, onClose, stats, loading = false, onS
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
-          >
-            <X className="h-4.5 w-4.5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {onRefresh && (
+              <button
+                type="button"
+                onClick={onRefresh}
+                title="Tải lại thống kê"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+            >
+              <X className="h-4.5 w-4.5" />
+            </button>
+          </div>
         </div>
 
         {/* Top Summary Cards */}
