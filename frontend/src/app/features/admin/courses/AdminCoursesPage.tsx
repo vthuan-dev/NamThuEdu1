@@ -64,7 +64,7 @@ export function AdminCoursesPage() {
   const [search, setSearch] = useState("");
   const [typeTab, setTypeTab] = useState<TypeTabKey>("all");
   const [ageFilter, setAgeFilter] = useState<"all" | AgeGroupKey>("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("published");
   const [teacherFilter, setTeacherFilter] = useState<string>("all");
   const [showTeacherStats, setShowTeacherStats] = useState(false);
   const [teacherStats, setTeacherStats] = useState<TeacherExamStat[]>([]);
@@ -179,21 +179,30 @@ export function AdminCoursesPage() {
   ], []);
 
   const statusDropdownOptions: HoverDropdownOption[] = useMemo(() => [
-    { value: "all", label: "Tất cả trạng thái" },
-    { value: "published", label: "Đã xuất bản" },
-    { value: "pending", label: "Chờ duyệt" },
-    { value: "draft", label: "Nháp" },
-  ], []);
+    { value: "published", label: "Đã xuất bản", count: stats.published },
+    { value: "draft", label: "Nháp", count: stats.draft },
+    { value: "pending", label: "Chờ duyệt", count: stats.pending },
+    { value: "all", label: "Tất cả trạng thái", count: stats.total },
+  ], [stats]);
 
   // Đếm số đề theo từng loại đề (cho badge trên tab)
   const typeCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: exams.length };
-    exams.forEach((e) => {
+    const relevant = statusFilter === "all"
+      ? exams
+      : exams.filter((e) => {
+          const s = getExamStatus(e);
+          if (statusFilter === "published") return s === "published";
+          if (statusFilter === "draft") return s === "draft" || (s !== "published" && s !== "pending");
+          if (statusFilter === "pending") return s === "pending";
+          return s === statusFilter;
+        });
+    const counts: Record<string, number> = { all: relevant.length };
+    relevant.forEach((e) => {
       const k = classifyExamType(e).key;
       counts[k] = (counts[k] || 0) + 1;
     });
     return counts;
-  }, [exams]);
+  }, [exams, statusFilter]);
 
   const stats = useMemo(() => {
     const total = exams.length;
@@ -222,7 +231,17 @@ export function AdminCoursesPage() {
         formatExamDateTime(getExamCreatedAt(e)).toLowerCase().includes(q);
       const matchesType = typeTab === "all" || classifyExamType(e).key === typeTab;
       const matchesAge = ageFilter === "all" || classifyAgeGroup(e) === ageFilter;
-      const matchesStatus = statusFilter === "all" || getExamStatus(e) === statusFilter;
+      let matchesStatus = true;
+      const s = getExamStatus(e);
+      if (statusFilter === "published") {
+        matchesStatus = s === "published";
+      } else if (statusFilter === "draft") {
+        matchesStatus = s === "draft" || (s !== "published" && s !== "pending");
+      } else if (statusFilter === "pending") {
+        matchesStatus = s === "pending";
+      } else if (statusFilter !== "all") {
+        matchesStatus = s === statusFilter;
+      }
       const matchesTeacher = filterTeacherId === null || getExamTeacherId(e) === filterTeacherId;
       return matchesSearch && matchesType && matchesAge && matchesStatus && matchesTeacher;
     });
@@ -316,10 +335,38 @@ export function AdminCoursesPage() {
         <AdminStatsSkeleton cards={4} />
       ) : (
         <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard icon={<FileText className="h-4 w-4" />} label="Tổng đề thi" value={stats.total} tone="slate" />
-          <StatCard icon={<BookOpenCheck className="h-4 w-4" />} label="Đã xuất bản" value={stats.published} tone="emerald" />
-          <StatCard icon={<Clock className="h-4 w-4" />} label="Chờ duyệt" value={stats.pending} tone="amber" />
-          <StatCard icon={<FileEdit className="h-4 w-4" />} label="Nháp" value={stats.draft} tone="slate" />
+          <StatCard
+            icon={<FileText className="h-4 w-4" />}
+            label="Tổng đề thi"
+            value={stats.total}
+            tone="slate"
+            active={statusFilter === "all"}
+            onClick={() => setStatusFilter("all")}
+          />
+          <StatCard
+            icon={<BookOpenCheck className="h-4 w-4" />}
+            label="Đã xuất bản"
+            value={stats.published}
+            tone="emerald"
+            active={statusFilter === "published"}
+            onClick={() => setStatusFilter("published")}
+          />
+          <StatCard
+            icon={<Clock className="h-4 w-4" />}
+            label="Chờ duyệt"
+            value={stats.pending}
+            tone="amber"
+            active={statusFilter === "pending"}
+            onClick={() => setStatusFilter("pending")}
+          />
+          <StatCard
+            icon={<FileEdit className="h-4 w-4" />}
+            label="Nháp"
+            value={stats.draft}
+            tone="slate"
+            active={statusFilter === "draft"}
+            onClick={() => setStatusFilter("draft")}
+          />
         </div>
       )}
 
@@ -369,6 +416,30 @@ export function AdminCoursesPage() {
             className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none transition-colors focus:border-slate-800 focus:ring-2 focus:ring-slate-100"
           />
         </div>
+        {/* Nút Đề nháp toggle nhanh cho Admin */}
+        <button
+          type="button"
+          onClick={() => setStatusFilter((prev) => (prev === "draft" ? "published" : "draft"))}
+          className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer whitespace-nowrap shadow-2xs ${
+            statusFilter === "draft"
+              ? "bg-amber-600 text-white hover:bg-amber-700 ring-2 ring-amber-300 ring-offset-1"
+              : "border border-amber-200 bg-amber-50/70 text-amber-800 hover:bg-amber-100 hover:border-amber-300"
+          }`}
+          title={statusFilter === "draft" ? "Đang xem đề nháp. Bấm để quay lại đề đã xuất bản" : "Bấm để xem các đề nháp"}
+        >
+          <FileEdit className={`h-4 w-4 ${statusFilter === "draft" ? "text-white" : "text-amber-600"}`} />
+          <span>{statusFilter === "draft" ? "Đang xem: Đề nháp" : "Đề nháp"}</span>
+          <span
+            className={`inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-bold ${
+              statusFilter === "draft"
+                ? "bg-white text-amber-800"
+                : "bg-amber-200/90 text-amber-900"
+            }`}
+          >
+            {stats.draft}
+          </span>
+        </button>
+
         <HoverDropdown
           value={teacherFilter}
           onChange={setTeacherFilter}
@@ -392,6 +463,25 @@ export function AdminCoursesPage() {
           menuMinWidth="min-w-[170px]"
         />
       </div>
+
+      {/* ── Banner thông báo khi đang xem Đề nháp ── */}
+      {statusFilter === "draft" && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-2.5 text-sm text-amber-900 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <FileEdit className="h-4 w-4 text-amber-600 flex-shrink-0" />
+            <span>
+              Đang hiển thị danh sách <b>{filtered.length} đề nháp</b> (chưa xuất bản).
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setStatusFilter("published")}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1 text-xs font-semibold text-amber-800 shadow-2xs transition-colors hover:bg-amber-100"
+          >
+            ← Quay lại đề đã xuất bản ({stats.published})
+          </button>
+        </div>
+      )}
 
       {/* ── Active Teacher Highlight Banner ── */}
       {activeTeacher && activeTeacherStats && (
@@ -641,16 +731,40 @@ const TONE_STYLES: Record<Tone, { border: string; bg: string; icon: string; text
   rose: { border: "border-rose-200", bg: "bg-rose-50", icon: "bg-rose-100 text-rose-700", text: "text-rose-700" },
 };
 
-function StatCard({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: number; tone: Tone }) {
+function StatCard({
+  icon,
+  label,
+  value,
+  tone,
+  active = false,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  tone: Tone;
+  active?: boolean;
+  onClick?: () => void;
+}) {
   const s = TONE_STYLES[tone];
   return (
-    <div className={`flex items-center gap-3 rounded-xl border ${s.border} ${s.bg} px-4 py-3`}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all cursor-pointer ${
+        s.border
+      } ${s.bg} ${
+        active
+          ? "ring-2 ring-slate-900 shadow-sm"
+          : "hover:border-slate-300 hover:shadow-2xs opacity-90 hover:opacity-100"
+      }`}
+    >
       <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg ${s.icon}`}>{icon}</div>
       <div className="min-w-0">
         <p className={`truncate text-xs ${tone === "slate" ? "text-slate-500" : s.text}`}>{label}</p>
         <p className={`text-lg font-bold leading-tight ${s.text}`}>{value}</p>
       </div>
-    </div>
+    </button>
   );
 }
 
