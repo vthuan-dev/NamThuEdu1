@@ -130,8 +130,7 @@ export function AdminThptPreview() {
         canNext={activeIdx < config.sections.length - 1}
         onPrev={() => setActiveIdx((i) => Math.max(0, i - 1))}
         onNext={() => setActiveIdx((i) => Math.min(config.sections.length - 1, i + 1))}
-        onSubmit={() => navigate(BACK_TO)}
-        isSubmitting={false}
+        hideSubmit
       />
     </div>
   );

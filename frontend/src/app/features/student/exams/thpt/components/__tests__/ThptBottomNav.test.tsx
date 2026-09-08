@@ -63,6 +63,13 @@ describe('ThptBottomNav — nút Nộp bài', () => {
 
     expect(screen.getByRole('button', { name: /Nộp bài/ })).toBeDisabled();
   });
+
+  /** Ẩn nút Nộp bài trong chế độ xem trước */
+  it('ẩn nút Nộp bài khi hideSubmit = true', () => {
+    render(<ThptBottomNav {...baseProps} hideSubmit />);
+
+    expect(screen.queryByRole('button', { name: /Nộp bài/ })).not.toBeInTheDocument();
+  });
 });
 
 describe('ThptBottomNav — điều hướng phần', () => {

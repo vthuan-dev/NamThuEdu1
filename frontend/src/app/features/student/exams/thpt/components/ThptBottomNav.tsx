@@ -7,13 +7,15 @@ interface Props {
   canNext: boolean;
   onPrev: () => void;
   onNext: () => void;
-  onSubmit: () => void;
+  onSubmit?: () => void;
   isSubmitting?: boolean;
   /** Mở bảng Tiến độ dạng bottom sheet (mobile). Không truyền → ô giữa chỉ là nhãn. */
   onOpenProgress?: () => void;
   /** Số câu đã trả lời / tổng số câu, hiển thị ở ô giữa. */
   answeredCount?: number;
   totalQuestions?: number;
+  /** Ẩn nút nộp bài (dành cho chế độ xem trước của giáo viên / admin). */
+  hideSubmit?: boolean;
 }
 
 /**
@@ -47,6 +49,7 @@ export function ThptBottomNav({
   onOpenProgress,
   answeredCount,
   totalQuestions,
+  hideSubmit,
 }: Props) {
   const isLast = activePart >= totalParts - 1;
   const showProgressCount =
@@ -106,26 +109,26 @@ export function ThptBottomNav({
           </button>
         )}
 
-        {/* Nộp bài — LUÔN hiển thị. Ở phần cuối thì nổi hơn (đầy màu) vì đó là
-            hành động mong đợi; ở phần giữa thì nhẹ hơn để không mời gọi bấm sớm,
-            nhưng vẫn luôn với tới được. */}
-        <button
-          type="button"
-          onClick={onSubmit}
-          disabled={isSubmitting}
-          className={`flex items-center justify-center gap-1.5 min-h-11 px-3 sm:px-4 rounded-lg font-semibold transition-colors cursor-pointer text-sm disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0 ${
-            isLast
-              ? 'text-white bg-orange-500 hover:bg-orange-600'
-              : 'text-orange-700 bg-orange-50 border border-orange-200 hover:bg-orange-100'
-          }`}
-        >
-          {isSubmitting ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Send className="w-4 h-4" />
-          )}
-          <span>Nộp bài</span>
-        </button>
+        {/* Nộp bài — LUÔN hiển thị trừ khi hideSubmit=true hoặc không có onSubmit (chế độ xem trước). */}
+        {!hideSubmit && onSubmit && (
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={isSubmitting}
+            className={`flex items-center justify-center gap-1.5 min-h-11 px-3 sm:px-4 rounded-lg font-semibold transition-colors cursor-pointer text-sm disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0 ${
+              isLast
+                ? 'text-white bg-orange-500 hover:bg-orange-600'
+                : 'text-orange-700 bg-orange-50 border border-orange-200 hover:bg-orange-100'
+            }`}
+          >
+            {isSubmitting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+            <span>Nộp bài</span>
+          </button>
+        )}
       </div>
     </footer>
   );
