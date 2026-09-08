@@ -25,6 +25,7 @@ import {
   formatSkillLabel,
   formatLevelLabel,
   formatExamDateTime,
+  getExamQuestionCount,
 } from "./examClassify";
 
 interface Props {
@@ -71,7 +72,7 @@ export function ExamCard({
   const status = getExamStatus(exam);
   const createdAt = getExamCreatedAt(exam);
   const isPublished = status === "published";
-  const questionsCount = exam.questions_count;
+  const questionsCount = getExamQuestionCount(exam);
 
   const runAndClose = (fn: () => void) => {
     setMenuOpen(false);

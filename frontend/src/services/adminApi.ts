@@ -65,9 +65,13 @@ export interface AdminExam {
   eDescription?: string | null;
   eDuration?: number | string | null;
   eDuration_minutes?: number | string | null;
-  // IELTS-specific
-  ielts_test_type?: string | null;
-  ielts_skill?: string | null;
+  // Config & question fields
+  thpt_config?: any;
+  thpt_draft_config?: any;
+  ielts_config?: any;
+  ielts_data?: any;
+  kids_exam_config?: any;
+  questions?: any[];
 }
 
 export interface TeacherExamStat {

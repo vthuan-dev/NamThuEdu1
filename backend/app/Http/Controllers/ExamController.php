@@ -97,6 +97,7 @@ class ExamController extends Controller
             $exam->_owner_name = $isOwner
                 ? 'Bạn'
                 : ($exam->teacher->uName ?? 'Giáo viên khác');
+            $exam->questions_count = $exam->getQuestionsCount();
             return $exam;
         });
 
@@ -1709,6 +1710,12 @@ class ExamController extends Controller
             ? $query->paginate((int) $request->get('per_page', 20))
             : $query->get();
 
+        $collection = $paginate ? $exams->getCollection() : $exams;
+        $collection->transform(function ($exam) {
+            $exam->questions_count = $exam->getQuestionsCount();
+            return $exam;
+        });
+
         return response()->json([
             'status' => 'success',
             'data' => $exams
@@ -1741,6 +1748,8 @@ class ExamController extends Controller
                 'message' => 'Không tìm thấy đề thi.'
             ], 404);
         }
+
+        $exam->questions_count = $exam->getQuestionsCount();
 
         return response()->json([
             'status' => 'success',
@@ -1919,6 +1928,11 @@ class ExamController extends Controller
                            ->where('eStatus', 'pending')
                            ->orderBy('eCreated_at', 'desc')
                            ->get();
+
+        $pendingExams->transform(function ($exam) {
+            $exam->questions_count = $exam->getQuestionsCount();
+            return $exam;
+        });
 
         return response()->json([
             'status' => 'success',

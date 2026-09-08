@@ -197,40 +197,98 @@ class Exam extends Model
     }
 
     /**
-     * Dynamically count questions for THPT exams from JSON config, fallback to Eloquent count for others.
+     * Dynamically count questions for all exam types:
+     * - THPT: JSON sections/parts in thpt_config or thpt_draft_config
+     * - IELTS: questions table, or draft/config data in ielts_config
+     * - VSTEP / Cambridge YLE / Kids / General: questions table or Eloquent count
      */
     public function getQuestionsCount(): int
     {
-        if ($this->eType === 'THPT' && is_array($this->thpt_config)) {
+        // 1. THPT (sections / parts)
+        $thpt = $this->thpt_config ?? $this->thpt_draft_config;
+        if (is_string($thpt)) {
+            $thpt = json_decode($thpt, true);
+        }
+        if (is_array($thpt)) {
             $count = 0;
-            foreach ($this->thpt_config['sections'] ?? [] as $s) {
+            $sections = $thpt['sections'] ?? $thpt['parts'] ?? [];
+            foreach ($sections as $s) {
                 $type = $s['type'] ?? '';
                 if ($type === 'mc_cloze' || $type === 'word_bank_cloze' || $type === 'open_cloze') {
                     $count += count($s['blanks'] ?? []);
                 } elseif ($type === 'tf_group') {
                     foreach ($s['items'] ?? [] as $it) {
-                        $count += count($it['statements'] ?? []);
+                        $count += count($it['statements'] ?? [1]);
                     }
                 } elseif ($type === 'reading_mixed') {
                     foreach ($s['items'] ?? [] as $it) {
                         $kind = $it['kind'] ?? '';
                         if ($kind === 'tf_group') {
-                            $count += count($it['statements'] ?? []);
+                            $count += count($it['statements'] ?? [1]);
                         } else {
                             $count += 1;
                         }
                     }
                 } elseif ($type === 'matching') {
                     foreach ($s['items'] ?? [] as $it) {
-                        $count += count($it['answers'] ?? []);
+                        $count += count($it['answers'] ?? $it['pairs'] ?? [1]);
                     }
-                } else {
-                    $count += count($s['items'] ?? []);
+                } elseif (!empty($s['items'])) {
+                    $count += count($s['items']);
+                } elseif (!empty($s['blanks'])) {
+                    $count += count($s['blanks']);
                 }
             }
-            return $count;
+            if ($count > 0) {
+                return $count;
+            }
         }
 
-        return $this->questions_count ?? $this->questions()->count();
+        // 2. IELTS (draft_data or parts in ielts_config)
+        $ielts = $this->ielts_config;
+        if (is_string($ielts)) {
+            $ielts = json_decode($ielts, true);
+        }
+        $draft = $ielts['draft_data'] ?? $ielts ?? null;
+        if (is_array($draft)) {
+            $ic = 0;
+            $secList = $draft['listening']['sections'] ?? $draft['sections'] ?? null;
+            if (is_array($secList)) {
+                foreach ($secList as $sc) {
+                    $ic += count($sc['questions'] ?? []);
+                }
+            }
+            $pasList = $draft['reading']['passages'] ?? $draft['passages'] ?? null;
+            if (is_array($pasList)) {
+                foreach ($pasList as $ps) {
+                    $ic += count($ps['questions'] ?? []);
+                }
+            }
+            $tskList = $draft['writing']['tasks'] ?? $draft['tasks'] ?? null;
+            if (is_array($tskList)) {
+                $ic += count($tskList);
+            }
+            $prtList = $draft['speaking']['parts'] ?? $draft['parts'] ?? null;
+            if (is_array($prtList)) {
+                $ic += count($prtList);
+            }
+            if ($ic > 0) {
+                return $ic;
+            }
+        }
+
+        // 3. Fallback: Eloquent questions count
+        if (isset($this->questions_count) && (int) $this->questions_count > 0) {
+            return (int) $this->questions_count;
+        }
+
+        if ($this->relationLoaded('questions')) {
+            $relCount = $this->questions->count();
+            if ($relCount > 0) {
+                return $relCount;
+            }
+        }
+
+        return (int) ($this->questions()->count());
     }
 }

@@ -52,19 +52,62 @@ function getExamPublishAt(exam: any): string | null {
 
 /**
  * Đếm số câu hỏi của đề (dùng chung cho lọc tab + badge).
- * THPT lưu trong thpt_config.sections[], các loại khác dùng questions_count hoặc questions[].
+ * THPT lưu trong thpt_config (sections[] hoặc parts[]), IELTS lưu ielts_config, các loại khác dùng questions_count hoặc questions[].
  */
 function countExamQuestionsFor(exam: any): number {
-  const eType = (exam?.eType || "").toUpperCase();
+  if (!exam) return 0;
 
-  // THPT: đếm từ thpt_config.sections[]
-  if (eType === "THPT" && exam?.thpt_config?.sections) {
+  // THPT: đếm từ thpt_config hoặc thpt_draft_config
+  const thpt = exam?.thpt_config || exam?.thpt_draft_config;
+  const sections = thpt?.sections || thpt?.parts;
+  if (Array.isArray(sections) && sections.length > 0) {
     let total = 0;
-    for (const sec of exam.thpt_config.sections) {
-      if (sec?.items?.length) total += sec.items.length;
-      else if (sec?.blanks?.length) total += sec.blanks.length;
+    for (const sec of sections) {
+      const type = sec?.type || "";
+      if (type === "mc_cloze" || type === "word_bank_cloze" || type === "open_cloze") {
+        total += sec?.blanks?.length || 0;
+      } else if (type === "tf_group") {
+        for (const it of sec?.items || []) {
+          total += it?.statements?.length || 1;
+        }
+      } else if (type === "reading_mixed") {
+        for (const it of sec?.items || []) {
+          if (it?.kind === "tf_group") {
+            total += it?.statements?.length || 1;
+          } else {
+            total += 1;
+          }
+        }
+      } else if (type === "matching") {
+        for (const it of sec?.items || []) {
+          total += it?.answers?.length || it?.pairs?.length || 1;
+        }
+      } else if (sec?.items && Array.isArray(sec.items)) {
+        total += sec.items.length;
+      } else if (sec?.blanks && Array.isArray(sec.blanks)) {
+        total += sec.blanks.length;
+      }
     }
     if (total > 0) return total;
+  }
+
+  // IELTS draft
+  const ielts = exam?.ielts_config?.draft_data || exam?.ielts_config || exam?.ielts_data;
+  if (ielts && typeof ielts === "object") {
+    let ieltsCount = 0;
+    const listeningSections = ielts.listening?.sections || ielts.sections;
+    if (Array.isArray(listeningSections)) {
+      for (const sec of listeningSections) ieltsCount += sec?.questions?.length || 0;
+    }
+    const readingPassages = ielts.reading?.passages || ielts.passages;
+    if (Array.isArray(readingPassages)) {
+      for (const pass of readingPassages) ieltsCount += pass?.questions?.length || 0;
+    }
+    const writingTasks = ielts.writing?.tasks || ielts.tasks;
+    if (Array.isArray(writingTasks)) ieltsCount += writingTasks.length;
+    const speakingParts = ielts.speaking?.parts || ielts.parts;
+    if (Array.isArray(speakingParts)) ieltsCount += speakingParts.length;
+    if (ieltsCount > 0 && (!exam.questions_count || exam.questions_count === 0)) return ieltsCount;
   }
 
   // Default: questions_count từ backend, fallback questions[].length
@@ -677,23 +720,9 @@ export function AllExams() {
     return { label: "Chưa phân loại", color: "#6B7280" };
   };
 
-  // Đếm câu hỏi tuỳ theo loại đề. THPT lưu trong thpt_config.sections[],
-  // các loại khác có quan hệ Question hoặc backend trả questions_count.
+  // Đếm câu hỏi tuỳ theo loại đề (dùng chung helper với filter & badge).
   const countExamQuestions = (exam: KidsExam): number => {
-    const eType = (exam.eType || "").toUpperCase();
-
-    // THPT: đếm từ thpt_config.sections[]
-    if (eType === "THPT" && exam.thpt_config?.sections) {
-      let total = 0;
-      for (const sec of exam.thpt_config.sections) {
-        if (sec?.items?.length) total += sec.items.length;
-        else if (sec?.blanks?.length) total += sec.blanks.length;
-      }
-      if (total > 0) return total;
-    }
-
-    // Default: questions_count từ backend, fallback questions[].length
-    return (exam as any).questions_count ?? exam.questions?.length ?? 0;
+    return countExamQuestionsFor(exam);
   };
 
   // Đường dẫn chỉnh sửa tuỳ theo loại đề
