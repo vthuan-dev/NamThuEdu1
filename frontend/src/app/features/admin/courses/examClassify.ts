@@ -141,6 +141,67 @@ export function statusLabel(status: string): string {
 }
 
 /**
+ * Chuyển đổi mã kỹ năng (eSkill, ielts_skill) sang nhãn tiếng Việt rõ ràng, dễ hiểu.
+ * Ví dụ: 'mixed' -> 'Kỹ năng: Tổng hợp', 'reading' -> 'Kỹ năng: Đọc'
+ */
+export function formatSkillLabel(rawSkill?: string | null, includePrefix = true): string {
+  if (!rawSkill) return "";
+  const s = rawSkill.trim().toLowerCase();
+
+  const nameMap: Record<string, string> = {
+    mixed: "Tổng hợp",
+    full: "Tổng hợp",
+    listening: "Nghe",
+    reading: "Đọc",
+    writing: "Viết",
+    speaking: "Nói",
+    grammar: "Ngữ pháp",
+    vocabulary: "Từ vựng",
+  };
+
+  const name = nameMap[s] || rawSkill;
+  if (!includePrefix) {
+    if (s === "mixed" || s === "full") return "Tổng hợp kỹ năng";
+    return name;
+  }
+  return `Kỹ năng: ${name}`;
+}
+
+/**
+ * Chuyển đổi độ khó / cấp độ (eDifficulty, eTarget_level) sang nhãn tiếng Việt rõ ràng.
+ * Ví dụ: 'medium' -> 'Độ khó: Trung bình', 'easy' -> 'Độ khó: Dễ'
+ */
+export function formatLevelLabel(rawLevel?: string | null, includePrefix = true): string {
+  if (!rawLevel) return "";
+  const l = rawLevel.trim().toLowerCase();
+
+  const levelMap: Record<string, string> = {
+    easy: "Dễ",
+    medium: "Trung bình",
+    hard: "Khó",
+    beginner: "Cơ bản",
+    intermediate: "Trung cấp",
+    advanced: "Nâng cao",
+  };
+
+  if (levelMap[l]) {
+    return includePrefix ? `Độ khó: ${levelMap[l]}` : levelMap[l];
+  }
+
+  // Nếu là dạng CEFR (A1, A2, B1, B2, C1, C2)
+  if (/^[abc][12]$/i.test(l)) {
+    return includePrefix ? `Trình độ: ${rawLevel.toUpperCase()}` : rawLevel.toUpperCase();
+  }
+
+  // IELTS band (e.g. 5.5, 6.0, 6.5, 7.0...)
+  if (/^\d+(\.\d+)?$/.test(l)) {
+    return includePrefix ? `Band: ${rawLevel}` : `Band ${rawLevel}`;
+  }
+
+  return includePrefix ? `Cấp độ: ${rawLevel}` : rawLevel;
+}
+
+/**
  * Đường dẫn "Xem trước đề" (UI học viên) cho admin, route theo loại đề.
  * Tương ứng adminPreviewRoutes (/admin/de-thi/xem/*).
  */

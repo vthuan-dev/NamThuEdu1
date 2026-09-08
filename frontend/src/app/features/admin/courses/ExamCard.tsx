@@ -20,6 +20,8 @@ import {
   getExamLevel,
   getExamStatus,
   statusLabel,
+  formatSkillLabel,
+  formatLevelLabel,
 } from "./examClassify";
 
 interface Props {
@@ -176,12 +178,12 @@ export function ExamCard({
         <div className="mb-3 flex flex-wrap gap-1.5">
           {skill && (
             <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
-              {skill}
+              {formatSkillLabel(skill)}
             </span>
           )}
           {level && (
             <span className="inline-flex items-center rounded-md bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700">
-              {level}
+              {formatLevelLabel(level)}
             </span>
           )}
           {typeof questionsCount === "number" && (

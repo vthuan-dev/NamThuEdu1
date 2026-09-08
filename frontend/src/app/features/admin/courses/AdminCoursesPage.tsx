@@ -30,7 +30,10 @@ import {
   getExamTeacher,
   getExamTeacherId,
   getExamSkill,
+  getExamLevel,
   getExamStatus,
+  formatSkillLabel,
+  formatLevelLabel,
   EXAM_TYPE_META,
   type AgeGroupKey,
 } from "./examClassify";
@@ -211,7 +214,9 @@ export function AdminCoursesPage() {
         getExamTitle(e).toLowerCase().includes(q) ||
         getExamTeacher(e).toLowerCase().includes(q) ||
         classifyExamType(e).label.toLowerCase().includes(q) ||
-        getExamSkill(e).toLowerCase().includes(q);
+        getExamSkill(e).toLowerCase().includes(q) ||
+        formatSkillLabel(getExamSkill(e)).toLowerCase().includes(q) ||
+        formatLevelLabel(getExamLevel(e)).toLowerCase().includes(q);
       const matchesType = typeTab === "all" || classifyExamType(e).key === typeTab;
       const matchesAge = ageFilter === "all" || classifyAgeGroup(e) === ageFilter;
       const matchesStatus = statusFilter === "all" || getExamStatus(e) === statusFilter;

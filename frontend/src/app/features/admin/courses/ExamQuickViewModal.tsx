@@ -13,6 +13,8 @@ import {
   getExamStatus,
   statusLabel,
   AGE_GROUP_META,
+  formatSkillLabel,
+  formatLevelLabel,
 } from "./examClassify";
 
 interface Props {
@@ -56,8 +58,8 @@ export function ExamQuickViewModal({ exam, onClose, onPreview }: Props) {
     { icon: Hash, label: "Mã đề", value: `#${getExamId(exam)}` },
     { icon: User, label: "Giáo viên", value: getExamTeacher(exam) },
     { icon: Layers, label: "Loại đề", value: typeMeta.label },
-    { icon: ListChecks, label: "Kỹ năng", value: skill || "Tổng hợp" },
-    { icon: FileText, label: "Cấp độ", value: level || "—" },
+    { icon: ListChecks, label: "Kỹ năng", value: formatSkillLabel(skill, false) || "Tổng hợp" },
+    { icon: FileText, label: "Độ khó", value: formatLevelLabel(level, false) || "—" },
     { icon: Calendar, label: "Ngày tạo", value: formatDate(getExamCreatedAt(exam)) },
   ];
 
