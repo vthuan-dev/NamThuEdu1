@@ -37,6 +37,7 @@ interface IeltsListeningViewProps {
   draggableNavigator?: boolean;
   /** Preview mode: ẩn nút Bỏ qua */
   previewMode?: boolean;
+  hideSubmit?: boolean;
 }
 
 type Phase = "section" | "review";
@@ -52,6 +53,7 @@ export function IeltsListeningView({
   showTimer,
   draggableNavigator = false,
   previewMode = false,
+  hideSubmit = false,
 }: IeltsListeningViewProps) {
   const [phase, setPhase] = useState<Phase>("section");
   const [sectionIndex, setSectionIndex] = useState(0);
@@ -262,7 +264,7 @@ export function IeltsListeningView({
         timeLeft={timeLeft}
         showTimer={showTimer}
         onSubmit={onSubmit}
-        hideSubmit={draggableNavigator}
+        hideSubmit={hideSubmit || draggableNavigator}
       />
     </div>
   );

@@ -15,8 +15,9 @@ interface IeltsWritingViewProps {
   payload: IeltsWritingPayload;
   answers: AnswerMap;
   onAnswer: (qId: number, value: string) => void;
-  onSubmit: () => void;
+  onSubmit?: () => void;
   reviewMode?: boolean;
+  hideSubmit?: boolean;
 }
 
 function countWords(text: string): number {
@@ -30,6 +31,7 @@ export function IeltsWritingView({
   onAnswer,
   onSubmit,
   reviewMode = false,
+  hideSubmit = false,
 }: IeltsWritingViewProps) {
   const tasks = payload.tasks ?? [];
   const [activeIdx, setActiveIdx] = useState(0);
@@ -271,7 +273,7 @@ export function IeltsWritingView({
                 Sang {tasks[activeIdx + 1]?.taskName}
               </button>
             )}
-            {!reviewMode && (
+            {!reviewMode && !hideSubmit && onSubmit && (
               <button
                 type="button"
                 onClick={onSubmit}

@@ -207,6 +207,7 @@ export function IeltsTestPreviewPage({
                 showTimer={false}
                 draggableNavigator
                 previewMode
+                hideSubmit
               />
             )}
             {skill === "reading" && (
@@ -219,6 +220,7 @@ export function IeltsTestPreviewPage({
                 onSubmit={handleNoopSubmit}
                 showTimer={false}
                 draggableNavigator
+                hideSubmit
               />
             )}
             {skill === "writing" && (
@@ -227,6 +229,7 @@ export function IeltsTestPreviewPage({
                 answers={answers}
                 onAnswer={handleAnswer}
                 onSubmit={handleNoopSubmit}
+                hideSubmit
               />
             )}
             {skill === "speaking" && (
@@ -234,6 +237,7 @@ export function IeltsTestPreviewPage({
                 payload={payload as IeltsSpeakingPayload}
                 submissionId={null}
                 onSubmit={handleNoopSubmit}
+                hideSubmit
               />
             )}
           </div>

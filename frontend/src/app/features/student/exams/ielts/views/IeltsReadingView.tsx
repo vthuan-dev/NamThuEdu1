@@ -29,6 +29,7 @@ interface IeltsReadingViewProps {
   draggableNavigator?: boolean;
   reviewMode?: boolean;
   submissionId?: number;
+  hideSubmit?: boolean;
 }
 
 export function IeltsReadingView({
@@ -43,6 +44,7 @@ export function IeltsReadingView({
   draggableNavigator = false,
   reviewMode = false,
   submissionId,
+  hideSubmit = false,
 }: IeltsReadingViewProps) {
   const passages = payload.passages ?? [];
   const [activeIdx, setActiveIdx] = useState(0);
@@ -213,7 +215,7 @@ export function IeltsReadingView({
         timeLeft={reviewMode ? undefined : timeLeft}
         showTimer={reviewMode ? false : showTimer}
         onSubmit={onSubmit}
-        hideSubmit={draggableNavigator || reviewMode}
+        hideSubmit={hideSubmit || draggableNavigator || reviewMode}
       />
     </div>
   );

@@ -17,8 +17,9 @@ interface IeltsSpeakingViewProps {
   payload: IeltsSpeakingPayload;
   /** Current submission ID (for uploading audio) */
   submissionId: number | null;
-  onSubmit: () => void;
+  onSubmit?: () => void;
   reviewMode?: boolean;
+  hideSubmit?: boolean;
 }
 
 /**
@@ -38,7 +39,7 @@ function buildIeltsSpeakingAnnounce(part: IeltsSpeakingPart): string {
   return `${name}.${mins ? ` You have about ${mins} minutes.` : ""} Please read the question on the screen, then start speaking.`;
 }
 
-export function IeltsSpeakingView({ payload, submissionId, onSubmit, reviewMode = false }: IeltsSpeakingViewProps) {
+export function IeltsSpeakingView({ payload, submissionId, onSubmit, reviewMode = false, hideSubmit = false }: IeltsSpeakingViewProps) {
   const parts = payload.parts ?? [];
   const [activePartIdx, setActivePartIdx] = useState(0);
   const [activeQuestionIdx, setActiveQuestionIdx] = useState(0);
@@ -271,7 +272,7 @@ export function IeltsSpeakingView({ payload, submissionId, onSubmit, reviewMode 
                 Tiếp: {parts[activePartIdx + 1]?.partName} →
               </button>
             )}
-            {!reviewMode && activePartIdx === parts.length - 1 && completedParts.size === parts.length && (
+            {!reviewMode && !hideSubmit && onSubmit && activePartIdx === parts.length - 1 && completedParts.size === parts.length && (
               <button
                 type="button"
                 onClick={onSubmit}

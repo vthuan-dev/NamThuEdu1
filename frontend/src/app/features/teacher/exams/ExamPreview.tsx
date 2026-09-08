@@ -50,7 +50,7 @@ interface ExamData {
   questions: Question[];
 }
 
-export function ExamPreview({ admin = false, backTo }: { admin?: boolean; backTo?: string } = {}) {
+export function ExamPreview({ admin = false, backTo, hideSubmit = false }: { admin?: boolean; backTo?: string; hideSubmit?: boolean } = {}) {
   const { examId } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
@@ -1345,7 +1345,7 @@ export function ExamPreview({ admin = false, backTo }: { admin?: boolean; backTo
               </button>
 
               {currentPartIndex === allParts.length - 1 ? (
-                interactiveMode && (
+                interactiveMode && !admin && !hideSubmit && (
                   <button
                     onClick={handleSubmitExam}
                     disabled={!areAllPartsCompleted()}
@@ -1442,7 +1442,7 @@ export function ExamPreview({ admin = false, backTo }: { admin?: boolean; backTo
               </div>
 
               {/* Submit Button in Sidebar */}
-              {interactiveMode && (
+              {interactiveMode && !admin && !hideSubmit && (
                 <div className="p-4 border-t-4 border-gray-200">
                   <button
                     onClick={handleSubmitExam}
@@ -1624,10 +1624,12 @@ export function ExamPreview({ admin = false, backTo }: { admin?: boolean; backTo
                     <span className="text-xl">🎨</span>
                     <span className="text-sm font-bold text-gray-800">Vẽ, kéo thả tương tác</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">🚀</span>
-                    <span className="text-sm font-bold text-gray-800">Nộp bài khi hoàn thành</span>
-                  </div>
+                  {!admin && !hideSubmit && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">🚀</span>
+                      <span className="text-sm font-bold text-gray-800">Nộp bài khi hoàn thành</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
