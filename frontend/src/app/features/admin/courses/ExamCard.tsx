@@ -15,6 +15,7 @@ import {
   getExamId,
   getExamTitle,
   getExamTeacher,
+  getExamTeacherId,
   getExamSkill,
   getExamLevel,
   getExamStatus,
@@ -28,6 +29,7 @@ interface Props {
   onApprove: () => void;
   onReject: () => void;
   onDelete: () => void;
+  onSelectTeacher?: (teacherId: number, teacherName: string) => void;
 }
 
 /**
@@ -184,10 +186,30 @@ export function ExamCard({ exam, busy = false, onView, onApprove, onReject, onDe
 
         {/* Footer: giáo viên + trạng thái */}
         <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-3">
-          <span className="flex min-w-0 items-center gap-1.5 text-xs text-slate-500">
-            <User className="h-3.5 w-3.5 flex-shrink-0" />
-            <span className="truncate">{getExamTeacher(exam)}</span>
-          </span>
+          {onSelectTeacher ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                const tid = getExamTeacherId(exam);
+                if (tid) {
+                  onSelectTeacher(tid, getExamTeacher(exam));
+                }
+              }}
+              title={`Lọc tất cả đề thi của ${getExamTeacher(exam)}`}
+              className="group/teacher flex min-w-0 items-center gap-1.5 text-xs text-slate-500 hover:text-blue-600 transition-colors cursor-pointer text-left"
+            >
+              <User className="h-3.5 w-3.5 flex-shrink-0 text-slate-400 group-hover/teacher:text-blue-600 transition-colors" />
+              <span className="truncate font-medium group-hover/teacher:underline">
+                {getExamTeacher(exam)}
+              </span>
+            </button>
+          ) : (
+            <span className="flex min-w-0 items-center gap-1.5 text-xs text-slate-500">
+              <User className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="truncate">{getExamTeacher(exam)}</span>
+            </span>
+          )}
           <span
             className={`inline-flex flex-shrink-0 items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
               isPublished

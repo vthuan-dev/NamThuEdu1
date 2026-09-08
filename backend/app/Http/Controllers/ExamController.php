@@ -1991,6 +1991,47 @@ class ExamController extends Controller
         ]);
     }
 
+    /**
+     * GET /api/admin/exams/teacher-stats
+     * Thống kê chi tiết đề thi theo từng giáo viên (Admin only)
+     */
+    public function teacherExamStats(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user || $user->uRole !== 'admin') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Chỉ quản trị viên mới có quyền truy cập.'
+            ], 403);
+        }
+
+        $teachers = \App\Models\User::where('uRole', 'teacher')
+            ->select('uId', 'uName', 'uPhone', 'uEmail', 'uStatus', 'avatar_url')
+            ->withCount([
+                'exams as total_exams',
+                'exams as published_exams' => function ($query) {
+                    $query->where('eStatus', 'published');
+                },
+                'exams as pending_exams' => function ($query) {
+                    $query->where('eStatus', 'pending');
+                },
+                'exams as draft_exams' => function ($query) {
+                    $query->where(function ($q) {
+                        $q->whereNull('eStatus')
+                          ->orWhereNotIn('eStatus', ['published', 'pending']);
+                    });
+                },
+            ])
+            ->orderByDesc('total_exams')
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $teachers
+        ]);
+    }
+
     /* ========================================
      * VSTEP LISTENING METHODS
      * ======================================== */

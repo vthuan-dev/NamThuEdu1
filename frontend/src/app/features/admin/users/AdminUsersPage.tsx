@@ -645,10 +645,23 @@ export function AdminUsersPage() {
         setCredentialsMode("create");
         
         showToast("Tạo tài khoản người dùng thành công", "ok");
-        await loadUsers();
+        if ((cRole === "teacher" && activeTab !== "teachers") || (cRole === "student" && activeTab !== "students")) {
+          setSearchParams({ tab: cRole === "teacher" ? "teachers" : "students" });
+        } else {
+          await loadUsers();
+        }
       }
     } catch (err: any) {
-      const errMsg = err?.response?.data?.message || "Tạo tài khoản thất bại";
+      const respData = err?.response?.data;
+      let errMsg = respData?.message || "Tạo tài khoản thất bại";
+      if (respData?.errors && typeof respData.errors === "object") {
+        const firstVal = Object.values(respData.errors)[0];
+        if (Array.isArray(firstVal) && firstVal[0]) {
+          errMsg = String(firstVal[0]);
+        } else if (typeof firstVal === "string") {
+          errMsg = firstVal;
+        }
+      }
       showToast(errMsg, "err");
     } finally {
       setCreating(false);

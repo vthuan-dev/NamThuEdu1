@@ -10,20 +10,24 @@ import {
   LayoutGrid,
   ChevronLeft,
   ChevronRight,
+  Users,
+  X,
 } from "lucide-react";
-import { adminApi, AdminExam } from "@/services/adminApi";
+import { adminApi, AdminExam, TeacherExamStat } from "@/services/adminApi";
 import { AdminStatsSkeleton } from "../components/AdminPageSkeleton";
 import { RejectReasonModal } from "../components/RejectReasonModal";
 import { useToastContext } from "@/contexts/ToastContext";
 import { ExamCard } from "./ExamCard";
 import { ExamQuickViewModal } from "./ExamQuickViewModal";
 import { ExamPreviewModal } from "./ExamPreviewModal";
+import { TeacherStatsModal } from "./TeacherStatsModal";
 import {
   classifyAgeGroup,
   classifyExamType,
   getExamId,
   getExamTitle,
   getExamTeacher,
+  getExamTeacherId,
   getExamSkill,
   getExamStatus,
   EXAM_TYPE_META,
@@ -55,6 +59,10 @@ export function AdminCoursesPage() {
   const [typeTab, setTypeTab] = useState<TypeTabKey>("all");
   const [ageFilter, setAgeFilter] = useState<"all" | AgeGroupKey>("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [teacherFilter, setTeacherFilter] = useState<string>("all");
+  const [showTeacherStats, setShowTeacherStats] = useState(false);
+  const [teacherStats, setTeacherStats] = useState<TeacherExamStat[]>([]);
+  const [loadingTeacherStats, setLoadingTeacherStats] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [viewTarget, setViewTarget] = useState<AdminExam | null>(null);
   const [previewTarget, setPreviewTarget] = useState<AdminExam | null>(null);
@@ -81,10 +89,70 @@ export function AdminCoursesPage() {
     loadExams();
   }, []);
 
+  const loadTeacherStats = async () => {
+    try {
+      setLoadingTeacherStats(true);
+      const res = await adminApi.getTeacherExamStats();
+      setTeacherStats(res);
+    } catch {
+      toast.error("Không tải được thống kê năng suất giáo viên");
+    } finally {
+      setLoadingTeacherStats(false);
+    }
+  };
+
+  const handleOpenTeacherStats = () => {
+    setShowTeacherStats(true);
+    loadTeacherStats();
+  };
+
   // Reset về trang 1 khi đổi filter/tab
   useEffect(() => {
     setPage(1);
-  }, [typeTab, ageFilter, statusFilter, search, pageSize]);
+  }, [typeTab, ageFilter, statusFilter, teacherFilter, search, pageSize]);
+
+  // Danh sách các giáo viên có đề thi trong hệ thống (dùng cho dropdown filter)
+  const teacherOptions = useMemo(() => {
+    const map = new Map<number, { id: number; name: string; count: number }>();
+    exams.forEach((e) => {
+      const tid = getExamTeacherId(e);
+      const name = getExamTeacher(e);
+      if (tid) {
+        const prev = map.get(tid);
+        if (prev) {
+          prev.count += 1;
+        } else {
+          map.set(tid, { id: tid, name: name || `Giáo viên #${tid}`, count: 1 });
+        }
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [exams]);
+
+  // Giáo viên đang được chọn lọc
+  const activeTeacher = useMemo(() => {
+    if (teacherFilter === "all") return null;
+    const tid = Number(teacherFilter);
+    return teacherOptions.find((t) => t.id === tid) || {
+      id: tid,
+      name: `Giáo viên #${tid}`,
+      count: 0,
+    };
+  }, [teacherFilter, teacherOptions]);
+
+  // Thống kê nhanh của giáo viên đang lọc
+  const activeTeacherStats = useMemo(() => {
+    if (!activeTeacher) return null;
+    const teacherExams = exams.filter((e) => getExamTeacherId(e) === activeTeacher.id);
+    const total = teacherExams.length;
+    const published = teacherExams.filter((e) => getExamStatus(e) === "published").length;
+    const pending = teacherExams.filter((e) => getExamStatus(e) === "pending").length;
+    const draft = teacherExams.filter((e) => {
+      const s = getExamStatus(e);
+      return s !== "published" && s !== "pending";
+    }).length;
+    return { total, published, pending, draft };
+  }, [activeTeacher, exams]);
 
   // Đếm số đề theo từng loại đề (cho badge trên tab)
   const typeCounts = useMemo(() => {
@@ -109,6 +177,8 @@ export function AdminCoursesPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const filterTeacherId = teacherFilter !== "all" ? Number(teacherFilter) : null;
+
     return exams.filter((e) => {
       const matchesSearch =
         !q ||
@@ -119,9 +189,10 @@ export function AdminCoursesPage() {
       const matchesType = typeTab === "all" || classifyExamType(e).key === typeTab;
       const matchesAge = ageFilter === "all" || classifyAgeGroup(e) === ageFilter;
       const matchesStatus = statusFilter === "all" || getExamStatus(e) === statusFilter;
-      return matchesSearch && matchesType && matchesAge && matchesStatus;
+      const matchesTeacher = filterTeacherId === null || getExamTeacherId(e) === filterTeacherId;
+      return matchesSearch && matchesType && matchesAge && matchesStatus && matchesTeacher;
     });
-  }, [exams, search, typeTab, ageFilter, statusFilter]);
+  }, [exams, search, typeTab, ageFilter, statusFilter, teacherFilter]);
 
   // Pagination logic
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -184,17 +255,26 @@ export function AdminCoursesPage() {
   return (
     <div className="min-h-screen p-6" style={{ background: "#F8FAFC" }}>
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Quản lý đề thi</h1>
           <p className="text-sm text-slate-500">Ngân hàng đề thi toàn hệ thống</p>
         </div>
-        <button
-          onClick={loadExams}
-          className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Tải lại
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleOpenTeacherStats}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/70 px-4 py-2 text-sm font-semibold text-indigo-700 transition-colors hover:bg-indigo-100"
+          >
+            <Users className="h-4 w-4 text-indigo-600" /> Năng suất giáo viên
+          </button>
+          <button
+            onClick={loadExams}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Tải lại
+          </button>
+        </div>
       </div>
 
       {/* Stat cards */}
@@ -256,6 +336,19 @@ export function AdminCoursesPage() {
           />
         </div>
         <select
+          value={teacherFilter}
+          onChange={(e) => setTeacherFilter(e.target.value)}
+          aria-label="Lọc theo giáo viên"
+          className="cursor-pointer rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition-colors focus:border-slate-800 focus:ring-2 focus:ring-slate-100"
+        >
+          <option value="all">Tất cả giáo viên ({teacherOptions.length})</option>
+          {teacherOptions.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name} ({t.count} đề)
+            </option>
+          ))}
+        </select>
+        <select
           value={ageFilter}
           onChange={(e) => setAgeFilter(e.target.value as "all" | AgeGroupKey)}
           aria-label="Lọc theo nhóm tuổi"
@@ -280,6 +373,49 @@ export function AdminCoursesPage() {
         </select>
       </div>
 
+      {/* ── Active Teacher Highlight Banner ── */}
+      {activeTeacher && activeTeacherStats && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50/80 via-purple-50/40 to-white p-3.5 shadow-xs">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white font-bold text-sm shadow-xs">
+              {activeTeacher.name.charAt(0).toUpperCase()}
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-indigo-600">Đang lọc theo giáo viên</span>
+                <span className="text-xs text-slate-400">• ID #{activeTeacher.id}</span>
+              </div>
+              <h2 className="text-base font-bold text-slate-900">{activeTeacher.name}</h2>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="rounded-md bg-white px-2.5 py-1 font-semibold text-slate-700 border border-slate-200/80">
+                {activeTeacherStats.total} đề thi
+              </span>
+              <span className="rounded-md bg-emerald-50 px-2 py-1 font-medium text-emerald-700 border border-emerald-200/60">
+                {activeTeacherStats.published} xuất bản
+              </span>
+              {activeTeacherStats.pending > 0 && (
+                <span className="rounded-md bg-amber-50 px-2 py-1 font-medium text-amber-700 border border-amber-200/60">
+                  {activeTeacherStats.pending} chờ duyệt
+                </span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setTeacherFilter("all")}
+              className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+              title="Xóa bộ lọc giáo viên"
+            >
+              <X className="h-3.5 w-3.5" /> Bỏ lọc
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Content ── */}
       {loading ? (
         <CardGridSkeleton />
@@ -302,7 +438,20 @@ export function AdminCoursesPage() {
             <LayoutGrid className="h-7 w-7 text-slate-300" />
           </span>
           <p className="text-sm font-semibold text-slate-900">Không tìm thấy đề thi</p>
-          <p className="mt-1 text-xs text-slate-500">Thử đổi tab, bộ lọc hoặc từ khóa tìm kiếm</p>
+          <p className="mt-1 text-xs text-slate-500">
+            {teacherFilter !== "all"
+              ? "Không có đề thi nào phù hợp với giáo viên và các bộ lọc hiện tại"
+              : "Thử đổi tab, bộ lọc hoặc từ khóa tìm kiếm"}
+          </p>
+          {teacherFilter !== "all" && (
+            <button
+              type="button"
+              onClick={() => setTeacherFilter("all")}
+              className="mt-3 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-2xs hover:bg-slate-50"
+            >
+              <X className="h-3.5 w-3.5" /> Bỏ chọn giáo viên
+            </button>
+          )}
         </div>
       ) : (
         <>
@@ -319,6 +468,7 @@ export function AdminCoursesPage() {
                   onApprove={() => handleApprove(id)}
                   onReject={() => setRejectTarget(e)}
                   onDelete={() => handleDelete(id)}
+                  onSelectTeacher={(tid) => setTeacherFilter(String(tid))}
                 />
               );
             })}
@@ -352,6 +502,17 @@ export function AdminCoursesPage() {
         busy={busyId === (rejectTarget ? getExamId(rejectTarget) : 0)}
         onCancel={() => setRejectTarget(null)}
         onConfirm={submitReject}
+      />
+      <TeacherStatsModal
+        open={showTeacherStats}
+        loading={loadingTeacherStats}
+        stats={teacherStats}
+        onClose={() => setShowTeacherStats(false)}
+        onSelectTeacher={(teacherId) => {
+          setTeacherFilter(String(teacherId));
+          setShowTeacherStats(false);
+        }}
+        onRefresh={loadTeacherStats}
       />
     </div>
   );

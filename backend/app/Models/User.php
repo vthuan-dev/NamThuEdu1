@@ -169,6 +169,11 @@ class User extends Authenticatable
     {
         return $this->hasMany(OtpLog::class, 'userId', 'uId');
     }
+
+    public function exams()
+    {
+        return $this->hasMany(Exam::class, 'eTeacher_id', 'uId');
+    }
     
     /**
      * Scopes

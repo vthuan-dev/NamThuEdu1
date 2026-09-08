@@ -54,7 +54,7 @@ export interface AdminExam {
   eIs_private?: boolean;
   eCreated_at?: string;
   created_at?: string;
-  teacher?: { uName?: string; name?: string };
+  teacher?: { uId?: number; id?: number; uName?: string; name?: string; uPhone?: string; phone?: string; avatar_url?: string | null };
   questions_count?: number;
   // Age-group classification fields
   age_group?: "kids" | "teens" | "adults" | string | null;
@@ -68,6 +68,19 @@ export interface AdminExam {
   // IELTS-specific
   ielts_test_type?: string | null;
   ielts_skill?: string | null;
+}
+
+export interface TeacherExamStat {
+  uId: number;
+  uName: string;
+  uPhone?: string;
+  uEmail?: string;
+  uStatus?: string;
+  avatar_url?: string | null;
+  total_exams: number;
+  published_exams: number;
+  pending_exams: number;
+  draft_exams: number;
 }
 
 export interface AdminActivityLogItem {
@@ -418,6 +431,11 @@ export const adminApi = {
   async getExamStatistics() {
     const response = await api.get<ApiResponse<Record<string, unknown>>>("/admin/exams/statistics");
     return unwrap(response.data);
+  },
+
+  async getTeacherExamStats() {
+    const response = await api.get<ApiResponse<TeacherExamStat[]>>("/admin/exams/teacher-stats");
+    return unwrap(response.data) || [];
   },
 
   async approveExam(examId: number) {

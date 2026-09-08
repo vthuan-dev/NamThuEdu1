@@ -71,6 +71,11 @@ export function getExamTeacher(exam: AdminExam): string {
   return exam.teacher?.uName || exam.teacher?.name || "Không rõ";
 }
 
+export function getExamTeacherId(exam: AdminExam): number | null {
+  const tid = (exam as any).eTeacher_id ?? (exam as any).teacher_id ?? exam.teacher?.uId ?? exam.teacher?.id;
+  return typeof tid === "number" ? tid : (tid ? Number(tid) : null);
+}
+
 export function getExamSkill(exam: AdminExam): string {
   return exam.eSkill || exam.ielts_skill || "";
 }

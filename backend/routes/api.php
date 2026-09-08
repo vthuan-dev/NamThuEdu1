@@ -780,6 +780,7 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         Route::get('/exams', [ExamController::class, 'adminExams']);
         Route::get('/exams/pending', [ExamController::class, 'pendingExams']);
         Route::get('/exams/statistics', [ExamController::class, 'examStatistics']);
+        Route::get('/exams/teacher-stats', [ExamController::class, 'teacherExamStats']);
         Route::get('/exams/{id}', [ExamController::class, 'adminExamDetail']);
         Route::post('/exams/{id}/approve', [ExamController::class, 'approveExam']);
         Route::post('/exams/{id}/reject', [ExamController::class, 'rejectExam']);

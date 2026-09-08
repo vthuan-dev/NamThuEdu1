@@ -71,6 +71,92 @@ class AdminApiTest extends TestCase
     }
 
     /** @test */
+    public function admin_can_create_student_with_age_group_and_status()
+    {
+        $token = $this->admin->createToken('test-token')->plainTextToken;
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+        ])->postJson('/api/admin/users', [
+            'phone' => '0999111222',
+            'password' => 'password123',
+            'name' => 'Học Sinh Tiểu Học',
+            'role' => 'student',
+            'status' => 'inactive',
+            'age_group' => 'kids',
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJson([
+                'status' => 'success',
+                'data' => [
+                    'phone' => '0999111222',
+                    'name' => 'Học Sinh Tiểu Học',
+                    'role' => 'student',
+                    'status' => 'inactive',
+                    'password' => 'password123',
+                ],
+            ]);
+
+        $this->assertDatabaseHas('users', [
+            'uPhone' => '0999111222',
+            'uRole' => 'student',
+            'uStatus' => 'inactive',
+            'age_group' => 'kids',
+        ]);
+    }
+
+    /** @test */
+    public function admin_cannot_create_user_with_duplicate_phone()
+    {
+        $token = $this->admin->createToken('test-token')->plainTextToken;
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+        ])->postJson('/api/admin/users', [
+            'phone' => $this->student->uPhone,
+            'password' => 'password123',
+            'name' => 'Duplicate Phone User',
+            'role' => 'student',
+        ]);
+
+        $response->assertStatus(400)
+            ->assertJson([
+                'status' => 'error',
+                'errors' => [
+                    'phone' => ['The phone has already been taken.'],
+                ],
+            ]);
+    }
+
+    /** @test */
+    public function admin_create_user_defaults_to_user123_when_password_blank()
+    {
+        $token = $this->admin->createToken('test-token')->plainTextToken;
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+        ])->postJson('/api/admin/users', [
+            'phone' => '0999555666',
+            'name' => 'Default Password User',
+            'role' => 'student',
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJson([
+                'status' => 'success',
+                'data' => [
+                    'phone' => '0999555666',
+                    'password' => 'user123',
+                ],
+            ]);
+
+        $created = \App\Models\User::where('uPhone', '0999555666')->first();
+        $this->assertNotNull($created);
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('user123', $created->uPassword));
+    }
+
+    /** @test */
     public function admin_can_change_user_role()
     {
         $token = $this->admin->createToken('test-token')->plainTextToken;
@@ -233,4 +319,41 @@ class AdminApiTest extends TestCase
 
         $response->assertStatus(403);
     }
+
+    /** @test */
+    public function admin_can_view_teacher_exam_stats()
+    {
+        // Create an exam assigned to the teacher
+        \App\Models\Exam::create([
+            'eTitle' => 'Test Teacher Exam',
+            'eType' => 'THPT',
+            'eSkill' => 'mixed',
+            'eTeacher_id' => $this->teacher->uId,
+            'eDuration_minutes' => 60,
+            'eStatus' => 'published',
+        ]);
+
+        $token = $this->admin->createToken('test-token')->plainTextToken;
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+        ])->getJson('/api/admin/exams/teacher-stats');
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'status',
+                'data' => [
+                    '*' => [
+                        'uId',
+                        'uName',
+                        'uPhone',
+                        'total_exams',
+                        'published_exams',
+                        'pending_exams',
+                        'draft_exams',
+                    ],
+                ],
+            ]);
+    }
 }
+
