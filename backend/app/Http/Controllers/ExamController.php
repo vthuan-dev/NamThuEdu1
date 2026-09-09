@@ -1368,11 +1368,11 @@ class ExamController extends Controller
 
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
-            'parts' => 'required|array|size:4',
+            'parts' => 'required|array|min:1|max:4',
             'parts.*.partNumber' => 'required|integer|min:1|max:4',
             'parts.*.partName' => 'required|string',
-            'parts.*.passage' => 'required|string',
-            'parts.*.questions' => 'required|array|size:10',
+            'parts.*.passage' => 'nullable|string',
+            'parts.*.questions' => 'nullable|array',
         ]);
 
         if ($validator->fails()) {
@@ -1385,55 +1385,101 @@ class ExamController extends Controller
 
         DB::beginTransaction();
         try {
-            // Find exam
-            $exam = Exam::where('eId', $examId)
-                       
-                       ->first();
+            // Find exam by numeric eId or exam_code
+            $exam = is_numeric($examId)
+                ? Exam::where('eId', $examId)->first()
+                : Exam::where('exam_code', $examId)->orWhere('eId', $examId)->first();
 
             if (!$exam) {
+                DB::rollBack();
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Không tìm thấy đề thi.'
                 ], 404);
             }
 
-            // Update exam title and status (theo cài đặt auto-duyệt)
-            $moderationStatus = Exam::resolveModerationStatus();
-            $exam->update([
-                'eTitle' => $request->title,
-                'eIs_private' => $moderationStatus !== 'published',
-                'eStatus' => $moderationStatus,
-            ]);
+            // Đếm các câu hỏi Reading thực tế đã lưu trong DB
+            $readingQuestions = Question::where('exam_id', $exam->eId)
+                ->where(function ($q) {
+                    $q->where('qSkill', 'reading')->orWhereNull('qSkill');
+                })
+                ->get();
+            $questionCount = $readingQuestions->count();
 
-            // Verify all 4 parts exist
-            $questionCount = Question::where('exam_id', $exam->eId)->count();
-            if ($questionCount < 40) {
+            if ($questionCount < 1) {
                 DB::rollBack();
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Đề thi chưa đủ 40 câu hỏi (4 parts x 10 câu).',
+                    'message' => 'Đề thi chưa có câu hỏi nào. Vui lòng lưu ít nhất 1 Part (đoạn văn + câu hỏi) trước khi xuất bản.',
                     'data' => [
                         'current_questions' => $questionCount,
-                        'required_questions' => 40,
+                        'required_questions' => 1,
                     ]
                 ], 400);
             }
 
-            // Create practice session
-            $practiceSession = DB::table('practice_sessions')->insertGetId([
+            // Thống kê số part thực tế có câu hỏi
+            $partNumbers = $readingQuestions
+                ->pluck('qPart')
+                ->filter()
+                ->unique()
+                ->sort()
+                ->values();
+            $partCount = max(1, $partNumbers->count());
+
+            // Tính thời lượng làm bài theo số câu (Full 40 câu = 60 phút; mỗi 10 câu = 15 phút)
+            $duration = $questionCount >= 40
+                ? 60
+                : max(15, (int) ceil(60 * $questionCount / 40));
+
+            // Update exam title, duration and status (theo cài đặt auto-duyệt)
+            $moderationStatus = Exam::resolveModerationStatus();
+            $exam->update([
+                'eTitle' => $request->title,
+                'eDuration_minutes' => $duration,
+                'eIs_private' => $moderationStatus !== 'published',
+                'eStatus' => $moderationStatus,
+            ]);
+
+            $partLabel = $partNumbers->isEmpty()
+                ? ''
+                : 'Part ' . $partNumbers->implode(', ');
+            $description = trim(sprintf(
+                'Đề luyện tập VSTEP Reading - %s%s, %d câu hỏi',
+                $partLabel ? $partLabel . ' · ' : '',
+                $partCount . ' part' . ($partCount > 1 ? 's' : ''),
+                $questionCount
+            ));
+
+            // Tìm session luyện tập đã có cho đề này để tránh nhân bản khi xuất bản lại
+            $existingSession = DB::table('practice_sessions')
+                ->where('ps_exam_id', $exam->eId)
+                ->where('ps_target_skill', 'reading')
+                ->first();
+
+            $sessionData = [
                 'ps_title' => $request->title,
-                'ps_description' => 'Đề luyện tập VSTEP Reading - 4 Parts, 40 câu hỏi',
+                'ps_description' => $description,
                 'ps_type' => 'skill_based',
                 'ps_purpose' => 'practice',
                 'ps_target_skill' => 'reading',
                 'ps_difficulty' => 'medium',
-                'ps_duration_minutes' => 60,
+                'ps_duration_minutes' => $duration,
                 'ps_teacher_id' => $user->uId,
                 'ps_exam_id' => $exam->eId,
                 'ps_is_active' => true,
-                'ps_created_at' => now(),
                 'ps_updated_at' => now(),
-            ]);
+            ];
+
+            if ($existingSession) {
+                DB::table('practice_sessions')
+                    ->where('ps_id', $existingSession->ps_id)
+                    ->update($sessionData);
+                $practiceSessionId = $existingSession->ps_id;
+            } else {
+                $sessionData['ps_created_at'] = now();
+                $practiceSessionId = DB::table('practice_sessions')->insertGetId($sessionData);
+            }
 
             DB::commit();
 
@@ -1443,9 +1489,10 @@ class ExamController extends Controller
                 'data' => [
                     'exam_id' => $exam->eId,
                     'exam_title' => $exam->eTitle,
-                    'practice_session_id' => $practiceSession,
+                    'practice_session_id' => $practiceSessionId,
                     'total_questions' => $questionCount,
-                    'parts' => 4,
+                    'parts' => $partCount,
+                    'duration_minutes' => $duration,
                 ]
             ]);
 
@@ -1454,6 +1501,82 @@ class ExamController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Lỗi khi xuất bản đề thi: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * DELETE /api/teacher/exams/{examId}/vstep/parts/{partNumber}
+     * Xoá một part của đề VSTEP Reading (passage + questions)
+     */
+    public function deleteVstepPart(Request $request, $examId, $partNumber)
+    {
+        $user = $request->user();
+
+        if (!$user || $user->uRole !== 'teacher') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Bạn không có quyền truy cập.'
+            ], 401);
+        }
+
+        $partNumber = (int) $partNumber;
+        if (!in_array($partNumber, [1, 2, 3, 4], true)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Part number không hợp lệ. Chỉ có Part 1, 2, 3, 4.'
+            ], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            $exam = is_numeric($examId)
+                ? Exam::where('eId', $examId)->first()
+                : Exam::where('exam_code', $examId)->orWhere('eId', $examId)->first();
+
+            if (!$exam) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Không tìm thấy đề thi.'
+                ], 404);
+            }
+
+            // Xoá content block passage của part này
+            $blocks = \App\Models\ContentBlock::where('exam_id', $exam->eId)
+                ->where('block_type', 'passage')
+                ->get()
+                ->filter(function ($b) use ($partNumber) {
+                    $meta = $b->metadata ?? [];
+                    return ($meta['part_number'] ?? null) == $partNumber;
+                });
+            foreach ($blocks as $block) {
+                $block->delete();
+            }
+
+            // Xoá câu hỏi và đáp án của part này
+            $questions = Question::where('exam_id', $exam->eId)
+                ->where('qSkill', 'reading')
+                ->where('qPart', $partNumber)
+                ->get();
+
+            foreach ($questions as $question) {
+                Answer::where('question_id', $question->qId)->delete();
+                $question->delete();
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Đã xoá Part ' . $partNumber . ' thành công',
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Lỗi khi xoá Part: ' . $e->getMessage()
             ], 500);
         }
     }

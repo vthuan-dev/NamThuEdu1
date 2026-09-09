@@ -296,6 +296,7 @@ Route::middleware(['auth:sanctum', 'maintenance'])->group(function () {
         // VSTEP-specific routes
         // Reading
         Route::post('/exams/{examId}/vstep/parts/{partNumber}', [ExamController::class, 'saveVstepPart']);
+        Route::delete('/exams/{examId}/vstep/parts/{partNumber}', [ExamController::class, 'deleteVstepPart']);
         Route::post('/exams/{examId}/vstep/publish', [ExamController::class, 'publishVstepExam']);
         Route::get('/exams/{examId}/vstep/load', [ExamController::class, 'loadVstepExam']);
         

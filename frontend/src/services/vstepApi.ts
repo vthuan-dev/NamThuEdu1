@@ -55,6 +55,14 @@ export const saveVstepPart = async (examId: string, partNumber: number, data: Vs
 };
 
 /**
+ * Xoá một part của đề VSTEP Reading
+ */
+export const deleteVstepPart = async (examId: string, partNumber: number) => {
+  const response = await api.delete(`/teacher/exams/${examId}/vstep/parts/${partNumber}`);
+  return response.data;
+};
+
+/**
  * Xuất bản đề VSTEP Reading hoàn chỉnh
  */
 export const publishVstepExam = async (examId: string, data: VstepExamData) => {

@@ -4340,6 +4340,11 @@ class StudentTestController extends Controller
                 return isset($metadata['part_number']) && $metadata['part_number'] == $i && isset($metadata['word_count']);
             });
 
+            // Bỏ qua các part không có nội dung và không có câu hỏi (hỗ trợ đề bán phần 1-3 part)
+            if ($partQuestions->isEmpty() && (!$contentBlock || empty(trim($contentBlock->content ?? '')))) {
+                continue;
+            }
+
             $parts[] = [
                 'partNumber' => $i,
                 'partName' => $contentBlock->metadata['part_name'] ?? "Part $i",

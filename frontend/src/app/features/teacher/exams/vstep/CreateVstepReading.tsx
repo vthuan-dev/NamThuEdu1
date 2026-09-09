@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router";
-import { ArrowLeft, Save, BookOpen, FileText, CheckCircle2, Sparkles } from "lucide-react";
+import { ArrowLeft, Save, BookOpen, FileText, CheckCircle2, Sparkles, Plus, X } from "lucide-react";
 import { useToastContext } from "../../../../../contexts/ToastContext";
 import { useTranslation } from "react-i18next";
 import { QuillEditor } from "../../../../../components/ui/QuillEditor";
 import { RichTextInput } from "../../../../../components/ui/RichTextInput";
-import { saveVstepPart, publishVstepExam, loadVstepExam } from "../../../../../services/vstepApi";
+import { saveVstepPart, publishVstepExam, loadVstepExam, deleteVstepPart } from "../../../../../services/vstepApi";
 import { teacherApi } from "../../../../../services/teacherApi";
 import { VstepImportModal } from "./VstepImportModal";
 import "react-quill-new/dist/quill.snow.css";
@@ -67,6 +67,21 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
   const [savedParts, setSavedParts] = useState<Set<number>>(new Set());
   const [showImportModal, setShowImportModal] = useState(false);
   const [reloadTrigger, setReloadTrigger] = useState(0);
+
+  /**
+   * Các part đang được soạn trong đề — Set<number>.
+   * Full Test luôn mở đủ 4 part (chuẩn 40 câu).
+   * Đề đơn kỹ năng mặc định chỉ mở 1 part (Part 1) — giáo viên tự thêm các part cần dạy.
+   */
+  const [activeParts, setActiveParts] = useState<Set<number>>(() => {
+    const init = new Set<number>();
+    if (isFullTest) {
+      [1, 2, 3, 4].forEach((p) => init.add(p));
+    } else {
+      init.add(1);
+    }
+    return init;
+  });
   const [parts, setParts] = useState<ReadingPart[]>(
     VSTEP_READING_PARTS.map((p) => ({
       partNumber: p.part as 1 | 2 | 3 | 4,
@@ -165,6 +180,25 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
               }
             });
             setSavedParts(newSaved);
+
+            // Đề đơn kỹ năng: chỉ kích hoạt các part thực sự có nội dung
+            if (!isFullTest) {
+              const active = new Set<number>();
+              examData.parts.forEach((part: any) => {
+                const hasContent =
+                  Boolean(part.passage?.trim()) ||
+                  (Array.isArray(part.questions) &&
+                    part.questions.length > 0 &&
+                    part.questions.some((q: any) => q.questionText?.trim()));
+                if (hasContent) {
+                  active.add(part.partNumber);
+                }
+              });
+              if (active.size === 0) active.add(1);
+              setActiveParts(active);
+              const firstActive = [...active].sort((a, b) => a - b)[0] || 1;
+              setCurrentPart(firstActive as 1 | 2 | 3 | 4);
+            }
             
             console.log('✅ Loaded parts:', loadedParts.length);
             success(t('vstep.reading.toast.loadSuccess'));
@@ -238,6 +272,57 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
       return newId;
     }
     throw new Error('Không thể tạo đề thi trong cơ sở dữ liệu.');
+  };
+
+  const addPart = (partNumber: 1 | 2 | 3 | 4) => {
+    setActiveParts((prev) => new Set(prev).add(partNumber));
+    setCurrentPart(partNumber);
+  };
+
+  const removePart = async (partNumber: 1 | 2 | 3 | 4) => {
+    if (activeParts.size <= 1) {
+      error("Đề thi phải còn ít nhất 1 Part. Không thể bỏ phần cuối cùng.");
+      return;
+    }
+
+    if (savedParts.has(partNumber) && !examId.startsWith("vstep-")) {
+      try {
+        await deleteVstepPart(examId, partNumber);
+      } catch (err: any) {
+        console.error("Lỗi khi xoá part khỏi database:", err);
+      }
+    }
+
+    // Reset nội dung part trong state
+    setParts((prev) =>
+      prev.map((p) => {
+        if (p.partNumber !== partNumber) return p;
+        return {
+          ...p,
+          passage: "",
+          questions: Array.from({ length: 10 }, (_, i) => ({
+            id: `part${partNumber}-q${i + 1}`,
+            questionNumber: i + 1,
+            questionText: "",
+            options: { A: "", B: "", C: "", D: "" },
+            correctAnswer: "A" as const,
+          })),
+        };
+      })
+    );
+
+    setSavedParts((prev) => {
+      const next = new Set(prev);
+      next.delete(partNumber);
+      return next;
+    });
+
+    const remaining = [...activeParts].filter((n) => n !== partNumber).sort((a, b) => a - b);
+    setActiveParts(new Set(remaining));
+    if (currentPart === partNumber) {
+      setCurrentPart(remaining[0] as 1 | 2 | 3 | 4);
+    }
+    success(`Đã bỏ Part ${partNumber}`);
   };
 
 
@@ -467,23 +552,39 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
   const handleSave = async () => {
     console.log('handleSave called - examId:', examId);
 
-    // Validate parts (in edit mode, skip empty parts with no content)
-    for (const part of parts) {
-      const hasAnyQuestion = part.questions.some(q => q.questionText.trim());
-      const hasContent = part.passage.trim() || hasAnyQuestion;
+    const partsToPublish = parts.filter((p) => activeParts.has(p.partNumber));
+    if (partsToPublish.length === 0) {
+      error("Vui lòng chọn ít nhất 1 Part để xuất bản.");
+      return;
+    }
 
-      // In edit mode, skip completely empty parts
-      if (isEditMode && !hasContent) continue;
-      // In create mode, skip completely empty parts too
-      if (!hasContent) continue;
-      
+    // Validate active parts
+    for (const part of partsToPublish) {
+      if (!part.passage.trim()) {
+        error(`Part ${part.partNumber}: Chưa nhập đoạn văn`);
+        setCurrentPart(part.partNumber);
+        return;
+      }
+
+      const completedCount = part.questions.filter(
+        (q) => q.questionText.trim() && q.options.A && q.options.B && q.options.C && q.options.D
+      ).length;
+
+      if (completedCount === 0) {
+        error(`Part ${part.partNumber}: Vui lòng hoàn thành ít nhất 1 câu hỏi`);
+        setCurrentPart(part.partNumber);
+        return;
+      }
+
       for (const q of part.questions) {
         if (!q.questionText.trim()) {
           error(t('vstep.reading.toast.missingQuestion', { part: part.partNumber, num: q.questionNumber }));
+          setCurrentPart(part.partNumber);
           return;
         }
         if (!q.options.A || !q.options.B || !q.options.C || !q.options.D) {
           error(t('vstep.reading.toast.missingOptions', { part: part.partNumber, num: q.questionNumber }));
+          setCurrentPart(part.partNumber);
           return;
         }
       }
@@ -491,14 +592,38 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
 
     setIsSaving(true);
     try {
-      // Prepare exam data
-      const examData = {
-        title: examTitle,
-        parts: parts.map(part => ({
+      const targetExamId = await ensureExam();
+
+      // Lưu lại từng part đang active vào database để đồng bộ
+      for (const part of partsToPublish) {
+        const completedQuestions = part.questions.filter(
+          (q) => q.questionText.trim() && q.options.A && q.options.B && q.options.C && q.options.D
+        );
+        await saveVstepPart(targetExamId, part.partNumber, {
           partNumber: part.partNumber,
           partName: part.partName,
           passage: part.passage,
-          questions: part.questions.map(q => ({
+          wordCount: countWords(part.passage),
+          completedQuestions: completedQuestions.length,
+          totalQuestions: part.questions.length,
+          questions: completedQuestions.map((q) => ({
+            questionNumber: q.questionNumber,
+            questionText: q.questionText,
+            options: q.options,
+            correctAnswer: q.correctAnswer,
+            explanation: q.explanation || "",
+          })),
+        });
+      }
+
+      // Payload CHỈ chứa các part đang active (không gửi part rỗng)
+      const examData = {
+        title: examTitle,
+        parts: partsToPublish.map((part) => ({
+          partNumber: part.partNumber,
+          partName: part.partName,
+          passage: part.passage,
+          questions: part.questions.map((q) => ({
             questionNumber: q.questionNumber,
             questionText: q.questionText,
             options: q.options,
@@ -509,17 +634,19 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
       };
 
       console.log('Publishing exam:', examData);
-      
-      // Call real API
-      const response = await publishVstepExam(examId, examData);
-      
+
+      const response = await publishVstepExam(targetExamId, examData);
       console.log('✅ Publish response:', response);
-      
+
       success(isEditMode ? 'Cập nhật thành công!' : t('vstep.reading.toast.publishSuccess'));
-      
-      // In edit mode go back, otherwise navigate to practice list
+
+      if (isFullTest && onComplete) {
+        onComplete();
+        return;
+      }
+
       setTimeout(() => {
-        isEditMode ? navigate(-1) : navigate('/giao-vien/luyen-tap');
+        isEditMode ? navigate(-1) : navigate('/giao-vien/de-thi');
       }, 1500);
     } catch (err: any) {
       console.error('Publish error:', err);
@@ -552,7 +679,9 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
                     placeholder={t('vstep.reading.title')}
                   />
                   <p className="text-sm text-gray-500 mt-1">
-                    {t('vstep.reading.subtitle')}
+                    {isFullTest
+                      ? t('vstep.reading.subtitle')
+                      : `${activeParts.size} Part${activeParts.size > 1 ? 's' : ''} - ${activeParts.size * 10} câu hỏi - ${activeParts.size * 15} phút`}
                     <span className="ml-2 text-xs text-green-600 font-medium">• {t('vstep.reading.examIdLabel')}: {examId}</span>
                   </p>
                 </div>
@@ -583,41 +712,91 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
       {/* Part Tabs */}
       <div className="bg-white border-b border-gray-200 flex-shrink-0">
         <div className="max-w-[1800px] mx-auto px-6">
-          <div className="flex gap-2 overflow-x-auto">
-            {VSTEP_READING_PARTS.map((part) => {
-              const partData = parts.find((p) => p.partNumber === part.part)!;
-              const wc = countWords(partData.passage);
+          <div className="flex gap-2 overflow-x-auto items-center">
+            {VSTEP_READING_PARTS.filter((part) => activeParts.has(part.part)).map((part) => {
+              const partData = parts.find((p) => p.partNumber === part.part);
+              const wc = countWords(partData?.passage || "");
               const isValid = wc >= part.wordCount[0] && wc <= part.wordCount[1];
-              const hasAllQuestions = partData.questions.every(
+              const hasAllQuestions = partData?.questions.every(
                 (q) => q.questionText.trim() && q.options.A && q.options.B && q.options.C && q.options.D
               );
 
               const isSaved = savedParts.has(part.part);
+              const canRemove = !isFullTest && activeParts.size > 1;
+
               return (
-                <button
-                  key={part.part}
-                  onClick={() => setCurrentPart(part.part as 1 | 2 | 3 | 4)}
-                  className={`flex items-center gap-3 px-6 py-4 border-b-2 transition-colors whitespace-nowrap ${
-                    currentPart === part.part
-                      ? "border-blue-600 text-blue-600 bg-blue-50"
-                      : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                  }`}
-                >
-                  <BookOpen className="w-5 h-5" />
-                  <div className="text-left">
-                    <div className="font-semibold">Part {part.part} - {t(part.description)}</div>
-                    <div className="text-xs text-gray-500">
-                      {part.wordCount[0]}-{part.wordCount[1]} {t('vstep.reading.partTab.words')} • 10 {t('vstep.reading.partTab.questions')}
+                <div key={part.part} className="relative flex items-center">
+                  <button
+                    onClick={() => setCurrentPart(part.part as 1 | 2 | 3 | 4)}
+                    className={`flex items-center gap-3 px-6 py-4 border-b-2 transition-colors whitespace-nowrap ${
+                      currentPart === part.part
+                        ? "border-blue-600 text-blue-600 bg-blue-50"
+                        : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                    }`}
+                  >
+                    <BookOpen className="w-5 h-5" />
+                    <div className="text-left">
+                      <div className="font-semibold">Part {part.part} - {t(part.description)}</div>
+                      <div className="text-xs text-gray-500">
+                        {part.wordCount[0]}-{part.wordCount[1]} {t('vstep.reading.partTab.words')} • 10 {t('vstep.reading.partTab.questions')}
+                      </div>
                     </div>
-                  </div>
-                  {isSaved ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                  ) : isValid && hasAllQuestions ? (
-                    <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                  ) : null}
-                </button>
+                    {isSaved ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    ) : isValid && hasAllQuestions ? (
+                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                    ) : null}
+                  </button>
+                  {canRemove && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removePart(part.part as 1 | 2 | 3 | 4);
+                      }}
+                      title={`Bỏ Part ${part.part}`}
+                      className="ml-0.5 mr-1 p-1 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               );
             })}
+
+            {!isFullTest &&
+              VSTEP_READING_PARTS.filter((part) => !activeParts.has(part.part)).map((part) => {
+                return (
+                  <div key={`add-${part.part}`} className="group relative flex items-center">
+                    <button
+                      onClick={() => addPart(part.part as 1 | 2 | 3 | 4)}
+                      className="flex items-center gap-2 my-2 px-4 py-2 border border-dashed border-gray-300 rounded-lg text-gray-500 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 transition-colors whitespace-nowrap"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <div className="text-left">
+                        <div className="font-semibold text-sm">Thêm Part {part.part}</div>
+                        <div className="text-xs text-gray-400">
+                          {part.wordCount[0]}-{part.wordCount[1]} từ • 10 câu
+                        </div>
+                      </div>
+                    </button>
+                    {/* Tooltip hướng dẫn khi hover */}
+                    <div className="pointer-events-none absolute top-full left-0 z-50 mt-1 w-72 origin-top-left scale-95 opacity-0 transition-all duration-150 group-hover:scale-100 group-hover:opacity-100">
+                      <div className="rounded-xl bg-gray-900 px-4 py-3 text-left shadow-xl ring-1 ring-black/5">
+                        <div className="flex items-center gap-1.5 text-sm font-semibold text-white">
+                          <BookOpen className="h-3.5 w-3.5 text-blue-400" />
+                          Thêm Part {part.part} (tùy chọn)
+                        </div>
+                        <p className="mt-1.5 text-xs leading-relaxed text-gray-300">
+                          {t(part.description)}. Thêm phần này nếu bạn muốn soạn đề gồm nhiều part. Học viên sẽ làm các part bạn đã xuất bản.
+                        </p>
+                        <div className="mt-2 flex items-center gap-3 border-t border-white/10 pt-2 text-[11px] text-gray-400">
+                          <span>⏱ 15 phút • 10 câu hỏi</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         </div>
       </div>
