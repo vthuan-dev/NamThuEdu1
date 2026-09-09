@@ -145,6 +145,8 @@ export const CreateVstepListening = ({
   const autoSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   // Track lần load đầu để skip auto-save khi chỉ load data
   const isInitialLoad = useRef(true);
+  // Theo dõi các section đã kích hoạt thông báo "Sẵn sàng lưu" để không spam toast
+  const readySectionsNotifiedRef = useRef<Set<string>>(new Set());
   // Auto-save chạy trong setTimeout nên closure có thể giữ examId cũ (ID tạm).
   // Ref này luôn trỏ tới ID mới nhất sau khi ensureExam() đổi sang ID thật.
   const examIdRef = useRef(examId);
@@ -514,6 +516,9 @@ export const CreateVstepListening = ({
 
     if (!effectiveExamId) {
       if (!isFullTest && !params.examId) setSearchParams({ id: examId }, { replace: true });
+      setTimeout(() => {
+        isInitialLoad.current = false;
+      }, 100);
       return;
     }
 
@@ -611,12 +616,32 @@ export const CreateVstepListening = ({
         const newSaved = new Set<string>();
         newParts.forEach((p) => {
           p.sections.forEach((s) => {
+            const key = sectionKey(p.partNumber, s.sectionNumber);
             if (
               s.audioUrl &&
               !s.audioUrl.startsWith("blob:") &&
               s.questions.some((q) => q.questionText.trim())
             ) {
-              newSaved.add(sectionKey(p.partNumber, s.sectionNumber));
+              newSaved.add(key);
+            }
+
+            // Đánh dấu các section đã hoàn chỉnh từ DB để không bắn toast khi vừa mở trang
+            const totalQs = s.questions.length;
+            const filledQsCount = s.questions.filter(
+              (q) =>
+                q.questionText.trim() &&
+                q.options.A?.trim() &&
+                q.options.B?.trim() &&
+                q.options.C?.trim() &&
+                q.options.D?.trim()
+            ).length;
+            if (
+              s.audioUrl &&
+              !s.audioUrl.startsWith("blob:") &&
+              totalQs > 0 &&
+              filledQsCount === totalQs
+            ) {
+              readySectionsNotifiedRef.current.add(key);
             }
           });
         });
@@ -657,6 +682,47 @@ export const CreateVstepListening = ({
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [propExamId]);
+
+  // ─── Toast thông báo khi câu hỏi được nhập đầy đủ và sẵn sàng lưu ────────
+  useEffect(() => {
+    if (isInitialLoad.current || isLoading) return;
+
+    parts.forEach((part) => {
+      part.sections.forEach((section) => {
+        const key = sectionKey(part.partNumber, section.sectionNumber);
+        if (!activeSections.has(key)) return;
+
+        const totalQs = section.questions.length;
+        const filledQsCount = section.questions.filter(
+          (q) =>
+            q.questionText.trim() &&
+            q.options.A?.trim() &&
+            q.options.B?.trim() &&
+            q.options.C?.trim() &&
+            q.options.D?.trim()
+        ).length;
+
+        const isReady =
+          !!section.audioUrl &&
+          !section.audioUrl.startsWith("blob:") &&
+          totalQs > 0 &&
+          filledQsCount === totalQs;
+
+        if (isReady) {
+          if (!readySectionsNotifiedRef.current.has(key)) {
+            readySectionsNotifiedRef.current.add(key);
+            success(
+              `✓ Sẵn sàng lưu! Bạn đã nhập đủ ${totalQs}/${totalQs} câu hỏi. Hãy nhấn nút "Lưu ${section.sectionName}" bên dưới để lưu lại nhé!`,
+              5000
+            );
+          }
+        } else {
+          // Cho phép thông báo lại nếu người dùng xoá bớt rồi nhập lại đầy đủ
+          readySectionsNotifiedRef.current.delete(key);
+        }
+      });
+    });
+  }, [parts, activeSections, isLoading, success]);
 
   // ─── Audio upload + transcribe (per section) ────────────────────────────
 
@@ -1881,7 +1947,7 @@ export const CreateVstepListening = ({
                               <span className="text-blue-600">{filledQsCount}/{totalQs} câu sẽ được lưu</span>
                             )}
                             {section.audioUrl && !section.audioUrl.startsWith("blob:") && filledQsCount === totalQs && (
-                              <span className="text-emerald-600">✓ Sẵn sàng lưu — {totalQs} câu hoàn thành</span>
+                              <span className="text-emerald-600 font-medium">✓ Sẵn sàng lưu — {totalQs} câu hoàn thành</span>
                             )}
                             {autoSavingKey === key && (
                               <span className="ml-2 text-blue-600 inline-flex items-center gap-1">
@@ -1903,7 +1969,13 @@ export const CreateVstepListening = ({
                               section.audioUrl.startsWith("blob:") ||
                               filledQsCount === 0
                             }
-                            className="flex items-center gap-2 px-5 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                            className={`flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                              section.audioUrl &&
+                              !section.audioUrl.startsWith("blob:") &&
+                              filledQsCount === totalQs
+                                ? "bg-blue-600 text-white hover:bg-blue-700 ring-2 ring-blue-500 ring-offset-2 shadow-md shadow-blue-500/20"
+                                : "bg-blue-600 text-white hover:bg-blue-700 shadow-sm"
+                            }`}
                           >
                             {isSaving ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
