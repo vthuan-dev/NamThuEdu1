@@ -28,6 +28,7 @@ import {
 import { teacherApi } from "../../../../../services/teacherApi";
 import { transcribeAudio } from "../../../../../services/groqApi";
 import { api } from "../../../../../services/api";
+import { AutoResizeTextarea } from "@/app/components/ui/auto-resize-textarea";
 import { RichTextInput } from "../../../../../components/ui/RichTextInput";
 
 // ─── Types ────────────────────────────────────────────────────────────────
@@ -1933,7 +1934,7 @@ export const CreateVstepListening = ({
                                   ))}
 
                                   {/* Explanation (Optional) */}
-                                  <textarea
+                                  <AutoResizeTextarea
                                     value={q.explanation || ""}
                                     onChange={(e) =>
                                       updateQuestion(
@@ -1945,8 +1946,8 @@ export const CreateVstepListening = ({
                                       )
                                     }
                                     placeholder="💡 Giải thích đáp án (tuỳ chọn) - học sinh xem lại sau khi làm bài..."
-                                    rows={2}
-                                    className="w-full mt-1 px-2 py-1.5 text-sm border border-amber-200 bg-amber-50/40 rounded focus:ring-2 focus:ring-amber-400 focus:border-transparent resize-y"
+                                    minHeight={42}
+                                    className="w-full mt-1 px-2 py-1.5 text-sm border border-amber-200 bg-amber-50/40 rounded focus:ring-2 focus:ring-amber-400 focus:border-transparent"
                                   />
                                 </div>
                               </div>

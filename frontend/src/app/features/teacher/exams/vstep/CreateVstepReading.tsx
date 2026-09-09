@@ -5,6 +5,7 @@ import { useToastContext } from "../../../../../contexts/ToastContext";
 import { useTranslation } from "react-i18next";
 import { QuillEditor } from "../../../../../components/ui/QuillEditor";
 import { RichTextInput } from "../../../../../components/ui/RichTextInput";
+import { AutoResizeTextarea } from "@/app/components/ui/auto-resize-textarea";
 import { saveVstepPart, publishVstepExam, loadVstepExam, deleteVstepPart } from "../../../../../services/vstepApi";
 import { teacherApi } from "../../../../../services/teacherApi";
 import { VstepImportModal } from "./VstepImportModal";
@@ -999,14 +1000,14 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           💡 Giải thích đáp án (Tuỳ chọn)
                         </label>
-                        <textarea
+                        <AutoResizeTextarea
                           value={question.explanation || ""}
                           onChange={(e) =>
                             updateQuestion(question.id, "explanation", e.target.value)
                           }
                           placeholder="Giải thích vì sao đây là đáp án đúng để học sinh xem lại sau khi làm bài..."
-                          rows={2}
-                          className="w-full px-3 py-2 text-sm border border-amber-200 bg-amber-50/40 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent resize-y"
+                          minHeight={52}
+                          className="w-full px-3 py-2 text-sm border border-amber-200 bg-amber-50/40 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent"
                         />
                       </div>
                     </div>
