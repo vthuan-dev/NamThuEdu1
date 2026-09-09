@@ -448,4 +448,144 @@ class VstepPartialSkillPublishTest extends TestCase
         $this->assertSame(8, \App\Models\Question::where('exam_id', $exam->eId)
             ->where('qSkill', 'listening')->count());
     }
+
+    // ===================== READING =====================
+
+    private function readingPartPayload(int $partNumber, int $questionCount = 10): array
+    {
+        $questions = [];
+        for ($i = 1; $i <= $questionCount; $i++) {
+            $questions[] = [
+                'questionNumber' => $i,
+                'questionText'   => "Part {$partNumber} Question {$i} text",
+                'options'        => [
+                    'A' => "Option A {$i}",
+                    'B' => "Option B {$i}",
+                    'C' => "Option C {$i}",
+                    'D' => "Option D {$i}",
+                ],
+                'correctAnswer'  => 'A',
+                'explanation'    => "Explanation for Q{$i}",
+            ];
+        }
+
+        return [
+            'partNumber'         => $partNumber,
+            'partName'           => "Passage {$partNumber}",
+            'passage'            => "This is a comprehensive passage for Part {$partNumber}. " . str_repeat("Reading test passage content. ", 40),
+            'wordCount'          => 450,
+            'completedQuestions' => $questionCount,
+            'totalQuestions'     => $questionCount,
+            'questions'          => $questions,
+        ];
+    }
+
+    /** @test */
+    public function teacher_can_publish_reading_exam_with_only_part_1()
+    {
+        $examId = $this->createExam('reading');
+
+        // Save chỉ Part 1
+        $save = $this->withHeaders($this->authHeader())
+            ->postJson("/api/teacher/exams/{$examId}/vstep/parts/1", $this->readingPartPayload(1, 10));
+        $save->assertStatus(200);
+
+        // Publish chỉ với Part 1 (10 câu hỏi, 15 phút)
+        $publish = $this->withHeaders($this->authHeader())
+            ->postJson("/api/teacher/exams/{$examId}/vstep/publish", [
+                'title' => 'VSTEP Reading - chỉ Part 1',
+                'parts' => [
+                    [
+                        'partNumber' => 1,
+                        'partName'   => 'Passage 1',
+                        'passage'    => 'Passage 1 content',
+                        'questions'  => [
+                            [
+                                'questionNumber' => 1,
+                                'questionText'   => 'Q1',
+                                'options'        => ['A' => 'A', 'B' => 'B', 'C' => 'C', 'D' => 'D'],
+                                'correctAnswer'  => 'A',
+                            ]
+                        ],
+                    ]
+                ],
+            ]);
+
+        $publish->assertStatus(200);
+        $this->assertSame(1, $publish->json('data.parts'));
+        $this->assertSame(10, $publish->json('data.total_questions'));
+        $this->assertSame(15, $publish->json('data.duration_minutes'));
+
+        $exam = \App\Models\Exam::find($examId);
+        $this->assertSame(15, $exam->eDuration_minutes);
+    }
+
+    /** @test */
+    public function teacher_can_delete_reading_part()
+    {
+        $examId = $this->createExam('reading');
+
+        // Lưu Part 1 và Part 2
+        $this->withHeaders($this->authHeader())
+            ->postJson("/api/teacher/exams/{$examId}/vstep/parts/1", $this->readingPartPayload(1, 10))
+            ->assertStatus(200);
+        $this->withHeaders($this->authHeader())
+            ->postJson("/api/teacher/exams/{$examId}/vstep/parts/2", $this->readingPartPayload(2, 10))
+            ->assertStatus(200);
+
+        $this->assertSame(20, \App\Models\Question::where('exam_id', $examId)->where('qSkill', 'reading')->count());
+
+        // Xoá Part 2
+        $delete = $this->withHeaders($this->authHeader())
+            ->deleteJson("/api/teacher/exams/{$examId}/vstep/parts/2");
+
+        $delete->assertStatus(200);
+
+        // Chỉ còn lại câu hỏi của Part 1
+        $this->assertSame(10, \App\Models\Question::where('exam_id', $examId)->where('qSkill', 'reading')->count());
+        $this->assertSame(10, \App\Models\Question::where('exam_id', $examId)->where('qSkill', 'reading')->where('qPart', 1)->count());
+        $this->assertSame(0, \App\Models\Question::where('exam_id', $examId)->where('qSkill', 'reading')->where('qPart', 2)->count());
+    }
+
+    /** @test */
+    public function republishing_reading_does_not_duplicate_practice_session()
+    {
+        $examId = $this->createExam('reading');
+
+        $this->withHeaders($this->authHeader())
+            ->postJson("/api/teacher/exams/{$examId}/vstep/parts/1", $this->readingPartPayload(1, 10))
+            ->assertStatus(200);
+
+        $payload = [
+            'title' => 'VSTEP Reading Test',
+            'parts' => [
+                [
+                    'partNumber' => 1,
+                    'partName'   => 'Passage 1',
+                    'passage'    => 'Content',
+                    'questions'  => [],
+                ]
+            ],
+        ];
+
+        $first = $this->withHeaders($this->authHeader())
+            ->postJson("/api/teacher/exams/{$examId}/vstep/publish", $payload);
+        $first->assertStatus(200);
+
+        $second = $this->withHeaders($this->authHeader())
+            ->postJson("/api/teacher/exams/{$examId}/vstep/publish", $payload);
+        $second->assertStatus(200);
+
+        $this->assertSame(
+            1,
+            \Illuminate\Support\Facades\DB::table('practice_sessions')
+                ->where('ps_exam_id', $examId)
+                ->where('ps_target_skill', 'reading')
+                ->count()
+        );
+        $this->assertSame(
+            $first->json('data.practice_session_id'),
+            $second->json('data.practice_session_id')
+        );
+    }
 }
