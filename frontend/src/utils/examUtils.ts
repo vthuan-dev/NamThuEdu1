@@ -91,11 +91,55 @@ export const sanitizeRichContent = (html?: string | null): string => {
  * @param html - Raw passage HTML
  * @returns Cleaned HTML safe to render with dangerouslySetInnerHTML
  */
+/**
+ * Strip unwanted text color, background, opacity, and font-family from passage HTML
+ * while preserving italics, bold, underline, lists, headers, links, and structure.
+ */
+export const cleanPassageStyles = (html: string): string => {
+  if (!html) return "";
+
+  let cleaned = html
+    // 1. Remove font tags (e.g. <font color="#999">...</font>)
+    .replace(/<font[^>]*>([\s\S]*?)<\/font>/gi, "$1")
+    // 2. Strip color, background, opacity, font-family from style attributes
+    .replace(/\s*style\s*=\s*("([^"]*)"|'([^']*)')/gi, (_match, _fullGroup, doubleQuoted, singleQuoted) => {
+      const styles = doubleQuoted !== undefined ? doubleQuoted : singleQuoted;
+      const filtered = styles
+        .split(";")
+        .map((s) => s.trim())
+        .filter((s) => {
+          if (!s) return false;
+          const prop = s.split(":")[0].trim().toLowerCase();
+          return ![
+            "color",
+            "background",
+            "background-color",
+            "background-image",
+            "opacity",
+            "font-family",
+          ].includes(prop);
+        })
+        .join("; ");
+      return filtered ? ` style="${filtered}"` : "";
+    });
+
+  // 3. Unwrap empty spans repeatedly (e.g. <span > or <span> or nested <span><span>)
+  let prev;
+  do {
+    prev = cleaned;
+    cleaned = cleaned.replace(/<span\s*>([\s\S]*?)<\/span>/gi, "$1");
+  } while (cleaned !== prev);
+
+  return cleaned;
+};
+
 export const sanitizePassageHtml = (html: string): string => {
   if (!html) return "";
 
+  const preCleaned = cleanPassageStyles(html);
+
   return (
-    html
+    preCleaned
       // Remove invisible break characters (soft hyphen, zero-width spaces, BOM)
       .replace(/[\u00AD\u200B\u200C\u200D\u2060\uFEFF]/g, "")
       // Convert non-breaking spaces (&nbsp;, &#160;, U+00A0, narrow/figure NBSP)

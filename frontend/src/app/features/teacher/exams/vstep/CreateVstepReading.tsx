@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { QuillEditor } from "../../../../../components/ui/QuillEditor";
 import { RichTextInput } from "../../../../../components/ui/RichTextInput";
 import { AutoResizeTextarea } from "@/app/components/ui/auto-resize-textarea";
+import { cleanPassageStyles } from "@/utils/examUtils";
 import { saveVstepPart, publishVstepExam, loadVstepExam, deleteVstepPart } from "../../../../../services/vstepApi";
 import { teacherApi } from "../../../../../services/teacherApi";
 import { VstepImportModal } from "./VstepImportModal";
@@ -153,7 +154,7 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
               return {
                 partNumber: part.partNumber as 1 | 2 | 3 | 4,
                 partName: part.partName,
-                passage: part.passage,
+                passage: cleanPassageStyles(part.passage || ""),
                 wordCount: VSTEP_READING_PARTS[part.partNumber - 1].wordCount,
                 questions,
               };
@@ -328,9 +329,10 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
 
 
   const updatePassage = (content: string) => {
+    const cleaned = cleanPassageStyles(content);
     setParts((prev) =>
       prev.map((p) =>
-        p.partNumber === currentPart ? { ...p, passage: content } : p
+        p.partNumber === currentPart ? { ...p, passage: cleaned } : p
       )
     );
   };

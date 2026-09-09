@@ -860,6 +860,22 @@
   hyphens: none !important;
 }
 
+/* Ensure reading passage text is never faint or washed-out */
+.vstep-passage p,
+.vstep-passage span:not([class*="bg-"]):not([class*="text-"]):not([data-highlight]),
+.vstep-passage li,
+.vstep-passage div {
+  color: #1e293b !important;
+  opacity: 1 !important;
+}
+
+.vstep-reading-editor .ql-editor p,
+.vstep-reading-editor .ql-editor span,
+.vstep-reading-editor .ql-editor li {
+  color: #1f2937 !important;
+  opacity: 1 !important;
+}
+
 /*
  * RichTextInput (contentEditable) — show a greyed placeholder when empty.
  * :empty only matches when there are no child nodes; the browser inserts a
