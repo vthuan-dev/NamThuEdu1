@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   Plus,
   Trash2,
+  X,
 } from "lucide-react";
 import { useToastContext } from "../../../../../contexts/ToastContext";
 import { useTranslation } from "react-i18next";
@@ -362,69 +363,95 @@ export const CreateVstepListening = ({
       next.delete(key);
       return next;
     });
+    const remainingInPart = activeSectionNumbers(partNumber).filter((s) => s !== sectionNumber);
+    if (remainingInPart.length === 0 && currentPart === partNumber) {
+      const otherActive = PART_LIST.filter((p) => p !== partNumber && activeSectionNumbers(p).length > 0);
+      if (otherActive.length > 0) {
+        setCurrentPart(otherActive[0] as 1 | 2 | 3);
+      }
+    }
+
     success(`Đã bỏ ${buildEmptySection(partNumber as 1 | 2 | 3, sectionNumber).sectionName}`);
   };
 
-  /** Chuyển nhanh phạm vi đề theo preset (Part 1 / Part 2 / Part 3 / Full 3 Part) */
-  const applyPreset = (preset: 'part1' | 'part2' | 'part3' | 'full') => {
-    const newActive = new Set<string>();
-    const newExpanded = new Set<string>();
-
-    if (preset === 'part1') {
-      newActive.add(sectionKey(1, 1));
-      newExpanded.add(sectionKey(1, 1));
-      setCurrentPart(1);
-    } else if (preset === 'part2') {
-      for (let s = 1; s <= 3; s++) {
-        newActive.add(sectionKey(2, s));
-        newExpanded.add(sectionKey(2, s));
-      }
-      setCurrentPart(2);
-    } else if (preset === 'part3') {
-      for (let s = 1; s <= 3; s++) {
-        newActive.add(sectionKey(3, s));
-        newExpanded.add(sectionKey(3, s));
-      }
-      setCurrentPart(3);
-    } else if (preset === 'full') {
-      PART_LIST.forEach((p) => {
-        const layout = VSTEP_LISTENING_LAYOUT[p as 1 | 2 | 3];
-        for (let s = 1; s <= layout.sectionCount; s++) {
-          newActive.add(sectionKey(p, s));
-          newExpanded.add(sectionKey(p, s));
-        }
-      });
-    }
-
-    setActiveSections(newActive);
-    setExpandedKeys(newExpanded);
-    success(
-      `Đã chuyển phạm vi đề sang: ${
-        preset === 'part1'
-          ? 'Part 1 (8 câu)'
-          : preset === 'part2'
-          ? 'Part 2 (12 câu)'
-          : preset === 'part3'
-          ? 'Part 3 (15 câu)'
-          : 'Toàn bộ 3 Part (35 câu)'
-      }`
-    );
+  /** Kiểm tra Part có đang hoạt động trong đề hay không */
+  const isPartActive = (pn: number): boolean => {
+    if (isFullTest) return true;
+    return activeSectionNumbers(pn).length > 0;
   };
 
-  const isPresetActive = (preset: 'part1' | 'part2' | 'part3' | 'full') => {
-    if (preset === 'part1') {
-      return activeSections.size === 1 && activeSections.has(sectionKey(1, 1));
+  /** Thêm toàn bộ các section của Part vào đề */
+  const addPart = (pn: 1 | 2 | 3) => {
+    const layout = VSTEP_LISTENING_LAYOUT[pn];
+    setActiveSections((prev) => {
+      const next = new Set(prev);
+      for (let s = 1; s <= layout.sectionCount; s++) {
+        next.add(sectionKey(pn, s));
+      }
+      return next;
+    });
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      for (let s = 1; s <= layout.sectionCount; s++) {
+        next.add(sectionKey(pn, s));
+      }
+      return next;
+    });
+    setCurrentPart(pn);
+    success(`Đã thêm Part ${pn}`);
+  };
+
+  /** Bỏ toàn bộ Part khỏi đề và dọn dẹp câu hỏi/audio nếu đã lưu trong DB */
+  const removePart = async (pn: 1 | 2 | 3) => {
+    const activeParts = PART_LIST.filter((p) => isPartActive(p));
+    if (activeParts.length <= 1) {
+      error("Đề thi phải còn ít nhất 1 Part. Không thể bỏ phần cuối cùng.");
+      return;
     }
-    if (preset === 'part2') {
-      return activeSections.size === 3 && [1, 2, 3].every((s) => activeSections.has(sectionKey(2, s)));
+
+    const activeNums = activeSectionNumbers(pn);
+    for (const s of activeNums) {
+      const key = sectionKey(pn, s);
+      if (savedSections.has(key) && !examId.startsWith("vstep-")) {
+        try {
+          await deleteVstepListeningSection(examId, pn, s);
+        } catch (err: any) {
+          console.error(`Lỗi khi xoá section ${s} của Part ${pn}:`, err);
+        }
+      }
     }
-    if (preset === 'part3') {
-      return activeSections.size === 3 && [1, 2, 3].every((s) => activeSections.has(sectionKey(3, s)));
+
+    setActiveSections((prev) => {
+      const next = new Set(prev);
+      for (const s of activeNums) {
+        next.delete(sectionKey(pn, s));
+      }
+      return next;
+    });
+    setSavedSections((prev) => {
+      const next = new Set(prev);
+      for (const s of activeNums) {
+        next.delete(sectionKey(pn, s));
+      }
+      return next;
+    });
+    setExpandedKeys((prev) => {
+      const next = new Set(prev);
+      for (const s of activeNums) {
+        next.delete(sectionKey(pn, s));
+      }
+      return next;
+    });
+
+    setParts((prev) =>
+      prev.map((p) => (p.partNumber === pn ? buildEmptyPart(pn) : p))
+    );
+
+    const remaining = activeParts.filter((p) => p !== pn);
+    if (currentPart === pn && remaining.length > 0) {
+      setCurrentPart(remaining[0] as 1 | 2 | 3);
     }
-    if (preset === 'full') {
-      return activeSections.size === 7;
-    }
-    return false;
+    success(`Đã bỏ Part ${pn}`);
   };
 
   // ─── Debounced auto-save (questions + transcript) ───────────────────────
@@ -1288,6 +1315,20 @@ export const CreateVstepListening = ({
 
   // ─── Render ─────────────────────────────────────────────────────────────
 
+  const activePartList = PART_LIST.filter((p) => isPartActive(p));
+  const totalActiveQs = activePartList.reduce(
+    (sum, p) =>
+      sum +
+      activeSectionNumbers(p).length *
+        VSTEP_LISTENING_LAYOUT[p as 1 | 2 | 3].questionsPerSection,
+    0
+  );
+  const activeDurationMinutes = isFullTest
+    ? 40
+    : totalActiveQs >= 35
+    ? 40
+    : Math.max(10, Math.ceil((40 * totalActiveQs) / 35));
+
   return (
     <div
       className={`bg-gray-50 flex flex-col ${
@@ -1315,7 +1356,11 @@ export const CreateVstepListening = ({
                     placeholder={t("vstep.listening.title")}
                   />
                   <p className="text-sm text-gray-500 mt-1">
-                    {t("vstep.listening.subtitle")}
+                    {isFullTest
+                      ? t("vstep.listening.subtitle")
+                      : `${activePartList.length} Part${
+                          activePartList.length > 1 ? "s" : ""
+                        } - ${totalActiveQs} câu hỏi - ${activeDurationMinutes} phút`}
                     <span className="ml-2 text-xs text-green-600 font-medium">
                       • {t("vstep.listening.examIdLabel")}:{" "}
                       {examId.startsWith("vstep-") ? "chưa lưu" : examId}
@@ -1341,8 +1386,8 @@ export const CreateVstepListening = ({
       {/* Part Tabs */}
       <div className="bg-white border-b border-gray-200 flex-shrink-0">
         <div className="max-w-[1800px] mx-auto px-6">
-          <div className="flex gap-2 overflow-x-auto">
-            {PART_LIST.map((pn) => {
+          <div className="flex gap-2 overflow-x-auto items-center">
+            {PART_LIST.filter((pn) => isPartActive(pn)).map((pn) => {
               const layout = VSTEP_LISTENING_LAYOUT[pn as 1 | 2 | 3];
               const isActive = currentPart === pn;
               const isFilled = isPartFullyFilled(pn);
@@ -1351,9 +1396,8 @@ export const CreateVstepListening = ({
               const savedCount = activeNums.filter((s) =>
                 savedSections.has(sectionKey(pn, s))
               ).length;
-              // Đếm theo section ĐANG SOẠN, không phải theo layout đầy đủ — đề bán
-              // phần không nên bị hiển thị là "0/3" như thể đang thiếu.
               const totalQs = activeNums.length * layout.questionsPerSection;
+              const canRemove = !isFullTest && activePartList.length > 1;
 
               // Cảnh báo: có câu hỏi nhưng thiếu audio file
               const sectionsWithQs =
@@ -1368,47 +1412,91 @@ export const CreateVstepListening = ({
               const hasWarning = sectionsWithQs.length > 0 && missingAudioCount > 0;
 
               return (
-                <button
-                  key={pn}
-                  onClick={() => setCurrentPart(pn as 1 | 2 | 3)}
-                  className={`flex items-center gap-3 px-6 py-4 border-b-2 transition-colors whitespace-nowrap ${
-                    isActive
-                      ? "border-blue-600 text-blue-600 bg-blue-50"
-                      : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                  }`}
-                >
-                  <Headphones className="w-5 h-5" />
-                  <div className="text-left">
-                    <div className="font-semibold flex items-center gap-1.5">
-                      Part {pn}
-                      {hasWarning && (
-                        <span
-                          title={`Thiếu audio cho ${missingAudioCount} section`}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-medium border border-amber-200"
-                        >
-                          <AlertTriangle className="w-3 h-3" />
-                          {missingAudioCount === sectionsWithQs.length
-                            ? "Thiếu audio"
-                            : `Thiếu ${missingAudioCount} audio`}
-                        </span>
-                      )}
+                <div key={pn} className="relative flex items-center">
+                  <button
+                    onClick={() => setCurrentPart(pn as 1 | 2 | 3)}
+                    className={`flex items-center gap-3 px-6 py-4 border-b-2 transition-colors whitespace-nowrap ${
+                      isActive
+                        ? "border-blue-600 text-blue-600 bg-blue-50"
+                        : "border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                    }`}
+                  >
+                    <Headphones className="w-5 h-5" />
+                    <div className="text-left">
+                      <div className="font-semibold flex items-center gap-1.5">
+                        Part {pn} - {layout.name}
+                        {hasWarning && (
+                          <span
+                            title={`Thiếu audio cho ${missingAudioCount} section`}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-medium border border-amber-200"
+                          >
+                            <AlertTriangle className="w-3 h-3" />
+                            {missingAudioCount === sectionsWithQs.length
+                              ? "Thiếu audio"
+                              : `Thiếu ${missingAudioCount} audio`}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {savedCount}/{activeNums.length} phần đã lưu • {totalQs} câu
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500">
-                      {activeNums.length === 0 ? (
-                        <span className="text-gray-400">chưa thêm phần nào</span>
-                      ) : (
-                        <>
-                          {savedCount}/{activeNums.length} phần đã lưu • {totalQs} câu
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {isFilled && (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    {isFilled && (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    )}
+                  </button>
+                  {canRemove && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removePart(pn as 1 | 2 | 3);
+                      }}
+                      title={`Bỏ Part ${pn}`}
+                      className="ml-0.5 mr-1 p-1 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   )}
-                </button>
+                </div>
               );
             })}
+
+            {!isFullTest &&
+              PART_LIST.filter((pn) => !isPartActive(pn)).map((pn) => {
+                const layout = VSTEP_LISTENING_LAYOUT[pn as 1 | 2 | 3];
+                const totalQs = layout.sectionCount * layout.questionsPerSection;
+                return (
+                  <div key={`add-part-${pn}`} className="group relative flex items-center">
+                    <button
+                      onClick={() => addPart(pn as 1 | 2 | 3)}
+                      className="flex items-center gap-2 my-2 px-4 py-2 border border-dashed border-gray-300 rounded-lg text-gray-500 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 transition-colors whitespace-nowrap"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <div className="text-left">
+                        <div className="font-semibold text-sm">Thêm Part {pn}</div>
+                        <div className="text-xs text-gray-400">
+                          {layout.sectionCount} đoạn audio • {totalQs} câu
+                        </div>
+                      </div>
+                    </button>
+                    {/* Tooltip hướng dẫn khi hover */}
+                    <div className="pointer-events-none absolute top-full left-0 z-50 mt-1 w-72 origin-top-left scale-95 opacity-0 transition-all duration-150 group-hover:scale-100 group-hover:opacity-100">
+                      <div className="rounded-xl bg-gray-900 px-4 py-3 text-left shadow-xl ring-1 ring-black/5">
+                        <div className="flex items-center gap-1.5 text-sm font-semibold text-white">
+                          <Headphones className="h-3.5 w-3.5 text-blue-400" />
+                          Thêm Part {pn} - {layout.name} (tùy chọn)
+                        </div>
+                        <p className="mt-1.5 text-xs leading-relaxed text-gray-300">
+                          {layout.description}. Thêm phần này nếu bạn muốn soạn đề gồm nhiều part. Học viên sẽ làm các part bạn đã xuất bản.
+                        </p>
+                        <div className="mt-2 flex items-center gap-3 border-t border-white/10 pt-2 text-[11px] text-gray-400">
+                          <span>⏱ {layout.sectionCount} audio • {totalQs} câu hỏi</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         </div>
       </div>
@@ -1424,70 +1512,6 @@ export const CreateVstepListening = ({
           </div>
         ) : (
           <div className={`max-w-[1400px] mx-auto px-6 py-6 ${isFullTest ? 'pb-32' : ''}`}>
-            {/* Quick Presets for Single-Skill Listening */}
-            {!isFullTest && (
-              <div className="bg-white rounded-lg shadow-sm border border-blue-100 p-3.5 mb-4 flex items-center justify-between gap-3 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                    <Sparkles className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold text-gray-900 block">
-                      Chọn nhanh cấu trúc đề nghe:
-                    </span>
-                    <span className="text-[11px] text-gray-500">
-                      Cho phép bạn tạo đề luyện tập theo từng phần nhỏ hoặc đề thi đầy đủ
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => applyPreset("part1")}
-                    className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-all ${
-                      isPresetActive("part1")
-                        ? "bg-blue-600 text-white shadow-xs font-semibold"
-                        : "bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200"
-                    }`}
-                  >
-                    Chỉ Part 1 (8 câu)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyPreset("part2")}
-                    className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-all ${
-                      isPresetActive("part2")
-                        ? "bg-blue-600 text-white shadow-xs font-semibold"
-                        : "bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200"
-                    }`}
-                  >
-                    Chỉ Part 2 (12 câu)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyPreset("part3")}
-                    className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-all ${
-                      isPresetActive("part3")
-                        ? "bg-blue-600 text-white shadow-xs font-semibold"
-                        : "bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200"
-                    }`}
-                  >
-                    Chỉ Part 3 (15 câu)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyPreset("full")}
-                    className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-all ${
-                      isPresetActive("full")
-                        ? "bg-blue-600 text-white shadow-xs font-semibold"
-                        : "bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200"
-                    }`}
-                  >
-                    Đầy đủ 3 Part (35 câu)
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Part header + expand controls */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">

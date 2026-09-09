@@ -154,7 +154,7 @@ export const AGE_GROUP_CATALOG: AgeGroupCatalog[] = [
         skills: [
           { value: 'mixed', label: 'Full 4 kỹ năng (Thi thử hoàn chỉnh)', description: 'Bắt buộc đủ cả 4 kỹ năng: Listening · Reading · Writing · Speaking' },
           { value: 'listening', label: 'Listening (Soạn từng Part / Cả bài)', description: 'Tự do soạn riêng Part 1, 2, 3 hoặc cả 35 câu (40 phút)' },
-          { value: 'reading', label: 'Reading', description: '60 phút' },
+          { value: 'reading', label: 'Reading (Soạn từng Part / Cả bài)', description: 'Tự do soạn riêng Part 1, 2, 3, 4 hoặc cả 40 câu (15 - 60 phút)' },
           { value: 'writing', label: 'Writing', description: '60 phút' },
           { value: 'speaking', label: 'Speaking', description: '12 phút' },
         ],
