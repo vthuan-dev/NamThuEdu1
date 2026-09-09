@@ -137,9 +137,72 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
     });
   }, [testType, meta.label]);
 
-  // ── Total stats ─────────────────────────────────────────────────────────
-  const totalDuration = structure.duration;
-  const totalQuestions = structure.totalQuestions;
+  // ── Total stats (linh hoạt theo các phần đang soạn) ─────────────────────
+  const { totalDuration, totalQuestions, partsSummary } = useMemo(() => {
+    if (!skillData) {
+      return {
+        totalDuration: structure.duration,
+        totalQuestions: structure.totalQuestions,
+        partsSummary: `${structure.parts.length} ${meta.sectionWord}s`,
+      };
+    }
+    if (skill === "listening") {
+      const sections = skillData.sections || [];
+      const secCount = sections.length || 1;
+      const qCount = sections.reduce((sum: number, s: any) => sum + (s.questions?.length || 0), 0) || (secCount * 10);
+      const dur = Math.min(40, Math.max(10, secCount * 10));
+      return {
+        totalDuration: dur,
+        totalQuestions: qCount,
+        partsSummary: `${secCount} ${meta.sectionWord}${secCount > 1 ? "s" : ""}`,
+      };
+    }
+    if (skill === "reading") {
+      const passages = skillData.passages || [];
+      const passCount = passages.length || 1;
+      const qCount = passages.reduce((sum: number, p: any) => sum + (p.questions?.length || 0), 0) || (passCount * 13);
+      const dur = Math.min(60, Math.max(20, passCount * 20));
+      return {
+        totalDuration: dur,
+        totalQuestions: qCount,
+        partsSummary: `${passCount} ${meta.sectionWord}${passCount > 1 ? "s" : ""}`,
+      };
+    }
+    if (skill === "writing") {
+      const tasks = skillData.tasks || [];
+      const taskCount = tasks.length || 1;
+      let dur = 0;
+      tasks.forEach((t: any) => {
+        dur += (t.taskNumber === 1 ? 20 : 40);
+      });
+      return {
+        totalDuration: dur || 60,
+        totalQuestions: taskCount,
+        partsSummary: `${taskCount} ${meta.sectionWord}${taskCount > 1 ? "s" : ""}`,
+      };
+    }
+    if (skill === "speaking") {
+      const parts = skillData.parts || [];
+      const partCount = parts.length || 1;
+      let dur = 0;
+      let qCount = 0;
+      parts.forEach((p: any) => {
+        dur += (p.partNumber === 2 ? 4 : 5);
+        if (p.partNumber === 2) qCount += 1;
+        else qCount += (p.questions?.length || 0);
+      });
+      return {
+        totalDuration: dur || 14,
+        totalQuestions: qCount || partCount,
+        partsSummary: `${partCount} ${meta.sectionWord}${partCount > 1 ? "s" : ""}`,
+      };
+    }
+    return {
+      totalDuration: structure.duration,
+      totalQuestions: structure.totalQuestions,
+      partsSummary: `${structure.parts.length} ${meta.sectionWord}s`,
+    };
+  }, [skillData, skill, structure, meta.sectionWord]);
 
   // ── Auto-create draft hoặc fetch draft hiện có ─────────────────────────
   useEffect(() => {
@@ -330,6 +393,8 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
               <span className="font-medium" style={{ color: meta.color }}>
                 {meta.label}
               </span>
+              <span className="text-gray-300">•</span>
+              <span className="font-medium text-gray-700">{partsSummary}</span>
               <span className="text-gray-300">•</span>
               <span className="inline-flex items-center gap-0.5">
                 <Clock className="w-3 h-3" />
@@ -680,8 +745,8 @@ export function validateIeltsSkillData(skill: IeltsSkill, data: any): Validation
 
   if (skill === "listening") {
     const sections = data.sections || [];
-    if (sections.length < 4) {
-      issues.push({ severity: "error", location: "Tổng quát", message: `Cần đủ 4 sections (hiện ${sections.length})` });
+    if (sections.length < 1) {
+      issues.push({ severity: "error", location: "Tổng quát", message: "Cần ít nhất 1 section" });
     }
     sections.forEach((sec: any) => {
       const loc = `Section ${sec.sectionNumber}`;
@@ -734,8 +799,8 @@ export function validateIeltsSkillData(skill: IeltsSkill, data: any): Validation
 
   if (skill === "reading") {
     const passages = data.passages || [];
-    if (passages.length < 3) {
-      issues.push({ severity: "error", location: "Tổng quát", message: `Cần đủ 3 passages (hiện ${passages.length})` });
+    if (passages.length < 1) {
+      issues.push({ severity: "error", location: "Tổng quát", message: "Cần ít nhất 1 passage" });
     }
     passages.forEach((p: any) => {
       const loc = `Passage ${p.passageNumber}`;
@@ -816,8 +881,8 @@ export function validateIeltsSkillData(skill: IeltsSkill, data: any): Validation
 
   if (skill === "speaking") {
     const parts = data.parts || [];
-    if (parts.length < 3) {
-      issues.push({ severity: "error", location: "Tổng quát", message: `Cần đủ 3 parts (hiện ${parts.length})` });
+    if (parts.length < 1) {
+      issues.push({ severity: "error", location: "Tổng quát", message: "Cần ít nhất 1 part" });
     }
     parts.forEach((p: any) => {
       const loc = `Part ${p.partNumber}`;

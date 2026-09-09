@@ -289,6 +289,33 @@ class IeltsExamController extends Controller
 
             $result = IELTSService::publishIeltsExam($exam, $testType, $wrappedData);
 
+            // Tính toán thời gian làm bài phù hợp theo số phần thực tế giáo viên tạo
+            $calculatedDuration = self::DEFAULT_DURATIONS[$skill] ?? 40;
+            if (!$isFull) {
+                if ($skill === 'listening') {
+                    $secCount = count($data['sections'] ?? (is_array($data) ? $data : []));
+                    $calculatedDuration = min(40, max(10, $secCount * 10));
+                } elseif ($skill === 'reading') {
+                    $passCount = count($data['passages'] ?? (is_array($data) ? $data : []));
+                    $calculatedDuration = min(60, max(20, $passCount * 20));
+                } elseif ($skill === 'writing') {
+                    $tasks = $data['tasks'] ?? (is_array($data) ? $data : []);
+                    $dur = 0;
+                    foreach ($tasks as $t) {
+                        $dur += (($t['taskNumber'] ?? 1) == 1 ? 20 : 40);
+                    }
+                    $calculatedDuration = max(20, $dur);
+                } elseif ($skill === 'speaking') {
+                    $parts = $data['parts'] ?? (is_array($data) ? $data : []);
+                    $dur = 0;
+                    foreach ($parts as $p) {
+                        $pNum = $p['partNumber'] ?? 1;
+                        $dur += ($pNum == 2 ? 4 : 5);
+                    }
+                    $calculatedDuration = max(5, $dur);
+                }
+            }
+
             // Update thêm các field single-skill specific (publishIeltsExam đã set published)
             $exam->update([
                 'eType' => 'IELTS',  // Giữ đúng enum
@@ -300,7 +327,7 @@ class IeltsExamController extends Controller
                 'ielts_skill' => $isFull ? null : $skill,
                 'eDuration_minutes' => $isFull
                     ? array_sum(self::DEFAULT_DURATIONS)
-                    : self::DEFAULT_DURATIONS[$skill],
+                    : $calculatedDuration,
                 'ielts_config' => array_merge($exam->ielts_config ?? [], [
                     'test_type' => $testType,
                     'skill' => $skill,

@@ -9,6 +9,8 @@ import {
   Wand2,
   Image as ImageIcon,
   ZoomIn,
+  Plus,
+  X,
 } from "lucide-react";
 import { IELTS_STRUCTURE, IELTS_LISTENING_QUESTION_TYPES, type IeltsTestType } from "../structure";
 import { api } from "../../../../../../services/api";
@@ -215,7 +217,34 @@ interface Props {
   testType: IeltsTestType;
   initialData?: any;
   onSave: (data: any) => void;
+  isFullTest?: boolean;
 }
+
+const SECTION_INFOS: Record<
+  1 | 2 | 3 | 4,
+  { name: string; desc: string; detail: string }
+> = {
+  1: {
+    name: "Section 1",
+    desc: "Hội thoại 2 người",
+    detail: "Đoạn đối thoại giữa 2 người trong ngữ cảnh xã hội hàng ngày (đặt phòng, hỏi thăm thông tin...).",
+  },
+  2: {
+    name: "Section 2",
+    desc: "Độc thoại đời sống",
+    detail: "Bài nói của 1 người về các tiện ích công cộng, sự kiện địa phương hoặc hướng dẫn tham quan.",
+  },
+  3: {
+    name: "Section 3",
+    desc: "Thảo luận học thuật",
+    detail: "Cuộc đối thoại giữa 2-4 người về ngữ cảnh giáo dục, nghiên cứu hoặc khóa đào tạo.",
+  },
+  4: {
+    name: "Section 4",
+    desc: "Bài giảng học thuật",
+    detail: "Bài thuyết trình / giảng giải của giáo sư hoặc chuyên gia về một chủ đề học thuật.",
+  },
+};
 
 const buildEmptySection = (n: 1 | 2 | 3 | 4): ListeningSection => {
   const start = (n - 1) * 10 + 1;
@@ -238,7 +267,12 @@ const buildEmptySection = (n: 1 | 2 | 3 | 4): ListeningSection => {
   };
 };
 
-export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
+export function IeltsListeningEditor({
+  examId,
+  initialData,
+  onSave,
+  isFullTest = false,
+}: Props) {
   const [sections, setSections] = useState<ListeningSection[]>(() => {
     const empty = [1, 2, 3, 4].map((n) => buildEmptySection(n as 1 | 2 | 3 | 4));
     if (!initialData?.sections) return empty;
@@ -277,7 +311,42 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
       };
     });
   });
-  const [activeSection, setActiveSection] = useState<1 | 2 | 3 | 4>(1);
+
+  const [activeSections, setActiveSections] = useState<Set<1 | 2 | 3 | 4>>(() => {
+    if (isFullTest) return new Set<1 | 2 | 3 | 4>([1, 2, 3, 4]);
+    if (initialData?.sections?.length) {
+      const nums = initialData.sections
+        .map((s: any) => s.sectionNumber as 1 | 2 | 3 | 4)
+        .filter((n: number) => n >= 1 && n <= 4);
+      if (nums.length) return new Set<1 | 2 | 3 | 4>(nums);
+    }
+    return new Set<1 | 2 | 3 | 4>([1]);
+  });
+
+  const [activeSection, setActiveSection] = useState<1 | 2 | 3 | 4>(() => {
+    if (initialData?.sections?.length) {
+      const first = initialData.sections[0]?.sectionNumber;
+      if (first >= 1 && first <= 4) return first as 1 | 2 | 3 | 4;
+    }
+    return 1;
+  });
+
+  const addSection = (n: 1 | 2 | 3 | 4) => {
+    setActiveSections((prev) => new Set(prev).add(n));
+    setActiveSection(n);
+  };
+
+  const removeSection = (n: 1 | 2 | 3 | 4) => {
+    setActiveSections((prev) => {
+      const next = new Set(prev);
+      next.delete(n);
+      if (activeSection === n) {
+        const remaining = [...next].sort((a, b) => a - b);
+        setActiveSection((remaining[0] ?? 1) as 1 | 2 | 3 | 4);
+      }
+      return next;
+    });
+  };
   const [uploadingSection, setUploadingSection] = useState<number | null>(null);
   // Tập các section đang transcribe — Set để nhiều section chạy SONG SONG.
   const [transcribingSections, setTranscribingSections] = useState<Set<number>>(new Set());
@@ -695,14 +764,16 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
 
     if (autoSaveTimerRef.current) window.clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = window.setTimeout(() => {
-      onSave({ sections });
+      onSave({
+        sections: sections.filter((s) => activeSections.has(s.sectionNumber)),
+      });
     }, 1500);
 
     return () => {
       if (autoSaveTimerRef.current) window.clearTimeout(autoSaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sections, transcribingSections]);
+  }, [sections, activeSections, transcribingSections]);
 
   // Section đang xem có đang transcribe không (dùng cho UI nút/banner).
   const isActiveTranscribing = transcribingSections.has(activeSection);
@@ -711,55 +782,119 @@ export function IeltsListeningEditor({ examId, initialData, onSave }: Props) {
     <div className="space-y-5">
       {/* ── Section tabs ─────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <div className="grid grid-cols-4 divide-x divide-gray-100">
-          {sections.map((s) => {
-            const isActive = s.sectionNumber === activeSection;
-            const hasAudio = !!s.audioUrl;
-            const filledQs = s.questions.filter((q) =>
-              q.questionType === "image-completion"
-                ? (q.correctAnswer ?? "").trim() !== ""
-                : q.questionText.trim()
-            ).length;
-            const isSecTranscribing = transcribingSections.has(s.sectionNumber);
-            return (
-              <button
-                key={s.sectionNumber}
-                type="button"
-                onClick={() => setActiveSection(s.sectionNumber)}
-                className="px-4 py-3 text-left transition-all cursor-pointer relative"
-                style={{
-                  background: isActive ? "#EFF6FF" : "#FFFFFF",
-                  borderBottom: isActive ? "3px solid #2563EB" : "3px solid transparent",
-                }}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span
-                    className="text-xs font-bold"
-                    style={{ color: isActive ? "#1D4ED8" : "#6B7280" }}
+        <div className="flex flex-wrap items-stretch divide-x divide-gray-100">
+          {sections
+            .filter((s) => activeSections.has(s.sectionNumber))
+            .map((s) => {
+              const isActive = s.sectionNumber === activeSection;
+              const hasAudio = !!s.audioUrl;
+              const filledQs = s.questions.filter((q) =>
+                q.questionType === "image-completion"
+                  ? (q.correctAnswer ?? "").trim() !== ""
+                  : q.questionText.trim()
+              ).length;
+              const isSecTranscribing = transcribingSections.has(s.sectionNumber);
+              const canRemove = !isFullTest && activeSections.size > 1;
+
+              return (
+                <div
+                  key={s.sectionNumber}
+                  className="relative flex items-center flex-1 min-w-[180px]"
+                  style={{
+                    background: isActive ? "#EFF6FF" : "#FFFFFF",
+                    borderBottom: isActive ? "3px solid #2563EB" : "3px solid transparent",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setActiveSection(s.sectionNumber)}
+                    className="flex-1 px-4 py-3 text-left transition-all cursor-pointer"
                   >
-                    Section {s.sectionNumber}
-                  </span>
-                  {isSecTranscribing ? (
-                    <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-                  ) : hasAudio && filledQs === 10 ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                  ) : null}
-                </div>
-                <div className="flex items-center gap-1 text-[11px] text-gray-500">
-                  <Volume2 className="w-3 h-3" />
-                  <span className={hasAudio ? "text-emerald-600 font-medium" : ""}>
-                    {hasAudio ? "Audio ✓" : "Cần audio"}
-                  </span>
-                  <span className="text-gray-300">·</span>
-                  {isSecTranscribing ? (
-                    <span className="text-blue-600 font-medium">Đang nhận dạng…</span>
-                  ) : (
-                    <span>{filledQs}/10 câu</span>
+                    <div className="flex items-center justify-between mb-1">
+                      <span
+                        className="text-xs font-bold"
+                        style={{ color: isActive ? "#1D4ED8" : "#6B7280" }}
+                      >
+                        Section {s.sectionNumber}
+                      </span>
+                      {isSecTranscribing ? (
+                        <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                      ) : hasAudio && filledQs === 10 ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      ) : null}
+                    </div>
+                    <div className="flex items-center gap-1 text-[11px] text-gray-500">
+                      <Volume2 className="w-3 h-3" />
+                      <span className={hasAudio ? "text-emerald-600 font-medium" : ""}>
+                        {hasAudio ? "Audio ✓" : "Cần audio"}
+                      </span>
+                      <span className="text-gray-300">·</span>
+                      {isSecTranscribing ? (
+                        <span className="text-blue-600 font-medium">Đang nhận dạng…</span>
+                      ) : (
+                        <span>{filledQs}/10 câu</span>
+                      )}
+                    </div>
+                  </button>
+                  {canRemove && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeSection(s.sectionNumber);
+                      }}
+                      title={`Bỏ Section ${s.sectionNumber}`}
+                      className="mr-2 p-1 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   )}
                 </div>
-              </button>
-            );
-          })}
+              );
+            })}
+
+          {/* Nút thêm section (chỉ ở đề đơn kỹ năng) */}
+          {!isFullTest &&
+            ([1, 2, 3, 4] as const)
+              .filter((n) => !activeSections.has(n))
+              .map((n) => {
+                const info = SECTION_INFOS[n];
+                return (
+                  <div key={`add-sec-${n}`} className="group relative flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => addSection(n)}
+                      className="flex items-center gap-2 m-2 px-3 py-2 border border-dashed border-gray-300 rounded-lg text-gray-500 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50/50 transition-colors whitespace-nowrap cursor-pointer text-left"
+                    >
+                      <Plus className="w-4 h-4 text-blue-500" />
+                      <div>
+                        <div className="font-semibold text-xs text-gray-700 group-hover:text-blue-600">
+                          + Thêm Section {n}
+                        </div>
+                        <div className="text-[10px] text-gray-400">
+                          10 câu · ~10 phút
+                        </div>
+                      </div>
+                    </button>
+                    {/* Tooltip hướng dẫn chi tiết khi hover */}
+                    <div className="pointer-events-none absolute top-full left-0 z-50 mt-1 w-64 origin-top-left scale-95 opacity-0 transition-all duration-150 group-hover:scale-100 group-hover:opacity-100">
+                      <div className="rounded-xl bg-gray-900 px-3.5 py-2.5 text-left shadow-xl ring-1 ring-black/5">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-white">
+                          <Headphones className="h-3.5 w-3.5 text-blue-400" />
+                          Section {n} - {info.desc}
+                        </div>
+                        <p className="mt-1 text-[11px] leading-relaxed text-gray-300">
+                          {info.detail}
+                        </p>
+                        <div className="mt-1.5 flex items-center gap-2 border-t border-white/10 pt-1.5 text-[10px] text-gray-400">
+                          <span>🎧 Cần 1 audio riêng</span>
+                          <span>📝 10 câu hỏi</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
         </div>
       </div>
 

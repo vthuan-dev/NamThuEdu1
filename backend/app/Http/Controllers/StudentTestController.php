@@ -4535,6 +4535,17 @@ class StudentTestController extends Controller
                     && (($meta['section_number'] ?? null) == $sectionNumber);
             });
 
+            $sectionQuestions = $exam->questions
+                ->where('qSkill', 'listening')
+                ->where('qPart', $sectionNumber)
+                ->sortBy('qSection_order')
+                ->values();
+
+            // Nếu đề tạo lẻ (chỉ 1 hoặc 2 sections), bỏ qua section không có block lẫn câu hỏi
+            if (!$block && $sectionQuestions->isEmpty()) {
+                continue;
+            }
+
             $blockMeta = $block ? ($block->metadata ?? []) : [];
 
             // Regenerate audio URL from real stored URL (not metadata.audio_filename
@@ -4544,12 +4555,6 @@ class StudentTestController extends Controller
             $audioFilename = ($storedAudio ? basename(parse_url($storedAudio, PHP_URL_PATH)) : '')
                 ?: ($blockMeta['audio_filename'] ?? '');
             $freshAudioUrl = $audioFilename ? url('files/audio/' . $audioFilename) : '';
-
-            $sectionQuestions = $exam->questions
-                ->where('qSkill', 'listening')
-                ->where('qPart', $sectionNumber)
-                ->sortBy('qSection_order')
-                ->values();
 
             $sections[] = [
                 'sectionNumber' => $sectionNumber,
@@ -4566,13 +4571,15 @@ class StudentTestController extends Controller
             ];
         }
 
+        $totalQuestions = $exam->questions->where('qSkill', 'listening')->count() ?: 40;
+
         return response()->json([
             'status' => 'success',
             'data' => [
                 'exam_id' => $exam->eId,
                 'title' => $exam->eTitle,
                 'testType' => $exam->ielts_test_type ?? 'Academic',
-                'totalQuestions' => 40,
+                'totalQuestions' => $totalQuestions,
                 'duration' => $exam->eDuration_minutes ?? 40,
                 'sections' => $sections,
             ],
@@ -4611,6 +4618,11 @@ class StudentTestController extends Controller
                 ->sortBy('qSection_order')
                 ->values();
 
+            // Nếu đề tạo lẻ passage, bỏ qua passage không có nội dung lẫn câu hỏi
+            if (!$block && $passageQuestions->isEmpty()) {
+                continue;
+            }
+
             $count = $passageQuestions->count();
             $questionStart = $runningQNumber;
 
@@ -4628,14 +4640,16 @@ class StudentTestController extends Controller
             $runningQNumber += $count;
         }
 
+        $totalQuestions = $exam->questions->where('qSkill', 'reading')->count() ?: 40;
+
         return response()->json([
             'status' => 'success',
             'data' => [
                 'exam_id' => $exam->eId,
                 'title' => $exam->eTitle,
                 'testType' => $exam->ielts_test_type ?? 'Academic',
-                'totalQuestions' => 40,
-                'duration' => 60,
+                'totalQuestions' => $totalQuestions,
+                'duration' => $exam->eDuration_minutes ?? 60,
                 'passages' => $passages,
             ],
         ]);
@@ -4693,7 +4707,7 @@ class StudentTestController extends Controller
                 'exam_id' => $exam->eId,
                 'title' => $exam->eTitle,
                 'testType' => $exam->ielts_test_type ?? 'Academic',
-                'duration' => 60,
+                'duration' => $exam->eDuration_minutes ?? 60,
                 'tasks' => $tasks,
             ],
         ]);
@@ -4730,6 +4744,11 @@ class StudentTestController extends Controller
                 ->sortBy('qSection_order')
                 ->values();
 
+            // Nếu đề tạo lẻ part, bỏ qua part không có dữ liệu
+            if (!$block && $partQuestions->isEmpty()) {
+                continue;
+            }
+
             $partData = [
                 'partNumber' => $partNumber,
                 'partName' => "Part {$partNumber}",
@@ -4763,7 +4782,7 @@ class StudentTestController extends Controller
                 'exam_id' => $exam->eId,
                 'title' => $exam->eTitle,
                 'testType' => $exam->ielts_test_type ?? 'Academic',
-                'duration' => 14, // upper bound 11-14 min
+                'duration' => $exam->eDuration_minutes ?? 14,
                 'parts' => $parts,
             ],
         ]);

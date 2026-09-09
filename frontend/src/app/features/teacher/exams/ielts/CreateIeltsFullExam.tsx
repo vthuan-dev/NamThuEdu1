@@ -646,6 +646,7 @@ export function CreateIeltsFullExam() {
               testType={testType}
               initialData={skillData.listening}
               onSave={(d) => handleSaveSkill("listening", d)}
+              isFullTest
             />
           )}
           {activeSkill === "reading" && (
@@ -654,6 +655,7 @@ export function CreateIeltsFullExam() {
               testType={testType}
               initialData={skillData.reading}
               onSave={(d) => handleSaveSkill("reading", d)}
+              isFullTest
             />
           )}
           {activeSkill === "writing" && (
@@ -671,6 +673,7 @@ export function CreateIeltsFullExam() {
               testType={testType}
               initialData={skillData.speaking}
               onSave={(d) => handleSaveSkill("speaking", d)}
+              isFullTest
             />
           )}
         </div>

@@ -8,6 +8,7 @@ import {
   Trash2,
   Plus,
   Layers,
+  X,
 } from "lucide-react";
 import { IELTS_STRUCTURE, IELTS_READING_QUESTION_TYPES, type IeltsTestType } from "../structure";
 import { RichTextInput } from "../../../../../../components/ui/RichTextInput";
@@ -53,7 +54,29 @@ interface Props {
   testType: IeltsTestType;
   initialData?: any;
   onSave: (data: any) => void;
+  isFullTest?: boolean;
 }
+
+const PASSAGE_INFOS: Record<
+  1 | 2 | 3,
+  { name: string; desc: string; detail: string }
+> = {
+  1: {
+    name: "Passage 1",
+    desc: "Chủ đề phổ thông",
+    detail: "Văn bản trích từ sách báo, tạp chí về chủ đề thường thức (750-900 từ, ~13 câu).",
+  },
+  2: {
+    name: "Passage 2",
+    desc: "Đời sống / Công sở",
+    detail: "Văn bản liên quan đến công việc, đào tạo, nghiệp vụ hoặc tài liệu xã hội (750-900 từ, ~13 câu).",
+  },
+  3: {
+    name: "Passage 3",
+    desc: "Chuyên sâu học thuật",
+    detail: "Văn bản học thuật mang tính phân tích, nghiên cứu chuyên sâu (800-1000 từ, ~14 câu).",
+  },
+};
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 const MATCHING_TYPES = [
@@ -298,11 +321,51 @@ function flattenPassages(passages: ReadingPassage[]) {
 }
 
 // ─── Main editor ─────────────────────────────────────────────────────────────
-export function IeltsReadingEditor({ initialData, onSave, testType }: Props) {
+export function IeltsReadingEditor({
+  initialData,
+  onSave,
+  testType,
+  isFullTest = false,
+}: Props) {
   const [passages, setPassages] = useState<ReadingPassage[]>(() =>
     buildPassages(initialData)
   );
-  const [activePassage, setActivePassage] = useState<1 | 2 | 3>(1);
+
+  const [activePassages, setActivePassages] = useState<Set<1 | 2 | 3>>(() => {
+    if (isFullTest) return new Set<1 | 2 | 3>([1, 2, 3]);
+    if (initialData?.passages?.length) {
+      const nums = initialData.passages
+        .map((p: any) => p.passageNumber as 1 | 2 | 3)
+        .filter((n: number) => n >= 1 && n <= 3);
+      if (nums.length) return new Set<1 | 2 | 3>(nums);
+    }
+    return new Set<1 | 2 | 3>([1]);
+  });
+
+  const [activePassage, setActivePassage] = useState<1 | 2 | 3>(() => {
+    if (initialData?.passages?.length) {
+      const first = initialData.passages[0]?.passageNumber;
+      if (first >= 1 && first <= 3) return first as 1 | 2 | 3;
+    }
+    return 1;
+  });
+
+  const addPassage = (n: 1 | 2 | 3) => {
+    setActivePassages((prev) => new Set(prev).add(n));
+    setActivePassage(n);
+  };
+
+  const removePassage = (n: 1 | 2 | 3) => {
+    setActivePassages((prev) => {
+      const next = new Set(prev);
+      next.delete(n);
+      if (activePassage === n) {
+        const remaining = [...next].sort((a, b) => a - b);
+        setActivePassage((remaining[0] ?? 1) as 1 | 2 | 3);
+      }
+      return next;
+    });
+  };
 
   const current = passages.find((p) => p.passageNumber === activePassage)!;
   const currentIdx = passages.findIndex((p) => p.passageNumber === activePassage);
@@ -439,9 +502,13 @@ export function IeltsReadingEditor({ initialData, onSave, testType }: Props) {
   }, [current.body]);
 
   useEffect(() => {
-    onSave({ passages: flattenPassages(passages) });
+    onSave({
+      passages: flattenPassages(
+        passages.filter((p) => activePassages.has(p.passageNumber))
+      ),
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [passages]);
+  }, [passages, activePassages]);
 
   return (
     <div className="space-y-5">
@@ -455,47 +522,111 @@ export function IeltsReadingEditor({ initialData, onSave, testType }: Props) {
 
       {/* Passage tabs */}
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <div className="grid grid-cols-3 divide-x divide-gray-100">
-          {passages.map((p, idx) => {
-            const isActive = p.passageNumber === activePassage;
-            const qCount = p.groups.reduce((s, g) => s + g.questions.length, 0);
-            const hasBody = p.body.trim().length > 50;
-            const start = passageStartNumbers[idx] ?? 1;
-            return (
-              <button
-                key={p.passageNumber}
-                type="button"
-                onClick={() => setActivePassage(p.passageNumber)}
-                className="px-4 py-3 text-left transition-all cursor-pointer"
-                style={{
-                  background: isActive ? "#ECFDF5" : "#FFFFFF",
-                  borderBottom: isActive ? "3px solid #10B981" : "3px solid transparent",
-                }}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span
-                    className="text-xs font-bold"
-                    style={{ color: isActive ? "#047857" : "#6B7280" }}
+        <div className="flex flex-wrap items-stretch divide-x divide-gray-100">
+          {passages
+            .filter((p) => activePassages.has(p.passageNumber))
+            .map((p, idx) => {
+              const isActive = p.passageNumber === activePassage;
+              const qCount = p.groups.reduce((s, g) => s + g.questions.length, 0);
+              const hasBody = p.body.trim().length > 50;
+              const start = passageStartNumbers[idx] ?? 1;
+              const canRemove = !isFullTest && activePassages.size > 1;
+
+              return (
+                <div
+                  key={p.passageNumber}
+                  className="relative flex items-center flex-1 min-w-[180px]"
+                  style={{
+                    background: isActive ? "#ECFDF5" : "#FFFFFF",
+                    borderBottom: isActive ? "3px solid #10B981" : "3px solid transparent",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setActivePassage(p.passageNumber)}
+                    className="flex-1 px-4 py-3 text-left transition-all cursor-pointer"
                   >
-                    Passage {p.passageNumber}
-                  </span>
-                  {hasBody && qCount > 0 && (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <div className="flex items-center justify-between mb-1">
+                      <span
+                        className="text-xs font-bold"
+                        style={{ color: isActive ? "#047857" : "#6B7280" }}
+                      >
+                        Passage {p.passageNumber}
+                      </span>
+                      {hasBody && qCount > 0 && (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 text-[11px] text-gray-500">
+                      <FileText className="w-3 h-3" />
+                      <span className={hasBody ? "text-emerald-600 font-medium" : ""}>
+                        {hasBody ? `${p.wordCount} từ` : "Chưa có text"}
+                      </span>
+                      <span className="text-gray-300">·</span>
+                      <span>
+                        {qCount > 0 ? `Câu ${start}–${start + qCount - 1}` : "0 câu"}
+                      </span>
+                    </div>
+                  </button>
+                  {canRemove && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removePassage(p.passageNumber);
+                      }}
+                      title={`Bỏ Passage ${p.passageNumber}`}
+                      className="mr-2 p-1 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   )}
                 </div>
-                <div className="flex items-center gap-1 text-[11px] text-gray-500">
-                  <FileText className="w-3 h-3" />
-                  <span className={hasBody ? "text-emerald-600 font-medium" : ""}>
-                    {hasBody ? `${p.wordCount} từ` : "Chưa có text"}
-                  </span>
-                  <span className="text-gray-300">·</span>
-                  <span>
-                    {qCount > 0 ? `Câu ${start}–${start + qCount - 1}` : "0 câu"}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
+              );
+            })}
+
+          {/* Nút thêm passage (chỉ ở đề đơn kỹ năng) */}
+          {!isFullTest &&
+            ([1, 2, 3] as const)
+              .filter((n) => !activePassages.has(n))
+              .map((n) => {
+                const info = PASSAGE_INFOS[n];
+                return (
+                  <div key={`add-pass-${n}`} className="group relative flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => addPassage(n)}
+                      className="flex items-center gap-2 m-2 px-3 py-2 border border-dashed border-gray-300 rounded-lg text-gray-500 hover:text-emerald-600 hover:border-emerald-400 hover:bg-emerald-50/50 transition-colors whitespace-nowrap cursor-pointer text-left"
+                    >
+                      <Plus className="w-4 h-4 text-emerald-500" />
+                      <div>
+                        <div className="font-semibold text-xs text-gray-700 group-hover:text-emerald-600">
+                          + Thêm Passage {n}
+                        </div>
+                        <div className="text-[10px] text-gray-400">
+                          ~13 câu · 20 phút
+                        </div>
+                      </div>
+                    </button>
+                    {/* Tooltip khi hover */}
+                    <div className="pointer-events-none absolute top-full left-0 z-50 mt-1 w-64 origin-top-left scale-95 opacity-0 transition-all duration-150 group-hover:scale-100 group-hover:opacity-100">
+                      <div className="rounded-xl bg-gray-900 px-3.5 py-2.5 text-left shadow-xl ring-1 ring-black/5">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-white">
+                          <BookOpen className="h-3.5 w-3.5 text-emerald-400" />
+                          Passage {n} - {info.desc}
+                        </div>
+                        <p className="mt-1 text-[11px] leading-relaxed text-gray-300">
+                          {info.detail}
+                        </p>
+                        <div className="mt-1.5 flex items-center gap-2 border-t border-white/10 pt-1.5 text-[10px] text-gray-400">
+                          <span>📄 Bài đọc 700-1100 từ</span>
+                          <span>⏱ ~20 phút</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
         </div>
       </div>
 

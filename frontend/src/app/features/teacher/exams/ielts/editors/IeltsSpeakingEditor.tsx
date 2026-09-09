@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Mic, Save, Plus, Trash2, Sparkles, MessageCircle } from "lucide-react";
+import { Mic, Save, Plus, Trash2, Sparkles, MessageCircle, X } from "lucide-react";
 import {
   IELTS_STRUCTURE,
   SPEAKING_CUE_CARD_TEMPLATE,
@@ -23,7 +23,32 @@ interface Props {
   testType: IeltsTestType;
   initialData?: any;
   onSave: (data: any) => void;
+  isFullTest?: boolean;
 }
+
+const SPEAKING_PART_INFOS: Record<
+  1 | 2 | 3,
+  { name: string; desc: string; detail: string; time: string }
+> = {
+  1: {
+    name: "Part 1",
+    desc: "Interview (Phỏng vấn)",
+    detail: "Hỏi đáp các chủ đề quen thuộc hàng ngày: quê quán, công việc, sở thích...",
+    time: "4-5 phút",
+  },
+  2: {
+    name: "Part 2",
+    desc: "Long Turn (Cue Card)",
+    detail: "Thí sinh có 1 phút chuẩn bị và nói liên tục 1-2 phút theo chủ đề cue card.",
+    time: "3-4 phút",
+  },
+  3: {
+    name: "Part 3",
+    desc: "Two-way Discussion",
+    detail: "Thảo luận sâu hơn về các vấn đề trừu tượng mở rộng từ chủ đề Part 2.",
+    time: "4-5 phút",
+  },
+};
 
 const buildEmptyParts = (): SpeakingPart[] => [
   {
@@ -54,11 +79,33 @@ const buildEmptyParts = (): SpeakingPart[] => [
   },
 ];
 
-export function IeltsSpeakingEditor({ initialData, onSave }: Props) {
+export function IeltsSpeakingEditor({
+  initialData,
+  onSave,
+  isFullTest = false,
+}: Props) {
   const [parts, setParts] = useState<SpeakingPart[]>(
     () => initialData?.parts || buildEmptyParts()
   );
-  const [activePart, setActivePart] = useState<1 | 2 | 3>(1);
+
+  const [activeParts, setActiveParts] = useState<Set<1 | 2 | 3>>(() => {
+    if (isFullTest) return new Set<1 | 2 | 3>([1, 2, 3]);
+    if (initialData?.parts?.length) {
+      const nums = initialData.parts
+        .map((p: any) => p.partNumber as 1 | 2 | 3)
+        .filter((n: number) => n >= 1 && n <= 3);
+      if (nums.length) return new Set<1 | 2 | 3>(nums);
+    }
+    return new Set<1 | 2 | 3>([1]);
+  });
+
+  const [activePart, setActivePart] = useState<1 | 2 | 3>(() => {
+    if (initialData?.parts?.length) {
+      const first = initialData.parts[0]?.partNumber;
+      if (first >= 1 && first <= 3) return first as 1 | 2 | 3;
+    }
+    return 1;
+  });
 
   const current = parts.find((p) => p.partNumber === activePart)!;
   const partInfo = IELTS_STRUCTURE.speaking.parts[activePart - 1];
@@ -67,48 +114,128 @@ export function IeltsSpeakingEditor({ initialData, onSave }: Props) {
     setParts((prev) => prev.map((p) => (p.partNumber === n ? { ...p, ...patch } : p)));
   };
 
+  const addPart = (n: 1 | 2 | 3) => {
+    setActiveParts((prev) => new Set(prev).add(n));
+    setActivePart(n);
+  };
+
+  const removePart = (n: 1 | 2 | 3) => {
+    setActiveParts((prev) => {
+      const next = new Set(prev);
+      next.delete(n);
+      if (activePart === n) {
+        const remaining = [...next].sort((a, b) => a - b);
+        setActivePart((remaining[0] ?? 1) as 1 | 2 | 3);
+      }
+      return next;
+    });
+  };
+
   useEffect(() => {
-    onSave({ parts });
+    onSave({ parts: parts.filter((p) => activeParts.has(p.partNumber)) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parts]);
+  }, [parts, activeParts]);
 
   return (
     <div className="space-y-5">
       {/* Part tabs */}
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <div className="grid grid-cols-3 divide-x divide-gray-100">
-          {parts.map((p) => {
-            const isActive = p.partNumber === activePart;
-            const filled =
-              p.partNumber === 2
-                ? !!p.cueCard?.topic && p.cueCard.topic.length > 10
-                : (p.questions || []).filter((q) => q.text.trim()).length > 0;
-            return (
-              <button
-                key={p.partNumber}
-                type="button"
-                onClick={() => setActivePart(p.partNumber)}
-                className="px-4 py-3 text-left transition-all cursor-pointer"
-                style={{
-                  background: isActive ? "#FAF5FF" : "#FFFFFF",
-                  borderBottom: isActive ? "3px solid #A855F7" : "3px solid transparent",
-                }}
-              >
-                <p
-                  className="text-sm font-bold"
-                  style={{ color: isActive ? "#7E22CE" : "#374151" }}
+        <div className="flex flex-wrap items-stretch divide-x divide-gray-100">
+          {parts
+            .filter((p) => activeParts.has(p.partNumber))
+            .map((p) => {
+              const isActive = p.partNumber === activePart;
+              const filled =
+                p.partNumber === 2
+                  ? !!p.cueCard?.topic && p.cueCard.topic.length > 10
+                  : (p.questions || []).filter((q) => q.text.trim()).length > 0;
+              const canRemove = !isFullTest && activeParts.size > 1;
+
+              return (
+                <div
+                  key={p.partNumber}
+                  className="relative flex items-center flex-1 min-w-[180px]"
+                  style={{
+                    background: isActive ? "#FAF5FF" : "#FFFFFF",
+                    borderBottom: isActive ? "3px solid #A855F7" : "3px solid transparent",
+                  }}
                 >
-                  Part {p.partNumber}
-                </p>
-                <p className="text-xs text-gray-500 mt-0.5 truncate">
-                  {p.partNumber === 1 && "Interview"}
-                  {p.partNumber === 2 && "Long turn"}
-                  {p.partNumber === 3 && "Discussion"}
-                  {filled && <span className="text-emerald-600 ml-1">✓</span>}
-                </p>
-              </button>
-            );
-          })}
+                  <button
+                    type="button"
+                    onClick={() => setActivePart(p.partNumber)}
+                    className="flex-1 px-4 py-3 text-left transition-all cursor-pointer"
+                  >
+                    <p
+                      className="text-sm font-bold"
+                      style={{ color: isActive ? "#7E22CE" : "#374151" }}
+                    >
+                      Part {p.partNumber}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5 truncate">
+                      {p.partNumber === 1 && "Interview (4–5p)"}
+                      {p.partNumber === 2 && "Cue Card (3–4p)"}
+                      {p.partNumber === 3 && "Discussion (4–5p)"}
+                      {filled && <span className="text-emerald-600 ml-1 font-semibold">✓</span>}
+                    </p>
+                  </button>
+                  {canRemove && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removePart(p.partNumber);
+                      }}
+                      title={`Bỏ Part ${p.partNumber}`}
+                      className="mr-2 p-1 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+
+          {/* Nút thêm part (chỉ ở đề đơn kỹ năng) */}
+          {!isFullTest &&
+            ([1, 2, 3] as const)
+              .filter((n) => !activeParts.has(n))
+              .map((n) => {
+                const info = SPEAKING_PART_INFOS[n];
+                return (
+                  <div key={`add-part-${n}`} className="group relative flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => addPart(n)}
+                      className="flex items-center gap-2 m-2 px-3 py-2 border border-dashed border-gray-300 rounded-lg text-gray-500 hover:text-purple-600 hover:border-purple-400 hover:bg-purple-50/50 transition-colors whitespace-nowrap cursor-pointer text-left"
+                    >
+                      <Plus className="w-4 h-4 text-purple-500" />
+                      <div>
+                        <div className="font-semibold text-xs text-gray-700 group-hover:text-purple-600">
+                          + Thêm Part {n}
+                        </div>
+                        <div className="text-[10px] text-gray-400">
+                          {info.time}
+                        </div>
+                      </div>
+                    </button>
+                    {/* Tooltip khi hover */}
+                    <div className="pointer-events-none absolute top-full left-0 z-50 mt-1 w-64 origin-top-left scale-95 opacity-0 transition-all duration-150 group-hover:scale-100 group-hover:opacity-100">
+                      <div className="rounded-xl bg-gray-900 px-3.5 py-2.5 text-left shadow-xl ring-1 ring-black/5">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-white">
+                          <Mic className="h-3.5 w-3.5 text-purple-400" />
+                          Part {n} - {info.desc}
+                        </div>
+                        <p className="mt-1 text-[11px] leading-relaxed text-gray-300">
+                          {info.detail}
+                        </p>
+                        <div className="mt-1.5 flex items-center gap-2 border-t border-white/10 pt-1.5 text-[10px] text-gray-400">
+                          <span>⏱ Thời lượng: ~{info.time}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
         </div>
       </div>
 
