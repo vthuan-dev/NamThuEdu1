@@ -30,6 +30,9 @@ interface IeltsReadingViewProps {
   reviewMode?: boolean;
   submissionId?: number;
   hideSubmit?: boolean;
+  correctAnswers?: Record<number, string>;
+  isCorrectMap?: Record<number, boolean>;
+  explanations?: Record<number, string>;
 }
 
 export function IeltsReadingView({
@@ -45,6 +48,9 @@ export function IeltsReadingView({
   reviewMode = false,
   submissionId,
   hideSubmit = false,
+  correctAnswers = {},
+  isCorrectMap = {},
+  explanations = {},
 }: IeltsReadingViewProps) {
   const passages = payload.passages ?? [];
   const [activeIdx, setActiveIdx] = useState(0);
@@ -183,6 +189,8 @@ export function IeltsReadingView({
                         ?.task_instruction || ""
                     : null;
                 const showInstruction = instr && instr !== prevInstr;
+                const qExplanation = explanations[q.qId] || q.explanation || (q as any).qExplanation;
+                const enrichedQ = qExplanation ? { ...q, explanation: qExplanation } : q;
                 return (
                   <div key={q.qId} id={`ielts-q-${q.qId}`}>
                     {showInstruction && (
@@ -191,11 +199,13 @@ export function IeltsReadingView({
                       </div>
                     )}
                     <IeltsQuestionRenderer
-                      question={q}
+                      question={enrichedQ}
                       answer={answers[q.qId] ?? null}
                       onAnswer={onAnswer}
                       flagged={!!flagged[q.qId]}
                       onToggleFlag={onToggleFlag}
+                      reviewMode={reviewMode}
+                      correctAnswer={correctAnswers[q.qId]}
                     />
                   </div>
                 );
@@ -216,6 +226,9 @@ export function IeltsReadingView({
         showTimer={reviewMode ? false : showTimer}
         onSubmit={onSubmit}
         hideSubmit={hideSubmit || draggableNavigator || reviewMode}
+        reviewMode={reviewMode}
+        correctAnswers={correctAnswers}
+        isCorrectMap={isCorrectMap}
       />
     </div>
   );

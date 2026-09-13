@@ -230,6 +230,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
   const [correctAnswers, setCorrectAnswers] = useState<Record<number, string>>({});
   /** Map qId → boolean: kết quả chấm của server (saIs_correct). Dùng thay cho so sánh text ở client */
   const [isCorrectMap, setIsCorrectMap] = useState<Record<number, boolean>>({});
+  const [explanations, setExplanations] = useState<Record<number, string>>({});
   const [availableSkills, setAvailableSkills] = useState<IeltsSkill[] | null>(skill ? [skill] : null);
 
   usePageTitle(reviewMode ? "Xem lại bài IELTS" : "IELTS Test");
@@ -481,7 +482,12 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
         // 2) qData.correct_answer / qData.answer / qData.correctAnswer
         //    (used by PDF-imported IELTS text-completion questions)
         const cmap: Record<number, string> = {};
+        const emap: Record<number, string> = {};
         for (const q of (data.exam?.questions ?? [])) {
+          const exp = q.qExplanation || q.qData?.explanation;
+          if (exp != null && String(exp).trim() !== "") {
+            emap[q.qId] = String(exp).trim();
+          }
           const correct = (q.answers ?? []).find((x: any) => x.aIs_correct);
           if (correct && correct.aContent != null) {
             cmap[q.qId] = String(correct.aContent);
@@ -494,6 +500,7 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
           }
         }
         setCorrectAnswers(cmap);
+        setExplanations(emap);
       } catch {
         // Lặng lẽ — payload vẫn load để xem câu hỏi
       }
@@ -949,6 +956,9 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
           timeLeft={reviewMode ? undefined : timeLeft}
           showTimer={!reviewMode}
           reviewMode={reviewMode}
+          correctAnswers={correctAnswers}
+          isCorrectMap={isCorrectMap}
+          explanations={explanations}
           submissionId={submissionId || undefined}
         />
       )}

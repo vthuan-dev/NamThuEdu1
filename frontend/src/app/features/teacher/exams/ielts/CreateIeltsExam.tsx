@@ -808,13 +808,21 @@ export function validateIeltsSkillData(skill: IeltsSkill, data: any): Validation
         issues.push({ severity: "warning", location: loc, message: "Chưa có tiêu đề" });
       }
       if (!p.body?.trim()) {
-        issues.push({ severity: "error", location: loc, message: "Chưa có nội dung bài đọc" });
+        issues.push({
+          severity: "error",
+          location: loc,
+          message: "Chưa có nội dung bài đọc (Bấm dấu [✕] trên tab nếu chỉ tạo đề 1 passage)",
+        });
       } else if ((p.wordCount || 0) < 200) {
         issues.push({ severity: "warning", location: loc, message: `Bài đọc ngắn (${p.wordCount} từ, IELTS thường 700-900 từ)` });
       }
       const qs = p.questions || [];
       if (qs.length === 0) {
-        issues.push({ severity: "error", location: loc, message: "Chưa có câu hỏi nào" });
+        issues.push({
+          severity: "error",
+          location: loc,
+          message: "Chưa có câu hỏi nào (Bấm dấu [✕] trên tab nếu chỉ tạo đề 1 passage)",
+        });
       }
       const missingText: number[] = [];
       const missingAnswer: number[] = [];

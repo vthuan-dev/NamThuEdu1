@@ -90,13 +90,13 @@ export function IeltsQuestionRenderer({
       </div>
 
       {reviewMode && (question.explanation || (question as any).qExplanation) && (
-        <div className="mt-3 p-3 rounded-lg bg-emerald-50/50 border border-emerald-200 ml-10">
-          <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1">
-            <span>💡</span> Explanation
+        <div className="mt-3 p-3 rounded-lg bg-emerald-50/70 border border-emerald-200 ml-10">
+          <p className="text-xs font-bold text-emerald-800 mb-1.5 flex items-center gap-1.5">
+            <span>💡</span> Giải thích chi tiết (Explanation)
           </p>
-          <p className="text-xs text-slate-600 leading-relaxed">
-            {question.explanation || (question as any).qExplanation}
-          </p>
+          <div className="text-xs text-slate-700 leading-relaxed whitespace-pre-line">
+            <RichText text={question.explanation || (question as any).qExplanation} />
+          </div>
         </div>
       )}
     </div>
@@ -151,16 +151,18 @@ function renderInput(
         {letters.map((letter) => {
           const selected = multi ? selectedSet.has(letter) : answer === letter;
           const isCorrect =
-            reviewMode && (multi ? correctSet.has(letter) : letter === correctAnswer);
+            reviewMode && (multi ? correctSet.has(letter) : letter.toUpperCase() === (correctAnswer ?? "").trim().toUpperCase());
           const isWrong = reviewMode && selected && !isCorrect;
           return (
             <label
               key={letter}
-              className={`flex items-start gap-2.5 p-2.5 rounded-md border transition-all cursor-pointer ${
+              className={`flex items-start gap-2.5 p-2.5 rounded-md border transition-all ${
+                reviewMode ? "cursor-default" : "cursor-pointer"
+              } ${
                 isCorrect
-                  ? "bg-emerald-50 border-emerald-300"
+                  ? "bg-emerald-50 border-emerald-400 ring-1 ring-emerald-300"
                   : isWrong
-                    ? "bg-red-50 border-red-300"
+                    ? "bg-red-50 border-red-400 ring-1 ring-red-300"
                     : selected
                       ? "bg-blue-50 border-blue-400 ring-1 ring-blue-200"
                       : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
@@ -176,7 +178,11 @@ function renderInput(
                 className="mt-0.5 accent-blue-600"
               />
               <div className="flex items-start gap-2 flex-1">
-                <span className="font-bold text-gray-900 text-sm">{letter}</span>
+                <span className={`font-bold text-sm ${isCorrect ? "text-emerald-700" : isWrong ? "text-red-700" : "text-gray-900"}`}>
+                  {letter}
+                  {isCorrect && <span className="ml-1 text-emerald-600 font-black">✓</span>}
+                  {isWrong && <span className="ml-1 text-red-600 font-black">✕</span>}
+                </span>
                 <RichText className="text-sm text-gray-700 leading-relaxed" text={q.options![letter]} />
               </div>
             </label>
@@ -195,7 +201,7 @@ function renderInput(
       <div className="flex flex-wrap gap-2">
         {options.map((opt) => {
           const selected = answer === opt;
-          const isCorrect = reviewMode && opt === correctAnswer;
+          const isCorrect = reviewMode && opt.toUpperCase() === (correctAnswer ?? "").trim().toUpperCase();
           const isWrong = reviewMode && selected && !isCorrect;
           return (
             <button
@@ -203,17 +209,21 @@ function renderInput(
               type="button"
               onClick={() => onChange(opt)}
               disabled={reviewMode}
-              className={`px-3.5 py-1.5 rounded-md border text-xs font-bold tracking-wider transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-md border text-xs font-bold tracking-wider transition-all ${
+                reviewMode ? "cursor-default" : "cursor-pointer"
+              } ${
                 isCorrect
-                  ? "bg-emerald-100 border-emerald-400 text-emerald-700"
+                  ? "bg-emerald-100 border-emerald-500 text-emerald-800 shadow-xs ring-1 ring-emerald-400"
                   : isWrong
-                    ? "bg-red-100 border-red-400 text-red-700"
+                    ? "bg-red-100 border-red-500 text-red-800 ring-1 ring-red-400 line-through"
                     : selected
                       ? "bg-blue-600 border-blue-700 text-white shadow-sm"
                       : "bg-white border-gray-300 text-gray-700 hover:border-blue-400 hover:bg-blue-50"
               }`}
             >
               {opt}
+              {isCorrect && <span className="ml-1 text-emerald-700 font-black">✓</span>}
+              {isWrong && <span className="ml-1 text-red-600 font-black">✕</span>}
             </button>
           );
         })}
@@ -251,25 +261,34 @@ function renderInput(
               ))}
             </ul>
           )}
-          <select
-            value={(answer as string) ?? ""}
-            onChange={(e) => onChange(e.target.value)}
-            disabled={reviewMode}
-            className={`w-full max-w-xs px-3 py-2 rounded-md border text-sm cursor-pointer transition-colors ${
-              reviewMode && answer === correctAnswer
-                ? "bg-emerald-50 border-emerald-400 text-emerald-900"
-                : reviewMode && answer && answer !== correctAnswer
-                  ? "bg-red-50 border-red-400 text-red-900"
-                  : "bg-white border-gray-300 text-gray-900 hover:border-blue-400 focus:ring-2 focus:ring-blue-200 focus:border-blue-500"
-            }`}
-          >
-            <option value="">— Choose —</option>
-            {choiceKeys.map((k) => (
-              <option key={k} value={k}>
-                {choices[k] ? `${k} — ${choices[k]}` : k}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-3 flex-wrap">
+            <select
+              value={(answer as string) ?? ""}
+              onChange={(e) => onChange(e.target.value)}
+              disabled={reviewMode}
+              className={`w-full max-w-xs px-3 py-2 rounded-md border text-sm transition-colors ${
+                reviewMode ? "cursor-default" : "cursor-pointer"
+              } ${
+                reviewMode && answer === correctAnswer
+                  ? "bg-emerald-50 border-emerald-400 text-emerald-900 font-semibold"
+                  : reviewMode && answer && answer !== correctAnswer
+                    ? "bg-red-50 border-red-400 text-red-900"
+                    : "bg-white border-gray-300 text-gray-900 hover:border-blue-400 focus:ring-2 focus:ring-blue-200 focus:border-blue-500"
+              }`}
+            >
+              <option value="">— Choose —</option>
+              {choiceKeys.map((k) => (
+                <option key={k} value={k}>
+                  {choices[k] ? `${k} — ${choices[k]}` : k}
+                </option>
+              ))}
+            </select>
+            {reviewMode && correctAnswer && String(answer).trim().toLowerCase() !== String(correctAnswer).trim().toLowerCase() && (
+              <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200">
+                ✓ Đáp án đúng: <span className="font-bold">{correctAnswer}</span>
+              </span>
+            )}
+          </div>
         </div>
       );
     }
@@ -321,22 +340,31 @@ function renderInput(
   // ─── Text input (fill-blank style) ────────────────────────────────────
   // sentence_completion, note_completion, form_completion, table_completion,
   // flow_chart_completion, summary_completion, short_answer, diagram_labelling
+  const isInputCorrect = reviewMode && (answer as string)?.toLowerCase().trim() === (correctAnswer ?? "").toLowerCase().trim();
   return (
-    <input
-      type="text"
-      value={(answer as string) ?? ""}
-      onChange={(e) => onChange(e.target.value)}
-      disabled={reviewMode}
-      placeholder="Your answer…"
-      className={`w-full max-w-md px-3 py-2 rounded-md border text-sm transition-colors ${
-        reviewMode && (answer as string)?.toLowerCase() === (correctAnswer ?? "").toLowerCase()
-          ? "bg-emerald-50 border-emerald-400 text-emerald-900"
-          : reviewMode && answer
-            ? "bg-red-50 border-red-400 text-red-900"
-            : "bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-200 focus:border-blue-500"
-      }`}
-      autoComplete="off"
-      spellCheck={false}
-    />
+    <div className="space-y-1.5 max-w-md">
+      <input
+        type="text"
+        value={(answer as string) ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={reviewMode}
+        placeholder="Your answer…"
+        className={`w-full px-3 py-2 rounded-md border text-sm transition-colors ${
+          isInputCorrect
+            ? "bg-emerald-50 border-emerald-400 text-emerald-900 font-semibold"
+            : reviewMode && answer
+              ? "bg-red-50 border-red-400 text-red-900 line-through"
+              : "bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-blue-200 focus:border-blue-500"
+        }`}
+        autoComplete="off"
+        spellCheck={false}
+      />
+      {reviewMode && correctAnswer && !isInputCorrect && (
+        <div className="text-xs text-emerald-700 font-medium flex items-center gap-1.5 bg-emerald-50/80 px-2.5 py-1 rounded border border-emerald-200">
+          <span>✓ Đáp án đúng:</span>
+          <span className="font-bold font-mono text-emerald-800">{correctAnswer}</span>
+        </div>
+      )}
+    </div>
   );
 }

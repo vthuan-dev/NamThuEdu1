@@ -4852,7 +4852,7 @@ class StudentTestController extends Controller
             ? $qData
             : array_diff_key($qData, ['correct_answer' => 1]);
 
-        return [
+        $res = [
             'qId' => $q->qId,
             'questionNumber' => $qData['question_number'] ?? $q->qSection_order,
             'questionType' => $type,
@@ -4860,6 +4860,12 @@ class StudentTestController extends Controller
             'options' => $options,
             'data' => $extraData,
         ];
+
+        if ($includeAnswer) {
+            $res['explanation'] = $q->qExplanation ?? $qData['explanation'] ?? null;
+        }
+
+        return $res;
     }
 
     /**
