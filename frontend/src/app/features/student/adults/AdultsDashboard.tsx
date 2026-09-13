@@ -817,22 +817,33 @@ export function AdultsDashboard() {
                       className="group relative flex flex-col rounded-2xl bg-white p-4 hover:-translate-y-0.5 transition-all duration-200"
                       style={{ border: `1.5px solid ${urgent ? '#FECACA' : '#F0F0F8'}`, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}
                     >
-                      <div className="flex items-start gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                          style={{ background: skill.bg, border: `1px solid ${skill.border}` }}>
-                          <SkillIcon className="w-5 h-5" style={{ color: skill.color }} strokeWidth={2.2} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <h3 className="text-sm font-bold text-slate-900 truncate leading-snug">{a.exam_title}</h3>
-                            {urgent && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-600 text-white flex-shrink-0">KHẨN</span>
-                            )}
+                      <div className="flex items-start justify-between gap-2.5 mb-3">
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                            style={{ background: skill.bg, border: `1px solid ${skill.border}` }}>
+                            <SkillIcon className="w-5 h-5" style={{ color: skill.color }} strokeWidth={2.2} />
                           </div>
-                          <p className="text-[11px] font-semibold mt-0.5" style={{ color: skill.color }}>
-                            {a.exam_type} · {skill.label}
-                          </p>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <h3 className="text-sm font-bold text-slate-900 truncate leading-snug">{a.exam_title}</h3>
+                              {urgent && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-600 text-white flex-shrink-0">KHẨN</span>
+                              )}
+                            </div>
+                            <p className="text-[11px] font-semibold mt-0.5" style={{ color: skill.color }}>
+                              {a.exam_type} · {skill.label}
+                            </p>
+                          </div>
                         </div>
+                        {a.exam_id ? (
+                          <span
+                            title={`Mã đề: #${a.exam_id}`}
+                            className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-[11px] font-mono font-bold text-slate-600 tabular-nums flex-shrink-0 transition-colors"
+                          >
+                            <span className="text-slate-400 font-normal">#</span>
+                            {a.exam_id}
+                          </span>
+                        ) : null}
                       </div>
 
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500 mb-3">
