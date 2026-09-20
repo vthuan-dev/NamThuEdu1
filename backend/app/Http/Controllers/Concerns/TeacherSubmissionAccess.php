@@ -33,7 +33,16 @@ trait TeacherSubmissionAccess
 
     protected function teacherCanAccessSubmission($user, Submission $submission): bool
     {
-        if (!$user || ($user->uRole ?? null) !== 'teacher') {
+        if (!$user) {
+            return false;
+        }
+
+        // Admin có toàn quyền truy cập và chấm mọi bài làm
+        if (($user->uRole ?? null) === 'admin') {
+            return true;
+        }
+
+        if (($user->uRole ?? null) !== 'teacher') {
             return false;
         }
 
@@ -44,6 +53,15 @@ trait TeacherSubmissionAccess
             ?? Exam::where('eId', $submission->exam_id)->value('eTeacher_id');
         if ((int) $examTeacherId === $teacherId) {
             return true;
+        }
+
+        // 2) Assignment do chính GV này giao (ngân hàng đề / dùng chung giao cho học sinh)
+        if ($submission->assignment_id) {
+            $assignerId = TestAssignment::where('taId', $submission->assignment_id)
+                ->value('taTeacher_id');
+            if ($assignerId && (int) $assignerId === $teacherId) {
+                return true;
+            }
         }
 
         $classIds = $this->teacherManagedClassIds($teacherId);

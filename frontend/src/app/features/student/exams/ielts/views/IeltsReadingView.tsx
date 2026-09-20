@@ -116,6 +116,13 @@ export function IeltsReadingView({
               const answered = p.questions.filter(
                 (q) => answers[q.qId] != null && answers[q.qId] !== ""
               ).length;
+              const correctCount = p.questions.filter((q) => {
+                if (q.qId in isCorrectMap) return isCorrectMap[q.qId];
+                const a = answers[q.qId];
+                const ca = correctAnswers[q.qId];
+                return a != null && ca != null && String(a).trim().toLowerCase() === String(ca).trim().toLowerCase();
+              }).length;
+
               return (
                 <button
                   key={p.passageNumber}
@@ -130,13 +137,17 @@ export function IeltsReadingView({
                   <FileText className="w-3.5 h-3.5" />
                   <span>Passage {p.passageNumber}</span>
                   <span className={`ml-1 px-1.5 rounded text-[10px] tabular-nums font-bold ${
-                    active
-                      ? "bg-white/20 text-white"
-                      : answered === p.questions.length
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-gray-100 text-gray-500"
+                    reviewMode
+                      ? active
+                        ? "bg-white/20 text-white"
+                        : "bg-emerald-100 text-emerald-800"
+                      : active
+                        ? "bg-white/20 text-white"
+                        : answered === p.questions.length
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-gray-100 text-gray-500"
                   }`}>
-                    {answered}/{p.questions.length}
+                    {reviewMode ? `${correctCount}/${p.questions.length} đúng` : `${answered}/${p.questions.length}`}
                   </span>
                 </button>
               );
@@ -174,8 +185,21 @@ export function IeltsReadingView({
           }
           questionsTitle={`Questions ${currentPassage.questionStart}-${currentPassage.questionEnd}`}
           questionsHeaderExtra={
-            <div className="text-xs text-gray-500">
-                {currentAnswered} / {currentPassage.questions.length} answered
+            <div className="text-xs font-medium">
+              {reviewMode ? (
+                <span className="text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  {currentPassage.questions.filter((q) => {
+                    if (q.qId in isCorrectMap) return isCorrectMap[q.qId];
+                    const a = answers[q.qId];
+                    const ca = correctAnswers[q.qId];
+                    return a != null && ca != null && String(a).trim().toLowerCase() === String(ca).trim().toLowerCase();
+                  }).length} / {currentPassage.questions.length} câu đúng
+                </span>
+              ) : (
+                <span className="text-gray-500">
+                  {currentAnswered} / {currentPassage.questions.length} answered
+                </span>
+              )}
             </div>
           }
           questionsBodyClassName="space-y-3"
@@ -206,6 +230,7 @@ export function IeltsReadingView({
                       onToggleFlag={onToggleFlag}
                       reviewMode={reviewMode}
                       correctAnswer={correctAnswers[q.qId]}
+                      isCorrect={isCorrectMap[q.qId]}
                     />
                   </div>
                 );

@@ -10,6 +10,8 @@
  *    Khi `lockAfterEnd=false` (practice mode): cho phép pause/seek/replay tự do.
  */
 import { useEffect, useRef, useState } from "react";
+import { normalizeAudioUrl } from "../../../../../../utils/examUtils";
+import { getFullMediaUrl } from "../../../../../../utils/mediaUtils";
 
 interface IeltsAudioOnceProps {
   src: string;
@@ -35,6 +37,7 @@ export function IeltsAudioOnce({
 }: IeltsAudioOnceProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [ended, setEnded] = useState(false);
+  const safeSrc = normalizeAudioUrl(getFullMediaUrl(src));
 
   // Try autoplay on mount
   useEffect(() => {
@@ -46,7 +49,7 @@ export function IeltsAudioOnce({
         // Autoplay blocked → học viên bấm play trên thanh mặc định
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPlay, src]);
+  }, [autoPlay, safeSrc]);
 
   const handleEnded = () => {
     if (lockAfterEnd) setEnded(true);
@@ -66,7 +69,7 @@ export function IeltsAudioOnce({
   return (
     <audio
       ref={audioRef}
-      src={src}
+      src={safeSrc}
       controls
       preload="auto"
       className="w-full"

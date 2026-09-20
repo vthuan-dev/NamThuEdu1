@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Loader2,
   AlertCircle,
+  AlertTriangle,
   Send,
   Plus,
   ChevronUp,
@@ -487,6 +488,9 @@ export function CreateThptExam() {
         age_group: ageGroup,
         thpt_config: config,
       });
+      if (examStatus === 'published') {
+        setHasDraft(true);
+      }
       setHasUnsaved(false);
       setLastSaved(new Date());
       // Sau khi lưu thành công → dữ liệu hiện tại trở thành baseline mới
@@ -501,6 +505,25 @@ export function CreateThptExam() {
 
   const handlePublish = async () => {
     if (!examId) return;
+
+    // 0) Nếu phát hiện đề có chỉnh sửa chưa lưu -> Yêu cầu giáo viên bấm Lưu trước!
+    if (hasUnsaved || isDirty) {
+      toast.warning(
+        examStatus === 'published'
+          ? "Đề đang có chỉnh sửa chưa lưu. Vui lòng bấm nút 'Lưu' trước khi cập nhật cho học viên nhé!"
+          : "Đề đang có chỉnh sửa chưa lưu. Vui lòng bấm nút 'Lưu' trước khi xuất bản nhé!",
+        6000,
+      );
+      const saveBtn = document.getElementById('btn-thpt-save');
+      if (saveBtn) {
+        saveBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        saveBtn.classList.add('ring-4', 'ring-amber-500');
+        setTimeout(() => {
+          saveBtn?.classList.remove('ring-4', 'ring-amber-500');
+        }, 2000);
+      }
+      return;
+    }
 
     // 1) Ràng buộc client: thiếu audio / cấu trúc phần
     if (publishBlockers.length > 0) {
@@ -525,15 +548,14 @@ export function CreateThptExam() {
     const wasRepublish = examStatus === 'published';
     setIsPublishing(true);
     try {
-      await handleSaveDraft();
       await api.post(`/teacher/exams/${examId}/thpt/publish`);
       setHasDraft(false);
       setExamStatus('published');
 
       if (wasRepublish) {
-        toast.success('Đã cập nhật đề. Học viên sẽ thấy bản mới ở lần thi tiếp theo.');
+        toast.success('Đã cập nhật đề thành công. Học viên sẽ thấy bản mới ở lần thi tiếp theo.');
       } else {
-        toast.success('Đã xuất bản đề thi.');
+        toast.success('Đã xuất bản đề thi thành công.');
       }
       navigate('/giao-vien/de-thi');
     } catch (err: any) {
@@ -648,31 +670,37 @@ export function CreateThptExam() {
                 </>
               )}
 
-              {/* Có thay đổi chưa cập nhật cho học viên */}
-              {hasDraft && (
+              {/* Trạng thái lưu / cập nhật */}
+              {(hasUnsaved || isDirty) ? (
+                <>
+                  <span className="text-slate-300">•</span>
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    Chưa lưu (hãy bấm Lưu)
+                  </span>
+                </>
+              ) : hasDraft ? (
                 <>
                   <span className="text-slate-300">•</span>
                   <span
-                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-semibold"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold text-xs"
                     style={{ backgroundColor: '#FEF3C7', color: '#92400E' }}
                   >
                     Có thay đổi chưa cập nhật
                   </span>
+                  {lastSaved && (
+                    <>
+                      <span className="text-slate-300">•</span>
+                      <span className="text-emerald-600 font-medium text-xs">Đã lưu {lastSaved.toLocaleTimeString('vi-VN')}</span>
+                    </>
+                  )}
                 </>
-              )}
-
-              {lastSaved && !hasUnsaved && (
+              ) : lastSaved ? (
                 <>
                   <span className="text-slate-300">•</span>
-                  <span className="text-emerald-600 font-medium">Đã lưu {lastSaved.toLocaleTimeString('vi-VN')}</span>
+                  <span className="text-emerald-600 font-medium text-xs">Đã lưu {lastSaved.toLocaleTimeString('vi-VN')}</span>
                 </>
-              )}
-              {hasUnsaved && (
-                <>
-                  <span className="text-slate-300">•</span>
-                  <span className="text-amber-600 font-medium">Chưa lưu</span>
-                </>
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -732,14 +760,14 @@ export function CreateThptExam() {
             <span>Import (AI)</span>
           </button>
 
-          {/* Nút LỨU riêng — trước đây chỉ có nút Xuất bản nên giáo viên không có
-              cách nào lưu nháp giữa lúc soạn ("chưa hiển thị nút lưu"). */}
+          {/* Nút LỨU riêng */}
           <button
+            id="btn-thpt-save"
             type="button"
             onClick={async () => {
               try {
                 await handleSaveDraft();
-                toast.success('Đã lưu.');
+                toast.success('Đã lưu thay đổi thành công. Bạn có thể bấm "Cập nhật cho học viên" khi sẵn sàng.');
               } catch {
                 /* handleSaveDraft đã hiện lỗi */
               }
@@ -748,19 +776,25 @@ export function CreateThptExam() {
             title={
               !hasUnsaved && !isDirty
                 ? 'Không có thay đổi nào cần lưu'
-                : 'Lưu thay đổi (chưa áp dụng cho học viên)'
+                : 'Lưu thay đổi (vui lòng lưu trước khi cập nhật cho học viên)'
             }
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold text-slate-700 bg-white ring-1 ring-slate-300 hover:bg-slate-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-sm"
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-semibold transition-all text-sm cursor-pointer ${
+              hasUnsaved || isDirty
+                ? 'text-amber-900 bg-amber-100 ring-2 ring-amber-400 hover:bg-amber-200 shadow-sm animate-pulse'
+                : 'text-slate-700 bg-white ring-1 ring-slate-300 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed'
+            }`}
           >
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icons.Save className="w-4 h-4" />}
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icons.Save className={`w-4 h-4 ${hasUnsaved || isDirty ? 'text-amber-700' : ''}`} />}
             <span>Lưu</span>
+            {(hasUnsaved || isDirty) && (
+              <span className="w-2 h-2 rounded-full bg-amber-600 animate-ping" />
+            )}
           </button>
 
-          {/* Xuất bản (tự lưu thay đổi trước khi áp dụng cho học viên).
-              Đề đã xuất bản → chỉ bật khi có thay đổi so với CSDL (isDirty). */}
+          {/* Xuất bản / Cập nhật cho học viên */}
           {(() => {
             const isPublished = examStatus === 'published';
-            const canPublish = isPublished ? isDirty : true;
+            const canPublish = isPublished ? (hasDraft || isDirty || hasUnsaved) : true;
             const disabled =
               isPublishing || isSaving || !examId || total === 0 || !isOwner || !canPublish;
             return (
@@ -771,13 +805,17 @@ export function CreateThptExam() {
                 title={
                   !isOwner
                     ? 'Đề của giáo viên khác — chỉ xem'
-                    : isPublished && !isDirty
+                    : isPublished && !canPublish
                     ? 'Chưa có thay đổi nào so với bản đang chạy'
+                    : (hasUnsaved || isDirty)
+                    ? 'Có thay đổi chưa lưu — Vui lòng bấm "Lưu" trước khi cập nhật'
                     : isPublished
-                    ? 'Lưu và cập nhật đề. Học viên sẽ thấy bản mới ở lần thi tiếp theo.'
+                    ? 'Cập nhật đề cho học viên. Học viên sẽ thấy bản mới ở lần thi tiếp theo.'
                     : 'Xuất bản đề cho học viên'
                 }
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-sm"
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg font-semibold text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-sm ${
+                  !disabled && hasDraft && !hasUnsaved && !isDirty ? 'ring-2 ring-blue-400 shadow-md' : ''
+                }`}
                 style={{ backgroundColor: THPT_THEME.primary }}
               >
                 {isPublishing || isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -995,26 +1033,40 @@ export function CreateThptExam() {
             </div>
           )}
 
-          {/* Banner: đang có thay đổi chưa cập nhật cho học viên */}
-          {isOwner && hasDraft && (
+          {/* Banner: Đang có thay đổi chưa lưu */}
+          {isOwner && (hasUnsaved || isDirty) && (
             <div
               className="rounded-xl px-4 py-3 border flex items-start gap-2.5 text-sm"
               style={{ backgroundColor: '#FFFBEB', borderColor: '#FCD34D', color: '#92400E' }}
             >
-              <History className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600" />
               <div className="flex-1">
-                <div className="font-semibold">Bạn đang chỉnh sửa</div>
-                <div className="text-xs mt-0.5 opacity-90">
-                  Học viên vẫn đang dùng bản cũ. Thay đổi chỉ áp dụng khi bạn bấm{' '}
-                  <span className="font-semibold">Cập nhật cho học viên</span>. Học viên đang làm bài dở
-                  không bị gián đoạn, lần thi tiếp theo mới thấy bản mới.
+                <div className="font-semibold text-amber-900">Đề đang có chỉnh sửa chưa lưu</div>
+                <div className="text-xs mt-0.5 text-amber-800">
+                  Vui lòng bấm nút <span className="font-bold underline text-amber-950">Lưu</span> trên thanh công cụ trước. Sau khi lưu xong, bạn hãy bấm <span className="font-bold text-blue-700">Cập nhật cho học viên</span> để áp dụng nội dung mới cho học sinh làm bài.
                 </div>
               </div>
             </div>
           )}
 
-          {/* Banner: đã xuất bản, chưa có thay đổi */}
-          {isOwner && examStatus === 'published' && !hasDraft && (
+          {/* Banner: Đã lưu bản nháp nhưng chưa cập nhật cho học viên */}
+          {isOwner && hasDraft && !hasUnsaved && !isDirty && (
+            <div
+              className="rounded-xl px-4 py-3 border flex items-start gap-2.5 text-sm"
+              style={{ backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', color: '#1E40AF' }}
+            >
+              <History className="w-4 h-4 flex-shrink-0 mt-0.5 text-blue-600" />
+              <div className="flex-1">
+                <div className="font-semibold text-blue-900">Bản chỉnh sửa đã được lưu an toàn</div>
+                <div className="text-xs mt-0.5 text-blue-800">
+                  Học viên vẫn đang làm bài theo bản cũ. Bấm <span className="font-semibold underline">Cập nhật cho học viên</span> để áp dụng bản mới này cho học sinh.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Banner: Đã xuất bản, không có thay đổi dở dang */}
+          {isOwner && examStatus === 'published' && !hasDraft && !hasUnsaved && !isDirty && (
             <div
               className="rounded-xl px-4 py-3 border flex items-start gap-2.5 text-sm"
               style={{ backgroundColor: '#F0FDF4', borderColor: '#BBF7D0', color: '#166534' }}
@@ -1023,7 +1075,7 @@ export function CreateThptExam() {
               <div className="flex-1">
                 <div className="font-semibold">Đề đang phát cho học viên</div>
                 <div className="text-xs mt-0.5 opacity-90">
-                  Bạn có thể sửa thoải mái — học viên chưa thấy ngay. Sửa xong bấm{' '}
+                  Bạn có thể chỉnh sửa đề thoải mái. Khi sửa xong, hãy bấm <span className="font-semibold">Lưu</span> rồi bấm{' '}
                   <span className="font-semibold">Cập nhật cho học viên</span> để áp dụng.
                 </div>
               </div>

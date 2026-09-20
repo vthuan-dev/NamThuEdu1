@@ -372,3 +372,23 @@ export const formatErrorSentence = (
   return result;
 };
 
+/**
+ * Chuẩn hoá URL file audio: tự động nâng cấp http:// sang https://
+ * để tránh bị trình duyệt chặn Mixed Content trên trang HTTPS.
+ */
+export const normalizeAudioUrl = (url?: string | null): string => {
+  if (!url) return "";
+  const trimmed = url.trim();
+  if (!trimmed) return "";
+  if (/^http:\/\/namthuedu\.vn/i.test(trimmed)) {
+    return trimmed.replace(/^http:\/\/namthuedu\.vn/i, "https://namthuedu.vn");
+  }
+  if (/^http:\/\/www\.namthuedu\.vn/i.test(trimmed)) {
+    return trimmed.replace(/^http:\/\/www\.namthuedu\.vn/i, "https://www.namthuedu.vn");
+  }
+  if (typeof window !== "undefined" && window.location.protocol === "https:" && /^http:\/\//i.test(trimmed) && !trimmed.includes("localhost") && !trimmed.includes("127.0.0.1")) {
+    return trimmed.replace(/^http:\/\//i, "https://");
+  }
+  return trimmed;
+};
+

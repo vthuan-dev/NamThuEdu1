@@ -634,9 +634,8 @@ export function IeltsListeningEditor({
       }
     } catch (err: any) {
       console.error("Audio upload failed:", err);
-      // Fallback: dùng object URL local — vẫn cho transcribe được
-      uploadedUrl = URL.createObjectURL(file);
-      updateSection(activeSection, { audioUrl: uploadedUrl, audioFileName: file.name });
+      const errMsg = err?.response?.data?.message || err?.message || "Upload audio thất bại";
+      alert(`Không thể tải file audio lên máy chủ: ${errMsg}`);
     } finally {
       setUploadingSection(null);
     }

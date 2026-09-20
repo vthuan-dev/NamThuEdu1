@@ -521,6 +521,7 @@ export function makeListeningMcItem(qn: number) {
     prompt: '',
     options: ['A', 'B', 'C', 'D'].map((id) => ({ id, text: '' })),
     correct_id: '',
+    explanation: '',
   };
 }
 
@@ -532,6 +533,7 @@ export function makeListeningFillItem(qn: number) {
     prompt: '',
     accepted_answers: [''],
     case_sensitive: false,
+    explanation: '',
   };
 }
 

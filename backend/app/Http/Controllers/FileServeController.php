@@ -18,37 +18,32 @@ class FileServeController extends Controller
         $path = storage_path('app/public/exam_audio/' . $filename);
         
         if (!file_exists($path)) {
+            $altPaths = [
+                public_path('files/audio/' . $filename),
+                storage_path('app/public/kids-exams/audios/' . $filename),
+                storage_path('app/public/audios/' . $filename),
+            ];
+            foreach ($altPaths as $alt) {
+                if (file_exists($alt)) {
+                    $path = $alt;
+                    break;
+                }
+            }
+        }
+        
+        if (!file_exists($path)) {
             \Log::error('Audio file not found', ['path' => $path]);
             return response()->json(['error' => 'File not found'], 404)
                 ->header('Access-Control-Allow-Origin', '*');
         }
         
-        $file = file_get_contents($path);
-        $mimeType = mime_content_type($path);
-        $fileSize = filesize($path);
-        
-        \Log::info('Serving audio file', [
-            'path' => $path,
-            'size' => $fileSize,
-            'mime' => $mimeType
+        return response()->file($path, [
+            'Access-Control-Allow-Origin' => '*',
+            'Access-Control-Allow-Methods' => 'GET, HEAD, OPTIONS',
+            'Access-Control-Allow-Headers' => 'Origin, Content-Type, Accept, Range',
+            'Access-Control-Expose-Headers' => 'Content-Length, Content-Range, Accept-Ranges',
+            'Cache-Control' => 'public, max-age=31536000',
         ]);
-        
-        // Return response with explicit headers
-        $response = response($file, 200);
-        $response->header('Content-Type', $mimeType);
-        $response->header('Content-Length', $fileSize);
-        $response->header('Access-Control-Allow-Origin', '*');
-        $response->header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-        $response->header('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Range');
-        $response->header('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
-        $response->header('Accept-Ranges', 'bytes');
-        $response->header('Cache-Control', 'public, max-age=31536000');
-        
-        \Log::info('Response headers set', [
-            'headers' => $response->headers->all()
-        ]);
-        
-        return $response;
     }
     
     /**

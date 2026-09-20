@@ -4892,7 +4892,7 @@ class StudentTestController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'audio' => 'required|file|mimes:webm,ogg,mp4,wav,m4a,aac|max:102400', // 100 MB
+            'audio' => 'required|file|mimes:mp3,webm,ogg,mp4,wav,m4a,aac|max:102400', // 100 MB
         ]);
         if ($validator->fails()) {
             return response()->json(['status' => 'error', 'message' => 'File âm thanh không hợp lệ.', 'errors' => $validator->errors()], 400);

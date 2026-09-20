@@ -2290,8 +2290,8 @@ class ExamController extends Controller
         }
 
         $exam = Exam::where('eId', $examId)
-                    
-                    ->first();
+            ->where('eTeacher_id', $user->uId)
+            ->first();
 
         if (!$exam) {
             return response()->json([

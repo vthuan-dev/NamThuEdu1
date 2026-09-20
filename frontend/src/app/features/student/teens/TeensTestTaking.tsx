@@ -35,6 +35,8 @@ import { examDraftStorage } from '../../../../lib/exam/examDraftStorage';
 import { HighlightablePassage } from '../components/HighlightablePassage';
 import { useTextHighlight } from '../../../../hooks/exam/useTextHighlight';
 import { RichText } from '../../../../components/ui/RichText';
+import { normalizeAudioUrl } from '../../../../utils/examUtils';
+import { getFullMediaUrl } from '../../../../utils/mediaUtils';
 
 const BASE = '/hoc-vien';
 const TEAL = '#0D9488';
@@ -686,7 +688,9 @@ export function TeensTestTaking() {
   }, [current, started]);
 
   const playAudio = () => {
-    const url = q?.qMedia_url as string | undefined;
+    const rawUrl = q?.qMedia_url as string | undefined;
+    if (!rawUrl) return;
+    const url = normalizeAudioUrl(getFullMediaUrl(rawUrl) ?? rawUrl);
     if (!url) return;
     if (!audioRef.current || audioRef.current.src !== url) audioRef.current = new Audio(url);
     audioRef.current.play().catch(() => undefined);
@@ -1021,7 +1025,14 @@ export function TeensTestTaking() {
 
                     {/* Audio/ảnh per-câu: ẩn khi đã có image-block chung bên trái */}
                     {!isImageBlock && gq?.qMedia_url && (
-                      <button onClick={(e) => { e.stopPropagation(); const a = new Audio(gq.qMedia_url); a.play().catch(() => undefined); }}
+                      <button onClick={(e) => {
+                        e.stopPropagation();
+                        const rawUrl = gq.qMedia_url;
+                        const url = normalizeAudioUrl(getFullMediaUrl(rawUrl) ?? rawUrl);
+                        if (!url) return;
+                        if (!audioRef.current || audioRef.current.src !== url) audioRef.current = new Audio(url);
+                        audioRef.current.play().catch(() => undefined);
+                      }}
                         className="mb-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-white font-semibold text-sm"
                         style={{ background: `linear-gradient(135deg, ${TEAL}, ${TEAL_MID})` }}>
                         <Volume2 className="w-4 h-4" /> Nghe đoạn ghi âm

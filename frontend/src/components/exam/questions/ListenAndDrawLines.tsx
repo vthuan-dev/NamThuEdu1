@@ -3,6 +3,7 @@ import { Volume2 } from 'lucide-react';
 import { QuestionRendererProps } from '../../../types/exam';
 import { extractTaskData } from '../../../utils/examDataExtractor';
 import { getFullMediaUrl } from '../../../utils/mediaUtils';
+import { normalizeAudioUrl } from '../../../utils/examUtils';
 
 export function ListenAndDrawLines({
   question,
@@ -16,7 +17,7 @@ export function ListenAndDrawLines({
   const taskData = extractTaskData(question);
   const { instructions, imageUrl: rawImageUrl, audioUrl: rawAudioUrl, items = [] } = taskData;
   const imageUrl = rawImageUrl ? getFullMediaUrl(rawImageUrl) : '';
-  const audioUrl = rawAudioUrl ? getFullMediaUrl(rawAudioUrl) : '';
+  const audioUrl = rawAudioUrl ? normalizeAudioUrl(getFullMediaUrl(rawAudioUrl) ?? rawAudioUrl) : '';
   const isInteractive = mode === 'student';
   const matchingMode: string =
     (taskData as any).matchingMode ||

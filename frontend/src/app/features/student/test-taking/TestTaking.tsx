@@ -19,6 +19,8 @@ import { examDraftStorage } from "../../../../lib/exam/examDraftStorage";
 import { useTranslation } from "react-i18next";
 import { PassageSplitLayout } from "../components/PassageSplitLayout";
 import { getAuthUser } from "../../../../utils/authStorage";
+import { normalizeAudioUrl } from "../../../../utils/examUtils";
+import { getFullMediaUrl } from "../../../../utils/mediaUtils";
 
 // VSTEP Structure - 4 Skills, 7 Parts
 const VSTEP_STRUCTURE = {
@@ -539,7 +541,8 @@ export function TestTaking() {
     if (activeSkill !== "listening") return;
     if (listeningPlayedSections[activeSectionKey]) return;
 
-    const mediaUrl = currentPartQuestions[0]?.qMedia_url as string | undefined;
+    const rawMediaUrl = currentPartQuestions[0]?.qMedia_url as string | undefined;
+    const mediaUrl = normalizeAudioUrl(getFullMediaUrl(rawMediaUrl) ?? rawMediaUrl);
     if (mediaUrl) {
       if (!audioPlayerRef.current || audioPlayerRef.current.src !== mediaUrl) {
         audioPlayerRef.current = new Audio(mediaUrl);
@@ -638,7 +641,9 @@ export function TestTaking() {
   };
 
   const playSpeakingAudio = (qid: string) => {
-    const url = speakingMediaMap[qid]?.url;
+    const rawUrl = speakingMediaMap[qid]?.url;
+    if (!rawUrl) return;
+    const url = normalizeAudioUrl(getFullMediaUrl(rawUrl) ?? rawUrl);
     if (!url) return;
     const a = new Audio(url);
     a.play().catch(() => undefined);

@@ -30,7 +30,8 @@ import { usePageTitle } from "../../../../hooks/usePageTitle";
 import { useExamSession } from "../../../../hooks/exam/useExamSession";
 import { useConfirm } from "../../../../contexts/ConfirmContext";
 import { PassageSplitLayout } from "../components/PassageSplitLayout";
-import { sanitizePassageHtml } from "../../../../utils/examUtils";
+import { sanitizePassageHtml, normalizeAudioUrl } from "../../../../utils/examUtils";
+import { getFullMediaUrl } from "../../../../utils/mediaUtils";
 import { RichText } from "../../../../components/ui/RichText";
 
 /* ============================================================
@@ -3732,6 +3733,7 @@ function QuestionCard({ q, selected, onSelect, flagged, onToggleFlag, reviewMode
 const SPEEDS = [0.75, 1, 1.25, 1.5, 2];
 
 function AudioPlayer({ src, reviewMode = false }: { src?: string; reviewMode?: boolean }) {
+  const safeSrc = normalizeAudioUrl(getFullMediaUrl(src) ?? src);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const seekRef = useRef<HTMLDivElement | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -3750,15 +3752,15 @@ function AudioPlayer({ src, reviewMode = false }: { src?: string; reviewMode?: b
     setPlaying(false); setCurrentTime(0); setDuration(0); setPlayed(false); setLoadError(false);
     const onTime    = () => setCurrentTime(a.currentTime);
     const onLoaded  = () => setDuration(a.duration || 0);
-    const onEnded   = () => { setPlaying(false); setCurrentTime(0); };
-    const onError   = () => { setLoadError(true); console.error("[AudioPlayer] Failed to load:", src); };
+    const onEnded   = () => { setPlaying(false); setCurrentTime(0); setPlayed(true); };
+    const onError   = () => { setLoadError(true); console.error("[AudioPlayer] Failed to load:", safeSrc); };
     a.addEventListener("timeupdate", onTime);
     a.addEventListener("loadedmetadata", onLoaded);
     a.addEventListener("durationchange", onLoaded);
     a.addEventListener("ended", onEnded);
     a.addEventListener("error", onError);
     // Force reload so the browser actually fetches the new src
-    if (src) a.load();
+    if (safeSrc) a.load();
     return () => {
       a.removeEventListener("timeupdate", onTime);
       a.removeEventListener("loadedmetadata", onLoaded);
@@ -3766,7 +3768,7 @@ function AudioPlayer({ src, reviewMode = false }: { src?: string; reviewMode?: b
       a.removeEventListener("ended", onEnded);
       a.removeEventListener("error", onError);
     };
-  }, [src]);
+  }, [safeSrc]);
 
   // Khi component unmount (rời trang/đổi part) → dừng audio đang phát.
   // Đặc biệt cần thiết cho review mode: rời sang skill khác mà audio vẫn chạy là khó chịu.
@@ -3791,20 +3793,20 @@ function AudioPlayer({ src, reviewMode = false }: { src?: string; reviewMode?: b
       } else { a.pause(); setPlaying(false); }
       return;
     }
-    // Exam mode: chỉ phát 1 lần.
-    // QUAN TRỌNG (iOS): play() trả về Promise và có thể bị trình duyệt từ chối
-    // (autoplay policy). Chỉ đánh dấu "đã phát" (setPlayed) SAU KHI play() thành
-    // công — nếu không, học sinh bấm Play mà bị chặn sẽ mất luôn lượt nghe.
+    // Exam mode: chỉ phát 1 lần cho đến khi kết thúc (onEnded).
+    // Trong lúc đang nghe, học sinh có thể tạm dừng/tiếp tục.
     if (played) return;
-    a.play()
-      .then(() => { setPlaying(true); setPlayed(true); })
-      .catch((err) => {
-        // iOS/Safari có thể từ chối play() nếu không đúng ngữ cảnh user-gesture.
-        // KHÔNG đánh dấu played/loadError — giữ nguyên nút Play để học sinh bấm lại,
-        // tránh mất lượt nghe "1 lần duy nhất" một cách oan uổng.
-        console.error("[AudioPlayer] play() rejected — giữ nút Play để thử lại:", err);
-        setPlaying(false);
-      });
+    if (a.paused) {
+      a.play()
+        .then(() => { setPlaying(true); })
+        .catch((err) => {
+          console.error("[AudioPlayer] play() rejected — giữ nút Play để thử lại:", err);
+          setPlaying(false);
+        });
+    } else {
+      a.pause();
+      setPlaying(false);
+    }
   };
 
   const seek = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -3819,7 +3821,7 @@ function AudioPlayer({ src, reviewMode = false }: { src?: string; reviewMode?: b
   const fmt = (s: number) => { if (!isFinite(s)) return "00:00"; return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`; };
   const VolumeIcon = muted || volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
 
-  if (!src) {
+  if (!safeSrc) {
     return (<div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center gap-3 text-slate-400 text-sm"><div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center"><Volume2 className="w-5 h-5" /></div>Chưa có audio cho phần này</div>);
   }
 
@@ -3830,16 +3832,16 @@ function AudioPlayer({ src, reviewMode = false }: { src?: string; reviewMode?: b
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           Không thể tải file audio. Vui lòng liên hệ giáo viên.
         </div>
-        <p className="text-[11px] text-red-400 font-mono break-all">{src}</p>
+        <p className="text-[11px] text-red-400 font-mono break-all">{safeSrc}</p>
       </div>
     );
   }
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-      <audio ref={audioRef} src={src} preload="metadata" />
+      <audio ref={audioRef} src={safeSrc} preload="metadata" />
       <div className="px-4 py-2.5 flex items-center gap-3">
-        <button onClick={toggle} disabled={!reviewMode && played} title={reviewMode ? (playing ? "Tạm dừng" : "Phát") : (played ? "Bài nghe đã phát" : "Phát bài nghe")}
+        <button onClick={toggle} disabled={!reviewMode && played} title={reviewMode ? (playing ? "Tạm dừng" : "Phát") : (played ? "Bài nghe đã phát xong" : (playing ? "Tạm dừng" : "Phát bài nghe"))}
           className={`w-9 h-9 rounded-full text-white flex items-center justify-center transition-all flex-shrink-0 ${(!reviewMode && played) ? "bg-slate-300 cursor-not-allowed" : "bg-slate-900 hover:bg-slate-700 active:scale-95 cursor-pointer"}`}>
           {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
         </button>

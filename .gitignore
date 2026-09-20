@@ -76,6 +76,7 @@ backend/bootstrap/cache/
 *~
 nul
 backend/nul
+scratch/
 
 # Package manager locks (keep these)
 # package-lock.json

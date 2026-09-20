@@ -315,7 +315,7 @@ class GradingReviewController extends Controller
 
     private function ensureSubmissionAccess(int $id, $teacher)
     {
-        if (!$teacher || $teacher->uRole !== 'teacher') {
+        if (!$teacher || !in_array($teacher->uRole, ['teacher', 'admin'], true)) {
             return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
         }
 

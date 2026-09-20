@@ -915,13 +915,48 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
 
       {/* Review mode banner */}
       {reviewMode && (
-        <div className="bg-[#f8fafb] border-b border-[#e2e8f0] py-2 px-4 text-sm text-[#475569] flex items-center justify-center gap-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
-          <span>Chế độ xem lại — đáp án đã được điền sẵn từ bài nộp</span>
+        <div className="bg-[#f8fafb] border-b border-[#e2e8f0] py-2.5 px-4 text-sm text-[#475569] flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+            <span className="font-semibold text-slate-700">Chế độ xem lại</span>
+            <span className="hidden sm:inline text-xs text-slate-500">— Đáp án đã được điền sẵn từ bài nộp</span>
+          </div>
+
+          {/* Full test skill switcher */}
+          {skillSequence.length > 1 && (
+            <div className="flex items-center gap-1 bg-slate-200/70 p-1 rounded-lg">
+              {skillSequence.map((sk, idx) => {
+                const labels: Record<IeltsSkill, string> = {
+                  listening: "Listening",
+                  reading: "Reading",
+                  writing: "Writing",
+                  speaking: "Speaking",
+                };
+                const isActive = idx === skillIdx;
+                return (
+                  <button
+                    key={sk}
+                    type="button"
+                    onClick={() => {
+                      setSkillIdx(idx);
+                    }}
+                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                      isActive
+                        ? "bg-white text-emerald-700 shadow-sm font-bold"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+                    }`}
+                  >
+                    {labels[sk]}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="ml-3 px-2.5 py-0.5 rounded border border-[#cbd5e1] text-xs text-[#334155] hover:bg-[#e2e8f0] transition-colors cursor-pointer"
+            className="px-3 py-1 rounded-md border border-[#cbd5e1] text-xs font-medium text-[#334155] hover:bg-[#e2e8f0] transition-colors cursor-pointer"
           >
             ← Về kết quả
           </button>

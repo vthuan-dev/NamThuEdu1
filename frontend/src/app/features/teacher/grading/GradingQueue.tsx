@@ -1009,18 +1009,18 @@ export function GradingQueue() {
 
               {/* ── Split Layout: Students List (Left) & Submissions List (Right) ── */}
               {!loading && !error && (
-                <div className="flex flex-col lg:flex-row gap-6 items-start">
-                            {/* Left Panel: Student List Sidebar (320px) */}
-              <div className="w-full lg:w-[320px] lg:flex-shrink-0 bg-white border border-slate-100 rounded-2xl p-4 flex flex-col gap-3 shadow-sm">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1 flex items-center gap-1.5">
-                  Danh sách học sinh ({studentList.length})
-                  {pinnedStudents.size > 0 && (
-                    <span className="inline-flex items-center gap-0.5 text-amber-500 normal-case">
-                      <Pin className="w-3 h-3 fill-amber-500" /> {pinnedStudents.size}
-                    </span>
-                  )}
-                </p>
-                <div className="flex flex-col gap-2 max-h-[600px] overflow-y-auto pr-1 scrollbar-thin">
+                <div className="flex flex-col lg:flex-row gap-6 items-stretch lg:sticky lg:top-4 lg:h-[calc(100vh-6rem)]">
+                  {/* Left Panel: Student List Sidebar (320px) */}
+                  <div className="w-full lg:w-[320px] lg:flex-shrink-0 bg-white border border-slate-100 rounded-2xl p-4 flex flex-col gap-3 shadow-sm lg:h-full">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1 flex items-center gap-1.5 flex-shrink-0">
+                      Danh sách học sinh ({studentList.length})
+                      {pinnedStudents.size > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-amber-500 normal-case">
+                          <Pin className="w-3 h-3 fill-amber-500" /> {pinnedStudents.size}
+                        </span>
+                      )}
+                    </p>
+                    <div className="flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto pr-1 scrollbar-thin">
                   {studentList.map((stu) => {
                     const isSelected = stu.studentName === selectedStudentName;
                     const isPinned = pinnedStudents.has(stu.studentId);
@@ -1122,12 +1122,12 @@ export function GradingQueue() {
                 </div>
               </div>
 
-                            {/* Right Panel: Student Submissions Detail (flex-1) */}
-              <div className="flex-1 w-full bg-white rounded-2xl border border-slate-100 p-5 lg:p-6 overflow-hidden shadow-sm">
+              {/* Right Panel: Student Submissions Detail (flex-1) */}
+              <div className="flex-1 w-full bg-white rounded-2xl border border-slate-100 p-5 lg:p-6 overflow-hidden shadow-sm flex flex-col lg:h-full">
                 {selectedStudentData ? (
-                  <div key={selectedStudentName} className="flex flex-col gap-5 animate-fade-in-up">
-                                        {/* Header: Student Info */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-3">
+                  <div key={selectedStudentName} className="flex-1 min-h-0 flex flex-col gap-4 animate-fade-in-up">
+                    {/* Header: Student Info */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-3 flex-shrink-0">
                       <div className="flex items-center gap-3.5 min-w-0">
                         {/* Avatar học viên */}
                         <div className="relative flex-shrink-0">
@@ -1270,7 +1270,7 @@ export function GradingQueue() {
                     </div>
 
                     {/* Search trong bảng bài làm + sort hint */}
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between flex-shrink-0">
                       <div className="relative flex-1 min-w-[200px] max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
@@ -1321,12 +1321,12 @@ export function GradingQueue() {
                     </div>
 
                     {/* Table of Submissions */}
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[600px]">
-                        <thead>
-                          <tr className="bg-slate-50 border-b border-slate-100 select-none">
+                    <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0 border border-slate-100 rounded-xl scrollbar-thin">
+                      <table className="w-full min-w-[600px] border-separate border-spacing-0">
+                        <thead className="sticky top-0 z-10 bg-slate-50 shadow-sm">
+                          <tr className="bg-slate-50 select-none">
                             {sourceTab === "assigned" && (
-                              <th className="px-4 py-3 w-12 rounded-tl-2xl">
+                              <th className="px-4 py-3 w-12 rounded-tl-xl bg-slate-50 border-b border-slate-100">
                                 <input
                                   type="checkbox"
                                   className="w-4 h-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed accent-violet-600"
@@ -1342,7 +1342,7 @@ export function GradingQueue() {
                             )}
                             <th
                               onClick={() => handleSort("exam")}
-                              className={`px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group ${sourceTab !== "assigned" ? "rounded-tl-2xl" : ""}`}
+                              className={`px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group bg-slate-50 border-b border-slate-100 ${sourceTab !== "assigned" ? "rounded-tl-xl" : ""}`}
                               title="Sắp xếp theo tên đề thi"
                             >
                               <div className="flex items-center gap-1">
@@ -1360,7 +1360,7 @@ export function GradingQueue() {
                             </th>
                             <th
                               onClick={() => handleSort("time")}
-                              className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group"
+                              className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group bg-slate-50 border-b border-slate-100"
                               title="Sắp xếp theo thời gian nộp"
                             >
                               <div className="flex items-center gap-1">
@@ -1378,7 +1378,7 @@ export function GradingQueue() {
                             </th>
                             <th
                               onClick={() => handleSort("status")}
-                              className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group"
+                              className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group bg-slate-50 border-b border-slate-100"
                               title="Sắp xếp theo trạng thái"
                             >
                               <div className="flex items-center gap-1">
@@ -1396,7 +1396,7 @@ export function GradingQueue() {
                             </th>
                             <th
                               onClick={() => handleSort("score")}
-                              className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group"
+                              className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group bg-slate-50 border-b border-slate-100"
                               title="Sắp xếp theo điểm"
                             >
                               <div className="flex items-center gap-1">
@@ -1414,7 +1414,7 @@ export function GradingQueue() {
                             </th>
                             <th
                               onClick={() => handleSort("gradedTime")}
-                              className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group"
+                              className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors group bg-slate-50 border-b border-slate-100"
                               title="Sắp xếp theo thời gian chấm"
                             >
                               <div className="flex items-center gap-1">
@@ -1431,16 +1431,16 @@ export function GradingQueue() {
                               </div>
                             </th>
                             {sourceTab === "assigned" && (
-                              <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                              <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-100">
                                 {t("teacher.grading.table.review")}
                               </th>
                             )}
-                            <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider rounded-tr-2xl">
+                            <th className="px-4 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider rounded-tr-xl bg-slate-50 border-b border-slate-100">
                               {t("teacher.grading.table.actions")}
                             </th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-50">
+                        <tbody className="divide-y divide-slate-50 bg-white">
                           {paginatedSubmissions.map((sub) => {
                             const cfg = STATUS_CONFIG[sub.status] ?? STATUS_CONFIG.submitted;
                             const isReviewed = !!sub.teacher_reviewed_at;
@@ -1703,7 +1703,7 @@ export function GradingQueue() {
                     </div>
                     {/* Pagination Controls */}
                     {totalPages > 1 && (
-                      <div className="flex items-center justify-between border-t border-slate-100 pt-4 mt-2">
+                      <div className="flex items-center justify-between border-t border-slate-100 pt-3 mt-auto flex-shrink-0">
                         <p className="text-xs text-slate-500 font-medium">
                           Hiển thị <span className="font-semibold text-slate-700">{startIndex + 1}</span> - <span className="font-semibold text-slate-700">{Math.min(endIndex, totalItems)}</span> trên <span className="font-semibold text-slate-700">{totalItems}</span> bài
                         </p>

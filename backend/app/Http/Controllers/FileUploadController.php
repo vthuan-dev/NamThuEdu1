@@ -71,7 +71,8 @@ class FileUploadController extends Controller
             }
 
             // Generate public URL - use /files/audio/ instead of /storage/
-            $audioUrl = url('files/audio/' . $filename);
+            $isHttps = $request->isSecure() || $request->header('X-Forwarded-Proto') === 'https' || config('app.env') === 'production';
+            $audioUrl = $isHttps ? secure_url('files/audio/' . $filename) : url('files/audio/' . $filename);
 
             // Log upload info
             \Log::info('Audio uploaded successfully', [

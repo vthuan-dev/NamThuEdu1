@@ -22,7 +22,7 @@ import { useToastContext } from "../../../../contexts/ToastContext";
 import { api } from "../../../../services/api";
 import { gradingApi } from "../../../../services/gradingApi";
 import { getFullMediaUrl } from "../../../../utils/mediaUtils";
-import { sanitizePassageHtml } from "../../../../utils/examUtils";
+import { sanitizePassageHtml, normalizeAudioUrl } from "../../../../utils/examUtils";
 import {
   ChevronLeft, Save, Loader2, AlertCircle, CheckCircle2,
   Headphones, BookOpen, PenLine, Mic, Award, Sparkles,
@@ -920,7 +920,7 @@ function QuestionRow({
         </div>
         {q.audioUrl ? (
           <div className="space-y-2">
-            <audio controls preload="none" src={getFullMediaUrl(q.audioUrl) ?? q.audioUrl} className="w-full h-9">
+            <audio controls preload="none" src={normalizeAudioUrl(getFullMediaUrl(q.audioUrl) ?? q.audioUrl)} className="w-full h-9">
               Trình duyệt không hỗ trợ phát audio.
             </audio>
             {q.transcript && (

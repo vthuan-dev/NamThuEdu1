@@ -8,6 +8,8 @@ import {
   isSuffixComparisonGroup,
   hasHtmlOrEntities,
   sanitizeRichContent,
+  sanitizeInlineHtml,
+  normalizeAudioUrl,
 } from '../../../../../../utils/examUtils';
 import { useTextHighlight } from '../../../../../../hooks/exam/useTextHighlight';
 
@@ -120,6 +122,39 @@ function FormattedContext({ content }: { content?: string }) {
   );
 }
 
+/**
+ * Render prompt câu hỏi với định dạng rich text an toàn (đậm, nghiêng, gạch chân).
+ * Giữ nguyên font-normal cho text thông thường, chỉ in đậm/gạch chân từ có thẻ do GV định dạng.
+ */
+function QuestionPrompt({
+  content,
+  className = '',
+}: {
+  content?: string | null;
+  className?: string;
+}) {
+  if (!content) return null;
+  const raw = String(content).trim();
+  if (!raw) return null;
+
+  // Hỗ trợ chia dòng khi có danh sách lựa chọn a. b. c. trong prompt
+  const parts = raw.split(/\s+(?=[a-e]\.\s)/i);
+
+  return (
+    <div
+      className={`text-sm text-slate-800 leading-relaxed font-normal mb-3 space-y-1.5 [&_b]:font-bold [&_b]:text-slate-900 [&_strong]:font-bold [&_strong]:text-slate-900 [&_u]:underline [&_u]:underline-offset-2 [&_i]:italic [&_em]:italic [&_s]:line-through break-words ${className}`}
+    >
+      {parts.map((part, i) => (
+        <p
+          key={i}
+          className="leading-relaxed"
+          dangerouslySetInnerHTML={{ __html: sanitizeRichContent(part.trim()) }}
+        />
+      ))}
+    </div>
+  );
+}
+
 interface Props {
   section: ThptSection;
   answers: ThptAnswers;
@@ -157,6 +192,9 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
   const isListeningImageBlock =
     section.type === 'listening' && taskImage.length > 0 && layoutMode === 'image_block';
 
+  const rawAudio = (section as any).audio_url as string | undefined;
+  const audioUrl = normalizeAudioUrl(rawAudio);
+
   const headerEl = !hideHeader ? (
     // Nhánh đọc chia đôi: section đã khóa chiều cao & không cuộn → header đứng
     // yên (flex-none), KHÔNG sticky để tránh offset top-[68px] làm lệch/bị
@@ -175,12 +213,31 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
     </header>
   ) : null;
 
+  // Thanh nghe audio chung: hiển thị ở vị trí trên cùng của bất kỳ phần thi nào có audio_url
+  const audioBarEl = audioUrl ? (
+    <div className="rounded-2xl border border-teal-200 bg-teal-50/80 p-3 flex items-center gap-3 shadow-xs sticky top-[68px] z-10 backdrop-blur">
+      <div className="w-8 h-8 rounded-lg bg-teal-600 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+        <Headphones className="w-4 h-4" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <audio
+          controls
+          controlsList="nodownload"
+          preload="metadata"
+          src={audioUrl}
+          className="w-full h-9"
+        />
+      </div>
+    </div>
+  ) : null;
+
   if (isSplitReading) {
     return (
       // Khóa chiều cao đúng viewport (trừ topbar 68 + pt-6 24 + pb-24 96 = 188px)
       // => trang KHÔNG cuộn nữa; header đứng yên (flex-none); chỉ 2 cột cuộn nội bộ.
       <section className="flex flex-col gap-3 lg:h-[calc(100vh-188px)] lg:overflow-hidden">
         {headerEl}
+        {audioBarEl}
         <ResizableSplit
           storageKey="thpt-reading-split"
           left={<PassageBox text={passageText!} markers={section.type === 'reading_mixed'} submissionId={submissionId} sectionId={section.id} enabled={mode !== 'review'} />}
@@ -198,13 +255,7 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
     return (
       <section className="space-y-5">
         {headerEl}
-        {/* Audio sticky full-width trên ảnh + câu */}
-        {(section as any).audio_url && (
-          <div className="rounded-xl border border-slate-200 bg-white p-3 flex items-center gap-3 sticky top-[68px] z-10">
-            <Headphones className="w-4 h-4 text-teal-600 flex-shrink-0" />
-            <audio controls src={(section as any).audio_url} className="w-full h-10" />
-          </div>
-        )}
+        {audioBarEl}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
           {/* Cột ảnh: sticky — chuột trên ảnh vẫn cuộn trang được */}
           <div className="lg:sticky lg:top-[88px] lg:self-start">
@@ -252,6 +303,7 @@ export function SectionView({ section, answers, correctAnswers, onAnswerChange, 
   return (
     <section className="space-y-5">
       {headerEl}
+      {audioBarEl}
       <Body section={section} answers={answers} correctAnswers={correctAnswers} onAnswerChange={onAnswerChange} mode={mode} submissionId={submissionId} speakingParts={speakingParts} speakingAudio={speakingAudio} writingParts={writingParts} correctQuestions={correctQuestions} showExplanation={showExplanation} />
     </section>
   );
@@ -333,14 +385,13 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             return (
               <QCard key={key} n={item.question_number}>
                 {!isError && item.prompt && (
-                  <div className="text-sm text-slate-900 leading-relaxed font-bold mb-3 space-y-1 [&_*]:!text-slate-900 [&_*]:!font-bold">
-                    {String(item.prompt ?? '').split(/\s+(?=[a-e]\.\s)/i).map((part: string, i: number) => (
-                      <p key={i} className="leading-relaxed" dangerouslySetInnerHTML={{ __html: part.trim() }} />
-                    ))}
-                  </div>
+                  <QuestionPrompt content={item.prompt} />
                 )}
                 {isError && item.sentence && (
-                  <p className="text-sm text-slate-700 italic mb-3" dangerouslySetInnerHTML={{ __html: formatErrorSentence(item.sentence, item.segments) }} />
+                  <p
+                    className="text-sm text-slate-800 italic mb-3 [&_b]:font-bold [&_b]:text-slate-900 [&_strong]:font-bold [&_u]:underline [&_u]:underline-offset-2"
+                    dangerouslySetInnerHTML={{ __html: formatErrorSentence(item.sentence, item.segments) }}
+                  />
                 )}
                 <div className={isError ? 'grid grid-cols-2 sm:grid-cols-4 gap-2' : 'space-y-2'}>
                   {options.map((opt: any) => (
@@ -448,7 +499,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                         </span>
                         <div className="min-w-0 space-y-1">
                           {prompt ? (
-                            <p className="text-xs text-slate-500 leading-snug">{prompt}</p>
+                            <QuestionPrompt content={prompt} className="text-xs text-slate-600 mb-1" />
                           ) : null}
                           <TextAnswer
                             value={String(answers[key] ?? '')}
@@ -484,7 +535,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                       </span>
                       <div className="min-w-0 space-y-1.5">
                         {prompt ? (
-                          <p className="text-xs text-slate-500 leading-snug">{prompt}</p>
+                          <QuestionPrompt content={prompt} className="text-xs text-slate-600 mb-1" />
                         ) : null}
                         {labelsOnly ? (
                           <div className="flex flex-wrap gap-2">
@@ -540,11 +591,6 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
       // ── Layout mặc định: full card + prompt ──
       return (
         <div className="space-y-4">
-          {!hideAudio && section.audio_url && (
-            <div className="rounded-xl border border-slate-200 bg-white p-3 flex items-center gap-3">
-              <audio controls src={section.audio_url} className="w-full h-10" />
-            </div>
-          )}
           {(section.items as any[]).map((item) => {
             const key = `q${item.question_number}`;
             const kind = item.kind === 'fill_blank' ? 'fill_blank' : 'mc';
@@ -552,7 +598,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
               return (
                 <QCard key={key} n={item.question_number}>
                   {item.prompt && (
-                    <p className="text-sm text-slate-900 font-bold mb-3 whitespace-pre-wrap">{item.prompt}</p>
+                    <QuestionPrompt content={item.prompt} />
                   )}
                   <TextAnswer
                     value={String(answers[key] ?? '')}
@@ -578,7 +624,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             return (
               <QCard key={key} n={item.question_number}>
                 {item.prompt && (
-                  <p className="text-sm text-slate-900 font-bold mb-3 whitespace-pre-wrap">{item.prompt}</p>
+                  <QuestionPrompt content={item.prompt} />
                 )}
                 <div className="space-y-2">
                   {options.map((opt: any) => (
@@ -734,7 +780,10 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
             const key = `q${item.question_number}`;
             return (
               <QCard key={key} n={item.question_number}>
-                <p className="text-sm text-slate-900 font-bold mb-2" dangerouslySetInnerHTML={{ __html: item.original }} />
+                <p
+                  className="text-sm text-slate-800 font-normal leading-relaxed mb-2 [&_b]:font-bold [&_b]:text-slate-900 [&_strong]:font-bold [&_strong]:text-slate-900 [&_u]:underline [&_u]:underline-offset-2 [&_i]:italic [&_em]:italic"
+                  dangerouslySetInnerHTML={{ __html: item.original }}
+                />
                 {(item.lead_in || item.prompt_word) && (
                   <p className="text-xs text-slate-500 mb-2">
                     {item.lead_in && <>➜ <span className="font-semibold">{item.lead_in}</span> </>}
@@ -1000,11 +1049,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
               {item.kind === 'mc' && (
                 <>
                   <div className="space-y-2">
-                    <div className="text-sm text-slate-900 font-bold mb-1 space-y-1 [&_*]:!text-slate-900 [&_*]:!font-bold">
-                      {String(item.prompt ?? '').split(/\s+(?=[a-e]\.\s)/i).map((part: string, i: number) => (
-                        <p key={i} className="leading-relaxed" dangerouslySetInnerHTML={{ __html: part.trim() }} />
-                      ))}
-                    </div>
+                    <QuestionPrompt content={item.prompt} className="mb-1" />
                     {usedChoices<any>(item.options).map((opt: any) => {
                       const key = `q${item.question_number}`;
                       const userVal = String(answers[key] ?? '').trim().toUpperCase();
@@ -1037,7 +1082,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
               {item.kind === 'sentence_insertion' && (
                 <>
                   <div className="space-y-2">
-                    <p className="text-sm text-slate-900 font-bold">{item.prompt}</p>
+                    <QuestionPrompt content={item.prompt} className="mb-1" />
                     <blockquote className="border-l-4 border-teal-300 pl-3 py-1 italic text-sm text-slate-700 bg-teal-50/40 rounded-r">
                       {item.sentence_to_insert}
                     </blockquote>
@@ -1284,7 +1329,14 @@ function ChoiceButton({
       </span>
       {hasLabel && (
         <span className="flex-1 min-w-0">
-          <span className="text-sm text-slate-800">{label}</span>
+          {typeof label === 'string' && hasHtmlOrEntities(label) ? (
+            <span
+              className="text-sm text-slate-800 leading-normal [&_b]:font-bold [&_b]:text-slate-900 [&_strong]:font-bold [&_u]:underline [&_u]:underline-offset-2 [&_i]:italic [&_em]:italic"
+              dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(label) }}
+            />
+          ) : (
+            <span className="text-sm text-slate-800 leading-normal">{label}</span>
+          )}
           {sub && <span className="block text-[11px] text-slate-500">[{sub}]</span>}
         </span>
       )}

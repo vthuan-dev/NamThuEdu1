@@ -1,5 +1,6 @@
 import { Volume2 } from 'lucide-react';
 import { getFullMediaUrl } from '../../../utils/mediaUtils';
+import { normalizeAudioUrl } from '../../../utils/examUtils';
 
 interface ListeningLetterMatchProps {
   question: any;
@@ -38,8 +39,8 @@ export function ListeningLetterMatch({
           <Volume2 className="w-6 h-6 text-blue-600" />
           <div className="flex-1">
             <p className="text-sm font-medium text-blue-900">🎧 Audio Instructions</p>
-            <audio controls className="w-full mt-2">
-              <source src={getFullMediaUrl(audioUrl)} type="audio/mpeg" />
+            <audio controls className="w-full mt-2" src={normalizeAudioUrl(getFullMediaUrl(audioUrl) ?? audioUrl)}>
+              <source src={normalizeAudioUrl(getFullMediaUrl(audioUrl) ?? audioUrl)} type="audio/mpeg" />
             </audio>
           </div>
         </div>

@@ -12,6 +12,8 @@
 import { useMemo, useState } from 'react';
 import { CheckCircle2, Volume2 } from 'lucide-react';
 import type { KidsAnswerMap } from './kidsAnswer';
+import { normalizeAudioUrl } from '../../../../../utils/examUtils';
+import { getFullMediaUrl } from '../../../../../utils/mediaUtils';
 
 interface RendererProps {
   taskData: any;
@@ -458,7 +460,8 @@ function PictureStoryTask({ taskData, answer, onChange }: RendererProps) {
 
 // ─── E. Listening letter match (nghe → ghép chủ thể với chữ cái hình) ────────
 function ListeningLetterMatchTask({ taskData, answer, onChange }: RendererProps) {
-  const audioUrl: string = taskData?.audio_url ?? taskData?.audioUrl ?? '';
+  const rawAudio: string = taskData?.audio_url ?? taskData?.audioUrl ?? '';
+  const audioUrl: string = normalizeAudioUrl(getFullMediaUrl(rawAudio) ?? rawAudio);
   const options: any[] = taskData?.options ?? [];
   const subjects: any[] = (taskData?.subjects ?? []).filter(
     (s: any) => !(s.is_example ?? s.isExample)
@@ -520,7 +523,8 @@ function ListenAndDrawLinesTask({ taskData, answer, onChange, gradeOverrides }: 
   const [dragOverHotspot, setDragOverHotspot] = useState<number | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
 
-  const audioUrl: string = taskData?.audioUrl ?? taskData?.audio_url ?? '';
+  const rawAudio: string = taskData?.audioUrl ?? taskData?.audio_url ?? '';
+  const audioUrl: string = normalizeAudioUrl(getFullMediaUrl(rawAudio) ?? rawAudio);
   const imageUrl: string = taskData?.imageUrl ?? taskData?.image_url ?? '';
   const items: any[] = taskData?.items ?? [];
 

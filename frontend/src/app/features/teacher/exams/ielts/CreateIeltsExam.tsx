@@ -306,6 +306,10 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
       error("Chưa có exam ID — không thể xuất bản");
       return;
     }
+    if (hasUnsavedChanges) {
+      error("Đề đang có chỉnh sửa chưa lưu. Vui lòng bấm 'Lưu nháp' trước khi xuất bản nhé!");
+      return;
+    }
     if (!skillData) {
       error("Chưa có nội dung — vui lòng nhập đầy đủ trước khi xuất bản");
       setActiveTab("edit");
@@ -473,14 +477,21 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
                 ? `${warningCount} cảnh báo (vẫn lưu được)`
                 : "Lưu nháp"
             }
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-semibold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-sm relative"
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-sm relative ${
+              hasUnsavedChanges
+                ? 'text-amber-900 bg-amber-50 border-2 border-amber-400 shadow-sm animate-pulse hover:bg-amber-100'
+                : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+            }`}
           >
             {isSaving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <SaveIcon className="w-4 h-4" />
+              <SaveIcon className={`w-4 h-4 ${hasUnsavedChanges ? 'text-amber-600' : ''}`} />
             )}
             <span className="hidden sm:inline">Lưu nháp</span>
+            {hasUnsavedChanges && (
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+            )}
             {validationEnabled && errorCount > 0 && (
               <span className="ml-0.5 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold">
                 {errorCount}

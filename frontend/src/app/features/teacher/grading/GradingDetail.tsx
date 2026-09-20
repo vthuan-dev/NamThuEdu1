@@ -2,7 +2,7 @@ import { Fragment, useState, useMemo, useEffect, useRef, useLayoutEffect, Suspen
 import { lazyWithReload } from "../../../../utils/lazyWithReload";
 import { api } from "../../../../services/api";
 import { getFullMediaUrl } from "../../../../utils/mediaUtils";
-import { sanitizePassageHtml } from "../../../../utils/examUtils";
+import { sanitizePassageHtml, normalizeAudioUrl } from "../../../../utils/examUtils";
 
 // Lazy-load các khung chấm điểm theo loại đề. Bọc lazyWithReload để tự reload
 // 1 lần khi chunk 404 (deploy mới đổi hash). Khai báo ở module scope để không
@@ -1400,7 +1400,7 @@ function VstepGradingDetailInternal() {
                                   <audio
                                     controls
                                     preload="metadata"
-                                    src={q.audioUrl}
+                                    src={normalizeAudioUrl(getFullMediaUrl(q.audioUrl) ?? q.audioUrl)}
                                     className="w-full rounded-lg min-w-0"
                                     style={{ accentColor: "#EC4899" }}
                                   >
@@ -1408,7 +1408,7 @@ function VstepGradingDetailInternal() {
                                   </audio>
                                 </div>
                                 <a
-                                  href={q.audioUrl}
+                                  href={normalizeAudioUrl(getFullMediaUrl(q.audioUrl) ?? q.audioUrl)}
                                   download={`speaking-task-${q.number}-${student.name.replace(/\s+/g, "_")}.webm`}
                                   target="_blank"
                                   rel="noopener noreferrer"

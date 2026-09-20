@@ -71,8 +71,8 @@ export function IeltsListeningFullTestView({
 }: Props) {
   const sections = payload.sections ?? [];
   const totalSectionCount = Number((payload as any).totalParts ?? sections.length);
-  // Review mode: mở khóa tất cả sections ngay từ đầu
-  const [sectionIdx, setSectionIdx] = useState(() => reviewMode ? Math.max(0, (payload.sections ?? []).length - 1) : 0);
+  // Review mode: bắt đầu từ section 0 (Part 1), mở khóa toàn bộ
+  const [sectionIdx, setSectionIdx] = useState(0);
   const [audioStartedAt, setAudioStartedAt] = useState<number | null>(null);
   const currentSection: IeltsListeningSection | undefined = sections[sectionIdx];
   const [isTipExpanded, setIsTipExpanded] = useState(false);
@@ -110,9 +110,11 @@ export function IeltsListeningFullTestView({
   };
 
   const jumpToQuestion = (q: QuestionMeta) => {
-    // Cho phép jump tới mọi câu trong section đã unlock (≤ sectionIdx).
-    // IELTS CBT thật cho học viên xem lại/sửa đáp án các part đã nghe xong.
-    if (q.groupIndex <= sectionIdx) {
+    // Cho phép jump tới mọi câu trong section đã unlock (≤ sectionIdx hoặc reviewMode).
+    if (reviewMode || q.groupIndex <= sectionIdx) {
+      if (reviewMode && q.groupIndex !== sectionIdx) {
+        setSectionIdx(q.groupIndex);
+      }
       requestAnimationFrame(() => {
         const el = document.getElementById(`ielts-ft-q-${q.qId}`);
         el?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -122,8 +124,8 @@ export function IeltsListeningFullTestView({
     }
   };
 
-  // Các section đã unlock (đã phát hoặc đang phát) — render tất cả trong body
-  const visibleSections = sections.slice(0, sectionIdx + 1);
+  // Các section đã unlock (đã phát hoặc đang phát) — reviewMode render toàn bộ
+  const visibleSections = reviewMode ? sections : sections.slice(0, sectionIdx + 1);
 
   if (!currentSection) {
     return (
@@ -527,6 +529,7 @@ function ImageCompletionBody({
               : value.trim().toLowerCase() === (correctAnswers[q.qId] ?? "").trim().toLowerCase()
           );
           const isWrong = reviewMode && answered && !isCorrect;
+          const isSkipped = reviewMode && !answered;
           return (
             <div
               key={q.qId}
@@ -534,11 +537,12 @@ function ImageCompletionBody({
               className={`flex items-center gap-3 p-3 rounded-lg border ${
                 isCorrect ? "border-emerald-300 bg-emerald-50/40" :
                 isWrong   ? "border-red-300 bg-red-50/40" :
+                isSkipped ? "border-amber-300 bg-amber-50/40" :
                 "border-gray-200 bg-white shadow-sm"
               }`}
             >
               <span className={`flex-shrink-0 w-8 h-8 rounded-md text-white text-sm font-bold flex items-center justify-center ${
-                isCorrect ? "bg-emerald-500" : isWrong ? "bg-red-500" : "bg-orange-500"
+                isCorrect ? "bg-emerald-500" : isWrong ? "bg-red-500" : isSkipped ? "bg-amber-500" : "bg-orange-500"
               }`}>
                 {q.questionNumber}
               </span>
@@ -549,17 +553,17 @@ function ImageCompletionBody({
                 type="text"
                 value={value}
                 onChange={(e) => !reviewMode && onAnswer(q.qId, e.target.value)}
-                placeholder={`Câu ${q.questionNumber}`}
+                placeholder={isSkipped ? "Bỏ trống (Chưa trả lời)" : `Câu ${q.questionNumber}`}
                 disabled={reviewMode}
                 className={`flex-1 px-3 py-1.5 text-[14px] rounded-md border outline-none transition-colors ${
                   reviewMode
                     ? isCorrect ? "border-emerald-300 bg-emerald-50 text-emerald-700 font-semibold"
                       : isWrong  ? "border-red-300 bg-red-50 text-red-700 font-semibold"
-                      : "border-gray-200 bg-gray-50 text-gray-500"
+                      : "border-amber-300 bg-amber-50/60 text-amber-700 italic font-medium"
                     : "border-orange-300 bg-orange-50/60 text-orange-800 focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
                 }`}
               />
-              {isWrong && correctAnswers[q.qId] && (
+              {reviewMode && !isCorrect && correctAnswers[q.qId] && (
                 <span className="flex-shrink-0 text-[12px] font-bold text-emerald-700 whitespace-nowrap">
                   ✓ {correctAnswers[q.qId]}
                 </span>
@@ -599,6 +603,7 @@ function McqBody({
             : String(answers[q.qId]).toLowerCase() === (correctAnswers[q.qId] ?? "").toLowerCase()
         );
         const isWrongQ = reviewMode && answered && !isCorrectQ;
+        const isSkippedQ = reviewMode && !answered;
         return (
           <div
             key={q.qId}
@@ -606,12 +611,13 @@ function McqBody({
             className={`rounded-lg border p-4 shadow-sm ${
               isCorrectQ ? "border-emerald-300 bg-emerald-50/40" :
               isWrongQ   ? "border-red-300 bg-red-50/40" :
+              isSkippedQ ? "border-amber-300 bg-amber-50/40" :
               "border-gray-200 bg-white"
             }`}
           >
             <div className="flex items-start gap-3 mb-3">
               <span className={`flex-shrink-0 w-7 h-7 rounded-md text-white text-sm font-bold flex items-center justify-center ${
-                isCorrectQ ? "bg-emerald-500" : isWrongQ ? "bg-red-500" : "bg-orange-500"
+                isCorrectQ ? "bg-emerald-500" : isWrongQ ? "bg-red-500" : isSkippedQ ? "bg-amber-500" : "bg-orange-500"
               }`}>
                 {q.questionNumber}
               </span>
@@ -682,6 +688,16 @@ function McqBody({
                 </div>
               );
             })()}
+            {reviewMode && !answered && (
+              <div className="mt-3 ml-10 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center justify-between">
+                <span className="font-semibold">⚠️ Bạn chưa chọn đáp án cho câu này (Bỏ trống)</span>
+                {correctAnswers[q.qId] && (
+                  <span className="font-bold text-emerald-700 bg-white px-2 py-0.5 rounded border border-emerald-300">
+                    Đáp án đúng: {correctAnswers[q.qId]}
+                  </span>
+                )}
+              </div>
+            )}
             {reviewMode && q.explanation && (
               <div className="mt-3 p-3 rounded-lg bg-emerald-50/50 border border-emerald-200 ml-10">
                 <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1">
@@ -1089,13 +1105,14 @@ function renderAnswerInput(
       : correctAnswer !== "" && value!.trim().toLowerCase() === correctAnswer.trim().toLowerCase()
   );
   const isWrong = reviewMode && answered && !isCorrect;
+  const isSkipped = reviewMode && !answered;
 
   const cls = reviewMode
     ? isCorrect
       ? "w-full px-3 py-2 text-sm font-semibold text-emerald-700 bg-emerald-50 border border-emerald-300 rounded-md outline-none"
       : isWrong
         ? "w-full px-3 py-2 text-sm font-semibold text-red-700 bg-red-50 border border-red-300 rounded-md outline-none"
-        : "w-full px-3 py-2 text-sm font-semibold text-gray-500 bg-gray-50 border border-gray-300 rounded-md outline-none"
+        : "w-full px-3 py-2 text-sm italic font-medium text-amber-700 bg-amber-50/60 border border-amber-300 rounded-md outline-none"
     : "w-full px-3 py-2 text-sm font-semibold text-orange-700 placeholder:text-orange-400/60 bg-orange-50/70 border border-orange-300 rounded-md focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none transition-colors";
 
   return (
@@ -1104,11 +1121,11 @@ function renderAnswerInput(
         type="text"
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={`Answer ${questionNumber}`}
+        placeholder={isSkipped ? "Bỏ trống" : `Answer ${questionNumber}`}
         disabled={reviewMode}
         className={cls}
       />
-      {isWrong && correctAnswer && (
+      {reviewMode && !isCorrect && correctAnswer && (
         <p className="mt-1 text-[12px] font-bold text-emerald-700">✓ {correctAnswer}</p>
       )}
     </div>
@@ -1140,13 +1157,14 @@ function renderInlineInput(
       : correctAnswer !== "" && value!.trim().toLowerCase() === correctAnswer.trim().toLowerCase()
   );
   const isWrong = reviewMode && answered && !isCorrect;
+  const isSkipped = reviewMode && !answered;
 
   const inputCls = reviewMode
     ? isCorrect
       ? "inline-block min-w-[120px] max-w-[260px] mx-1 px-2 py-1 text-sm font-semibold text-emerald-700 bg-emerald-50 border-b-2 border-emerald-500 outline-none rounded-sm"
       : isWrong
         ? "inline-block min-w-[120px] max-w-[260px] mx-1 px-2 py-1 text-sm font-semibold text-red-700 bg-red-50 border-b-2 border-red-400 outline-none rounded-sm"
-        : "inline-block min-w-[120px] max-w-[260px] mx-1 px-2 py-1 text-sm font-semibold text-gray-500 bg-gray-50 border-b-2 border-gray-300 outline-none rounded-sm"
+        : "inline-block min-w-[120px] max-w-[260px] mx-1 px-2 py-1 text-sm italic font-medium text-amber-700 bg-amber-50/60 border-b-2 border-amber-400 outline-none rounded-sm"
     : "inline-block min-w-[120px] max-w-[260px] mx-1 px-2 py-1 text-sm font-semibold text-orange-700 placeholder:text-orange-400/60 bg-orange-50/60 border-b-2 border-orange-400 focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none rounded-sm transition-colors";
 
   const tailCls = reviewMode
@@ -1154,7 +1172,7 @@ function renderInlineInput(
       ? "ml-2 inline-block min-w-[160px] max-w-[260px] px-2 py-1 text-sm font-semibold text-emerald-700 bg-emerald-50 border-b-2 border-emerald-500 outline-none rounded-sm"
       : isWrong
         ? "ml-2 inline-block min-w-[160px] max-w-[260px] px-2 py-1 text-sm font-semibold text-red-700 bg-red-50 border-b-2 border-red-400 outline-none rounded-sm"
-        : "ml-2 inline-block min-w-[160px] max-w-[260px] px-2 py-1 text-sm font-semibold text-gray-500 bg-gray-50 border-b-2 border-gray-300 outline-none rounded-sm"
+        : "ml-2 inline-block min-w-[160px] max-w-[260px] px-2 py-1 text-sm italic font-medium text-amber-700 bg-amber-50/60 border-b-2 border-amber-400 outline-none rounded-sm"
     : "ml-2 inline-block min-w-[160px] max-w-[260px] px-2 py-1 text-sm font-semibold text-orange-700 placeholder:text-orange-400/60 bg-orange-50/60 border-b-2 border-orange-400 focus:bg-white focus:border-orange-500 focus:ring-2 focus:ring-orange-200 outline-none rounded-sm transition-colors";
 
   const parts: React.ReactNode[] = [];
@@ -1174,13 +1192,13 @@ function renderInlineInput(
           type="text"
           value={value ?? ""}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={String(questionNumber)}
+          placeholder={isSkipped ? "Bỏ trống" : String(questionNumber)}
           disabled={reviewMode}
           className={inputCls}
         />
       );
-      // Hiển thị đáp án đúng cạnh ô nếu học viên trả lời sai
-      if (isWrong && correctAnswer) {
+      // Hiển thị đáp án đúng cạnh ô nếu học viên trả lời sai hoặc bỏ trống
+      if (reviewMode && !isCorrect && correctAnswer) {
         parts.push(
           <span key={`ca-${qId}`} className="ml-1.5 text-[12px] font-bold text-emerald-700 whitespace-nowrap">
             ✓ {correctAnswer}
@@ -1212,12 +1230,12 @@ function renderInlineInput(
         type="text"
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={`Câu ${questionNumber}`}
+        placeholder={isSkipped ? "Bỏ trống" : `Câu ${questionNumber}`}
         disabled={reviewMode}
         className={tailCls}
       />
     );
-    if (isWrong && correctAnswer) {
+    if (reviewMode && !isCorrect && correctAnswer) {
       parts.push(
         <span key={`ca-${qId}-tail`} className="ml-1.5 text-[12px] font-bold text-emerald-700 whitespace-nowrap">
           ✓ {correctAnswer}

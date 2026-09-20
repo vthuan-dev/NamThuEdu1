@@ -2,6 +2,7 @@ import { Volume2 } from 'lucide-react';
 import { QuestionRendererProps } from '../../../types/exam';
 import { extractTaskData } from '../../../utils/examDataExtractor';
 import { getFullMediaUrl } from '../../../utils/mediaUtils';
+import { normalizeAudioUrl } from '../../../utils/examUtils';
 
 export function ListenAndWrite({
   question,
@@ -39,8 +40,8 @@ export function ListenAndWrite({
           <Volume2 className="w-6 h-6 text-orange-600" />
           <div className="flex-1">
             <p className="text-sm font-medium text-orange-900">🎵 Audio Instructions</p>
-            <audio controls className="w-full mt-2">
-              <source src={getFullMediaUrl(audioUrl)} type="audio/mpeg" />
+            <audio controls className="w-full mt-2" src={normalizeAudioUrl(getFullMediaUrl(audioUrl) ?? audioUrl)}>
+              <source src={normalizeAudioUrl(getFullMediaUrl(audioUrl) ?? audioUrl)} type="audio/mpeg" />
               Your browser does not support the audio element.
             </audio>
           </div>

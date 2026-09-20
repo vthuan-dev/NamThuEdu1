@@ -235,6 +235,16 @@ export function IeltsQuestionNavigator({
                 const v = answers[q.qId];
                 return v != null && v !== "";
               }).length;
+              const groupCorrect = group.items.filter((q) => {
+                const v = answers[q.qId];
+                const answered = v != null && v !== "";
+                const ca = correctAnswers[q.qId];
+                return answered && (
+                  q.qId in isCorrectMap
+                    ? isCorrectMap[q.qId]
+                    : ca != null && String(v).trim().toLowerCase() === ca.trim().toLowerCase()
+                );
+              }).length;
               const isActiveGroup = activeGroupIndex === group.index;
 
               return (
@@ -243,8 +253,8 @@ export function IeltsQuestionNavigator({
                     <span className={`text-[11px] font-bold ${isActiveGroup ? "text-[#FF6B35]" : "text-[#677788]"}`}>
                       {group.label}
                     </span>
-                    <span className="text-[10px] text-[#9aa5b1] tabular-nums">
-                      {groupAnswered}/{group.items.length}
+                    <span className="text-[10px] text-[#9aa5b1] tabular-nums font-semibold">
+                      {reviewMode ? `${groupCorrect}/${group.items.length} đúng` : `${groupAnswered}/${group.items.length}`}
                     </span>
                   </div>
                   <div className="grid grid-cols-5 gap-1">
@@ -334,8 +344,25 @@ export function IeltsQuestionNavigator({
             )}
           </div>
 
-          {/* Footer legend — ẩn khi review mode */}
-          {!reviewMode && (
+          {/* Footer legend */}
+          {reviewMode ? (
+            <div className="px-3 py-2.5 border-t border-[#eef0f2] space-y-1.5 bg-slate-50/80">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Chú thích kết quả
+              </div>
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] text-slate-700">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <span className="w-3 h-3 rounded bg-emerald-500 flex items-center justify-center text-[8px] text-white font-bold">✓</span> Làm đúng
+                </span>
+                <span className="flex items-center gap-1.5 font-medium">
+                  <span className="w-3 h-3 rounded bg-red-500 flex items-center justify-center text-[8px] text-white font-bold">✕</span> Làm sai
+                </span>
+                <span className="flex items-center gap-1.5 col-span-2 text-slate-500">
+                  <span className="w-3 h-3 rounded bg-[#f1f3f5] border border-slate-300 flex items-center justify-center text-[8px] text-slate-500 font-bold">-</span> Chưa làm (0 điểm)
+                </span>
+              </div>
+            </div>
+          ) : (
             <div className="px-3 py-2 border-t border-[#eef0f2] space-y-1">
               <div className="flex items-center gap-3 text-[10px] text-[#677788]">
                 <span className="flex items-center gap-1">

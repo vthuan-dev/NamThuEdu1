@@ -1,5 +1,5 @@
 import type { ThptSection } from '../../../../../../types/thpt';
-import { useState, type ClipboardEvent, type DragEvent } from 'react';
+import { useState, useEffect, type ClipboardEvent, type DragEvent } from 'react';
 import { Upload, Loader2, Volume2, Trash2, AlertTriangle } from 'lucide-react';
 import { api } from '../../../../../../services/api';
 import {
@@ -385,7 +385,11 @@ function ItemCard({ n, onRemove, typeLabel, children }: { n: number; onRemove: (
   );
 }
 
-function AcceptedAnswersInput({
+function parseAcceptedAnswers(raw: string): string[] {
+  return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+export function AcceptedAnswersInput({
   value,
   onChange,
   placeholder,
@@ -394,16 +398,61 @@ function AcceptedAnswersInput({
   onChange: (v: string[]) => void;
   placeholder?: string;
 }) {
+  const safeValue = Array.isArray(value) ? value : [];
+  const [text, setText] = useState(() => safeValue.join(', '));
+
+  // Đồng bộ với bên ngoài nếu danh sách đáp án thực sự thay đổi
+  useEffect(() => {
+    const currentParsed = parseAcceptedAnswers(text);
+    const isDiff =
+      currentParsed.length !== safeValue.length ||
+      currentParsed.some((v, i) => v !== safeValue[i]);
+    if (isDiff) {
+      setText(safeValue.join(', '));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [safeValue.join('|||')]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const nextText = e.target.value;
+    setText(nextText);
+    onChange(parseAcceptedAnswers(nextText));
+  };
+
+  const handleBlur = () => {
+    const parsed = parseAcceptedAnswers(text);
+    setText(parsed.join(', '));
+    onChange(parsed);
+  };
+
+  const parsed = parseAcceptedAnswers(text);
+
   return (
-    <input
-      type="text"
-      value={value.join(', ')}
-      onChange={(e) =>
-        onChange(e.target.value.split(',').map((s) => s.trim()).filter(Boolean))
-      }
-      placeholder={placeholder ?? 'đáp án 1, đáp án 2 (cách bằng dấu phẩy)'}
-      className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
-    />
+    <div className="space-y-1.5">
+      <input
+        type="text"
+        value={text}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        placeholder={placeholder ?? 'đáp án 1, đáp án 2 (cách bằng dấu phẩy)'}
+        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-200"
+      />
+      {parsed.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+          <span className="text-[11px] text-slate-400">
+            {parsed.length === 1 ? '1 đáp án chấp nhận:' : `${parsed.length} đáp án chấp nhận:`}
+          </span>
+          {parsed.map((ans, idx) => (
+            <span
+              key={idx}
+              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-sky-50 text-sky-700 border border-sky-200"
+            >
+              {ans}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -870,8 +919,9 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
     const next = kind === 'fill_blank'
       ? makeListeningFillItem(qn)
       : makeListeningMcItem(qn);
-    // keep prompt when switching
+    // keep prompt and explanation when switching
     next.prompt = item.prompt || next.prompt;
+    (next as any).explanation = item.explanation || '';
     const items = [...section.items];
     items[idx] = next as any;
     update(items);
@@ -1110,12 +1160,21 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
                         </div>
                       </>
                     )}
+
+                    <ExplanationField
+                      value={item.explanation}
+                      onChange={(v) => {
+                        const items = [...section.items];
+                        items[idx] = { ...item, explanation: v };
+                        update(items);
+                      }}
+                    />
                   </div>
 
                   <button
                     type="button"
                     onClick={() => update(section.items.filter((_, i) => i !== idx))}
-                    className="self-start sm:self-center p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
+                    className="self-start p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
                     title="Xoá câu"
                   >
                     <Trash2 className="w-4 h-4" />

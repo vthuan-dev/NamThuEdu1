@@ -15,6 +15,7 @@ import {
   Plus,
   Trash2,
   X,
+  RotateCcw,
 } from "lucide-react";
 import { useToastContext } from "../../../../../contexts/ToastContext";
 import { useTranslation } from "react-i18next";
@@ -756,27 +757,84 @@ export const CreateVstepListening = ({
 
   const uploadAudioToServer = async (
     file: File,
-    key: string
+    key: string,
+    overrideExamId?: string
   ): Promise<string | null> => {
     setUploadingKey(key);
     try {
+      const activeExamId = overrideExamId || examIdRef.current || examId;
       const formData = new FormData();
       formData.append("audio", file, file.name);
-      formData.append("questionId", `vstep-listening-${examId}-${key}`);
-      const { data: result } = await api.post("/teacher/upload/audio", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      if (result.success) return result.data.audioUrl as string;
+      formData.append("questionId", `vstep-listening-${activeExamId}-${key}`);
+      const { data: result } = await api.post("/teacher/upload/audio", formData);
+      if (result.success && result.data?.audioUrl) {
+        return result.data.audioUrl as string;
+      }
       const errMsg = result.errors
         ? Object.values(result.errors).flat().join(", ")
         : result.message || "Upload failed";
       throw new Error(errMsg);
     } catch (err: any) {
       console.error("Audio upload error:", err);
-      error(`Lỗi upload audio: ${err.message || "Unknown error"}`);
+      const serverMsg =
+        err.response?.data?.message ||
+        err.response?.data?.errors?.audio?.[0] ||
+        err.message;
+      error(`Lỗi upload audio: ${serverMsg || "Unknown error"}`);
       return null;
     } finally {
       setUploadingKey(null);
+    }
+  };
+
+  const handleRetryAudioUpload = async (
+    partNumber: number,
+    sectionNumber: number
+  ) => {
+    const key = sectionKey(partNumber, sectionNumber);
+    const file = audioFiles[key];
+    if (!file) {
+      error("Không tìm thấy file audio trong phiên làm việc. Vui lòng click để chọn lại file.");
+      return;
+    }
+
+    let targetExamId = examIdRef.current;
+    try {
+      targetExamId = await ensureExam();
+    } catch (err: any) {
+      error(err.message || "Không tạo được đề thi để lưu audio.");
+      return;
+    }
+
+    const serverUrl = await uploadAudioToServer(file, key, targetExamId);
+    if (serverUrl) {
+      updateSection(partNumber, sectionNumber, (s) => ({
+        ...s,
+        audioUrl: serverUrl,
+      }));
+      success("✅ Đã tải audio lên máy chủ thành công!");
+
+      if (targetExamId && !targetExamId.startsWith("vstep-")) {
+        try {
+          const latestPart = partsRef.current.find((p) => p.partNumber === partNumber);
+          const latestSection = latestPart?.sections.find(
+            (s) => s.sectionNumber === sectionNumber
+          );
+          await saveVstepListeningSectionAudio(
+            targetExamId,
+            partNumber,
+            sectionNumber,
+            {
+              sectionName: latestSection?.sectionName,
+              audioUrl: serverUrl,
+              audioDuration: latestSection?.audioDuration || 1,
+              transcript: latestSection?.transcript || "",
+            }
+          );
+        } catch (err) {
+          console.error("Auto-save audio metadata after retry failed:", err);
+        }
+      }
     }
   };
 
@@ -865,7 +923,7 @@ export const CreateVstepListening = ({
     audio.src = blobUrl;
 
     // Upload to server (persistent URL)
-    const serverUrl = await uploadAudioToServer(file, key);
+    const serverUrl = await uploadAudioToServer(file, key, targetExamId);
     if (serverUrl) {
       updateSection(partNumber, sectionNumber, (s) => ({
         ...s,
@@ -1087,10 +1145,7 @@ export const CreateVstepListening = ({
       error(`${section.sectionName}: chưa có audio`);
       return;
     }
-    if (section.audioUrl.startsWith("blob:")) {
-      error(`${section.sectionName}: audio chưa upload server, vui lòng upload lại`);
-      return;
-    }
+
     if (uploadingKey === key) {
       error("Đang upload audio, đợi xong rồi save");
       return;
@@ -1112,9 +1167,30 @@ export const CreateVstepListening = ({
     setSavingKey(key);
     try {
       const targetExamId = await ensureExam();
+
+      let effectiveAudioUrl = section.audioUrl;
+      // Nếu audio vẫn là blob: cục bộ, tự động upload file lên server trước khi lưu
+      if (effectiveAudioUrl.startsWith("blob:")) {
+        const file = audioFiles[key];
+        if (!file) {
+          error(`${section.sectionName}: audio chưa upload server và không tìm thấy file gốc. Vui lòng chọn lại audio.`);
+          return;
+        }
+        const uploadedUrl = await uploadAudioToServer(file, key, targetExamId);
+        if (!uploadedUrl) {
+          error(`${section.sectionName}: tải audio lên máy chủ thất bại, chưa thể lưu.`);
+          return;
+        }
+        effectiveAudioUrl = uploadedUrl;
+        updateSection(partNumber, sectionNumber, (s) => ({
+          ...s,
+          audioUrl: uploadedUrl,
+        }));
+      }
+
       await saveVstepListeningSection(targetExamId, partNumber, sectionNumber, {
         sectionName: section.sectionName,
-        audioUrl: section.audioUrl,
+        audioUrl: effectiveAudioUrl,
         audioDuration: section.audioDuration || 1,
         transcript: section.transcript,
         questions: filledQs.map((q) => ({
@@ -1159,55 +1235,77 @@ export const CreateVstepListening = ({
    * khỏi payload kèm cảnh báo, không chặn cả quá trình như trước.
    */
   const handlePublish = async () => {
-    const readySections: {
-      partNumber: number;
-      partName: string;
-      section: ListeningSection;
-      questions: Question[];
-    }[] = [];
-    const skipped: string[] = [];
-
-    parts.forEach((p) => {
-      p.sections.forEach((s) => {
-        if (!isSectionActive(p.partNumber, s.sectionNumber)) return;
-
-        if (!s.audioUrl || s.audioUrl.startsWith("blob:")) {
-          skipped.push(`${s.sectionName}: chưa có audio`);
-          return;
-        }
-        const filledQs = s.questions.filter(
-          (q) =>
-            q.questionText.trim() &&
-            q.options.A &&
-            q.options.B &&
-            q.options.C &&
-            q.options.D
-        );
-        if (filledQs.length === 0) {
-          skipped.push(`${s.sectionName}: chưa có câu hỏi hoàn thành`);
-          return;
-        }
-        readySections.push({
-          partNumber: p.partNumber,
-          partName: p.partName,
-          section: s,
-          questions: filledQs,
-        });
-      });
-    });
-
-    if (readySections.length === 0) {
-      error(
-        skipped[0]
-          ? `Chưa xuất bản được — ${skipped[0]}`
-          : "Đề chưa có phần nào hoàn chỉnh (cần audio + ít nhất 1 câu hỏi)."
-      );
-      return;
-    }
-
     setIsPublishing(true);
     try {
       const targetExamId = await ensureExam();
+
+      // 1. Tự động upload những section đang soạn còn ở dạng blob: nếu có file trong audioFiles
+      for (const p of parts) {
+        for (const s of p.sections) {
+          if (!isSectionActive(p.partNumber, s.sectionNumber)) continue;
+          const key = sectionKey(p.partNumber, s.sectionNumber);
+          if (s.audioUrl && s.audioUrl.startsWith("blob:") && audioFiles[key]) {
+            try {
+              const uploadedUrl = await uploadAudioToServer(audioFiles[key], key, targetExamId);
+              if (uploadedUrl) {
+                s.audioUrl = uploadedUrl;
+                updateSection(p.partNumber, s.sectionNumber, (sec) => ({
+                  ...sec,
+                  audioUrl: uploadedUrl,
+                }));
+              }
+            } catch (err) {
+              console.error("Auto upload before publish failed:", err);
+            }
+          }
+        }
+      }
+
+      const readySections: {
+        partNumber: number;
+        partName: string;
+        section: ListeningSection;
+        questions: Question[];
+      }[] = [];
+      const skipped: string[] = [];
+
+      parts.forEach((p) => {
+        p.sections.forEach((s) => {
+          if (!isSectionActive(p.partNumber, s.sectionNumber)) return;
+
+          if (!s.audioUrl || s.audioUrl.startsWith("blob:")) {
+            skipped.push(`${s.sectionName}: chưa có audio hoặc chưa lưu lên máy chủ`);
+            return;
+          }
+          const filledQs = s.questions.filter(
+            (q) =>
+              q.questionText.trim() &&
+              q.options.A &&
+              q.options.B &&
+              q.options.C &&
+              q.options.D
+          );
+          if (filledQs.length === 0) {
+            skipped.push(`${s.sectionName}: chưa có câu hỏi hoàn thành`);
+            return;
+          }
+          readySections.push({
+            partNumber: p.partNumber,
+            partName: p.partName,
+            section: s,
+            questions: filledQs,
+          });
+        });
+      });
+
+      if (readySections.length === 0) {
+        error(
+          skipped[0]
+            ? `Chưa xuất bản được — ${skipped[0]}`
+            : "Đề chưa có phần nào hoàn chỉnh (cần audio + ít nhất 1 câu hỏi)."
+        );
+        return;
+      }
 
       // Tự động lưu tất cả section hợp lệ vào CSDL trước khi xuất bản nếu chưa được lưu
       for (const item of readySections) {
@@ -1284,7 +1382,7 @@ export const CreateVstepListening = ({
         }));
 
       await publishVstepListeningExam(targetExamId, {
-        title: examTitle,
+        title: examTitle.trim() || t("vstep.listening.title"),
         parts: publishParts,
       });
 
@@ -1666,8 +1764,23 @@ export const CreateVstepListening = ({
                           <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2 flex-wrap">
                             {section.audioUrl ? (
                               section.audioUrl.startsWith("blob:") ? (
-                                <span className="text-amber-600">
+                                <span className="text-amber-600 inline-flex items-center gap-1.5">
                                   ⚠ Audio chưa lưu server
+                                  {audioFiles[key] && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRetryAudioUpload(currentPart, section.sectionNumber);
+                                      }}
+                                      disabled={isUploading}
+                                      className="inline-flex items-center gap-1 text-[11px] text-amber-700 bg-amber-100 hover:bg-amber-200 px-1.5 py-0.5 rounded font-medium transition-colors cursor-pointer"
+                                      title="Thử upload audio lên server lại"
+                                    >
+                                      <RotateCcw className="w-2.5 h-2.5" />
+                                      Tải lại
+                                    </button>
+                                  )}
                                 </span>
                               ) : (
                                 <span className="text-green-600">✓ Audio OK</span>
@@ -1765,9 +1878,25 @@ export const CreateVstepListening = ({
                                   )}
                                   {!isUploading &&
                                     section.audioUrl.startsWith("blob:") && (
-                                      <span className="text-amber-600">
-                                        ⚠ Chưa lưu server
-                                      </span>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-amber-600 font-medium">
+                                          ⚠ Audio chưa lưu server
+                                        </span>
+                                        {audioFiles[key] && (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleRetryAudioUpload(
+                                                currentPart,
+                                                section.sectionNumber
+                                              )
+                                            }
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs text-blue-700 bg-blue-50 hover:bg-blue-100 rounded font-medium border border-blue-200 transition-colors cursor-pointer"
+                                          >
+                                            <RotateCcw className="w-3 h-3" /> Thử upload lại
+                                          </button>
+                                        )}
+                                      </div>
                                     )}
                                 </div>
                               </div>
@@ -1963,7 +2092,13 @@ export const CreateVstepListening = ({
                               <span className="text-amber-600">⚠ Chưa có audio</span>
                             )}
                             {section.audioUrl?.startsWith("blob:") && (
-                              <span className="text-amber-600">⚠ Audio đang upload server, đợi xong rồi save</span>
+                              <span className="text-amber-600 font-medium">
+                                {isUploading
+                                  ? "Đang upload audio lên máy chủ..."
+                                  : audioFiles[key]
+                                  ? "⚠ Audio chưa lưu server (bấm Lưu để tải lên & lưu)"
+                                  : "⚠ Audio chưa lưu server, vui lòng chọn lại file audio"}
+                              </span>
                             )}
                             {section.audioUrl && !section.audioUrl.startsWith("blob:") && filledQsCount === 0 && (
                               <span className="text-amber-600">⚠ Chưa có câu hỏi nào hoàn thành</span>
@@ -1991,12 +2126,11 @@ export const CreateVstepListening = ({
                               isSaving ||
                               isUploading ||
                               !section.audioUrl ||
-                              section.audioUrl.startsWith("blob:") ||
+                              (section.audioUrl.startsWith("blob:") && !audioFiles[key]) ||
                               filledQsCount === 0
                             }
                             className={`flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                               section.audioUrl &&
-                              !section.audioUrl.startsWith("blob:") &&
                               filledQsCount === totalQs
                                 ? "bg-blue-600 text-white hover:bg-blue-700 ring-2 ring-blue-500 ring-offset-2 shadow-md shadow-blue-500/20"
                                 : "bg-blue-600 text-white hover:bg-blue-700 shadow-sm"

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Volume2, Palette, Edit2, CheckCircle2, XCircle } from 'lucide-react';
 import { getFullMediaUrl } from '../../../utils/mediaUtils';
+import { normalizeAudioUrl } from '../../../utils/examUtils';
 
 interface ListenColourWriteProps {
   question: any;
@@ -191,8 +192,7 @@ export function ListenColourWrite({
           <Volume2 className="w-6 h-6 text-orange-500 animate-pulse" />
           <div className="flex-1">
             <p className="text-xs font-semibold text-slate-500">🎵 Nghe audio hướng dẫn:</p>
-            <audio controls className="w-full mt-1.5 h-10">
-              <source src={getFullMediaUrl(audioUrl)} type="audio/mpeg" />
+            <audio controls className="w-full mt-1.5 h-10" src={normalizeAudioUrl(getFullMediaUrl(audioUrl) ?? audioUrl)}>
               Trình duyệt không hỗ trợ nghe audio.
             </audio>
           </div>

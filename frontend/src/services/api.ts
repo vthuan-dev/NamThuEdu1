@@ -25,6 +25,11 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
+    // Khi gửi FormData, xoá Content-Type để browser/Axios tự sinh header kèm boundary
+    if (config.data instanceof FormData && config.headers) {
+      delete config.headers['Content-Type'];
+    }
+
     // Development mode logging
     if (import.meta.env.DEV) {
       console.group('🚀 API Request');

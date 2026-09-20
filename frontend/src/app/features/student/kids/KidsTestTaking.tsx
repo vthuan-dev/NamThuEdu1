@@ -24,6 +24,8 @@ import {
 import { examDraftStorage } from '../../../../lib/exam/examDraftStorage';
 import { useToast } from '../../../../hooks/useToast';
 import { useConfirm } from '../../../../contexts/ConfirmContext';
+import { normalizeAudioUrl } from '../../../../utils/examUtils';
+import { getFullMediaUrl } from '../../../../utils/mediaUtils';
 
 const BASE = '/hoc-vien';
 
@@ -307,7 +309,9 @@ export function KidsTestTaking() {
   }, [q, qid, setAnswer]);
 
   const playAudio = () => {
-    const url = q?.qMedia_url as string | undefined;
+    const rawUrl = q?.qMedia_url as string | undefined;
+    if (!rawUrl) return;
+    const url = normalizeAudioUrl(getFullMediaUrl(rawUrl) ?? rawUrl);
     if (!url) return;
     if (!audioRef.current || audioRef.current.src !== url) audioRef.current = new Audio(url);
     audioRef.current.play().catch(() => undefined);

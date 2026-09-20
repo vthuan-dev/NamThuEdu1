@@ -366,12 +366,31 @@ export function VstepResultPage() {
     statsItems.push({ label: "Thời gian", value: durationText });
   }
 
-  const listeningAnswers = answers
-    .filter((a) => (a.question?.qSection ?? "").toLowerCase() === "listening")
-    .sort((a, b) => (a.question?.qNumber ?? 0) - (b.question?.qNumber ?? 0));
-  const readingAnswers = answers
-    .filter((a) => (a.question?.qSection ?? "").toLowerCase() === "reading")
-    .sort((a, b) => (a.question?.qNumber ?? 0) - (b.question?.qNumber ?? 0));
+  const getQuestionOrder = (q: any): number => {
+    if (!q) return 0;
+    const explicitNum = q.qData?.question_number ?? q.qData?.order;
+    if (explicitNum != null && Number(explicitNum) > 0) {
+      return Number(explicitNum);
+    }
+    const secOrder = Number(q.qSection_order ?? q.qOrder ?? q.qNumber ?? 0);
+    const part = Number(q.qPart ?? 0);
+    if (part > 1 && secOrder > 0 && secOrder <= 10) {
+      return (part - 1) * 10 + secOrder;
+    }
+    return secOrder > 0 ? secOrder : 0;
+  };
+
+  const listeningAnswers = useMemo(() => {
+    return [...answers]
+      .filter((a) => (a.question?.qSection ?? a.question?.qSkill ?? "").toLowerCase() === "listening")
+      .sort((a, b) => getQuestionOrder(a.question) - getQuestionOrder(b.question));
+  }, [answers]);
+
+  const readingAnswers = useMemo(() => {
+    return [...answers]
+      .filter((a) => (a.question?.qSection ?? a.question?.qSkill ?? "").toLowerCase() === "reading")
+      .sort((a, b) => getQuestionOrder(a.question) - getQuestionOrder(b.question));
+  }, [answers]);
 
   const examQMap = useMemo(() => {
     const map: Record<number, string> = {};
@@ -379,15 +398,25 @@ export function VstepResultPage() {
     for (const q of (raw?.exam?.questions ?? [])) {
       const correct = (q.answers ?? []).find((a: any) => a.aIs_correct);
       if (correct) {
-        const order = correct.aOrder ?? (q.answers ?? []).indexOf(correct);
-        map[q.qId] = LETTERS[order] ?? correct.aContent ?? "?";
+        if (isIelts) {
+          map[q.qId] = correct.aContent ?? (LETTERS[correct.aOrder] ?? "?");
+        } else {
+          const order = correct.aOrder ?? (q.answers ?? []).indexOf(correct);
+          map[q.qId] = LETTERS[order] ?? correct.aContent ?? "?";
+        }
+      } else {
+        const ca = q.qData?.correct_answer ?? q.qData?.answer ?? q.qData?.correctAnswer;
+        if (ca != null) {
+          map[q.qId] = String(ca).trim();
+        }
       }
     }
     return map;
-  }, [raw]);
+  }, [raw, isIelts]);
 
   // ── Helper: Map letter answer to label (TRUE/FALSE/NOT GIVEN) ────────────
   const getAnswerLabel = (questionId: number, letter: string): string | null => {
+    if (isIelts) return null;
     const question = (raw?.exam?.questions ?? []).find((q: any) => q.qId === questionId);
     if (!question?.answers) return null;
     
@@ -396,7 +425,9 @@ export function VstepResultPage() {
     const isTrueFalseNotGiven = 
       answerTexts.includes("TRUE") || 
       answerTexts.includes("FALSE") || 
-      answerTexts.includes("NOT GIVEN");
+      answerTexts.includes("NOT GIVEN") ||
+      answerTexts.includes("YES") ||
+      answerTexts.includes("NO");
     
     if (!isTrueFalseNotGiven) return null;
     
@@ -589,7 +620,7 @@ export function VstepResultPage() {
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {displayRows.map((r, idx) => {
-                      const num = r.question?.qNumber ?? idx + 1;
+                      const num = getQuestionOrder(r.question) || (idx + 1);
                       const text = r.saAnswer_text;
                       const answered = text != null && String(text).trim() !== "";
                       const correct = !!r.saIs_correct;
@@ -790,15 +821,17 @@ export function VstepResultPage() {
             {isOpen && (
               <div className="divide-y divide-slate-100 border-t border-slate-100">
                 {rows.map((ans, idx) => {
-                  const qText = ans.question?.qContent
-                    ? ans.question.qContent
+                  const rawPrompt = ans.question?.qText || ans.question?.qContent || "";
+                  const qNum = getQuestionOrder(ans.question) || (idx + 1);
+                  const qText = rawPrompt
+                    ? `Câu ${qNum}: ` + rawPrompt
                         .replace(/<[^>]*>/g, "")
                         .replace(/&nbsp;/gi, " ")
                         .replace(/&#39;/gi, "'")
                         .replace(/&quot;/gi, '"')
                         .replace(/&amp;/gi, "&")
-                        .slice(0, 80)
-                    : `Câu ${idx + 1}`;
+                        .slice(0, 100)
+                    : `Câu ${qNum}`;
                   const correctAns = examQMap[ans.question?.qId] ?? "—";
                   const userAns = ans.saAnswer_text ?? "—";
                   

@@ -13,6 +13,7 @@ import { studentApi } from '../../../../services/studentApi';
 import { usePageTitle } from '../../../../hooks/usePageTitle';
 import { extractTaskData } from '../../../../utils/examDataExtractor';
 import { getFullMediaUrl } from '../../../../utils/mediaUtils';
+import { normalizeAudioUrl } from '../../../../utils/examUtils';
 import { parseKidsAnswer } from './player/kidsAnswer';
 import { buildReviewRows, buildCorrectAnswerMap, MANUAL_REVIEW_TYPES } from './player/kidsAnswerKey';
 import { QuestionRenderer } from '../../../../components/exam/QuestionRenderer';
@@ -493,7 +494,7 @@ export function KidsResult() {
                           )}
                           {/* Audio */}
                           {taskData?.audioUrl && (
-                            <audio controls className="w-full h-8" src={getFullMediaUrl(taskData.audioUrl)} />
+                            <audio controls className="w-full h-8" src={normalizeAudioUrl(getFullMediaUrl(taskData.audioUrl) ?? taskData.audioUrl)} />
                           )}
                           {/* Student answer card */}
                           <div className="rounded-xl bg-slate-50 p-3 border border-slate-100">
