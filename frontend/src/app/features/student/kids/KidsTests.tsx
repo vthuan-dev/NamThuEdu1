@@ -314,13 +314,20 @@ export function KidsTests() {
       attemptsAllowed: t.attempts_allowed ?? null,
       submittedAt: t.submitted_at ?? null,
     }));
+    const isExhausted = (t: any) => {
+      const allowed = t.attemptsAllowed ?? 0;
+      if (allowed <= 0) return false;
+      return (t.attemptsUsed ?? 0) >= allowed;
+    };
+    const isNotEligible = (t: any) => isPastDeadline(t.deadline) || (t.status !== 'in_progress' && isExhausted(t));
+
     // Ẩn bản giao cũ đã cạn lượt khi cùng đề vừa được giao lại — xem
     // utils/assignmentDedupe. Kết quả cũ vẫn xem được ở tab Lịch sử thi.
     return hideSupersededExhausted([
       ...map(groups.pending, 'pending'),
       ...map(groups.in_progress, 'in_progress'),
       ...map(groups.completed, 'completed'),
-    ].filter((t: any) => !isAdult(t.title) && !isPastDeadline(t.deadline)));
+    ].filter((t: any) => !isAdult(t.title) && !isNotEligible(t)));
   }, [assignedData, isPastDeadline]);
 
   const source = assignedExams;

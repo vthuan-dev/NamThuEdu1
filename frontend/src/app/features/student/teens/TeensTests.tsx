@@ -330,6 +330,13 @@ export function TeensTests() {
       attemptsAllowed: t.attempts_allowed ?? 0,
     }));
     const isPastDeadline = (d?: string | null) => !!d && new Date(d).getTime() < Date.now();
+    const isExhausted = (t: any) => {
+      const allowed = t.attemptsAllowed ?? 0;
+      if (allowed <= 0) return false;
+      return (t.attemptsUsed ?? 0) >= allowed;
+    };
+    // Không đủ điều kiện làm bài: quá hạn deadline HOẶC đã hết lượt (trừ khi đang làm dở phiên hiện tại)
+    const isNotEligible = (t: any) => isPastDeadline(t.deadline) || (t.status !== 'in_progress' && isExhausted(t));
 
     // Lọc ngay tại nguồn, không phải ở tầng hiển thị: badge "Tổng số đề" và các
     // ô thống kê đều đếm từ `assignedExams`, nên nếu chỉ ẩn lúc render thì số
@@ -338,7 +345,7 @@ export function TeensTests() {
       ...map(groups.in_progress, 'in_progress'),
       ...map(groups.pending, 'pending'),
       ...map(groups.completed, 'completed'),
-    ].filter((t) => !isPastDeadline(t.deadline)));
+    ].filter((t) => !isNotEligible(t)));
   }, [assignedData]);
 
   const source = assignedExams;
