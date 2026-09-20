@@ -18,11 +18,11 @@ export function parseVNDate(dateStr: string | null | undefined): Date | null {
     return Number.isNaN(d.getTime()) ? null : d;
   }
 
-  // MySQL naive datetime → UTC (khớp app.php timezone)
+  // MySQL naive datetime → giờ Việt Nam (+07:00) vì database lưu theo giờ VN
   const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
   // Bỏ microseconds thừa nếu > 3 chữ số để JS parse ổn định
   const noExtraFrac = normalized.replace(/\.(\d{3})\d+/, ".$1");
-  const d = new Date(`${noExtraFrac}Z`);
+  const d = new Date(`${noExtraFrac}+07:00`);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
