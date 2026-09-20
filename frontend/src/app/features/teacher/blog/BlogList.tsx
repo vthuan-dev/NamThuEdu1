@@ -57,8 +57,13 @@ export function BlogList() {
 
   const handleSubmit = useCallback(async (id: number) => {
     try {
-      await submitForReview(id);
-      showSuccess(t("blog.list.toastSubmitted"));
+      const res = await submitForReview(id);
+      const msg = res?.message || (
+        res?.pStatus === "active"
+          ? "Bài viết đã được xuất bản công khai!"
+          : "Bài viết đã được gửi duyệt. Vui lòng chờ quản trị viên phê duyệt!"
+      );
+      showSuccess(msg);
       setMenuOpen(null);
     } catch (e: any) {
       showError(e.response?.data?.message || t("blog.list.toastSubmitError"));

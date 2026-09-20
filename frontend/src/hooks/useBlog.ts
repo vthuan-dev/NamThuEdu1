@@ -9,7 +9,7 @@ interface UseBlogReturn {
   createBlog: (data: CreateBlogDto) => Promise<Blog>;
   updateBlog: (id: number, data: Partial<CreateBlogDto>) => Promise<Blog>;
   deleteBlog: (id: number) => Promise<void>;
-  submitForReview: (id: number) => Promise<void>;
+  submitForReview: (id: number) => Promise<Blog>;
 }
 
 export function useBlog(): UseBlogReturn {
@@ -36,15 +36,19 @@ export function useBlog(): UseBlogReturn {
   const createBlog = useCallback(async (data: CreateBlogDto): Promise<Blog> => {
     const response = await teacherBlogApi.createBlog(data);
     const newBlog = response.data?.data ?? response.data;
-    setBlogs((prev) => [newBlog, ...prev]);
-    return newBlog;
+    const message = response.data?.message;
+    const result: Blog = { ...newBlog, message };
+    setBlogs((prev) => [result, ...prev]);
+    return result;
   }, []);
 
   const updateBlog = useCallback(async (id: number, data: Partial<CreateBlogDto>): Promise<Blog> => {
     const response = await teacherBlogApi.updateBlog(id, data);
     const updated = response.data?.data ?? response.data;
-    setBlogs((prev) => prev.map((b) => (b.pId === id ? updated : b)));
-    return updated;
+    const message = response.data?.message;
+    const result: Blog = { ...updated, message };
+    setBlogs((prev) => prev.map((b) => (b.pId === id ? result : b)));
+    return result;
   }, []);
 
   const deleteBlog = useCallback(async (id: number): Promise<void> => {
@@ -52,11 +56,15 @@ export function useBlog(): UseBlogReturn {
     setBlogs((prev) => prev.filter((b) => b.pId !== id));
   }, []);
 
-  const submitForReview = useCallback(async (id: number): Promise<void> => {
-    await teacherBlogApi.submitForReview(id);
+  const submitForReview = useCallback(async (id: number): Promise<Blog> => {
+    const response = await teacherBlogApi.submitForReview(id);
+    const updated = response.data?.data ?? response.data;
+    const message = response.data?.message;
+    const result: Blog = { ...updated, message };
     setBlogs((prev) =>
-      prev.map((b) => (b.pId === id ? { ...b, pStatus: "pending" } : b))
+      prev.map((b) => (b.pId === id ? { ...b, ...result } : b))
     );
+    return result;
   }, []);
 
   return { blogs, loading, error, fetchBlogs, createBlog, updateBlog, deleteBlog, submitForReview };

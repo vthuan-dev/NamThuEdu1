@@ -49,6 +49,7 @@ export interface Blog {
     caId: number;
     caName: string;
   };
+  message?: string;
 }
 
 // Teacher Blog APIs

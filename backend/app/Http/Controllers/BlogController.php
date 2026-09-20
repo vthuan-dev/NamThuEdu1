@@ -264,10 +264,16 @@ class BlogController extends Controller
             'pLike' => 0,
         ]);
 
+        $message = $autoApproved
+            ? 'Bài viết đã được xuất bản công khai.'
+            : ($requestedStatus === 'pending'
+                ? 'Bài viết đã được gửi duyệt. Vui lòng chờ quản trị viên phê duyệt.'
+                : 'Lưu bản nháp thành công.');
+
         return response()->json([
             'status' => 'success',
             'data' => $blog,
-            'message' => $autoApproved ? 'Bài viết đã được xuất bản.' : 'Tạo blog thành công.'
+            'message' => $message
         ]);
     }
 
@@ -439,20 +445,37 @@ class BlogController extends Controller
             $updateData['pThumbnail'] = $newThumbnail;
         }
 
-        if ($request->has('blogStatus')) {
-            $newStatus = in_array($request->blogStatus, ['draft', 'pending']) ? $request->blogStatus : $blog->pStatus;
-            
-            // Gửi duyệt lại: reset lý do từ chối cũ
-            if ($newStatus === 'pending') {
-                $updateData['pReject_reason'] = null;
-                $updateData['pRejected_by'] = null;
-                $updateData['pRejected_at'] = null;
+        $message = 'Cập nhật bài viết thành công.';
 
-                // Nếu admin bật auto-duyệt -> xuất bản luôn
-                if ($this->blogAutoApproveEnabled()) {
+        if ($request->has('blogStatus')) {
+            $requestedStatus = in_array($request->blogStatus, ['draft', 'pending']) ? $request->blogStatus : $blog->pStatus;
+            
+            if ($requestedStatus === 'draft') {
+                $newStatus = 'draft';
+                $message = 'Lưu bản nháp thành công.';
+            } elseif ($requestedStatus === 'pending') {
+                // NẾU BÀI ĐÃ ĐƯỢC DUYỆT / ĐANG XUẤT BẢN (active) -> Giữ nguyên active, không cần duyệt lại!
+                if ($blog->pStatus === 'active') {
                     $newStatus = 'active';
-                    $updateData['pApproved_at'] = now();
+                    $message = 'Cập nhật bài viết thành công.';
+                } else {
+                    // Bài đang là draft hoặc inactive -> Gửi duyệt
+                    $updateData['pReject_reason'] = null;
+                    $updateData['pRejected_by'] = null;
+                    $updateData['pRejected_at'] = null;
+
+                    // Nếu admin bật auto-duyệt -> xuất bản luôn
+                    if ($this->blogAutoApproveEnabled()) {
+                        $newStatus = 'active';
+                        $updateData['pApproved_at'] = now();
+                        $message = 'Bài viết đã được xuất bản công khai.';
+                    } else {
+                        $newStatus = 'pending';
+                        $message = 'Bài viết đã được gửi duyệt. Vui lòng chờ quản trị viên phê duyệt.';
+                    }
                 }
+            } else {
+                $newStatus = $blog->pStatus;
             }
             $updateData['pStatus'] = $newStatus;
         }
@@ -461,8 +484,8 @@ class BlogController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data' => $blog,
-            'message' => 'Cập nhật bài viết thành công.'
+            'data' => $blog->fresh(),
+            'message' => $message
         ]);
     }
 

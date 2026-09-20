@@ -220,17 +220,9 @@ export function CreatePost() {
   const handleSubmit = async (status: "draft" | "pending") => {
     if (!validateForm()) return;
 
-    // Cảnh báo nếu bài viết đang xuất bản mà giáo viên gửi cập nhật
-    if (isEditing && originalStatus === "active" && status === "pending") {
-      const confirmed = window.confirm(
-        "Bài viết này đang được xuất bản trên trang công khai. Việc cập nhật nội dung sẽ chuyển bài viết về trạng thái Chờ duyệt (tạm thời ẩn khỏi trang công khai cho đến khi được duyệt lại). Bạn có chắc chắn muốn tiếp tục?"
-      );
-      if (!confirmed) return;
-    }
-
     try {
       if (isEditing && postId) {
-        await updateBlog(parseInt(postId), {
+        const res = await updateBlog(parseInt(postId), {
           blogName: title,
           blogContent: content,
           blogType: postType as any,
@@ -240,11 +232,15 @@ export function CreatePost() {
           blogStatus: status,
         });
 
-        if (status === "draft") {
-          showSuccess(t("blog.create.successDraft") || "Lưu bản nháp thành công!");
-        } else {
-          showSuccess(t("blog.create.successUpdate") || "Cập nhật bài viết thành công!");
-        }
+        // Hiển thị thông báo chính xác từ Backend (phản ánh đã xuất bản luôn hay chờ duyệt hay lưu nháp)
+        const successMsg = res.message || (
+          status === "draft"
+            ? (t("blog.create.successDraft") || "Lưu bản nháp thành công!")
+            : (res.pStatus === "active"
+                ? (t("blog.create.successUpdate") || "Cập nhật bài viết thành công!")
+                : "Bài viết đã được gửi duyệt. Vui lòng chờ quản trị viên phê duyệt!")
+        );
+        showSuccess(successMsg);
 
         // Log activity (best-effort)
         import("../../../../services/teacherActivityLog").then(({ logTeacherActivity }) => {
@@ -255,7 +251,7 @@ export function CreatePost() {
           });
         });
       } else {
-        await createBlog({
+        const res = await createBlog({
           blogName: title,
           blogContent: content,
           blogType: postType as any,
@@ -265,11 +261,15 @@ export function CreatePost() {
           blogStatus: status,
         });
 
-        showSuccess(
+        // Hiển thị thông báo chính xác (tự động xuất bản hay chờ duyệt)
+        const successMsg = res.message || (
           status === "draft"
             ? (t("blog.create.successDraft") || "Lưu nháp thành công!")
-            : (t("blog.create.successSubmit") || "Gửi duyệt bài viết thành công!")
+            : (res.pStatus === "active"
+                ? "Bài viết đã được xuất bản công khai!"
+                : (t("blog.create.successSubmit") || "Bài viết đã được gửi duyệt. Vui lòng chờ quản trị viên phê duyệt!"))
         );
+        showSuccess(successMsg);
 
         // Log activity (best-effort)
         import("../../../../services/teacherActivityLog").then(({ logTeacherActivity }) => {
