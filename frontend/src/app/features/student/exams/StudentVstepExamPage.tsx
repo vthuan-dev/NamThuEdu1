@@ -674,6 +674,15 @@ export function StudentVstepExamPage() {
     studentApi.startDirectVstepExam(Number(examId), isReload)
       .then((res: any) => {
         const data = res?.data?.data;
+        const responseStatus = String(res?.data?.status ?? '').toLowerCase();
+        if (responseStatus === 'finalized' || (data?.sStatus && data.sStatus !== 'in_progress')) {
+          const sid = data?.submissionId;
+          if (sid) {
+            toast.warning('Bài thi đã hết thời gian làm bài và đã được tự động nộp.', 5000);
+            navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${sid}`, { replace: true });
+            return;
+          }
+        }
         if (data?.submissionId) {
           setSubmissionId(data.submissionId);
           // ✅ FIX: Use direct timestamp from backend, NOT calculated from timeRemaining

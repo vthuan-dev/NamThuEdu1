@@ -214,6 +214,14 @@ export function KidsTestTaking() {
     },
     onSuccess: (res: any) => {
       const data = res?.data?.data;
+      if (res?.data?.status === 'finalized' || (data?.sStatus && data.sStatus !== 'in_progress')) {
+        const sid = data?.submissionId ?? querySubmissionId;
+        if (sid) {
+          toast.warning('Bài thi đã hết thời gian làm bài và đã được tự động nộp.', 5000);
+          navigate(`${BASE}/ket-qua/${sid}`, { replace: true });
+          return;
+        }
+      }
       const fetchedExam = data?.exam ?? data?.assignment?.exam;
       if (!fetchedExam || !Array.isArray(fetchedExam.questions)) {
         setLoadError('Không tải được bài thi. Em thử lại nhé!');

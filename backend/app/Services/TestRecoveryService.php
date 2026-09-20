@@ -19,6 +19,62 @@ use Illuminate\Support\Facades\Log;
 class TestRecoveryService
 {
     /**
+     * Xác định thời lượng thi (phút) chính xác cho mọi loại đề thi:
+     * - THPT: thpt_config['total_duration_minutes'] -> eDuration_minutes -> 60
+     * - IELTS: eDuration_minutes -> theo skill (listening=30, reading=60, writing=60, speaking=15, mixed=165) -> 60
+     * - VSTEP / Kids / Teens / General: eDuration_minutes -> 60
+     * - Snapshot trong submission_payload (nếu có)
+     */
+    public static function resolveSubmissionDurationMinutes(Submission $submission): int
+    {
+        // 1. Kiểm tra snapshot trong submission_payload
+        $payload = is_array($submission->submission_payload) ? $submission->submission_payload : [];
+        if (!empty($payload['exam_snapshot']['eDuration_minutes'])) {
+            return (int) $payload['exam_snapshot']['eDuration_minutes'];
+        }
+        if (!empty($payload['exam_snapshot']['config']['total_duration_minutes'])) {
+            return (int) $payload['exam_snapshot']['config']['total_duration_minutes'];
+        }
+
+        $exam = $submission->exam;
+        if (!$exam) {
+            return 60;
+        }
+
+        $eType = strtoupper((string) ($exam->eType ?? ''));
+
+        // 2. THPT
+        if ($eType === 'THPT') {
+            $fromConfig = $exam->thpt_config['total_duration_minutes'] ?? null;
+            if (is_numeric($fromConfig) && (int) $fromConfig > 0) {
+                return (int) $fromConfig;
+            }
+            $fromCol = (int) ($exam->eDuration_minutes ?? 0);
+            return $fromCol > 0 ? $fromCol : 60;
+        }
+
+        // 3. IELTS
+        if ($eType === 'IELTS') {
+            if ((int) ($exam->eDuration_minutes ?? 0) > 0) {
+                return (int) $exam->eDuration_minutes;
+            }
+            $skill = strtolower((string) ($exam->ielts_skill ?? $exam->eSkill ?? ''));
+            $defaultIelts = [
+                'listening' => 30,
+                'reading'   => 60,
+                'writing'   => 60,
+                'speaking'  => 15,
+                'mixed'     => 165,
+            ];
+            return $defaultIelts[$skill] ?? 60;
+        }
+
+        // 4. VSTEP / Kids / Teens / General
+        $fromCol = (int) ($exam->eDuration_minutes ?? 0);
+        return $fromCol > 0 ? $fromCol : 60;
+    }
+
+    /**
      * Kiểm tra và xử lý các bài thi bị gián đoạn.
      * Chạy định kỳ bằng cron job (every minute).
      *
@@ -26,57 +82,70 @@ class TestRecoveryService
      */
     public static function handleInterruptedTests(): array
     {
-        $threshold = ExamAutoSubmitService::INACTIVITY_THRESHOLD_MIN;
+        $utcNow = now()->utc();
 
-        // Use UTC_TIMESTAMP() to match Laravel's UTC timestamps (avoid timezone drift)
-        $utcNow = now()->utc()->toDateTimeString();
-
-        // 1) Hết giờ thi (sStart_time + eDuration_minutes < now)
-        $timeoutSubs = Submission::with(['exam.questions.answers', 'answers.question'])
+        // Lấy tất cả submissions đang in_progress
+        $inProgressSubs = Submission::with(['exam.questions.answers', 'answers.question'])
             ->where('sStatus', 'in_progress')
-            ->whereRaw('TIMESTAMPDIFF(MINUTE, sStart_time, ?) > (SELECT eDuration_minutes FROM exams WHERE eId = submissions.exam_id)', [$utcNow])
-            ->get();
-
-        // 2) Câm quá ngưỡng (last_activity_at IS NOT NULL AND > threshold)
-        // Loại trừ những bài đã match nhánh 1 để tránh double-process
-        $timeoutIds = $timeoutSubs->pluck('sId')->all();
-        $inactiveSubs = Submission::with(['exam.questions.answers', 'answers.question'])
-            ->where('sStatus', 'in_progress')
-            ->whereNotNull('last_activity_at')
-            ->whereRaw('TIMESTAMPDIFF(MINUTE, last_activity_at, ?) > ?', [$utcNow, $threshold])
-            ->when(!empty($timeoutIds), fn($q) => $q->whereNotIn('sId', $timeoutIds))
             ->get();
 
         $service = app(ExamAutoSubmitService::class);
-
         $stats = ['timeout' => 0, 'inactive' => 0, 'failed' => 0];
 
-        foreach ($timeoutSubs as $submission) {
-            $result = $service->autoSubmit($submission, ExamAutoSubmitService::REASON_TIMEOUT);
-            if ($result['ok'] && !$result['idempotent']) {
-                $stats['timeout']++;
-                Log::info('TestRecoveryService timeout auto-submit', [
-                    'submission_id' => $submission->sId,
-                    'user_id'       => $submission->user_id,
-                    'exam_id'       => $submission->exam_id,
-                ]);
-            } elseif (!$result['ok']) {
-                $stats['failed']++;
-            }
-        }
+        foreach ($inProgressSubs as $submission) {
+            $startTime = $submission->sStart_time
+                ? ($submission->sStart_time instanceof \Carbon\Carbon
+                    ? $submission->sStart_time->copy()->utc()
+                    : \Carbon\Carbon::parse((string) $submission->sStart_time)->utc())
+                : ($submission->created_at ? $submission->created_at->copy()->utc() : $utcNow);
 
-        foreach ($inactiveSubs as $submission) {
-            $result = $service->autoSubmit($submission, ExamAutoSubmitService::REASON_INACTIVE);
-            if ($result['ok'] && !$result['idempotent']) {
-                $stats['inactive']++;
-                Log::info('TestRecoveryService inactive auto-submit', [
-                    'submission_id'    => $submission->sId,
-                    'user_id'          => $submission->user_id,
-                    'exam_id'          => $submission->exam_id,
-                    'last_activity_at' => $submission->last_activity_at,
-                ]);
-            } elseif (!$result['ok']) {
-                $stats['failed']++;
+            $durationMinutes = self::resolveSubmissionDurationMinutes($submission);
+            $payload = is_array($submission->submission_payload) ? $submission->submission_payload : [];
+
+            // Kiểm tra deadline tuyệt đối nếu có trong payload, nếu không tính từ startTime + duration
+            if (!empty($payload['timer_deadline_at'])) {
+                $deadline = \Carbon\Carbon::parse($payload['timer_deadline_at'])->utc();
+            } else {
+                $deadline = $startTime->copy()->addMinutes($durationMinutes);
+            }
+
+            // 1. ĐÃ HẾT GIỜ THI (now >= deadline) -> Auto submit timeout
+            if ($utcNow->greaterThanOrEqualTo($deadline)) {
+                $result = $service->autoSubmit($submission, ExamAutoSubmitService::REASON_TIMEOUT);
+                if ($result['ok'] && !$result['idempotent']) {
+                    $stats['timeout']++;
+                    Log::info('TestRecoveryService timeout auto-submit', [
+                        'submission_id' => $submission->sId,
+                        'user_id'       => $submission->user_id,
+                        'exam_id'       => $submission->exam_id,
+                        'duration'      => $durationMinutes,
+                    ]);
+                } elseif (!$result['ok']) {
+                    $stats['failed']++;
+                }
+                continue;
+            }
+
+            // 2. Bài thi BỊ BỎ RƠI QUÁ LÂU (bỏ thi > 24 giờ)
+            // Không dùng threshold 15 phút để tránh tự nộp non khi học viên tắt máy tạm thời trong lúc đề thi chưa hết giờ.
+            $lastActivity = $submission->last_activity_at
+                ? ($submission->last_activity_at instanceof \Carbon\Carbon
+                    ? $submission->last_activity_at->copy()->utc()
+                    : \Carbon\Carbon::parse((string) $submission->last_activity_at)->utc())
+                : $startTime;
+
+            if ($utcNow->diffInHours($lastActivity, false) >= 24) {
+                $result = $service->autoSubmit($submission, ExamAutoSubmitService::REASON_INACTIVE);
+                if ($result['ok'] && !$result['idempotent']) {
+                    $stats['inactive']++;
+                    Log::info('TestRecoveryService abandoned test auto-submit (24h+)', [
+                        'submission_id' => $submission->sId,
+                        'user_id'       => $submission->user_id,
+                        'exam_id'       => $submission->exam_id,
+                    ]);
+                } elseif (!$result['ok']) {
+                    $stats['failed']++;
+                }
             }
         }
 
@@ -87,23 +156,42 @@ class TestRecoveryService
      * Kiểm tra trạng thái bài thi của học viên.
      * Dùng khi học viên reload trang / quay lại từ tab khác.
      */
-    public static function checkStudentTestStatus($userId, $assignmentId)
+    public static function checkStudentTestStatus($userId, $assignmentId = null, $submissionId = null)
     {
-        $submission = Submission::with(['exam'])
+        $query = Submission::with(['exam'])
             ->where('user_id', $userId)
-            ->where('assignment_id', $assignmentId)
-            ->where('sStatus', 'in_progress')
-            ->first();
+            ->where('sStatus', 'in_progress');
+
+        if ($submissionId) {
+            $query->where('sId', $submissionId);
+        } elseif ($assignmentId) {
+            $query->where('assignment_id', $assignmentId);
+        } else {
+            $query->whereNull('assignment_id');
+        }
+
+        $submission = $query->orderByDesc('sId')->first();
 
         if (!$submission) {
             return ['status' => 'no_active_test'];
         }
 
         $utcNow = now()->utc();
-        $timeElapsed = (int) $utcNow->diffInMinutes($submission->sStart_time->copy()->utc(), false);
-        $timeRemaining = (int) $submission->exam->eDuration_minutes - $timeElapsed;
+        $startTime = $submission->sStart_time
+            ? ($submission->sStart_time instanceof \Carbon\Carbon
+                ? $submission->sStart_time->copy()->utc()
+                : \Carbon\Carbon::parse((string) $submission->sStart_time)->utc())
+            : $utcNow;
 
-        if ($timeRemaining <= 0) {
+        $durationMinutes = self::resolveSubmissionDurationMinutes($submission);
+        $payload = is_array($submission->submission_payload) ? $submission->submission_payload : [];
+        if (!empty($payload['timer_deadline_at'])) {
+            $deadline = \Carbon\Carbon::parse($payload['timer_deadline_at'])->utc();
+        } else {
+            $deadline = $startTime->copy()->addMinutes($durationMinutes);
+        }
+
+        if ($utcNow->greaterThanOrEqualTo($deadline)) {
             // Tự động nộp bài hết thời gian thông qua service trung tâm
             $submission->load(['exam.questions.answers', 'answers.question']);
             app(ExamAutoSubmitService::class)
@@ -115,11 +203,13 @@ class TestRecoveryService
             ];
         }
 
+        $timeRemaining = max(0, (int) $deadline->diffInMinutes($utcNow));
+
         return [
-            'status'        => 'in_progress',
-            'submission_id' => $submission->sId,
+            'status'         => 'in_progress',
+            'submission_id'  => $submission->sId,
             'time_remaining' => $timeRemaining,
-            'can_resume'    => true,
+            'can_resume'     => true,
         ];
     }
 }

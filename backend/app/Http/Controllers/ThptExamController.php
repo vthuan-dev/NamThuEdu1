@@ -1763,7 +1763,11 @@ class ThptExamController extends Controller
      *  - tf:     "q{n}.s{i}" → bool
      *  - match:  "q{n}.{i}" → letter
      */
-    private function gradeSubmission(array $config, array $userAnswers): array
+    /**
+     * Chấm điểm bài thi THPT khách quan dựa vào thpt_config và đáp án học viên.
+     * Public để ExamAutoSubmitService có thể gọi khi auto-submit / cron timeout.
+     */
+    public function gradeSubmission(array $config, array $userAnswers): array
     {
         $rawScore = 0;
         $rawMax = 0;

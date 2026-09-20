@@ -224,7 +224,12 @@ export function StudentThptExamPage() {
         const startData = startRes.data?.data;
         if (!mounted || !startData) return;
 
-        const sid = startData.submission_id;
+        const sid = startData.submission_id || startData.submissionId;
+        if (startRes.data?.status === 'finalized' || (startData?.sStatus && startData.sStatus !== 'in_progress')) {
+          toast.warning('Bài thi đã hết thời gian làm bài và đã được tự động nộp.', 5000);
+          navigate(`/hoc-vien/ket-qua-thpt/${sid}`, { replace: true });
+          return;
+        }
         const durationFromServer = Number(startData.duration_minutes);
         const effectiveDurationMin =
           Number.isFinite(durationFromServer) && durationFromServer > 0

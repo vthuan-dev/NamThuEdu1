@@ -86,6 +86,92 @@ class ExamAutoSubmitService
                 ];
             }
 
+            // ── THPT Exam Handling ──────────────────────────────────────────
+            // Đề THPT lưu câu hỏi trong exams.thpt_config (JSON) và câu trả lời
+            // trong submission_payload['answers']. Cần dùng engine gradeSubmission của THPT.
+            if ($submission->exam && strtoupper($submission->exam->eType ?? '') === 'THPT') {
+                $payload = is_array($submission->submission_payload) ? $submission->submission_payload : [];
+                $answers = $payload['answers'] ?? [];
+                $configForGrading = $payload['exam_snapshot']['config']
+                    ?? $submission->exam->thpt_config
+                    ?? [];
+
+                /** @var \App\Http\Controllers\ThptExamController $thptController */
+                $thptController = app(\App\Http\Controllers\ThptExamController::class);
+                $result = $thptController->gradeSubmission($configForGrading, $answers);
+
+                // Giữ điểm giáo viên chấm tay (nếu có)
+                $existingOverride = $payload['result']['teacher_override_score'] ?? null;
+                if ($existingOverride !== null) {
+                    $result['teacher_override_score'] = (float) $existingOverride;
+                    $result['scaled_score_objective'] = $result['scaled_score'];
+                    $result['scaled_score'] = (float) $existingOverride;
+                }
+
+                $payload['result'] = $result;
+                $reasonLabel = $this->reasonLabel($reason);
+                $totalQuestions = $result['total_questions'] ?? 25;
+                $answeredQuestions = $result['answered_questions'] ?? count($answers);
+
+                $submission->sScore = $result['scaled_score'] ?? 0;
+                $submission->sStatus = 'auto_submitted';
+                $submission->sSubmit_time = now();
+                $submission->sGraded_time = now();
+                $submission->auto_submit_reason = $reason;
+                $submission->sTeacher_feedback = "Bài thi THPT được tự động nộp ({$reasonLabel}). Đã trả lời {$answeredQuestions}/{$totalQuestions} câu hỏi.";
+                $submission->submission_payload = $payload;
+                $submission->last_activity_at = now();
+                $submission->save();
+
+                // Dispatch AI grading nếu có speaking/writing
+                $hasSpeakingSection = collect($configForGrading['sections'] ?? [])
+                    ->contains(fn($s) => ($s['type'] ?? '') === 'speaking');
+                $rawFeedback = json_decode($submission->sGemini_feedback ?? '{}', true) ?: [];
+                $hasSpeakingAudio = !empty($rawFeedback['speaking_audio'] ?? []);
+                if ($hasSpeakingSection && $hasSpeakingAudio) {
+                    try {
+                        \App\Jobs\GradeThptSpeakingJob::dispatch((int) $submission->sId);
+                    } catch (\Throwable $e) {
+                        Log::warning('Cannot dispatch GradeThptSpeakingJob from auto-submit', ['error' => $e->getMessage()]);
+                    }
+                }
+                $hasWritingSection = collect($configForGrading['sections'] ?? [])
+                    ->contains(fn($s) => ($s['type'] ?? '') === 'writing');
+                if ($hasWritingSection) {
+                    try {
+                        \App\Jobs\GradeThptWritingJob::dispatch((int) $submission->sId);
+                    } catch (\Throwable $e) {
+                        Log::warning('Cannot dispatch GradeThptWritingJob from auto-submit', ['error' => $e->getMessage()]);
+                    }
+                }
+
+                DB::commit();
+
+                Log::info('ExamAutoSubmitService THPT completed', [
+                    'submission_id' => $submission->sId,
+                    'user_id'       => $submission->user_id,
+                    'exam_id'       => $submission->exam_id,
+                    'reason'        => $reason,
+                    'score'         => $result['scaled_score'] ?? 0,
+                ]);
+
+                return [
+                    'ok'         => true,
+                    'idempotent' => false,
+                    'data'       => [
+                        'submissionId'      => $submission->sId,
+                        'sScore'            => $result['scaled_score'] ?? 0,
+                        'sStatus'           => 'auto_submitted',
+                        'autoSubmitReason'  => $reason,
+                        'answeredQuestions' => $answeredQuestions,
+                        'totalQuestions'    => $totalQuestions,
+                        'autoSubmitted'     => true,
+                        'result'            => $result,
+                    ],
+                    'message'    => 'Bài thi THPT đã được tự động nộp.',
+                ];
+            }
+
             // ── Backfill blank answers for ALL unanswered questions ──────────
             // Đảm bảo mọi câu hỏi trong đề đều có row trong submission_answers
             // (đồng nhất với luồng submit thủ công).

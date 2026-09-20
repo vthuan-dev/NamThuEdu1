@@ -5261,9 +5261,14 @@ class StudentTestController extends Controller
             if ($timerState['expired']) {
                 $this->autoSubmit($existing);
                 return response()->json([
-                    'status' => 'error',
-                    'message' => 'Bài thi đã hết thời gian làm bài và đã được tự động nộp.'
-                ], 403);
+                    'status'  => 'finalized',
+                    'message' => 'Bài thi đã hết thời gian làm bài và đã được tự động nộp.',
+                    'data'    => [
+                        'submissionId' => $existing->sId,
+                        'sStatus'      => $existing->sStatus,
+                        'redirect_to'  => "/hoc-vien/ket-qua/{$existing->sId}",
+                    ],
+                ], 200);
             }
             $submission = $existing;
             $savedAnswers = $existing->answers;
@@ -5537,9 +5542,14 @@ class StudentTestController extends Controller
             if ($timerState['expired']) {
                 $this->autoSubmit($existing);
                 return response()->json([
-                    'status' => 'error',
-                    'message' => 'Bài thi đã hết thời gian làm bài và đã được tự động nộp.'
-                ], 403);
+                    'status'  => 'finalized',
+                    'message' => 'Bài thi đã hết thời gian làm bài và đã được tự động nộp.',
+                    'data'    => [
+                        'submissionId' => $existing->sId,
+                        'sStatus'      => $existing->sStatus,
+                        'redirect_to'  => "/hoc-vien/ket-qua/{$existing->sId}",
+                    ],
+                ], 200);
             }
             $submission = $existing;
             $savedAnswers = $existing->answers;
