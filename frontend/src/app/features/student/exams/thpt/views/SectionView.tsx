@@ -1378,12 +1378,16 @@ function TfStatementRow({
       <div className="flex items-start gap-3 w-full">
         <span className="text-xs font-bold text-slate-500 w-5 mt-0.5">{idx + 1}.</span>
         <p className="flex-1 text-sm text-slate-900 font-bold leading-relaxed">{text}</p>
-        <div className="flex items-center gap-0.5 p-0.5 rounded-md bg-slate-100 flex-shrink-0">
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 border-2 border-slate-300 shadow-xs flex-shrink-0">
           <button
             type="button"
             onClick={() => onAnswerChange(qKey, true)}
             disabled={isReview}
-            className={`px-3 py-1.5 text-xs font-bold rounded transition-all cursor-pointer disabled:cursor-default ${userVal === true ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-500'}`}
+            className={`px-3.5 py-1.5 min-w-[36px] text-center text-xs font-extrabold rounded-lg transition-all cursor-pointer disabled:cursor-default ${
+              userVal === true
+                ? 'bg-emerald-600 text-white shadow-sm border border-emerald-600'
+                : 'bg-white text-slate-800 border border-slate-300 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-400 shadow-xs'
+            }`}
           >
             T
           </button>
@@ -1391,7 +1395,11 @@ function TfStatementRow({
             type="button"
             onClick={() => onAnswerChange(qKey, false)}
             disabled={isReview}
-            className={`px-3 py-1.5 text-xs font-bold rounded transition-all cursor-pointer disabled:cursor-default ${userVal === false ? 'bg-red-500 text-white shadow-sm' : 'text-slate-500'}`}
+            className={`px-3.5 py-1.5 min-w-[36px] text-center text-xs font-extrabold rounded-lg transition-all cursor-pointer disabled:cursor-default ${
+              userVal === false
+                ? 'bg-red-600 text-white shadow-sm border border-red-600'
+                : 'bg-white text-slate-800 border border-slate-300 hover:bg-red-50 hover:text-red-700 hover:border-red-400 shadow-xs'
+            }`}
           >
             F
           </button>
