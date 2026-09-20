@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { teacherBlogApi, Blog } from "../../../../services/blogApi";
 import { useToast } from "../../../../hooks/useToast";
+import { sanitizeHtml } from "../../../../utils/sanitizeHtml";
 
 const typeConfig: Record<
   string,
@@ -270,7 +271,7 @@ export function PostDetail() {
             {/* Content */}
             <div
               className="prose prose-lg prose-slate max-w-none prose-headings:text-slate-900 prose-headings:font-bold prose-p:text-slate-700 prose-p:leading-relaxed prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline prose-strong:text-slate-900 prose-strong:font-semibold"
-              dangerouslySetInnerHTML={{ __html: blog.pContent }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(blog.pContent) }}
             />
 
             {/* Reject Reason */}

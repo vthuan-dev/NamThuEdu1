@@ -338,10 +338,11 @@ export function BlogList() {
                     <div className="absolute right-4 bottom-16 w-44 bg-white rounded-xl py-1.5 z-20"
                       style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}
                       onClick={(e) => e.stopPropagation()}>
-                      {blog.pStatus === "draft" && (
+                      {(blog.pStatus === "draft" || blog.pStatus === "inactive") && (
                         <button onClick={() => handleSubmit(blog.pId)}
                           className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 transition-colors cursor-pointer">
-                          <Send className="w-4 h-4" />{t("blog.list.btnSubmit")}
+                          <Send className="w-4 h-4 text-blue-600" />
+                          {blog.pStatus === "inactive" ? "Gửi duyệt lại" : t("blog.list.btnSubmit")}
                         </button>
                       )}
                       <button onClick={() => { setDeleteId(blog.pId); setMenuOpen(null); }}
@@ -404,8 +405,9 @@ export function BlogList() {
                       className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer">
                       <Edit3 className="w-4 h-4" />
                     </Link>
-                    {blog.pStatus === "draft" && (
+                    {(blog.pStatus === "draft" || blog.pStatus === "inactive") && (
                       <button onClick={() => handleSubmit(blog.pId)}
+                        title={blog.pStatus === "inactive" ? "Gửi duyệt lại" : "Gửi duyệt"}
                         className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-colors cursor-pointer">
                         <Send className="w-4 h-4" />
                       </button>

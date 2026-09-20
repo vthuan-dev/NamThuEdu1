@@ -75,6 +75,9 @@ export function CreatePost() {
   const [newTypeName, setNewTypeName] = useState("");
   const [newlyAddedType, setNewlyAddedType] = useState<string | null>(null);
 
+  // State for original post status when editing
+  const [originalStatus, setOriginalStatus] = useState<string>("draft");
+
   // Fetch blog types on mount
   useEffect(() => {
     const fetchBlogTypes = async () => {
@@ -122,6 +125,7 @@ export function CreatePost() {
           setCategory(String(blog.pCategory || "1"));
           setSlug(blog.pUrl || "");
           setThumbnail(blog.pThumbnail || null);
+          setOriginalStatus(blog.pStatus || "draft");
         }
       } catch (error: any) {
         console.error('Failed to fetch post detail:', error);
@@ -182,11 +186,12 @@ export function CreatePost() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      showError(t("blog.create.errorImageType"));
+      showError(t("blog.create.errorImageType") || "Vui lòng chọn file hình ảnh.");
       return;
     }
-    if (file.size > 20 * 1024 * 1024) {
-      showError(t("blog.create.errorImageSize"));
+    // Giới hạn 3MB để tránh quá tải payload Base64 và lỗi Nginx 413
+    if (file.size > 3 * 1024 * 1024) {
+      showError(t("blog.create.errorImageSize") || "Kích thước ảnh tối đa là 3MB. Vui lòng nén hoặc chọn ảnh khác.");
       return;
     }
     const reader = new FileReader();
@@ -214,6 +219,14 @@ export function CreatePost() {
 
   const handleSubmit = async (status: "draft" | "pending") => {
     if (!validateForm()) return;
+
+    // Cảnh báo nếu bài viết đang xuất bản mà giáo viên gửi cập nhật
+    if (isEditing && originalStatus === "active" && status === "pending") {
+      const confirmed = window.confirm(
+        "Bài viết này đang được xuất bản trên trang công khai. Việc cập nhật nội dung sẽ chuyển bài viết về trạng thái Chờ duyệt (tạm thời ẩn khỏi trang công khai cho đến khi được duyệt lại). Bạn có chắc chắn muốn tiếp tục?"
+      );
+      if (!confirmed) return;
+    }
 
     try {
       if (isEditing && postId) {

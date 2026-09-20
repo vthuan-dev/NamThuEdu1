@@ -4,11 +4,81 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use App\Models\Post;
 use App\Models\User;
 
 class BlogController extends Controller
 {
+    /**
+     * Xóa file thumbnail cũ trên disk nếu là file nội bộ
+     */
+    private function deleteOldThumbnail(?string $url): void
+    {
+        if (empty($url)) {
+            return;
+        }
+
+        $parsedPath = parse_url($url, PHP_URL_PATH);
+        if ($parsedPath && str_contains($parsedPath, '/uploads/blog/')) {
+            $filename = basename($parsedPath);
+            $filePath = public_path('uploads/blog/' . $filename);
+            if (file_exists($filePath)) {
+                @unlink($filePath);
+            }
+        }
+    }
+
+    /**
+     * Làm sạch nội dung HTML chống tấn công XSS
+     */
+    private function sanitizeHtmlContent(?string $content): string
+    {
+        if (empty($content)) {
+            return '';
+        }
+
+        // Loại bỏ script tags và nội dung bên trong
+        $content = preg_replace('/<script\b[^>]*>(.*?)<\/script>/is', '', $content);
+        // Loại bỏ iframe tags nguy hiểm
+        $content = preg_replace('/<iframe\b[^>]*>(.*?)<\/iframe>/is', '', $content);
+        // Loại bỏ object, embed, applet
+        $content = preg_replace('/<(object|embed|applet)\b[^>]*>(.*?)<\/\1>/is', '', $content);
+        // Loại bỏ các thuộc tính event handler như onclick, onerror, onload,...
+        $content = preg_replace('/\s*on[a-zA-Z]+\s*=\s*(["\']).*?\1/i', '', $content);
+        $content = preg_replace('/\s*on[a-zA-Z]+\s*=\s*[^"\'\s>]+/i', '', $content);
+        // Loại bỏ javascript: trong href hoặc src
+        $content = preg_replace('/(href|src)\s*=\s*(["\'])\s*javascript:[^"\']*\2/i', '$1="#"', $content);
+
+        return $content;
+    }
+
+    /**
+     * Sinh unique slug cho bài viết để không bị trùng lặp
+     */
+    private function generateUniqueSlug(string $title, ?string $requestedSlug = null, ?int $excludeId = null): string
+    {
+        $baseSlug = !empty($requestedSlug) 
+            ? Str::slug($requestedSlug) 
+            : Str::slug($title);
+
+        if (empty($baseSlug)) {
+            $baseSlug = 'bai-viet-' . time();
+        }
+
+        $slug = $baseSlug;
+        $counter = 1;
+
+        while (Post::where('pUrl', $slug)
+            ->when($excludeId, fn($q) => $q->where('pId', '!=', $excludeId))
+            ->exists()) {
+            $slug = $baseSlug . '-' . $counter;
+            $counter++;
+        }
+
+        return $slug;
+    }
+
     /**
      * Lưu thumbnail: nếu là chuỗi base64 (data URI) thì decode, ghi ra file
      * trong public/uploads/blog và trả về đường dẫn tương đối để lưu DB.
@@ -155,34 +225,37 @@ class BlogController extends Controller
             'blogName' => 'required|string|max:255',
             'blogContent' => 'required|string',
             'blogType' => 'nullable|string|exists:blog_types,type_value',
-            'blogCategory' => 'nullable|integer', // Removed exists validation temporarily
+            'blogCategory' => 'nullable|integer',
             'blogUrl' => 'nullable|string',
             'blogThumbnail' => 'nullable|string',
-            'blogStatus' => 'nullable|in:draft,pending,published',
+            'blogStatus' => 'nullable|in:draft,pending',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Dữ liệu không đầy đủ.',
+                'message' => 'Dữ liệu không đầy đủ hoặc không hợp lệ.',
                 'errors' => $validator->errors()
             ], 400);
         }
 
-        // Trạng thái yêu cầu; nếu là 'pending' và admin bật auto-duyệt -> xuất bản luôn
-        $requestedStatus = $request->blogStatus ?? 'draft';
+        // Giáo viên chỉ có thể lưu nháp hoặc gửi duyệt
+        $requestedStatus = in_array($request->blogStatus, ['draft', 'pending']) ? $request->blogStatus : 'draft';
         $autoApproved = false;
         if ($requestedStatus === 'pending' && $this->blogAutoApproveEnabled()) {
             $requestedStatus = 'active';
             $autoApproved = true;
         }
 
+        $uniqueSlug = $this->generateUniqueSlug($request->blogName, $request->blogUrl);
+        $cleanContent = $this->sanitizeHtmlContent($request->blogContent);
+
         $blog = Post::create([
             'pTitle' => $request->blogName,
-            'pContent' => $request->blogContent,
+            'pContent' => $cleanContent,
             'pType' => $request->blogType ?? 'teaching',
             'pCategory' => $request->blogCategory ?? 1,
-            'pUrl' => $request->blogUrl ?? '',
+            'pUrl' => $uniqueSlug,
             'pThumbnail' => $this->saveBase64Thumbnail($request->blogThumbnail),
             'pAuthor_id' => $user->uId,
             'pStatus' => $requestedStatus,
@@ -328,10 +401,10 @@ class BlogController extends Controller
             'blogName' => 'sometimes|required|string|max:255',
             'blogContent' => 'sometimes|required|string',
             'blogType' => 'sometimes|required|string|exists:blog_types,type_value',
-            'blogCategory' => 'sometimes|required|integer', // Removed exists validation temporarily
+            'blogCategory' => 'sometimes|required|integer',
             'blogUrl' => 'nullable|string',
             'blogThumbnail' => 'nullable|string',
-            'blogStatus' => 'sometimes|required|in:draft,pending,published',
+            'blogStatus' => 'sometimes|required|in:draft,pending',
         ]);
 
         if ($validator->fails()) {
@@ -344,17 +417,42 @@ class BlogController extends Controller
 
         $updateData = [];
         if ($request->has('blogName')) $updateData['pTitle'] = $request->blogName;
-        if ($request->has('blogContent')) $updateData['pContent'] = $request->blogContent;
+        if ($request->has('blogContent')) $updateData['pContent'] = $this->sanitizeHtmlContent($request->blogContent);
         if ($request->has('blogType')) $updateData['pType'] = $request->blogType;
         if ($request->has('blogCategory')) $updateData['pCategory'] = $request->blogCategory;
-        if ($request->has('blogUrl')) $updateData['pUrl'] = $request->blogUrl;
-        if ($request->has('blogThumbnail')) $updateData['pThumbnail'] = $this->saveBase64Thumbnail($request->blogThumbnail);
+        
+        // Cập nhật slug đảm bảo duy nhất
+        if ($request->has('blogUrl') || $request->has('blogName')) {
+            $updateData['pUrl'] = $this->generateUniqueSlug(
+                $request->blogName ?? $blog->pTitle,
+                $request->blogUrl ?? $blog->pUrl,
+                $blog->pId
+            );
+        }
+
+        // Cập nhật thumbnail & dọn dẹp file cũ nếu có ảnh mới
+        if ($request->has('blogThumbnail')) {
+            $newThumbnail = $this->saveBase64Thumbnail($request->blogThumbnail);
+            if (!empty($blog->pThumbnail) && $blog->pThumbnail !== $newThumbnail) {
+                $this->deleteOldThumbnail($blog->pThumbnail);
+            }
+            $updateData['pThumbnail'] = $newThumbnail;
+        }
+
         if ($request->has('blogStatus')) {
-            $newStatus = $request->blogStatus;
-            // Gửi duyệt + admin bật auto-duyệt -> xuất bản luôn
-            if ($newStatus === 'pending' && $this->blogAutoApproveEnabled()) {
-                $newStatus = 'active';
-                $updateData['pApproved_at'] = now();
+            $newStatus = in_array($request->blogStatus, ['draft', 'pending']) ? $request->blogStatus : $blog->pStatus;
+            
+            // Gửi duyệt lại: reset lý do từ chối cũ
+            if ($newStatus === 'pending') {
+                $updateData['pReject_reason'] = null;
+                $updateData['pRejected_by'] = null;
+                $updateData['pRejected_at'] = null;
+
+                // Nếu admin bật auto-duyệt -> xuất bản luôn
+                if ($this->blogAutoApproveEnabled()) {
+                    $newStatus = 'active';
+                    $updateData['pApproved_at'] = now();
+                }
             }
             $updateData['pStatus'] = $newStatus;
         }
@@ -620,6 +718,13 @@ class BlogController extends Controller
             ], 404);
         }
 
+        if ($post->pStatus === 'draft') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Không thể duyệt bài viết đang ở trạng thái bản nháp. Giáo viên cần gửi duyệt bài viết trước.'
+            ], 400);
+        }
+
         if ($post->pStatus === 'active') {
             // Idempotent: bài đã duyệt rồi thì coi như thành công, không báo lỗi
             return response()->json([
@@ -770,6 +875,7 @@ class BlogController extends Controller
             ], 404);
         }
 
+        $this->deleteOldThumbnail($post->pThumbnail);
         $post->update(['pDeleted_at' => now()]);
 
         return response()->json([
@@ -843,6 +949,7 @@ class BlogController extends Controller
         // Posts statistics
         $totalPosts = Post::whereNull('pDeleted_at')->count();
         $activePosts = Post::where('pStatus', 'active')->whereNull('pDeleted_at')->count();
+        $pendingPosts = Post::where('pStatus', 'pending')->whereNull('pDeleted_at')->count();
         $draftPosts = Post::where('pStatus', 'draft')->whereNull('pDeleted_at')->count();
         $inactivePosts = Post::where('pStatus', 'inactive')->whereNull('pDeleted_at')->count();
 
@@ -877,7 +984,8 @@ class BlogController extends Controller
             'data' => [
                 'total_posts' => $totalPosts,
                 'approved_posts' => $activePosts,
-                'pending_posts' => $draftPosts,
+                'pending_posts' => $pendingPosts,
+                'draft_posts' => $draftPosts,
                 'rejected_posts' => $inactivePosts,
                 'by_type' => $postsByType,
                 'by_author' => $postsByAuthor,

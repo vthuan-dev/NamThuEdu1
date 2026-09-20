@@ -6,6 +6,7 @@ import { publicBlogApi, type Blog } from "../../../services/blogApi";
 import { Header, Footer } from "./components";
 import { BlogSEO } from "../../../components/shared/BlogSEO";
 import { useToastContext } from "../../../contexts/ToastContext";
+import { sanitizeHtml } from "../../../utils/sanitizeHtml";
 import {
   ArrowLeft,
   Calendar,
@@ -344,7 +345,7 @@ export function PublicBlogDetail() {
             {/* Content — render HTML safely */}
             <div
               className="prose prose-slate prose-base md:prose-lg max-w-3xl prose-headings:font-bold prose-a:text-orange-600 prose-a:no-underline hover:prose-a:underline prose-img:rounded-lg"
-              dangerouslySetInnerHTML={{ __html: post.pContent ?? "" }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.pContent) }}
             />
 
             {/* Back link */}
