@@ -9,6 +9,7 @@ import {
   Filter,
 } from "lucide-react";
 import { studentApi } from "../../../../services/studentApi";
+import { hasHtmlOrEntities, sanitizeInlineHtml, sanitizeRichContent } from "../../../../utils/examUtils";
 
 const PRIMARY = "#0EA5E9";
 const PRIMARY_LIGHT = "#E0F2FE";
@@ -376,7 +377,7 @@ export function AnswerReview() {
                       </span>
                     </div>
                     <p style={{ fontSize: 15, fontWeight: 600, color: "#1F1344", lineHeight: 1.6 }}
-                      dangerouslySetInnerHTML={{ __html: q?.qContent ?? "" }} />
+                      dangerouslySetInnerHTML={{ __html: sanitizeRichContent(q?.qContent ?? "") }} />
                   </div>
                 </div>
 
@@ -400,7 +401,11 @@ export function AnswerReview() {
                           {String.fromCharCode(65 + oi)}
                         </span>
                         <p style={{ fontSize: 14, color: optColor, fontWeight: isCorrectOpt || isStudentChoice ? 600 : 400 }}>
-                          {opt.aContent}
+                          {hasHtmlOrEntities(opt.aContent) ? (
+                            <span dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(opt.aContent) }} />
+                          ) : (
+                            opt.aContent
+                          )}
                         </p>
                         <div className="ml-auto flex items-center gap-1 flex-shrink-0">
                           {isCorrectOpt && <CheckCircle className="w-4 h-4 text-emerald-500" />}
@@ -416,7 +421,14 @@ export function AnswerReview() {
                   <div className="ml-10 mt-3 p-3 rounded-xl"
                     style={{ background: PRIMARY_LIGHT, border: `1px solid ${PRIMARY}20` }}>
                     <p style={{ fontSize: 12, fontWeight: 600, color: PRIMARY, marginBottom: 4 }}>💡 Giải thích</p>
-                    <p style={{ fontSize: 13, color: "#374151", lineHeight: 1.6 }}>{q.qExplanation}</p>
+                    {hasHtmlOrEntities(q.qExplanation) ? (
+                      <div
+                        style={{ fontSize: 13, color: "#374151", lineHeight: 1.6 }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeRichContent(q.qExplanation) }}
+                      />
+                    ) : (
+                      <p style={{ fontSize: 13, color: "#374151", lineHeight: 1.6 }}>{q.qExplanation}</p>
+                    )}
                   </div>
                 )}
               </div>

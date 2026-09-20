@@ -12,7 +12,7 @@
 import { useMemo, useState } from 'react';
 import { CheckCircle2, Volume2 } from 'lucide-react';
 import type { KidsAnswerMap } from './kidsAnswer';
-import { normalizeAudioUrl } from '../../../../../utils/examUtils';
+import { normalizeAudioUrl, normalizePassageText } from '../../../../../utils/examUtils';
 import { getFullMediaUrl } from '../../../../../utils/mediaUtils';
 
 interface RendererProps {
@@ -396,7 +396,7 @@ function ReadingComprehensionTask({ taskData, answer, onChange }: RendererProps)
   return (
     <div className="space-y-4">
       <div className="rounded-2xl bg-slate-50 p-4 text-[15px] leading-7 text-slate-700 whitespace-pre-wrap">
-        {taskData?.passage}
+        {normalizePassageText(taskData?.passage)}
       </div>
       <div className="space-y-3">
         {questions.map((q, i) => (

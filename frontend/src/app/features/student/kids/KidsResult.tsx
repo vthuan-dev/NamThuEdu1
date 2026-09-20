@@ -13,7 +13,7 @@ import { studentApi } from '../../../../services/studentApi';
 import { usePageTitle } from '../../../../hooks/usePageTitle';
 import { extractTaskData } from '../../../../utils/examDataExtractor';
 import { getFullMediaUrl } from '../../../../utils/mediaUtils';
-import { normalizeAudioUrl } from '../../../../utils/examUtils';
+import { normalizeAudioUrl, hasHtmlOrEntities, sanitizeRichContent } from '../../../../utils/examUtils';
 import { parseKidsAnswer } from './player/kidsAnswer';
 import { buildReviewRows, buildCorrectAnswerMap, MANUAL_REVIEW_TYPES } from './player/kidsAnswerKey';
 import { QuestionRenderer } from '../../../../components/exam/QuestionRenderer';
@@ -642,7 +642,14 @@ export function KidsResult() {
                           <span className="text-base leading-none mt-0.5">💡</span>
                           <div className="min-w-0">
                             <p className="text-[10px] font-extrabold text-rose-600 uppercase tracking-wider">Giải thích đáp án</p>
-                            <p className="text-xs font-semibold leading-relaxed text-slate-700 whitespace-pre-wrap">{q.qExplanation}</p>
+                            {hasHtmlOrEntities(q.qExplanation) ? (
+                              <div
+                                className="text-xs font-semibold leading-relaxed text-slate-700 whitespace-pre-wrap"
+                                dangerouslySetInnerHTML={{ __html: sanitizeRichContent(q.qExplanation) }}
+                              />
+                            ) : (
+                              <p className="text-xs font-semibold leading-relaxed text-slate-700 whitespace-pre-wrap">{q.qExplanation}</p>
+                            )}
                           </div>
                         </div>
                       )}

@@ -3732,7 +3732,7 @@ function QuestionCard({ q, selected, onSelect, flagged, onToggleFlag, reviewMode
           <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1">
             <span>💡</span> Giải thích đáp án
           </p>
-          <p className="text-xs text-slate-600 leading-relaxed">{q.qExplanation}</p>
+          <RichText className="text-xs text-slate-600 leading-relaxed" text={q.qExplanation} />
         </div>
       )}
     </div>

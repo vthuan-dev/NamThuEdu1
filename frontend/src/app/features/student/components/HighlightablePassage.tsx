@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { Highlighter, Palette } from 'lucide-react';
 import type { TextHighlight, HighlightColor } from '../../../../hooks/exam/useTextHighlight';
+import { normalizePassageText } from '../../../../utils/examUtils';
 
 interface HighlightablePassageProps {
   html: string;
@@ -111,16 +112,13 @@ export function HighlightablePassage({
     return () => container.removeEventListener('click', handleClick);
   }, [onRemoveHighlight, enabled]);
 
-  // Apply highlights to HTML content
+  // Apply highlights to normalized passage content
   const highlightedHtml = useMemo(() => {
-    if (!enabled || highlights.length === 0) {
-      return html;
-    }
+    const cleanText = normalizePassageText(html);
 
-    // Create a temporary container to extract text
-    const temp = document.createElement('div');
-    temp.innerHTML = html;
-    const plainText = temp.textContent || '';
+    if (!enabled || highlights.length === 0) {
+      return escapeHtml(cleanText);
+    }
 
     // Sort highlights by start offset
     const sorted = [...highlights].sort((a, b) => a.startOffset - b.startOffset);
@@ -128,7 +126,7 @@ export function HighlightablePassage({
     // Build ranges for highlighting
     const ranges: Array<{ start: number; end: number; id: string; color: string }> = [];
     sorted.forEach(hl => {
-      if (hl.startOffset < plainText.length && hl.endOffset <= plainText.length) {
+      if (hl.startOffset < cleanText.length && hl.endOffset <= cleanText.length) {
         ranges.push({
           start: hl.startOffset,
           end: hl.endOffset,
@@ -138,7 +136,7 @@ export function HighlightablePassage({
       }
     });
 
-    if (ranges.length === 0) return html;
+    if (ranges.length === 0) return escapeHtml(cleanText);
 
     // Build highlighted text
     let result = '';
@@ -147,18 +145,18 @@ export function HighlightablePassage({
     ranges.forEach(range => {
       // Text before highlight
       if (range.start > lastIndex) {
-        result += escapeHtml(plainText.substring(lastIndex, range.start));
+        result += escapeHtml(cleanText.substring(lastIndex, range.start));
       }
       
       // Highlighted text
-      result += `<mark class="highlight-mark cursor-pointer transition-opacity hover:opacity-75" style="background-color: ${range.color}; padding: 2px 0; border-radius: 2px;" data-highlight-id="${range.id}" title="Click để xóa">${escapeHtml(plainText.substring(range.start, range.end))}</mark>`;
+      result += `<mark class="highlight-mark cursor-pointer transition-opacity hover:opacity-75" style="background-color: ${range.color}; padding: 2px 0; border-radius: 2px;" data-highlight-id="${range.id}" title="Click để xóa">${escapeHtml(cleanText.substring(range.start, range.end))}</mark>`;
       
       lastIndex = range.end;
     });
 
     // Remaining text
-    if (lastIndex < plainText.length) {
-      result += escapeHtml(plainText.substring(lastIndex));
+    if (lastIndex < cleanText.length) {
+      result += escapeHtml(cleanText.substring(lastIndex));
     }
 
     return result;
@@ -230,7 +228,7 @@ export function HighlightablePassage({
       {/* Passage content */}
       <article
         ref={contentRef}
-        className="prose prose-sm max-w-none text-slate-800 leading-relaxed [&>p]:mb-4 select-text"
+        className="prose prose-sm max-w-none text-slate-800 leading-relaxed whitespace-pre-wrap [&>p]:mb-4 select-text"
         onMouseUp={handleMouseUp}
         style={{ userSelect: enabled ? 'text' : 'none' }}
         dangerouslySetInnerHTML={{ __html: highlightedHtml }}

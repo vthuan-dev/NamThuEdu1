@@ -5,6 +5,7 @@ import { studentApi } from '../../../../services/studentApi';
 import { extractTaskData } from '../../../../utils/examDataExtractor';
 import { parseKidsAnswer } from './player/kidsAnswer';
 import { buildReviewRows, MANUAL_REVIEW_TYPES } from './player/kidsAnswerKey';
+import { hasHtmlOrEntities, sanitizeRichContent } from '../../../../utils/examUtils';
 
 const BASE = '/hoc-vien';
 
@@ -169,7 +170,14 @@ export function KidsAnswerReview() {
                   <span className="text-lg">💡</span>
                   <div className="space-y-1">
                     <p className="text-xs font-bold text-rose-600 uppercase tracking-wider">Giải thích đáp án</p>
-                    <p className="text-[14px] font-semibold text-slate-700 leading-relaxed">{q.qExplanation}</p>
+                    {hasHtmlOrEntities(q.qExplanation) ? (
+                      <div
+                        className="text-[14px] font-semibold text-slate-700 leading-relaxed whitespace-pre-wrap"
+                        dangerouslySetInnerHTML={{ __html: sanitizeRichContent(q.qExplanation) }}
+                      />
+                    ) : (
+                      <p className="text-[14px] font-semibold text-slate-700 leading-relaxed whitespace-pre-wrap">{q.qExplanation}</p>
+                    )}
                   </div>
                 </div>
               )}

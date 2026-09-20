@@ -156,6 +156,28 @@ function QuestionPrompt({
   );
 }
 
+/**
+ * Hiển thị giải thích đáp án với hỗ trợ định dạng rich text an toàn (HTML / thực thể).
+ */
+function ExplanationText({
+  text,
+  className = 'text-xs text-slate-600 leading-relaxed whitespace-pre-wrap',
+}: {
+  text?: string | null;
+  className?: string;
+}) {
+  if (!text) return null;
+  if (hasHtmlOrEntities(text)) {
+    return (
+      <div
+        className={className}
+        dangerouslySetInnerHTML={{ __html: sanitizeRichContent(text) }}
+      />
+    );
+  }
+  return <p className={className}>{text}</p>;
+}
+
 interface Props {
   section: ThptSection;
   answers: ThptAnswers;
@@ -364,7 +386,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                     <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1.5">
                       <span>💡</span> Giải thích đáp án:
                     </p>
-                    <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{item.explanation}</p>
+                    <ExplanationText text={item.explanation} />
                   </div>
                 )}
               </QCard>
@@ -414,7 +436,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                     <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1.5">
                       <span>💡</span> Giải thích đáp án:
                     </p>
-                    <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{item.explanation}</p>
+                    <ExplanationText text={item.explanation} />
                   </div>
                 )}
               </QCard>
@@ -449,7 +471,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                     <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1.5">
                       <span>💡</span> Giải thích đáp án:
                     </p>
-                    <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{item.explanation}</p>
+                    <ExplanationText text={item.explanation} />
                   </div>
                 )}
               </QCard>
@@ -514,7 +536,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                               <p className="text-[11px] font-bold text-emerald-700 mb-0.5 flex items-center gap-1.5">
                                 <span>💡</span> Giải thích đáp án:
                               </p>
-                              <p className="text-[11px] text-slate-600 leading-relaxed whitespace-pre-wrap">{item.explanation}</p>
+                              <ExplanationText text={item.explanation} className="text-[11px] text-slate-600 leading-relaxed whitespace-pre-wrap" />
                             </div>
                           )}
                         </div>
@@ -576,7 +598,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                             <p className="text-[11px] font-bold text-emerald-700 mb-0.5 flex items-center gap-1.5">
                               <span>💡</span> Giải thích đáp án:
                             </p>
-                            <p className="text-[11px] text-slate-600 leading-relaxed whitespace-pre-wrap">{item.explanation}</p>
+                            <ExplanationText text={item.explanation} className="text-[11px] text-slate-600 leading-relaxed whitespace-pre-wrap" />
                           </div>
                         )}
                       </div>
@@ -613,7 +635,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                       <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1.5">
                         <span>💡</span> Giải thích đáp án:
                       </p>
-                      <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{item.explanation}</p>
+                      <ExplanationText text={item.explanation} />
                     </div>
                   )}
                 </QCard>
@@ -647,7 +669,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                     <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1.5">
                       <span>💡</span> Giải thích đáp án:
                     </p>
-                    <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{item.explanation}</p>
+                    <ExplanationText text={item.explanation} />
                   </div>
                 )}
               </QCard>
@@ -804,7 +826,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                     <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1.5">
                       <span>💡</span> Giải thích đáp án:
                     </p>
-                    <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{item.explanation}</p>
+                    <ExplanationText text={item.explanation} />
                   </div>
                 )}
               </QCard>
@@ -874,7 +896,13 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                         }`}
                       >
                         <span className="text-xs font-bold text-slate-500 w-5 mt-1">{i + 1}.</span>
-                        <p className="flex-1 text-sm text-slate-800 leading-snug">{line}</p>
+                        <p className="flex-1 text-sm text-slate-800 leading-snug">
+                          {hasHtmlOrEntities(line) ? (
+                            <span dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(line) }} />
+                          ) : (
+                            line
+                          )}
+                        </p>
                         <select
                           value={userVal}
                           onChange={(e) => onAnswerChange(key, e.target.value)}
@@ -895,7 +923,13 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                   {rights.map(({ row: line, i }) => (
                     <div key={i} className="flex items-start gap-2">
                       <span className="text-xs font-bold text-teal-700 w-5 mt-0.5">{LETTERS[i]}.</span>
-                      <p className="flex-1 text-sm text-slate-700 leading-snug">{line}</p>
+                      <p className="flex-1 text-sm text-slate-700 leading-snug">
+                        {hasHtmlOrEntities(line) ? (
+                          <span dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(line) }} />
+                        ) : (
+                          line
+                        )}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -905,7 +939,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                   <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1.5">
                     <span>💡</span> Giải thích đáp án:
                   </p>
-                  <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{item.explanation}</p>
+                  <ExplanationText text={item.explanation} />
                 </div>
               )}
             </QCard>
@@ -944,7 +978,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                     <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1.5">
                       <span>💡</span> Giải thích đáp án:
                     </p>
-                    <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{b.explanation}</p>
+                    <ExplanationText text={b.explanation} />
                   </div>
                 )}
               </QCard>
@@ -984,7 +1018,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                 {asArray<any>(section.blanks).map((b) => b.explanation && (
                   <div key={b.question_number} className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                     <span className="font-bold text-teal-700 mr-2">Chỗ trống ({b.question_number}):</span>
-                    {b.explanation}
+                    <ExplanationText text={b.explanation} className="text-xs text-slate-600 leading-relaxed inline" />
                   </div>
                 ))}
               </div>
@@ -1013,7 +1047,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                 {asArray<any>(section.blanks).map((b) => b.explanation && (
                   <div key={b.question_number} className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                     <span className="font-bold text-teal-700 mr-2">Chỗ trống ({b.question_number}):</span>
-                    {b.explanation}
+                    <ExplanationText text={b.explanation} className="text-xs text-slate-600 leading-relaxed inline" />
                   </div>
                 ))}
               </div>
@@ -1076,7 +1110,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                       <p className="text-xs font-bold text-emerald-700 mb-1 flex items-center gap-1.5">
                         <span>💡</span> Giải thích đáp án:
                       </p>
-                      <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{item.explanation}</p>
+                      <ExplanationText text={item.explanation} />
                     </div>
                   )}
                 </>
@@ -1086,7 +1120,11 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                   <div className="space-y-2">
                     <QuestionPrompt content={item.prompt} className="mb-1" />
                     <blockquote className="border-l-4 border-teal-300 pl-3 py-1 italic text-sm text-slate-700 bg-teal-50/40 rounded-r">
-                      {item.sentence_to_insert}
+                      {hasHtmlOrEntities(item.sentence_to_insert) ? (
+                        <span dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(item.sentence_to_insert) }} />
+                      ) : (
+                        item.sentence_to_insert
+                      )}
                     </blockquote>
                     <div className="flex items-center gap-2">
                       {insertionMarkers(section.passage).map((m) => {
@@ -1154,7 +1192,11 @@ function SpeakingResultCard({ n, prompt, result, audioUrl }: { n: number; prompt
           <Mic className="w-[18px] h-[18px]" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[15px] font-bold text-slate-900 leading-relaxed">{prompt}</p>
+          {hasHtmlOrEntities(prompt) ? (
+            <div className="text-[15px] font-bold text-slate-900 leading-relaxed" dangerouslySetInnerHTML={{ __html: sanitizeRichContent(prompt) }} />
+          ) : (
+            <p className="text-[15px] font-bold text-slate-900 leading-relaxed">{prompt}</p>
+          )}
           {audioUrl && <audio controls src={audioUrl} className="w-full h-9 mt-2.5" />}
         </div>
       </div>
@@ -1251,7 +1293,11 @@ function PromptBox({ text, title = 'Đề bài' }: { text: string; title?: strin
         <p className="text-[11px] font-bold uppercase tracking-wider text-teal-700">{title}</p>
       </div>
       <div className="pl-1 text-[15px] text-slate-900 whitespace-pre-wrap leading-relaxed font-bold">
-        {text}
+        {hasHtmlOrEntities(text) ? (
+          <span dangerouslySetInnerHTML={{ __html: sanitizeRichContent(text) }} />
+        ) : (
+          text
+        )}
       </div>
     </div>
   );
@@ -1380,7 +1426,13 @@ function TfStatementRow({
     >
       <div className="flex items-start gap-3 w-full">
         <span className="text-xs font-bold text-slate-500 w-5 mt-0.5">{idx + 1}.</span>
-        <p className="flex-1 text-sm text-slate-900 font-bold leading-relaxed">{text}</p>
+        <p className="flex-1 text-sm text-slate-900 font-bold leading-relaxed">
+          {hasHtmlOrEntities(text) ? (
+            <span dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(text) }} />
+          ) : (
+            text
+          )}
+        </p>
         <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 border-2 border-slate-300 shadow-xs flex-shrink-0">
           <button
             type="button"
@@ -1415,7 +1467,17 @@ function TfStatementRow({
       </div>
       {isReview && explanation && (
         <div className="text-xs text-slate-600 bg-emerald-50/40 p-2 rounded border border-emerald-100/50 pl-8">
-          💡 <strong>Giải thích:</strong> {explanation}
+          <div className="flex items-start gap-1.5">
+            <span>💡</span>
+            <div className="min-w-0 flex-1">
+              <strong>Giải thích:</strong>{' '}
+              {hasHtmlOrEntities(explanation) ? (
+                <span dangerouslySetInnerHTML={{ __html: sanitizeRichContent(explanation) }} />
+              ) : (
+                explanation
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -1883,7 +1945,11 @@ function WritingResultCard({
           {prompt && (
             <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-3">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Đề bài</p>
-              <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{prompt}</p>
+              {hasHtmlOrEntities(prompt) ? (
+                <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed" dangerouslySetInnerHTML={{ __html: sanitizeRichContent(prompt) }} />
+              ) : (
+                <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{prompt}</p>
+              )}
             </div>
           )}
 

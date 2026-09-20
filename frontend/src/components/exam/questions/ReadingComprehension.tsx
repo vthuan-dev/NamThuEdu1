@@ -1,3 +1,5 @@
+import { normalizePassageText, sanitizePassageHtml, hasHtmlOrEntities, sanitizeInlineHtml } from '../../../utils/examUtils';
+
 interface ReadingComprehensionProps {
   question: any;
   taskData: any;
@@ -25,14 +27,23 @@ export function ReadingComprehension({
       {/* Instructions */}
       {instructions && (
         <div className="p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
-          <p className="text-blue-900 font-medium text-lg">📚 {instructions}</p>
+          <p className="text-blue-900 font-medium text-lg">
+            📚 {hasHtmlOrEntities(instructions) ? (
+              <span dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(instructions) }} />
+            ) : (
+              instructions
+            )}
+          </p>
         </div>
       )}
       
       {/* Reading passage */}
       {passage && passage !== 'kids_task' && (
         <div className="p-5 bg-white rounded-xl border-3 border-blue-200 shadow-md">
-          <div className="text-gray-700 text-lg leading-relaxed" dangerouslySetInnerHTML={{ __html: passage }} />
+          <div
+            className="text-gray-700 text-lg leading-relaxed whitespace-pre-wrap"
+            dangerouslySetInnerHTML={{ __html: sanitizePassageHtml(normalizePassageText(passage)) }}
+          />
         </div>
       )}
       
@@ -47,7 +58,11 @@ export function ReadingComprehension({
             return (
               <div key={idx} className="p-5 bg-white rounded-xl border-3 border-blue-200 shadow-md">
                 <p className="font-medium mb-4 text-gray-800 text-lg">
-                  {idx + 1}. {questionText}
+                  {idx + 1}. {hasHtmlOrEntities(questionText) ? (
+                    <span dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(questionText) }} />
+                  ) : (
+                    questionText
+                  )}
                 </p>
                 
                 {/* Multiple choice options */}
@@ -71,7 +86,11 @@ export function ReadingComprehension({
                           }
                         }}
                       >
-                        {String.fromCharCode(65 + optIdx)}. {option}
+                        {String.fromCharCode(65 + optIdx)}. {hasHtmlOrEntities(option) ? (
+                          <span dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(option) }} />
+                        ) : (
+                          option
+                        )}
                       </button>
                     ))}
                   </div>

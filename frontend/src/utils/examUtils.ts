@@ -50,7 +50,12 @@ export const hasHtmlOrEntities = (str?: string | null): boolean => {
  */
 export const sanitizeInlineHtml = (html?: string | null): string => {
   if (!html) return "";
-  return DOMPurify.sanitize(html, {
+  const pre = html
+    .replace(/<\/(p|div|h[1-6]|li)>\s*$/gi, "")
+    .replace(/<\/(p|div|h[1-6]|li)>/gi, "<br>")
+    .replace(/<(p|div|h[1-6]|li)[^>]*>/gi, "")
+    .replace(/&nbsp;/gi, " ");
+  return DOMPurify.sanitize(pre, {
     ALLOWED_TAGS: [...INLINE_ALLOWED_TAGS],
     // Cho phép class trên <span> để giữ tương thích với formatErrorSentence,
     // nhưng loại bỏ style inline (nguồn gốc style rác từ Word).
@@ -65,7 +70,8 @@ export const sanitizeInlineHtml = (html?: string | null): string => {
  */
 export const sanitizeRichContent = (html?: string | null): string => {
   if (!html) return "";
-  return DOMPurify.sanitize(html, {
+  const pre = html.replace(/&nbsp;/gi, " ");
+  return DOMPurify.sanitize(pre, {
     ALLOWED_TAGS: [
       "b", "strong", "i", "em", "u", "s", "sup", "sub", "br", "span",
       "p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote",

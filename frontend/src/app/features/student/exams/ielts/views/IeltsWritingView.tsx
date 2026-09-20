@@ -10,6 +10,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { PenLine, Image as ImageIcon, FileText, CheckCircle2 } from "lucide-react";
 import type { IeltsWritingPayload, AnswerMap, IeltsWritingTask } from "../types";
+import { sanitizePassageHtml, hasHtmlOrEntities, sanitizeRichContent } from "../../../../../../utils/examUtils";
 
 interface IeltsWritingViewProps {
   payload: IeltsWritingPayload;
@@ -174,7 +175,7 @@ export function IeltsWritingView({
               {/* Prompt text */}
               <div
                 className="prose prose-sm max-w-none text-gray-800 leading-relaxed [&>p]:mb-3"
-                dangerouslySetInnerHTML={{ __html: currentTask.prompt || "<p><em>No prompt</em></p>" }}
+                dangerouslySetInnerHTML={{ __html: sanitizePassageHtml(currentTask.prompt || "<p><em>No prompt</em></p>") }}
               />
 
               {/* Task requirements box */}
@@ -192,7 +193,14 @@ export function IeltsWritingView({
                   <p className="text-xs font-bold text-emerald-700 mb-1.5 flex items-center gap-1.5">
                     <span>💡</span> Dàn ý / Giải thích đáp án:
                   </p>
-                  <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">{currentTask.explanation}</p>
+                  {hasHtmlOrEntities(currentTask.explanation) ? (
+                    <div
+                      className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap"
+                      dangerouslySetInnerHTML={{ __html: sanitizeRichContent(currentTask.explanation) }}
+                    />
+                  ) : (
+                    <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">{currentTask.explanation}</p>
+                  )}
                 </div>
               )}
             </div>

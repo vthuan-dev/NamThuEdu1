@@ -1,5 +1,5 @@
 import { createElement, type ElementType } from "react";
-import { containsHtml, sanitizeInlineHtml } from "../../utils/examUtils";
+import { hasHtmlOrEntities, sanitizeInlineHtml } from "../../utils/examUtils";
 
 interface RichTextProps {
   /** Nội dung có thể là plain text hoặc HTML inline (b/i/u/sup/sub). */
@@ -12,8 +12,8 @@ interface RichTextProps {
 /**
  * Render an toàn nội dung câu hỏi / phương án.
  *
- * - Nếu chuỗi chứa thẻ HTML → sanitize (chỉ giữ tag inline an toàn) rồi render
- *   bằng dangerouslySetInnerHTML để hiển thị đúng in đậm/nghiêng/gạch chân.
+ * - Nếu chuỗi chứa thẻ HTML hoặc thực thể (&nbsp;...) → sanitize (chỉ giữ tag inline an toàn)
+ *   rồi render bằng dangerouslySetInnerHTML để hiển thị đúng in đậm/nghiêng/gạch chân.
  * - Nếu là plain text → render text thuần như cũ (không regression).
  *
  * Dùng chung cho VSTEP + IELTS, cả trang làm bài học viên lẫn preview giáo viên.
@@ -21,7 +21,7 @@ interface RichTextProps {
 export function RichText({ text, as = "span", className }: RichTextProps) {
   const value = text ?? "";
 
-  if (containsHtml(value)) {
+  if (hasHtmlOrEntities(value)) {
     return createElement(as, {
       className,
       dangerouslySetInnerHTML: { __html: sanitizeInlineHtml(value) },
