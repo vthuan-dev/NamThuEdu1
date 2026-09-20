@@ -364,9 +364,12 @@ class IeltsExamController extends Controller
     public function getDraft(Request $request, $examId)
     {
         $user = Auth::user();
-        $isAdmin = $user && $user->uRole === 'admin';
+        if (!$user || !in_array($user->uRole, ['teacher', 'admin'])) {
+            return $this->errorResponse('Bạn không có quyền truy cập.', 403);
+        }
+
+        // Đề thi trong ngân hàng đề: giáo viên và admin đều có quyền xem trước (preview).
         $exam = Exam::where('eId', $examId)
-            ->when(!$isAdmin, fn($q) => $q->where('eTeacher_id', $user->uId))
             ->with(['contentBlocks', 'questions.answers'])
             ->first();
 
@@ -736,7 +739,7 @@ class IeltsExamController extends Controller
 
     private function isIeltsExam(Exam $exam): bool
     {
-        return in_array($exam->eType, ['IELTS', 'IELTS_ACADEMIC', 'IELTS_GENERAL'], true);
+        return in_array(strtoupper((string) $exam->eType), ['IELTS', 'IELTS_ACADEMIC', 'IELTS_GENERAL'], true);
     }
 
     /**
