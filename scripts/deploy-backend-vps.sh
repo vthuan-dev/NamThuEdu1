@@ -127,6 +127,13 @@ else
     git merge-base --is-ancestor HEAD "origin/$BRANCH" \
         || fail "VPS đã phân nhánh khỏi origin/$BRANCH. Cần xử lý tay, không tự merge."
 
+    # Tự động reset working tree nếu trên VPS có file tracked bị thay đổi cục bộ
+    # tránh lỗi "Your local changes to the following files would be overwritten by merge"
+    if ! git diff --quiet || ! git diff --cached --quiet; then
+        log "    Phát hiện thay đổi cục bộ trên VPS, tự động reset working tree về HEAD..."
+        git reset --hard HEAD
+    fi
+
     git pull --ff-only origin "$BRANCH"
     PULLED=true
     log "    Đã cập nhật: $(git log --oneline -1)"
