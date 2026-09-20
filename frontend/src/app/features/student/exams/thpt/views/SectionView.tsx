@@ -867,7 +867,8 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
                     return (
                       <div
                         key={i}
-                        className={`rounded-lg border p-2.5 flex items-start gap-2 ${
+                        id={`qmatching-${key}`}
+                        className={`scroll-mt-24 rounded-lg border p-2.5 flex items-start gap-2 ${
                           isCorrect ? 'border-emerald-300 bg-emerald-50/50' : isWrong ? 'border-red-300 bg-red-50/50' : 'border-slate-200'
                         }`}
                       >
@@ -1371,7 +1372,8 @@ function TfStatementRow({
   const isWrong = isReview && userVal !== undefined && userVal !== correctVal;
   return (
     <div
-      className={`rounded-lg border p-3 flex flex-col gap-2 ${
+      id={`qstmt-${qKey}`}
+      className={`scroll-mt-24 rounded-lg border p-3 flex flex-col gap-2 ${
         isCorrect ? 'border-emerald-300 bg-emerald-50/50' : isWrong ? 'border-red-300 bg-red-50/50' : 'border-slate-200'
       }`}
     >
@@ -1770,7 +1772,7 @@ function ClozePassage({
                 const isWrong = isReview && userVal && !isCorrect;
                 const isMissing = isReview && !userVal;
                 return (
-                  <span key={i} className="inline-flex flex-col items-center align-middle mx-1">
+                  <span key={i} id={`qblank-${tok.qn}`} className="scroll-mt-24 inline-flex flex-col items-center align-middle mx-1">
                     <span className="inline-flex items-center gap-1">
                       <span className="text-xs font-bold text-teal-600 align-super">({tok.qn})</span>
                       <input

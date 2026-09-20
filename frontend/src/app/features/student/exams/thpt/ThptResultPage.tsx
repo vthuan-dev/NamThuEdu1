@@ -87,17 +87,175 @@ export function ThptResultPage() {
   const pollCountRef = useRef(0);
 
   const activeSection = config?.sections?.[activeIdx];
-  const questionNumbers = useMemo(() => {
+
+  interface NavQuestionItem {
+    key: string;
+    displayNum: number | string;
+    targetId: string;
+    fallbackTargetId?: string;
+    hasAnswer: boolean;
+    isCorrect: boolean;
+    isAiSkill?: boolean;
+  }
+
+  const navQuestions = useMemo<NavQuestionItem[]>(() => {
     if (!activeSection) return [];
     const sec = activeSection as any;
+    const items: NavQuestionItem[] = [];
+
+    const isSpeaking = sec.type === 'speaking';
+    const isWriting = sec.type === 'writing';
+
+    const checkAnswer = (key: string, qn?: number) => {
+      const uVal = answers[key];
+      const cVal = result?.correct_answers?.[key];
+      let hasAns = uVal !== undefined && uVal !== null && String(uVal).trim() !== '';
+
+      if (isSpeaking) {
+        hasAns = !!speakingAudio?.[String(qn)] || !!uVal;
+        return { hasAnswer: hasAns, isCorrect: false, isAiSkill: true };
+      }
+      if (isWriting) {
+        return { hasAnswer: hasAns, isCorrect: false, isAiSkill: true };
+      }
+
+      let isCorr = false;
+      if (result?.correct_questions?.[key] === true) {
+        isCorr = true;
+      } else if (hasAns && cVal !== undefined && cVal !== null) {
+        if (typeof uVal === 'boolean' || typeof cVal === 'boolean') {
+          isCorr = Boolean(uVal) === Boolean(cVal);
+        } else {
+          isCorr = String(uVal).trim().toUpperCase() === String(cVal).trim().toUpperCase();
+        }
+      }
+
+      return { hasAnswer: hasAns, isCorrect: isCorr, isAiSkill: false };
+    };
+
+    // 1. reading_mixed: detect tf_group statements as separate questions + mc / sentence_insertion
+    if (sec.type === 'reading_mixed' && Array.isArray(sec.items)) {
+      sec.items.forEach((item: any) => {
+        const qn = item.question_number ?? 1;
+        const kind = item.kind ?? 'mc';
+
+        if (kind === 'tf_group') {
+          const statements = Array.isArray(item.statements) ? item.statements : [];
+          const filled = statements
+            .map((st: any, idx: number) => ({ st, idx }))
+            .filter(({ st }: any) => String(st?.text ?? '').trim() !== '');
+          const rows = filled.length > 0 ? filled : statements.map((st: any, idx: number) => ({ st, idx }));
+
+          rows.forEach(({ idx }: any) => {
+            const key = `q${qn}.s${idx + 1}`;
+            const ansInfo = checkAnswer(key);
+            items.push({
+              key,
+              displayNum: qn + idx,
+              targetId: `qstmt-${key}`,
+              fallbackTargetId: `qcard-${qn}`,
+              ...ansInfo,
+            });
+          });
+        } else if (kind === 'sentence_insertion' || kind === 'mc') {
+          const key = `q${qn}`;
+          const ansInfo = checkAnswer(key, qn);
+          items.push({
+            key,
+            displayNum: qn,
+            targetId: `qcard-${qn}`,
+            ...ansInfo,
+          });
+        }
+      });
+      return items;
+    }
+
+    // 2. tf_group (standalone)
+    if (sec.type === 'tf_group' && Array.isArray(sec.items)) {
+      sec.items.forEach((item: any) => {
+        const qn = item.question_number ?? 1;
+        const statements = Array.isArray(item.statements) ? item.statements : [];
+        const filled = statements
+          .map((st: any, idx: number) => ({ st, idx }))
+          .filter(({ st }: any) => String(st?.text ?? '').trim() !== '');
+        const rows = filled.length > 0 ? filled : statements.map((st: any, idx: number) => ({ st, idx }));
+
+        rows.forEach(({ idx }: any) => {
+          const key = `q${qn}.s${idx + 1}`;
+          const ansInfo = checkAnswer(key);
+          items.push({
+            key,
+            displayNum: qn + idx,
+            targetId: `qstmt-${key}`,
+            fallbackTargetId: `qcard-${qn}`,
+            ...ansInfo,
+          });
+        });
+      });
+      return items;
+    }
+
+    // 3. matching
+    if (sec.type === 'matching' && Array.isArray(sec.items)) {
+      sec.items.forEach((item: any) => {
+        const qn = item.question_number ?? 1;
+        const list1 = Array.isArray(item.list_1) ? item.list_1 : [];
+        const filled = list1
+          .map((l: any, idx: number) => ({ l, idx }))
+          .filter(({ l }: any) => String(l ?? '').trim() !== '');
+        const rows = filled.length > 0 ? filled : list1.map((l: any, idx: number) => ({ l, idx }));
+
+        rows.forEach(({ idx }: any) => {
+          const key = `q${qn}.${idx + 1}`;
+          const ansInfo = checkAnswer(key);
+          items.push({
+            key,
+            displayNum: qn + idx,
+            targetId: `qmatching-${key}`,
+            fallbackTargetId: `qcard-${qn}`,
+            ...ansInfo,
+          });
+        });
+      });
+      return items;
+    }
+
+    // 4. cloze types (mc_cloze, open_cloze, word_bank_cloze)
     if (sec.blanks && Array.isArray(sec.blanks)) {
-      return sec.blanks.map((b: any) => b.question_number);
+      sec.blanks.forEach((b: any) => {
+        const qn = b.question_number;
+        const key = `q${qn}`;
+        const ansInfo = checkAnswer(key, qn);
+        items.push({
+          key,
+          displayNum: qn,
+          targetId: `qblank-${qn}`,
+          fallbackTargetId: `qcard-${qn}`,
+          ...ansInfo,
+        });
+      });
+      return items;
     }
+
+    // 5. standard items (mc_questions, phonetics, error_identification, sentence_transformation, speaking, writing, etc.)
     if (sec.items && Array.isArray(sec.items)) {
-      return sec.items.map((item: any) => item.question_number);
+      sec.items.forEach((item: any) => {
+        const qn = item.question_number;
+        const key = `q${qn}`;
+        const ansInfo = checkAnswer(key, qn);
+        items.push({
+          key,
+          displayNum: qn,
+          targetId: `qcard-${qn}`,
+          ...ansInfo,
+        });
+      });
+      return items;
     }
+
     return [];
-  }, [activeSection]);
+  }, [activeSection, answers, result, speakingAudio]);
 
   useEffect(() => {
     let mounted = true;
@@ -285,7 +443,7 @@ export function ThptResultPage() {
 
       {/* ── Top bar ── */}
       <header className="bg-white border-b border-slate-100 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3.5 flex items-center gap-3">
+        <div className="max-w-7xl 2xl:max-w-screen-2xl mx-auto px-4 sm:px-6 py-3.5 flex items-center gap-3">
           <button type="button" onClick={() => navigate('/hoc-vien')}
             className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors cursor-pointer flex-shrink-0">
             <ArrowLeft className="w-4 h-4 text-slate-500" />
@@ -297,7 +455,7 @@ export function ThptResultPage() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+      <main className="max-w-7xl 2xl:max-w-screen-2xl mx-auto px-4 sm:px-6 py-6 space-y-5">
 
         {overallPending && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-3">
@@ -637,27 +795,25 @@ export function ThptResultPage() {
 
               {/* Body content */}
               <div className="p-3 sm:p-5 bg-[#FCFDFE] rounded-b-2xl">
-                {questionNumbers.length > 0 ? (
+                {navQuestions.length > 0 ? (
                   <div className="grid grid-cols-1 lg:grid-cols-[180px_1fr] gap-6 items-start">
                     
                     {/* Left Column: Sticky Question List */}
                     <div className="hidden lg:block sticky top-[72px] self-start max-h-[calc(100vh-100px)] overflow-y-auto pr-1">
                       <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm">
                         <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2.5">
-                          Câu hỏi ({questionNumbers.length})
+                          Câu hỏi ({navQuestions.length})
                         </p>
                         <div className="grid grid-cols-3 gap-2">
-                          {questionNumbers.map((qn) => {
-                            const key = `q${qn}`;
-                            const userVal = String(answers[key] ?? '').trim().toUpperCase();
-                            const correctVal = String(result.correct_answers?.[key] ?? '').trim().toUpperCase();
-                            const hasAnswer = userVal !== '';
-                            const isCorrect = result.correct_questions?.[key] === true || (hasAnswer && correctVal !== '' && userVal === correctVal);
-                            
+                          {navQuestions.map((q) => {
                             let btnBg = 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200';
-                            if (isCorrect) {
+                            if (q.isAiSkill) {
+                              btnBg = q.hasAnswer
+                                ? 'bg-teal-600 text-white border-teal-600 hover:bg-teal-700'
+                                : 'bg-slate-100 text-slate-400 border-slate-200';
+                            } else if (q.isCorrect) {
                               btnBg = 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600';
-                            } else if (!hasAnswer) {
+                            } else if (!q.hasAnswer) {
                               btnBg = 'bg-slate-100 text-slate-400 border-slate-200';
                             } else {
                               btnBg = 'bg-rose-500 text-white border-rose-500 hover:bg-rose-600';
@@ -665,17 +821,18 @@ export function ThptResultPage() {
                             
                             return (
                               <button
-                                key={qn}
+                                key={q.key}
                                 type="button"
                                 onClick={() => {
-                                  const el = document.getElementById(`qcard-${qn}`);
+                                  const el = document.getElementById(q.targetId)
+                                    || (q.fallbackTargetId ? document.getElementById(q.fallbackTargetId) : null);
                                   if (el) {
-                                    el.scrollIntoView({ behavior: 'smooth' });
+                                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                   }
                                 }}
                                 className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold border transition-colors cursor-pointer ${btnBg}`}
                               >
-                                {qn}
+                                {q.displayNum}
                               </button>
                             );
                           })}
