@@ -37,65 +37,77 @@ export function HighlightablePassage({
     end: number;
   } | null>(null);
 
-  // Xử lý bắt vùng chọn văn bản (hỗ trợ cả Mouse và Touch/SelectionChange trên Mobile)
-  const updateSelection = useCallback(() => {
-    if (!enabled) return;
-
+  // Lấy dữ liệu selection an toàn cho cả Mobile và Desktop
+  const getActiveSelectionData = useCallback(() => {
+    if (!enabled) return null;
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
-      return;
+      return null;
     }
 
     const container = contentRef.current;
-    if (!container) return;
-
-    // Kiểm tra vùng chọn có nằm trong bài đọc không
-    const anchorNode = selection.anchorNode;
-    const focusNode = selection.focusNode;
-    if (
-      !anchorNode ||
-      !focusNode ||
-      !container.contains(anchorNode) ||
-      !container.contains(focusNode)
-    ) {
-      return;
-    }
+    if (!container) return null;
 
     const rawText = selection.toString();
-    if (!rawText.trim()) return;
+    if (!rawText.trim()) return null;
 
     try {
       const range = selection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
+      if (
+        !container.contains(range.commonAncestorContainer) &&
+        !container.contains(selection.anchorNode) &&
+        !container.contains(selection.focusNode)
+      ) {
+        return null;
+      }
 
-      // Tính startOffset theo textContent
-      const beforeRange = range.cloneRange();
-      beforeRange.selectNodeContents(container);
-      beforeRange.setEnd(range.startContainer, range.startOffset);
-      const rawStartOffset = beforeRange.toString().length;
+      let rawStartOffset = 0;
+      try {
+        const beforeRange = document.createRange();
+        beforeRange.setStart(container, 0);
+        beforeRange.setEnd(range.startContainer, range.startOffset);
+        rawStartOffset = beforeRange.toString().length;
+      } catch {
+        const beforeRange = range.cloneRange();
+        beforeRange.selectNodeContents(container);
+        beforeRange.setEnd(range.startContainer, range.startOffset);
+        rawStartOffset = beforeRange.toString().length;
+      }
 
-      // Xử lý khoảng trắng thừa ở đầu để offset chuẩn xác
       const leadingSpaces = rawText.length - rawText.trimStart().length;
       const cleanTextSelected = rawText.trim();
       const startOffset = rawStartOffset + leadingSpaces;
       const endOffset = startOffset + cleanTextSelected.length;
 
-      setCurrentSelection({
+      const rect = range.getBoundingClientRect();
+      const top = rect.top < 70 ? Math.max(10, rect.bottom + 8) : Math.max(10, rect.top - 48);
+      const left = Math.max(60, Math.min(window.innerWidth - 60, rect.left + rect.width / 2));
+
+      return {
         text: cleanTextSelected,
         start: startOffset,
         end: endOffset,
-      });
-
-      // Tọa độ cho floating toolbar (position: fixed -> relative to viewport, KHÔNG cộng window.scrollY)
-      const top = rect.top < 65 ? rect.bottom + 8 : rect.top - 48;
-      const left = Math.max(60, Math.min(window.innerWidth - 60, rect.left + rect.width / 2));
-
-      setToolbarPosition({ top, left });
-      setShowToolbar(true);
+        top,
+        left,
+      };
     } catch {
-      // Bỏ qua lỗi DOM range nếu có
+      return null;
     }
   }, [enabled]);
+
+  // Xử lý bắt vùng chọn văn bản (hỗ trợ cả Mouse và Touch/SelectionChange trên Mobile)
+  const updateSelection = useCallback(() => {
+    const data = getActiveSelectionData();
+    if (data) {
+      setCurrentSelection({
+        text: data.text,
+        start: data.start,
+        end: data.end,
+      });
+      setToolbarPosition({ top: data.top, left: data.left });
+      setShowToolbar(true);
+    }
+  }, [getActiveSelectionData]);
 
   // Lắng nghe selectionchange trên document (hoạt động nhạy trên mobile iOS/Android)
   useEffect(() => {
@@ -107,11 +119,10 @@ export function HighlightablePassage({
       timeoutId = setTimeout(() => {
         const selection = window.getSelection();
         if (!selection || selection.isCollapsed) {
-          // Chỉ đóng nếu selection thực sự đã bị collapse
           return;
         }
         updateSelection();
-      }, 50);
+      }, 40);
     };
 
     document.addEventListener('selectionchange', handleSelectionChange);
@@ -149,12 +160,13 @@ export function HighlightablePassage({
 
   // Áp dụng highlight
   const applyHighlightWithColor = useCallback((colorKey: HighlightColor) => {
-    if (!currentSelection) return;
+    const target = currentSelection || getActiveSelectionData();
+    if (!target) return;
 
     onAddHighlight({
-      text: currentSelection.text,
-      startOffset: currentSelection.start,
-      endOffset: currentSelection.end,
+      text: target.text,
+      startOffset: target.start,
+      endOffset: target.end,
       color: colors[colorKey],
     });
 
@@ -162,7 +174,7 @@ export function HighlightablePassage({
     window.getSelection()?.removeAllRanges();
     setShowToolbar(false);
     setCurrentSelection(null);
-  }, [currentSelection, colors, onAddHighlight]);
+  }, [currentSelection, getActiveSelectionData, colors, onAddHighlight]);
 
   const applyHighlight = useCallback(() => {
     applyHighlightWithColor(selectedColor);
@@ -254,15 +266,21 @@ export function HighlightablePassage({
                   <button
                     key={color}
                     type="button"
-                    onMouseDown={(e) => e.preventDefault()}
+                    onTouchStart={(e) => {
+                      e.preventDefault();
+                      onSelectColor(color);
+                      applyHighlightWithColor(color);
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      onSelectColor(color);
+                      applyHighlightWithColor(color);
+                    }}
                     onClick={() => {
                       onSelectColor(color);
-                      // Nếu đang bôi đen text, bấm màu là highlight ngay!
-                      if (currentSelection) {
-                        applyHighlightWithColor(color);
-                      }
+                      applyHighlightWithColor(color);
                     }}
-                    className={`w-7 h-7 rounded-lg border-2 transition-all cursor-pointer flex items-center justify-center ${
+                    className={`w-7 h-7 rounded-lg border-2 transition-all cursor-pointer flex items-center justify-center active:scale-90 ${
                       selectedColor === color
                         ? 'border-gray-900 ring-2 ring-amber-400 scale-110 shadow-sm'
                         : 'border-white hover:scale-105 shadow-xs'
@@ -284,6 +302,10 @@ export function HighlightablePassage({
               {currentSelection ? (
                 <button
                   type="button"
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    applyHighlight();
+                  }}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={applyHighlight}
                   className="highlight-toolbar inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold text-gray-900 shadow-md transition-all animate-pulse hover:scale-105 cursor-pointer border border-amber-400/80 active:scale-95"
@@ -314,6 +336,10 @@ export function HighlightablePassage({
         >
           <button
             type="button"
+            onTouchStart={(e) => {
+              e.preventDefault();
+              applyHighlight();
+            }}
             onMouseDown={(e) => e.preventDefault()}
             onClick={applyHighlight}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-900 shadow-xs transition-all hover:scale-105 active:scale-95 cursor-pointer border border-black/10"
@@ -327,6 +353,12 @@ export function HighlightablePassage({
           <div className="h-4 w-px bg-gray-200" />
           <button
             type="button"
+            onTouchStart={(e) => {
+              e.preventDefault();
+              setShowToolbar(false);
+              setCurrentSelection(null);
+              window.getSelection()?.removeAllRanges();
+            }}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => {
               setShowToolbar(false);

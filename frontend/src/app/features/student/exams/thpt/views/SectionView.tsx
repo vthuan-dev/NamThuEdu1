@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
-import { CheckCircle2, XCircle, Headphones, Mic, Sparkles, Loader2, FileText, PenLine, Highlighter } from 'lucide-react';
+import { CheckCircle2, XCircle, Headphones, Mic, Sparkles, Loader2, FileText, PenLine, Highlighter, Trash2 } from 'lucide-react';
 import type { ThptAnswers, ThptSection, ViewMode } from '../types';
 import { ThptSpeakingRecorder } from '../components/ThptSpeakingRecorder';
 import {
@@ -951,7 +951,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
     case 'mc_cloze':
       return (
         <>
-          {!hidePassage && <PassageBox text={section.passage} />}
+          {!hidePassage && <PassageBox text={section.passage} submissionId={submissionId} sectionId={section.id} enabled={mode !== 'review'} />}
           {asArray<any>(section.blanks).map((b) => {
             const key = `q${b.question_number}`;
             const userVal = String(answers[key] ?? '').trim().toUpperCase();
@@ -1059,7 +1059,7 @@ function Body({ section, answers, correctAnswers, onAnswerChange, mode, submissi
     case 'reading_mixed':
       return (
         <>
-          {!hidePassage && <PassageBox text={section.passage} markers />}
+          {!hidePassage && <PassageBox text={section.passage} markers submissionId={submissionId} sectionId={section.id} enabled={mode !== 'review'} />}
           {asArray<any>(section.items).map((item: any) => (
             <QCard key={item.question_number} n={item.question_number}>
               {item.kind === 'tf_group' && (
@@ -1653,43 +1653,62 @@ function PassageBox({
     { top: number; left: number; text: string; start: number; end: number } | null
   >(null);
 
-  // Bắt vùng chọn → tính offset theo textContent của container (khớp lúc render).
-  const updateSelection = useCallback(() => {
-    if (!enabled) return;
+  // Lấy dữ liệu selection an toàn cho cả Mobile và Desktop
+  const getActiveSelectionData = useCallback(() => {
+    if (!enabled) return null;
     const sel = window.getSelection();
-    if (!sel || sel.isCollapsed || sel.rangeCount === 0) { return; }
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null;
     const container = containerRef.current;
-    if (!container) return;
-
-    const anchor = sel.anchorNode;
-    const focus = sel.focusNode;
-    if (!anchor || !focus || !container.contains(anchor) || !container.contains(focus)) {
-      return;
-    }
+    if (!container) return null;
 
     const rawSel = sel.toString();
-    if (!rawSel.trim()) return;
+    if (!rawSel.trim()) return null;
 
     try {
       const range = sel.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      const before = range.cloneRange();
-      before.selectNodeContents(container);
-      before.setEnd(range.startContainer, range.startOffset);
-      const rawStart = before.toString().length;
+      if (
+        !container.contains(range.commonAncestorContainer) &&
+        !container.contains(sel.anchorNode) &&
+        !container.contains(sel.focusNode)
+      ) {
+        return null;
+      }
+
+      let rawStart = 0;
+      try {
+        const before = document.createRange();
+        before.setStart(container, 0);
+        before.setEnd(range.startContainer, range.startOffset);
+        rawStart = before.toString().length;
+      } catch {
+        const before = range.cloneRange();
+        before.selectNodeContents(container);
+        before.setEnd(range.startContainer, range.startOffset);
+        rawStart = before.toString().length;
+      }
 
       const leadingSpaces = rawSel.length - rawSel.trimStart().length;
-      const cleanText = rawSel.trim();
+      const cleanTextSelected = rawSel.trim();
       const start = rawStart + leadingSpaces;
-      const end = start + cleanText.length;
+      const end = start + cleanTextSelected.length;
 
-      const top = rect.top < 65 ? rect.bottom + 8 : rect.top - 48;
+      const rect = range.getBoundingClientRect();
+      const top = rect.top < 70 ? Math.max(10, rect.bottom + 8) : Math.max(10, rect.top - 48);
       const left = Math.max(60, Math.min(window.innerWidth - 60, rect.left + rect.width / 2));
-      setToolbar({ top, left, text: cleanText, start, end });
+
+      return { text: cleanTextSelected, start, end, top, left };
     } catch {
-      // Bỏ qua lỗi DOM range
+      return null;
     }
   }, [enabled]);
+
+  // Bắt vùng chọn → cập nhật toolbar state
+  const updateSelection = useCallback(() => {
+    const data = getActiveSelectionData();
+    if (data) {
+      setToolbar({ top: data.top, left: data.left, text: data.text, start: data.start, end: data.end });
+    }
+  }, [getActiveSelectionData]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -1700,7 +1719,7 @@ function PassageBox({
         const sel = window.getSelection();
         if (!sel || sel.isCollapsed) return;
         updateSelection();
-      }, 50);
+      }, 40);
     };
 
     document.addEventListener('selectionchange', handleSelectionChange);
@@ -1710,32 +1729,54 @@ function PassageBox({
     };
   }, [enabled, updateSelection]);
 
-  const applyHighlightWithColor = (colorKey: keyof typeof hl.colors) => {
-    if (!toolbar) return;
+  const applyHighlightWithColor = useCallback((colorKey: keyof typeof hl.colors) => {
+    const target = toolbar || getActiveSelectionData();
+    if (!target) return;
     hl.addHighlight({
-      text: toolbar.text,
-      startOffset: toolbar.start,
-      endOffset: toolbar.end,
+      text: target.text,
+      startOffset: target.start,
+      endOffset: target.end,
       color: hl.colors[colorKey],
     });
     window.getSelection()?.removeAllRanges();
     setToolbar(null);
-  };
+  }, [toolbar, getActiveSelectionData, hl]);
 
-  const applyHighlight = () => {
+  const applyHighlight = useCallback(() => {
     applyHighlightWithColor(hl.selectedColor);
-  };
+  }, [applyHighlightWithColor, hl.selectedColor]);
 
   // Render text: chèn xen kẽ các đoạn highlight + marker [A].
   const content = useMemo(() => {
-    const ranges = [...hl.highlights]
+    const sorted = [...hl.highlights]
       .filter((h) => h.startOffset < cleanText.length && h.endOffset <= cleanText.length && h.startOffset < h.endOffset)
       .sort((a, b) => a.startOffset - b.startOffset);
+
+    // Ghép và lọc tránh trùng lặp đè lên nhau gây nhân đôi text
+    const nonOverlappingRanges: Array<{ startOffset: number; endOffset: number; id: string; color: string }> = [];
+    for (const r of sorted) {
+      if (r.startOffset >= cleanText.length || r.endOffset <= r.startOffset) continue;
+      const start = Math.max(0, r.startOffset);
+      const end = Math.min(cleanText.length, r.endOffset);
+
+      if (nonOverlappingRanges.length === 0) {
+        nonOverlappingRanges.push({ startOffset: start, endOffset: end, id: r.id, color: r.color });
+      } else {
+        const prev = nonOverlappingRanges[nonOverlappingRanges.length - 1];
+        if (start < prev.endOffset) {
+          if (end > prev.endOffset) {
+            nonOverlappingRanges.push({ startOffset: prev.endOffset, endOffset: end, id: r.id, color: r.color });
+          }
+        } else {
+          nonOverlappingRanges.push({ startOffset: start, endOffset: end, id: r.id, color: r.color });
+        }
+      }
+    }
 
     type Seg = { text: string; hlId?: string; color?: string };
     const segs: Seg[] = [];
     let last = 0;
-    for (const r of ranges) {
+    for (const r of nonOverlappingRanges) {
       if (r.startOffset > last) segs.push({ text: cleanText.slice(last, r.startOffset) });
       segs.push({ text: cleanText.slice(r.startOffset, r.endOffset), hlId: r.id, color: r.color });
       last = r.endOffset;
@@ -1788,21 +1829,29 @@ function PassageBox({
           <span className="text-[11px] font-bold uppercase tracking-widest text-teal-700">Bài đọc</span>
         </div>
         {enabled && (
-          <div className="flex items-center gap-2" title="Chọn màu rồi bôi đen đoạn văn để ghi chú">
-            <Highlighter className="w-3.5 h-3.5 text-slate-400" />
-            <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2" title="Chọn màu hoặc bôi đen đoạn văn để ghi chú">
+            <div className="flex items-center gap-1.5">
               {(Object.keys(hl.colors) as (keyof typeof hl.colors)[]).map((c) => (
                 <button
                   key={c}
                   type="button"
-                  onMouseDown={(e) => e.preventDefault()}
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    hl.setSelectedColor(c);
+                    applyHighlightWithColor(c);
+                  }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    hl.setSelectedColor(c);
+                    applyHighlightWithColor(c);
+                  }}
                   onClick={() => {
                     hl.setSelectedColor(c);
-                    if (toolbar) {
-                      applyHighlightWithColor(c);
-                    }
+                    applyHighlightWithColor(c);
                   }}
-                  className={`w-5 h-5 rounded-full border transition-transform hover:scale-110 cursor-pointer ${hl.selectedColor === c ? 'border-slate-700 ring-2 ring-teal-400 scale-110' : 'border-slate-200'}`}
+                  className={`w-6 h-6 rounded-full border transition-all hover:scale-110 active:scale-90 cursor-pointer ${
+                    hl.selectedColor === c ? 'border-slate-800 ring-2 ring-teal-400 scale-110' : 'border-slate-300'
+                  }`}
                   style={{ backgroundColor: hl.colors[c] }}
                   aria-label={`Chọn màu ${c}`}
                 />
@@ -1811,12 +1860,41 @@ function PassageBox({
             {toolbar && (
               <button
                 type="button"
-                onMouseDown={(e) => e.preventDefault()}
+                onTouchStart={(e) => {
+                  e.preventDefault();
+                  applyHighlight();
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  applyHighlight();
+                }}
                 onClick={applyHighlight}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold text-slate-900 cursor-pointer shadow-xs border border-slate-300"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-slate-900 cursor-pointer shadow-xs border border-slate-300 active:scale-95 animate-pulse"
                 style={{ backgroundColor: hl.colors[hl.selectedColor] }}
               >
-                Bôi màu
+                <Highlighter className="w-3.5 h-3.5" />
+                <span>Bôi màu</span>
+              </button>
+            )}
+            {hl.highlights.length > 0 && (
+              <button
+                type="button"
+                onTouchStart={(e) => {
+                  e.preventDefault();
+                  if (window.confirm('Xóa tất cả các đoạn đã highlight?')) {
+                    hl.clearAllHighlights();
+                  }
+                }}
+                onClick={() => {
+                  if (window.confirm('Xóa tất cả các đoạn đã highlight?')) {
+                    hl.clearAllHighlights();
+                  }
+                }}
+                className="p-1 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer ml-1"
+                title="Xóa tất cả highlight"
+                aria-label="Xóa tất cả highlight"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
@@ -1839,14 +1917,35 @@ function PassageBox({
         >
           <button
             type="button"
-            onMouseDown={(e) => e.preventDefault()}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              applyHighlight();
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              applyHighlight();
+            }}
             onClick={applyHighlight}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold text-slate-800 cursor-pointer"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-bold text-slate-800 cursor-pointer active:scale-95"
             style={{ backgroundColor: hl.colors[hl.selectedColor] }}
           >
             <Highlighter className="w-3.5 h-3.5" /> Bôi màu
           </button>
-          <button type="button" onClick={() => setToolbar(null)} className="px-1.5 py-1 text-xs text-slate-400 hover:text-slate-600 cursor-pointer">✕</button>
+          <button
+            type="button"
+            onTouchStart={(e) => {
+              e.preventDefault();
+              setToolbar(null);
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setToolbar(null);
+            }}
+            onClick={() => setToolbar(null)}
+            className="px-1.5 py-1 text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
+          >
+            ✕
+          </button>
         </div>
       )}
     </article>
