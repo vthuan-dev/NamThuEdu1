@@ -19,7 +19,7 @@ import {
 } from '../sections';
 import { SectionHeader, QuestionBadge, DeleteBtn, AddButton, OptionRow, FormattedTextarea, ExplanationField } from './shared';
 import { THPT_THEME, LETTERS } from '../sections';
-import { splitPhoneticWord, formatErrorSentence, detectPhoneticEnding, isSuffixComparisonGroup } from '../../../../../../utils/examUtils';
+import { splitPhoneticWord, formatErrorSentence, detectPhoneticEnding, isSuffixComparisonGroup, normalizePassageText } from '../../../../../../utils/examUtils';
 
 interface Props {
   section: ThptSection;
@@ -1595,13 +1595,14 @@ function ErrorIdEditor({ section, all, onChange }: { section: Extract<ThptSectio
 // ════════════════════════════════════════════════════════════════════════════
 // 5. MC CLOZE
 // ════════════════════════════════════════════════════════════════════════════
-const PLACEHOLDER_RE = /\((\d{1,3})\)\s*_+/g;
+const PLACEHOLDER_RE = /\((\d{1,3})\)(?:\s|&nbsp;)*_+/g;
 
 function detectNumbers(passage: string): number[] {
   const set = new Set<number>();
+  const clean = normalizePassageText(passage);
   const re = new RegExp(PLACEHOLDER_RE.source, 'g');
   let m;
-  while ((m = re.exec(passage)) !== null) set.add(parseInt(m[1]));
+  while ((m = re.exec(clean)) !== null) set.add(parseInt(m[1]));
   return Array.from(set).sort((a, b) => a - b);
 }
 

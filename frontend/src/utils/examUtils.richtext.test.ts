@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { containsHtml, sanitizeInlineHtml, INLINE_ALLOWED_TAGS } from './examUtils';
+import { containsHtml, sanitizeInlineHtml, INLINE_ALLOWED_TAGS, normalizePassageText } from './examUtils';
 
 describe('containsHtml', () => {
   it('returns false for empty / null / plain text', () => {
@@ -70,3 +70,45 @@ describe('sanitizeInlineHtml', () => {
     expect(INLINE_ALLOWED_TAGS).not.toContain('script');
   });
 });
+
+describe('normalizePassageText', () => {
+  it('returns empty string for empty / null / undefined input', () => {
+    expect(normalizePassageText('')).toBe('');
+    expect(normalizePassageText(null)).toBe('');
+    expect(normalizePassageText(undefined)).toBe('');
+  });
+
+  it('converts block tags to newlines and preserves paragraphs', () => {
+    const html = '<p>Paragraph 1</p><p>Paragraph 2</p>';
+    const result = normalizePassageText(html);
+    expect(result).toBe('Paragraph 1\n\nParagraph 2');
+  });
+
+  it('decodes &nbsp; to spaces and replaces <div> with newlines (real bug reproduction)', () => {
+    const dirty =
+      '&nbsp; &nbsp; &nbsp;Once upon a time in Creativityville.&nbsp;<div>&nbsp; &nbsp; &nbsp;Lily was keen to get started.</div>';
+    const result = normalizePassageText(dirty);
+
+    expect(result).not.toContain('&nbsp;');
+    expect(result).not.toContain('<div>');
+    expect(result).not.toContain('</div>');
+    expect(result).toContain('     Once upon a time in Creativityville.');
+    expect(result).toContain('\n\n     Lily was keen to get started.');
+  });
+
+  it('decodes common HTML entities like &amp;, &lt;, &gt;, &quot;, &#39;', () => {
+    const text = 'Lily&#39;s craft kit &amp; &quot;origami&quot; &lt;animals&gt;';
+    const result = normalizePassageText(text);
+    expect(result).toBe('Lily\'s craft kit & "origami" <animals>');
+  });
+
+  it('preserves sentence insertion markers [A], [B], [C], [D]', () => {
+    const text = 'First part. [A] Second part. [B] <div>Third part. [C]</div>';
+    const result = normalizePassageText(text);
+    expect(result).toContain('[A]');
+    expect(result).toContain('[B]');
+    expect(result).toContain('[C]');
+    expect(result).toBe('First part. [A] Second part. [B]\n\nThird part. [C]');
+  });
+});
+

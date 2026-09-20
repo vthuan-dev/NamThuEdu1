@@ -133,6 +133,7 @@ export const cleanPassageStyles = (html: string): string => {
   return cleaned;
 };
 
+
 export const sanitizePassageHtml = (html: string): string => {
   if (!html) return "";
 
@@ -160,6 +161,75 @@ export const sanitizePassageHtml = (html: string): string => {
       )
   );
 };
+
+/**
+ * Chuẩn hóa nội dung bài đọc từ HTML / contentEditable sang văn bản thuần sạch:
+ * - Chuyển các thẻ khối (</p>, </div>, <br>, </li>, </h1-6>) thành xuống dòng (\n hoặc \n\n) để giữ cấu trúc đoạn văn.
+ * - Loại bỏ toàn bộ các thẻ HTML còn lại (<...>) để tránh rò rỉ mã HTML (&nbsp;, <div>) ra màn hình học viên.
+ * - Giải mã các thực thể HTML (&nbsp;, &amp;, &lt;, &gt;, &quot;, &#39;, &#160;...).
+ * - Chuyển non-breaking spaces (\u00A0...) thành khoảng trắng thông thường.
+ * - Chuẩn hóa dấu xuống dòng, tránh khoảng trống thừa liên tiếp.
+ *
+ * Đảm bảo:
+ * 1. Học viên không thấy các ký tự rác như &nbsp;, <div>, </div> khi làm bài.
+ * 2. Cấu trúc các đoạn văn (\n\n) và thụt đầu dòng được bảo toàn nguyên vẹn với whitespace-pre-wrap.
+ * 3. Độ dài chuỗi hiển thị khớp 1:1 với chỉ số offset của tính năng highlight ghi chú.
+ */
+export const normalizePassageText = (raw?: string | null): string => {
+  if (!raw) return "";
+
+  // 1. Chuyển đổi cả thẻ mở và thẻ đóng của các phần tử khối thành ký tự newline
+  // Trình duyệt (contentEditable) tạo dòng mới bằng <div>Line 2</div> (thẻ mở <div> nằm ở đầu dòng mới)
+  let s = raw
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p\s*>/gi, "\n\n")
+    .replace(/<p[^>]*>/gi, "\n\n")
+    .replace(/<\/div\s*>/gi, "\n\n")
+    .replace(/<div[^>]*>/gi, "\n\n")
+    .replace(/<\/li\s*>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "\n")
+    .replace(/<\/h[1-6]\s*>/gi, "\n\n")
+    .replace(/<h[1-6][^>]*>/gi, "\n\n");
+
+  // 2. Bóc toàn bộ các thẻ HTML còn lại
+  s = s.replace(/<[^>]*>/g, "");
+
+  // 3. Giải mã các thực thể HTML phổ biến
+  s = s
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&#160;|&#xA0;/gi, " ")
+    .replace(/[\u00A0\u202F\u2007]/g, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'");
+
+  // Giải mã các thực thể khác nếu có trong môi trường trình duyệt
+  if (typeof document !== "undefined" && /&[#a-z0-9]+;/i.test(s)) {
+    try {
+      const ta = document.createElement("textarea");
+      ta.innerHTML = s;
+      s = ta.value;
+    } catch {
+      // fallback giữ nguyên nếu có lỗi DOM
+    }
+  }
+
+  // 4. Chuẩn hóa khoảng trắng và ngắt dòng:
+  // - Chuẩn hóa CRLF về LF
+  // - Bỏ khoảng trắng thừa ở cuối mỗi dòng (trước dấu ngắt dòng)
+  // - Gom các dòng trống liên tiếp (>2 newlines) thành \n\n (1 dòng trống ngăn cách đoạn)
+  // - Xóa các dòng trống ở đầu và cuối nhưng bảo toàn khoảng trắng thụt đầu dòng
+  return s
+    .replace(/\u00a0/g, " ")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/^[\r\n]+|[\r\n\s]+$/g, "");
+};
+
 
 /**
  * Calculate total points for a question, excluding example items

@@ -10,6 +10,7 @@ import {
   sanitizeRichContent,
   sanitizeInlineHtml,
   normalizeAudioUrl,
+  normalizePassageText,
 } from '../../../../../../utils/examUtils';
 import { useTextHighlight } from '../../../../../../hooks/exam/useTextHighlight';
 
@@ -1582,6 +1583,10 @@ function PassageBox({
     enabled,
   });
 
+  // Chuẩn hóa bài đọc: gỡ thẻ HTML (<div>, <br>...), chuyển thành \n\n để giữ đoạn,
+  // và giải mã thực thể (&nbsp; -> space) để không rò rỉ mã HTML ra màn hình.
+  const cleanText = useMemo(() => normalizePassageText(text), [text]);
+
   const [toolbar, setToolbar] = useState<
     { top: number; left: number; text: string; start: number; end: number } | null
   >(null);
@@ -1620,18 +1625,18 @@ function PassageBox({
   // Render text: chèn xen kẽ các đoạn highlight + marker [A].
   const content = useMemo(() => {
     const ranges = [...hl.highlights]
-      .filter((h) => h.startOffset < text.length && h.endOffset <= text.length && h.startOffset < h.endOffset)
+      .filter((h) => h.startOffset < cleanText.length && h.endOffset <= cleanText.length && h.startOffset < h.endOffset)
       .sort((a, b) => a.startOffset - b.startOffset);
 
     type Seg = { text: string; hlId?: string; color?: string };
     const segs: Seg[] = [];
     let last = 0;
     for (const r of ranges) {
-      if (r.startOffset > last) segs.push({ text: text.slice(last, r.startOffset) });
-      segs.push({ text: text.slice(r.startOffset, r.endOffset), hlId: r.id, color: r.color });
+      if (r.startOffset > last) segs.push({ text: cleanText.slice(last, r.startOffset) });
+      segs.push({ text: cleanText.slice(r.startOffset, r.endOffset), hlId: r.id, color: r.color });
       last = r.endOffset;
     }
-    if (last < text.length) segs.push({ text: text.slice(last) });
+    if (last < cleanText.length) segs.push({ text: cleanText.slice(last) });
 
     const renderPlain = (str: string, keyBase: string): ReactNode[] => {
       if (!markers) return [<span key={keyBase} className="whitespace-pre-wrap">{str}</span>];
@@ -1669,7 +1674,7 @@ function PassageBox({
         <span key={`s${i}`}>{renderPlain(s.text, `s${i}`)}</span>
       )
     );
-  }, [text, markers, hl.highlights, enabled, hl]);
+  }, [cleanText, markers, hl.highlights, enabled, hl]);
 
   return (
     <article className="rounded-2xl bg-white border border-slate-200 p-6">
@@ -1740,7 +1745,8 @@ function ClozePassage({
   onAnswerChange: (key: string, v: string) => void;
   isReview: boolean;
 }) {
-  const paragraphs = useMemo(() => passage.split(/\n\s*\n/).filter(Boolean), [passage]);
+  const cleanPassage = useMemo(() => normalizePassageText(passage), [passage]);
+  const paragraphs = useMemo(() => cleanPassage.split(/\n\s*\n/).filter(Boolean), [cleanPassage]);
 
   const tokenize = (text: string) => {
     const out: Array<{ type: 'text' | 'blank'; text?: string; qn?: number }> = [];
