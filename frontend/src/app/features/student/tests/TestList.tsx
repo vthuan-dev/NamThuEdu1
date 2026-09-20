@@ -349,9 +349,6 @@ export function TestList() {
   const inProgress = filterKids((allTests?.in_progress || []).map((t: any) => ({ ...t, status: 'in_progress' })));
   const completed  = filterKids((allTests?.completed   || []).map((t: any) => ({ ...t, status: 'completed'   })));
 
-  const isNotEligible = (t: any) =>
-    isOverdue(t) || (t.status !== 'in_progress' && t.attemptsAllowed > 0 && t.attemptsUsed >= t.attemptsAllowed);
-
   // Ẩn bản giao cũ đã cạn lượt khi cùng đề vừa được giao lại (xem
   // utils/assignmentDedupe). Đặt SAU mergeVstepIntoSingleTest: bước gộp mới
   // quyết định assignment nào là primary và do đó lượt của thẻ là bao nhiêu —
@@ -365,8 +362,7 @@ export function TestList() {
         examId: Number(t.exam_id),
         attemptsUsed: Number(t.attempts_used || 0),
         attemptsAllowed: Number(t.attempts_allowed || 0),
-      }))
-      .filter((t: any) => !isNotEligible(t)),
+      })),
   );
 
   const overdueTests = normalizedTests.filter((t: any) => isOverdue(t));

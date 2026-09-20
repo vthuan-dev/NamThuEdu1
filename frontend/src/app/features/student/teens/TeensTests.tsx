@@ -330,13 +330,6 @@ export function TeensTests() {
       attemptsAllowed: t.attempts_allowed ?? 0,
     }));
     const isPastDeadline = (d?: string | null) => !!d && new Date(d).getTime() < Date.now();
-    const isExhausted = (t: any) => {
-      const allowed = t.attemptsAllowed ?? 0;
-      if (allowed <= 0) return false;
-      return (t.attemptsUsed ?? 0) >= allowed;
-    };
-    // Không đủ điều kiện làm bài: quá hạn deadline HOẶC đã hết lượt (trừ khi đang làm dở phiên hiện tại)
-    const isNotEligible = (t: any) => isPastDeadline(t.deadline) || (t.status !== 'in_progress' && isExhausted(t));
 
     // Lọc ngay tại nguồn, không phải ở tầng hiển thị: badge "Tổng số đề" và các
     // ô thống kê đều đếm từ `assignedExams`, nên nếu chỉ ẩn lúc render thì số
@@ -345,7 +338,7 @@ export function TeensTests() {
       ...map(groups.in_progress, 'in_progress'),
       ...map(groups.pending, 'pending'),
       ...map(groups.completed, 'completed'),
-    ].filter((t) => !isNotEligible(t)));
+    ].filter((t) => !isPastDeadline(t.deadline)));
   }, [assignedData]);
 
   const source = assignedExams;
@@ -449,18 +442,25 @@ export function TeensTests() {
           {/* Stats */}
           <div className="flex items-center gap-3 flex-wrap">
             {[
-              { label: 'Tổng số đề', value: stats.total, color: '#99F6E4' },
-              { label: 'Chưa làm', value: stats.pending, color: '#FCD34D' },
-              { label: 'Đang làm', value: stats.inProgress, color: '#FDBA74' },
-              { label: 'Hoàn thành', value: stats.completed, color: '#86EFAC' },
+              { id: 'all',         label: 'Tổng số đề', value: stats.total, color: '#99F6E4' },
+              { id: 'pending',     label: 'Chưa làm', value: stats.pending, color: '#FCD34D' },
+              { id: 'in_progress', label: 'Đang làm', value: stats.inProgress, color: '#FDBA74' },
+              { id: 'completed',   label: 'Hoàn thành', value: stats.completed, color: '#86EFAC' },
             ].map((s) => (
-              <div key={s.label} className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl"
-                style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)' }}>
+              <button
+                key={s.label}
+                type="button"
+                onClick={() => setStatusFilter(s.id as any)}
+                className={`flex items-center gap-2.5 px-4 py-2.5 rounded-2xl transition-all cursor-pointer ${
+                  statusFilter === s.id ? 'ring-2 ring-white/60 bg-white/20' : 'hover:bg-white/15'
+                }`}
+                style={{ background: statusFilter === s.id ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.15)' }}
+              >
                 <span className="text-xl font-extrabold tabular-nums" style={{ color: s.color }}>
                   {assignedLoading ? '—' : s.value}
                 </span>
                 <span className="text-xs font-semibold text-teal-100">{s.label}</span>
-              </div>
+              </button>
             ))}
           </div>
         </div>
