@@ -1468,7 +1468,7 @@ function ResizableSplit({
   const containerRef = useRef<HTMLDivElement>(null);
   const [leftPct, setLeftPct] = useState<number>(() => {
     const saved = Number(localStorage.getItem(storageKey));
-    return saved >= 30 && saved <= 70 ? saved : 50;
+    return saved >= 30 && saved <= 75 ? (saved === 50 ? 54 : saved) : 54;
   });
   const [dragging, setDragging] = useState(false);
   const [isDesktop, setIsDesktop] = useState(
@@ -1489,7 +1489,7 @@ function ResizableSplit({
       if (!el) return;
       const rect = el.getBoundingClientRect();
       const pct = ((e.clientX - rect.left) / rect.width) * 100;
-      setLeftPct(Math.min(70, Math.max(30, pct)));
+      setLeftPct(Math.min(75, Math.max(30, pct)));
     };
     const onUp = () => {
       setDragging(false);
@@ -1697,7 +1697,7 @@ function PassageBox({
       <div
         ref={containerRef}
         onMouseUp={handleMouseUp}
-        className="text-[15px] text-slate-900 font-semibold leading-7 select-text"
+        className="text-[15px] text-slate-800 font-normal leading-relaxed select-text"
         style={{ userSelect: enabled ? 'text' : 'none' }}
       >
         {content}

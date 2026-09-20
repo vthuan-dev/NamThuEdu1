@@ -524,7 +524,7 @@ export function StudentThptExamPage() {
 
       {/* Trang đã full-bleed (-mx ở div gốc) nên tự cấp padding ngang lại.
           pb-28 chừa chỗ cho thanh dưới + safe-area. */}
-      <main data-thpt-main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-28 flex flex-col lg:flex-row gap-6">
+      <main data-thpt-main className="flex-1 max-w-7xl 2xl:max-w-screen-2xl w-full mx-auto px-4 sm:px-6 pt-4 sm:pt-6 pb-28 flex flex-col lg:flex-row gap-6">
         <div className="min-w-0 flex-1">
           {activeSection && (
             <SectionErrorBoundary resetKey={activeSection.id} label={`phần "${activeSection.title}"`}>

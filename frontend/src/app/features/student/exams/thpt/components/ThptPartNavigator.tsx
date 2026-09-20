@@ -19,8 +19,11 @@ interface Props {
 }
 
 interface QItem {
-  qn: number;
+  qn: number | string;
   answered: boolean;
+  key?: string;
+  targetId?: string;
+  fallbackTargetId?: string;
 }
 
 /**
@@ -49,7 +52,7 @@ function usedIdx<T>(list: unknown, getText: (row: T) => unknown): number[] {
 }
 
 function sectionQuestions(s: ThptSection, answers: ThptAnswers): QItem[] {
-  const has = (k: string) => Object.prototype.hasOwnProperty.call(answers, k);
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(answers, k) && answers[k] !== undefined && answers[k] !== null && String(answers[k]).trim() !== '';
   const filled = (k: string) => !!String(answers[k] ?? '').trim();
   const items = asArray<any>((s as any).items);
   const blanks = asArray<any>((s as any).blanks);
@@ -60,40 +63,152 @@ function sectionQuestions(s: ThptSection, answers: ThptAnswers): QItem[] {
     case 'listening':
     case 'speaking':
     case 'error_identification':
-      return items.map((it: any) => ({ qn: it.question_number, answered: has(`q${it.question_number}`) }));
+      return items.map((it: any) => ({
+        qn: it.question_number,
+        key: `q${it.question_number}`,
+        answered: has(`q${it.question_number}`),
+        targetId: `qcard-${it.question_number}`,
+      }));
+
     case 'word_form':
     case 'sentence_transformation':
-      return items.map((it: any) => ({ qn: it.question_number, answered: filled(`q${it.question_number}`) }));
-    case 'tf_group':
       return items.map((it: any) => ({
         qn: it.question_number,
-        answered: usedIdx<any>(it.statements, (s) => s?.text).every((i) =>
-          has(`q${it.question_number}.s${i + 1}`),
-        ),
+        key: `q${it.question_number}`,
+        answered: filled(`q${it.question_number}`),
+        targetId: `qcard-${it.question_number}`,
       }));
-    case 'matching':
-      return items.map((it: any) => ({
-        qn: it.question_number,
-        // Trước đây hardcode [1,2,3,4] nên bài chỉ dùng 2 dòng KHÔNG BAO GIỜ
-        // được tính là xong → tiến độ kịt vĩnh viễn.
-        answered: usedIdx<any>(it.list_1, (l) => l).every((i) =>
-          has(`q${it.question_number}.${i + 1}`),
-        ),
-      }));
-    case 'reading_mixed':
-      return items.map((it: any) => ({
-        qn: it.question_number,
-        answered: it.kind === 'tf_group'
-          ? usedIdx<any>(it.statements, (s) => s?.text).every((i) =>
-              has(`q${it.question_number}.s${i + 1}`),
-            )
-          : has(`q${it.question_number}`),
-      }));
+
+    case 'tf_group': {
+      const qItems: QItem[] = [];
+      items.forEach((it: any) => {
+        const qn = it.question_number ?? 1;
+        const statements = asArray<any>(it.statements);
+        const filledRows = statements
+          .map((st: any, idx: number) => ({ st, idx }))
+          .filter(({ st }: any) => String(st?.text ?? '').trim() !== '');
+        const rows = filledRows.length > 0 ? filledRows : statements.map((st: any, idx: number) => ({ st, idx }));
+
+        if (rows.length > 0) {
+          rows.forEach(({ idx }) => {
+            const key = `q${qn}.s${idx + 1}`;
+            qItems.push({
+              qn: qn + idx,
+              key,
+              answered: answers[key] !== undefined && answers[key] !== null,
+              targetId: `qstmt-${key}`,
+              fallbackTargetId: `qcard-${qn}`,
+            });
+          });
+        } else {
+          qItems.push({
+            qn,
+            key: `q${qn}`,
+            answered: has(`q${qn}`),
+            targetId: `qcard-${qn}`,
+          });
+        }
+      });
+      return qItems;
+    }
+
+    case 'matching': {
+      const qItems: QItem[] = [];
+      items.forEach((it: any) => {
+        const qn = it.question_number ?? 1;
+        const list1 = asArray<any>(it.list_1);
+        const filledRows = list1
+          .map((l: any, idx: number) => ({ l, idx }))
+          .filter(({ l }: any) => String(l ?? '').trim() !== '');
+        const rows = filledRows.length > 0 ? filledRows : list1.map((l: any, idx: number) => ({ l, idx }));
+
+        if (rows.length > 0) {
+          rows.forEach(({ idx }) => {
+            const key = `q${qn}.${idx + 1}`;
+            qItems.push({
+              qn: qn + idx,
+              key,
+              answered: has(key),
+              targetId: `qmatching-${key}`,
+              fallbackTargetId: `qcard-${qn}`,
+            });
+          });
+        } else {
+          qItems.push({
+            qn,
+            key: `q${qn}`,
+            answered: has(`q${qn}`),
+            targetId: `qcard-${qn}`,
+          });
+        }
+      });
+      return qItems;
+    }
+
+    case 'reading_mixed': {
+      const qItems: QItem[] = [];
+      items.forEach((it: any) => {
+        const qn = it.question_number ?? 1;
+        const kind = it.kind ?? 'mc';
+
+        if (kind === 'tf_group') {
+          const statements = asArray<any>(it.statements);
+          const filledRows = statements
+            .map((st: any, idx: number) => ({ st, idx }))
+            .filter(({ st }: any) => String(st?.text ?? '').trim() !== '');
+          const rows = filledRows.length > 0 ? filledRows : statements.map((st: any, idx: number) => ({ st, idx }));
+
+          if (rows.length > 0) {
+            rows.forEach(({ idx }) => {
+              const key = `q${qn}.s${idx + 1}`;
+              qItems.push({
+                qn: qn + idx,
+                key,
+                answered: answers[key] !== undefined && answers[key] !== null,
+                targetId: `qstmt-${key}`,
+                fallbackTargetId: `qcard-${qn}`,
+              });
+            });
+          } else {
+            qItems.push({
+              qn,
+              key: `q${qn}`,
+              answered: has(`q${qn}`),
+              targetId: `qcard-${qn}`,
+            });
+          }
+        } else {
+          const key = `q${qn}`;
+          qItems.push({
+            qn,
+            key,
+            answered: has(key),
+            targetId: `qcard-${qn}`,
+          });
+        }
+      });
+      return qItems;
+    }
+
     case 'mc_cloze':
-      return blanks.map((b: any) => ({ qn: b.question_number, answered: has(`q${b.question_number}`) }));
+      return blanks.map((b: any) => ({
+        qn: b.question_number,
+        key: `q${b.question_number}`,
+        answered: has(`q${b.question_number}`),
+        targetId: `qblank-${b.question_number}`,
+        fallbackTargetId: `qcard-${b.question_number}`,
+      }));
+
     case 'word_bank_cloze':
     case 'open_cloze':
-      return blanks.map((b: any) => ({ qn: b.question_number, answered: filled(`q${b.question_number}`) }));
+      return blanks.map((b: any) => ({
+        qn: b.question_number,
+        key: `q${b.question_number}`,
+        answered: filled(`q${b.question_number}`),
+        targetId: `qblank-${b.question_number}`,
+        fallbackTargetId: `qcard-${b.question_number}`,
+      }));
+
     default:
       return [];
   }
@@ -234,11 +349,22 @@ export function ThptPartNavigator({ config, answers, activeIdx, onSectionChange,
                 </div>
               </button>
               <div className={`grid gap-1 mt-1 px-1 ${isSheet ? 'grid-cols-6 gap-2' : 'grid-cols-8'}`}>
-                {items.map((it) => (
+                {items.map((it, itemIdx) => (
                   <button
-                    key={it.qn}
+                    key={it.key || `${it.qn}-${itemIdx}`}
                     type="button"
-                    onClick={() => onSectionChange(idx)}
+                    onClick={() => {
+                      onSectionChange(idx);
+                      const targetId = it.targetId;
+                      const fallbackId = it.fallbackTargetId;
+                      setTimeout(() => {
+                        const el = (targetId ? document.getElementById(targetId) : null) ||
+                                   (fallbackId ? document.getElementById(fallbackId) : null);
+                        if (el) {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                      }, 100);
+                    }}
                     className={`text-[10px] font-bold rounded transition-all cursor-pointer ${
                       isSheet ? 'min-h-10 text-xs' : 'aspect-square'
                     } ${
