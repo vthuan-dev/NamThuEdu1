@@ -62,6 +62,7 @@ export function StudentManagement() {
   const debouncedSearchQuery = useDebounce(searchQuery, 500); // Debounce 500ms
   const [courseFilter, setCourseFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [ageGroupFilter, setAgeGroupFilter] = useState("all");
 
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -95,13 +96,17 @@ export function StudentManagement() {
   } | null>(null);
   const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false);
 
-  // Filter students by course (frontend only, since backend doesn't have course field)
+  // Filter students by course and age group (frontend-side safety)
   const filteredStudents = useMemo(() => {
-    if (courseFilter === "all") {
-      return students;
+    let result = students;
+    if (courseFilter !== "all") {
+      result = result.filter((student) => student.course === courseFilter);
     }
-    return students.filter((student) => student.course === courseFilter);
-  }, [students, courseFilter]);
+    if (ageGroupFilter !== "all") {
+      result = result.filter((student) => (student.ageGroup || 'teens') === ageGroupFilter);
+    }
+    return result;
+  }, [students, courseFilter, ageGroupFilter]);
 
   // Get unique courses (Khóa tháng) for filter dropdown
   const uniqueCourses = useMemo(() => {
@@ -121,7 +126,7 @@ export function StudentManagement() {
     if (activeTab === 'deleted') {
       fetchDeletedStudents();
     }
-  }, [activeTab, currentPage, debouncedSearchQuery, courseFilter, statusFilter]);
+  }, [activeTab, currentPage, debouncedSearchQuery, courseFilter, statusFilter, ageGroupFilter]);
 
   const fetchStudentStats = async () => {
     try {
@@ -211,6 +216,11 @@ export function StudentManagement() {
       // Add status filter
       if (statusFilter !== 'all') {
         params.append('status', statusFilter);
+      }
+
+      // Add age_group filter
+      if (ageGroupFilter !== 'all') {
+        params.append('age_group', ageGroupFilter);
       }
 
       // Note: courseFilter is frontend-only since backend doesn't have course field
@@ -774,7 +784,7 @@ export function StudentManagement() {
     
     try {
       // Prepare data for Excel
-      const excelData = students.map((student, index) => ({
+      const excelData = filteredStudents.map((student, index) => ({
         'STT': index + 1,
         'Họ và tên': student.name,
         'Số điện thoại': student.phone,
@@ -959,6 +969,19 @@ export function StudentManagement() {
                 />
               </div>
               <select 
+                value={ageGroupFilter}
+                onChange={(e) => {
+                  setAgeGroupFilter(e.target.value);
+                  setCurrentPage(1); // Reset to page 1 when filtering
+                }}
+                className="px-3 py-2 text-[13px] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900/10 cursor-pointer bg-white"
+              >
+                <option value="all">Tất cả nhóm tuổi (Kids / Teens / Adults)</option>
+                <option value="kids">👶 Kids (Trẻ em)</option>
+                <option value="teens">🎓 Teens (Thiếu niên)</option>
+                <option value="adults">👔 Adults (Người lớn)</option>
+              </select>
+              <select 
                 value={courseFilter}
                 onChange={(e) => {
                   setCourseFilter(e.target.value);
@@ -989,6 +1012,7 @@ export function StudentManagement() {
                   setSearchQuery("");
                   setCourseFilter("all");
                   setStatusFilter("all");
+                  setAgeGroupFilter("all");
                   setCurrentPage(1); // Reset to page 1
                   toast.success(t('teacher.students.management.toast.filtersCleared'));
                 }}

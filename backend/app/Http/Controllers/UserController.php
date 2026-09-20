@@ -293,7 +293,7 @@ class UserController extends Controller
     {
         $user = $request->user();
 
-        if (!$user || $user->uRole !== 'teacher') {
+        if (!$user || !in_array($user->uRole, ['teacher', 'admin'])) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Bạn không có quyền truy cập.'
@@ -306,22 +306,27 @@ class UserController extends Controller
                     ->where('uRole', 'student')
                     ->whereNull('uDeleted_at');
 
-        // Search by name or phone
+        // Search by name, phone, email or age_group
         if ($request->has('search') && !empty($request->search)) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
+            $search = trim($request->search);
+            $lowerSearch = strtolower($search);
+            $query->where(function($q) use ($search, $lowerSearch) {
                 $q->where('uName', 'LIKE', "%{$search}%")
-                  ->orWhere('uPhone', 'LIKE', "%{$search}%");
+                  ->orWhere('uPhone', 'LIKE', "%{$search}%")
+                  ->orWhere('uEmail', 'LIKE', "%{$search}%");
+                if (in_array($lowerSearch, ['kids', 'teens', 'adults'], true)) {
+                    $q->orWhere('age_group', $lowerSearch);
+                }
             });
         }
 
         // Filter by status
-        if ($request->has('status') && !empty($request->status)) {
+        if ($request->has('status') && !empty($request->status) && $request->status !== 'all') {
             $query->where('uStatus', $request->status);
         }
 
-        // Filter by age_group (kids/teens/adults) — thay cho filter class cũ
-        if ($request->has('age_group') && !empty($request->age_group)) {
+        // Filter by age_group (kids/teens/adults)
+        if ($request->has('age_group') && !empty($request->age_group) && $request->age_group !== 'all') {
             $query->where('age_group', $request->age_group);
         }
 
@@ -1333,7 +1338,7 @@ class UserController extends Controller
     {
         $user = $request->user();
 
-        if (!$user || $user->uRole !== 'teacher') {
+        if (!$user || !in_array($user->uRole, ['teacher', 'admin'])) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Bạn không có quyền truy cập.'
@@ -1342,10 +1347,18 @@ class UserController extends Controller
 
         $format = $request->get('format', 'csv');
         
-        $students = User::where('uRole', 'student')
-                       ->whereNull('uDeleted_at')
-                       ->orderBy('uCreated_at', 'desc')
-                       ->get();
+        $query = User::where('uRole', 'student')
+                       ->whereNull('uDeleted_at');
+
+        if ($request->has('age_group') && !empty($request->age_group) && $request->age_group !== 'all') {
+            $query->where('age_group', $request->age_group);
+        }
+
+        if ($request->has('status') && !empty($request->status) && $request->status !== 'all') {
+            $query->where('uStatus', $request->status);
+        }
+
+        $students = $query->orderBy('uCreated_at', 'desc')->get();
 
         if ($format === 'json') {
             return response()->json([
