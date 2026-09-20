@@ -1,9 +1,9 @@
 /**
  * Component hiển thị passage với khả năng highlight text
- * Học viên có thể select text và bôi màu để ghi chú
+ * Học viên có thể select text và bôi màu để ghi chú (hỗ trợ cả Mobile & Desktop)
  */
-import { useEffect, useRef, useState, useMemo } from 'react';
-import { Highlighter, Palette } from 'lucide-react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { Highlighter, Palette, Check } from 'lucide-react';
 import type { TextHighlight, HighlightColor } from '../../../../hooks/exam/useTextHighlight';
 import { normalizePassageText } from '../../../../utils/examUtils';
 
@@ -37,72 +37,147 @@ export function HighlightablePassage({
     end: number;
   } | null>(null);
 
-  // Handle text selection
-  const handleMouseUp = () => {
+  // Xử lý bắt vùng chọn văn bản (hỗ trợ cả Mouse và Touch/SelectionChange trên Mobile)
+  const updateSelection = useCallback(() => {
     if (!enabled) return;
-    
+
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
-      setShowToolbar(false);
       return;
     }
 
-    const text = selection.toString().trim();
-    if (text.length === 0) {
-      setShowToolbar(false);
-      return;
-    }
-
-    // Get selection position to show toolbar
-    const range = selection.getRangeAt(0);
-    const rect = range.getBoundingClientRect();
-    
-    // Calculate offset in full text content
     const container = contentRef.current;
     if (!container) return;
 
-    const textContent = container.textContent || '';
-    const beforeRange = range.cloneRange();
-    beforeRange.selectNodeContents(container);
-    beforeRange.setEnd(range.startContainer, range.startOffset);
-    const startOffset = beforeRange.toString().length;
-    const endOffset = startOffset + text.length;
+    // Kiểm tra vùng chọn có nằm trong bài đọc không
+    const anchorNode = selection.anchorNode;
+    const focusNode = selection.focusNode;
+    if (
+      !anchorNode ||
+      !focusNode ||
+      !container.contains(anchorNode) ||
+      !container.contains(focusNode)
+    ) {
+      return;
+    }
 
-    setCurrentSelection({ text, start: startOffset, end: endOffset });
-    setToolbarPosition({
-      top: rect.top - 60 + window.scrollY,
-      left: rect.left + rect.width / 2,
-    });
-    setShowToolbar(true);
-  };
+    const rawText = selection.toString();
+    if (!rawText.trim()) return;
 
-  // Apply highlight
-  const applyHighlight = () => {
+    try {
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+
+      // Tính startOffset theo textContent
+      const beforeRange = range.cloneRange();
+      beforeRange.selectNodeContents(container);
+      beforeRange.setEnd(range.startContainer, range.startOffset);
+      const rawStartOffset = beforeRange.toString().length;
+
+      // Xử lý khoảng trắng thừa ở đầu để offset chuẩn xác
+      const leadingSpaces = rawText.length - rawText.trimStart().length;
+      const cleanTextSelected = rawText.trim();
+      const startOffset = rawStartOffset + leadingSpaces;
+      const endOffset = startOffset + cleanTextSelected.length;
+
+      setCurrentSelection({
+        text: cleanTextSelected,
+        start: startOffset,
+        end: endOffset,
+      });
+
+      // Tọa độ cho floating toolbar (position: fixed -> relative to viewport, KHÔNG cộng window.scrollY)
+      const top = rect.top < 65 ? rect.bottom + 8 : rect.top - 48;
+      const left = Math.max(60, Math.min(window.innerWidth - 60, rect.left + rect.width / 2));
+
+      setToolbarPosition({ top, left });
+      setShowToolbar(true);
+    } catch {
+      // Bỏ qua lỗi DOM range nếu có
+    }
+  }, [enabled]);
+
+  // Lắng nghe selectionchange trên document (hoạt động nhạy trên mobile iOS/Android)
+  useEffect(() => {
+    if (!enabled) return;
+
+    let timeoutId: any = null;
+    const handleSelectionChange = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed) {
+          // Chỉ đóng nếu selection thực sự đã bị collapse
+          return;
+        }
+        updateSelection();
+      }, 50);
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('selectionchange', handleSelectionChange);
+    };
+  }, [enabled, updateSelection]);
+
+  // Đóng toolbar khi click ra ngoài
+  useEffect(() => {
+    const handlePointerDown = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest('.highlight-toolbar') || target.closest('.highlight-color-picker')) {
+        return;
+      }
+      // Click ra ngoài vùng chọn
+      setTimeout(() => {
+        const sel = window.getSelection();
+        if (!sel || sel.isCollapsed) {
+          setShowToolbar(false);
+          setCurrentSelection(null);
+        }
+      }, 100);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+    };
+  }, []);
+
+  // Áp dụng highlight
+  const applyHighlightWithColor = useCallback((colorKey: HighlightColor) => {
     if (!currentSelection) return;
 
     onAddHighlight({
       text: currentSelection.text,
       startOffset: currentSelection.start,
       endOffset: currentSelection.end,
-      color: colors[selectedColor],
+      color: colors[colorKey],
     });
 
-    // Clear selection
+    // Xóa selection
     window.getSelection()?.removeAllRanges();
     setShowToolbar(false);
     setCurrentSelection(null);
-  };
+  }, [currentSelection, colors, onAddHighlight]);
 
-  // Handle click on highlighted text to remove
+  const applyHighlight = useCallback(() => {
+    applyHighlightWithColor(selectedColor);
+  }, [applyHighlightWithColor, selectedColor]);
+
+  // Xóa highlight khi click vào thẻ <mark>
   useEffect(() => {
     const container = contentRef.current;
     if (!container || !enabled) return;
 
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.classList.contains('highlight-mark')) {
+    const handleClick = (e: MouseEvent | TouchEvent) => {
+      const target = (e.target as HTMLElement).closest('.highlight-mark') as HTMLElement | null;
+      if (target) {
         const id = target.dataset.highlightId;
-        if (id && window.confirm('Xóa highlight này?')) {
+        if (id && window.confirm('Xóa đánh dấu (highlight) này?')) {
           onRemoveHighlight(id);
         }
       }
@@ -112,7 +187,7 @@ export function HighlightablePassage({
     return () => container.removeEventListener('click', handleClick);
   }, [onRemoveHighlight, enabled]);
 
-  // Apply highlights to normalized passage content
+  // Chuẩn hóa và render highlight trên đoạn văn
   const highlightedHtml = useMemo(() => {
     const cleanText = normalizePassageText(html);
 
@@ -120,41 +195,43 @@ export function HighlightablePassage({
       return escapeHtml(cleanText);
     }
 
-    // Sort highlights by start offset
+    // Sắp xếp highlight theo startOffset
     const sorted = [...highlights].sort((a, b) => a.startOffset - b.startOffset);
 
-    // Build ranges for highlighting
+    // Ghép và lọc tránh trùng lặp đè lên nhau gây nhân đôi chữ
     const ranges: Array<{ start: number; end: number; id: string; color: string }> = [];
-    sorted.forEach(hl => {
-      if (hl.startOffset < cleanText.length && hl.endOffset <= cleanText.length) {
-        ranges.push({
-          start: hl.startOffset,
-          end: hl.endOffset,
-          id: hl.id,
-          color: hl.color,
-        });
+    for (const hl of sorted) {
+      if (hl.startOffset >= cleanText.length || hl.endOffset <= hl.startOffset) continue;
+      const start = Math.max(0, hl.startOffset);
+      const end = Math.min(cleanText.length, hl.endOffset);
+
+      if (ranges.length === 0) {
+        ranges.push({ start, end, id: hl.id, color: hl.color });
+      } else {
+        const prev = ranges[ranges.length - 1];
+        if (start < prev.end) {
+          if (end > prev.end) {
+            ranges.push({ start: prev.end, end, id: hl.id, color: hl.color });
+          }
+        } else {
+          ranges.push({ start, end, id: hl.id, color: hl.color });
+        }
       }
-    });
+    }
 
     if (ranges.length === 0) return escapeHtml(cleanText);
 
-    // Build highlighted text
     let result = '';
     let lastIndex = 0;
 
     ranges.forEach(range => {
-      // Text before highlight
       if (range.start > lastIndex) {
         result += escapeHtml(cleanText.substring(lastIndex, range.start));
       }
-      
-      // Highlighted text
-      result += `<mark class="highlight-mark cursor-pointer transition-opacity hover:opacity-75" style="background-color: ${range.color}; padding: 2px 0; border-radius: 2px;" data-highlight-id="${range.id}" title="Click để xóa">${escapeHtml(cleanText.substring(range.start, range.end))}</mark>`;
-      
+      result += `<mark class="highlight-mark cursor-pointer transition-opacity hover:opacity-75 select-text" style="background-color: ${range.color}; padding: 2px 1px; border-radius: 3px;" data-highlight-id="${range.id}" title="Chạm/Click để xóa highlight">${escapeHtml(cleanText.substring(range.start, range.end))}</mark>`;
       lastIndex = range.end;
     });
 
-    // Remaining text
     if (lastIndex < cleanText.length) {
       result += escapeHtml(cleanText.substring(lastIndex));
     }
@@ -164,38 +241,71 @@ export function HighlightablePassage({
 
   return (
     <div className="relative">
-      {/* Color picker toolbar */}
+      {/* Color picker toolbar — luôn hiển thị ở trên cùng, hỗ trợ cả mobile */}
       {enabled && (
-        <div className="mb-3 flex items-center gap-2 p-2 bg-gradient-to-r from-amber-50 to-white border border-amber-200 rounded-lg">
-          <Highlighter className="w-4 h-4 text-amber-600" />
-          <span className="text-xs font-medium text-gray-700">Chọn màu highlight:</span>
-          <div className="flex gap-1">
-            {(Object.keys(colors) as HighlightColor[]).map(color => (
-              <button
-                key={color}
-                type="button"
-                onClick={() => onSelectColor(color)}
-                className={`w-6 h-6 rounded-md border-2 transition-all hover:scale-110 ${
-                  selectedColor === color
-                    ? 'border-gray-800 ring-2 ring-gray-300'
-                    : 'border-gray-200'
-                }`}
-                style={{ backgroundColor: colors[color] }}
-                title={color.charAt(0).toUpperCase() + color.slice(1)}
-                aria-label={`Chọn màu ${color}`}
-              />
-            ))}
+        <div className="mb-3 p-2.5 bg-gradient-to-r from-amber-50/90 via-orange-50/40 to-white border border-amber-200/90 rounded-xl shadow-xs highlight-color-picker">
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
+            {/* Bộ chọn màu */}
+            <div className="flex items-center gap-2">
+              <Highlighter className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <span className="text-xs font-bold text-gray-700">Màu highlight:</span>
+              <div className="flex items-center gap-1.5">
+                {(Object.keys(colors) as HighlightColor[]).map(color => (
+                  <button
+                    key={color}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      onSelectColor(color);
+                      // Nếu đang bôi đen text, bấm màu là highlight ngay!
+                      if (currentSelection) {
+                        applyHighlightWithColor(color);
+                      }
+                    }}
+                    className={`w-7 h-7 rounded-lg border-2 transition-all cursor-pointer flex items-center justify-center ${
+                      selectedColor === color
+                        ? 'border-gray-900 ring-2 ring-amber-400 scale-110 shadow-sm'
+                        : 'border-white hover:scale-105 shadow-xs'
+                    }`}
+                    style={{ backgroundColor: colors[color] }}
+                    title={`Chọn màu ${color}${currentSelection ? ' (Chạm để highlight ngay)' : ''}`}
+                    aria-label={`Chọn màu ${color}`}
+                  >
+                    {selectedColor === color && (
+                      <Check className="w-3.5 h-3.5 text-gray-800 stroke-[3]" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Trạng thái / Nút hành động Highlight */}
+            <div className="flex items-center gap-2">
+              {currentSelection ? (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={applyHighlight}
+                  className="highlight-toolbar inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold text-gray-900 shadow-md transition-all animate-pulse hover:scale-105 cursor-pointer border border-amber-400/80 active:scale-95"
+                  style={{ backgroundColor: colors[selectedColor] }}
+                >
+                  <Palette className="w-3.5 h-3.5" />
+                  Highlight ngay ({currentSelection.text.length > 12 ? `${currentSelection.text.slice(0, 12)}…` : currentSelection.text})
+                </button>
+              ) : (
+                <span className="text-[11px] text-gray-500 font-medium">
+                  💡 Bôi đen chữ rồi chạm màu để highlight
+                </span>
+              )}
+            </div>
           </div>
-          <span className="text-[10px] text-gray-500 ml-auto">
-            Chọn text rồi nhấn "Highlight"
-          </span>
         </div>
       )}
 
-      {/* Selection toolbar */}
-      {showToolbar && (
+      {/* Floating Selection toolbar — hiển thị ngay cạnh chữ được bôi đen */}
+      {showToolbar && currentSelection && (
         <div
-          className="fixed z-50 bg-white shadow-xl border border-gray-200 rounded-lg p-2 flex items-center gap-2 animate-in fade-in duration-150"
+          className="fixed z-50 bg-white shadow-2xl border border-gray-200 rounded-xl p-1.5 flex items-center gap-1.5 animate-in fade-in duration-150 highlight-toolbar"
           style={{
             top: `${toolbarPosition.top}px`,
             left: `${toolbarPosition.left}px`,
@@ -204,20 +314,26 @@ export function HighlightablePassage({
         >
           <button
             type="button"
+            onMouseDown={(e) => e.preventDefault()}
             onClick={applyHighlight}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all hover:scale-105"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-900 shadow-xs transition-all hover:scale-105 active:scale-95 cursor-pointer border border-black/10"
             style={{ 
               backgroundColor: colors[selectedColor],
-              color: '#1f2937'
             }}
           >
             <Palette className="w-3.5 h-3.5" />
             Highlight
           </button>
+          <div className="h-4 w-px bg-gray-200" />
           <button
             type="button"
-            onClick={() => setShowToolbar(false)}
-            className="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              setShowToolbar(false);
+              setCurrentSelection(null);
+              window.getSelection()?.removeAllRanges();
+            }}
+            className="px-2 py-1 text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded cursor-pointer"
             aria-label="Đóng"
           >
             ✕
@@ -225,11 +341,12 @@ export function HighlightablePassage({
         </div>
       )}
 
-      {/* Passage content */}
+      {/* Đoạn văn bài đọc */}
       <article
         ref={contentRef}
         className="prose prose-sm max-w-none text-slate-800 leading-relaxed whitespace-pre-wrap [&>p]:mb-4 select-text"
-        onMouseUp={handleMouseUp}
+        onMouseUp={updateSelection}
+        onTouchEnd={updateSelection}
         style={{ userSelect: enabled ? 'text' : 'none' }}
         dangerouslySetInnerHTML={{ __html: highlightedHtml }}
       />
