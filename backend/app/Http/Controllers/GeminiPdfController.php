@@ -1779,6 +1779,19 @@ CRITICAL RULES:
                         $item['correct_id'] = strtoupper(trim((string) ($item['correct_id'] ?? '')));
                     }
                 }
+            } elseif ($type === 'listening') {
+                if (!isset($sec['items']) || !is_array($sec['items'])) $sec['items'] = [];
+                foreach ($sec['items'] as &$item) {
+                    if (isset($item['correct_id'])) {
+                        $item['correct_id'] = strtoupper(trim((string) ($item['correct_id'] ?? '')));
+                    }
+                    if (!isset($item['kind'])) {
+                        $item['kind'] = 'mc';
+                    }
+                }
+                if (!isset($sec['audio_url'])) $sec['audio_url'] = '';
+                if (!isset($sec['task_image'])) $sec['task_image'] = '';
+                if (!isset($sec['layout'])) $sec['layout'] = 'default';
             }
         }
         unset($sec);
@@ -1919,6 +1932,29 @@ Return ONLY valid JSON in EXACTLY this shape:
           \"explanation\": \"Expressing cause/reason.\"
         }
       ]
+    },
+    {
+      \"type\": \"listening\",
+      \"title\": \"Nghe hiểu\",
+      \"instructions\": \"Nghe đoạn hội thoại và chọn câu trả lời đúng.\",
+      \"audio_url\": \"\",
+      \"task_image\": \"\",
+      \"layout\": \"default\",
+      \"items\": [
+        {
+          \"question_number\": 1,
+          \"kind\": \"mc\",
+          \"prompt\": \"You will hear two friends talking about... Why didn't the boy enjoy the film?\",
+          \"options\": [
+            { \"id\": \"A\", \"text\": \"It was very frightening.\" },
+            { \"id\": \"B\", \"text\": \"It was too long.\" },
+            { \"id\": \"C\", \"text\": \"The sound was bad.\" },
+            { \"id\": \"D\", \"text\": \"The tickets were expensive.\" }
+          ],
+          \"correct_id\": \"A\",
+          \"explanation\": \"The boy said he found the monsters terrifying.\"
+        }
+      ]
     }
   ]
 }
@@ -1930,7 +1966,8 @@ CRITICAL RULES:
 4. For normal grammar, vocabulary, communication, synonym, antonym, sentence arrangement, or ordering questions, parse them as 'mc_questions'.
 5. For pronunciation/stress questions, parse them as 'phonetics'.
 6. For any section with fill-in-the-blank, open cloze, or word form questions (where type is 'open_cloze', 'word_bank_cloze', 'word_form', or 'sentence_transformation'), the 'accepted_answers' array MUST contain only the clean, direct answers (e.g. [\"am\", \"is\"] or [\"are\"] or [\"isn't\", \"is not\"]). Do NOT include any explanations, grammar notes, translations, or surrounding question context inside the answers. Any explanation or notes MUST go strictly in the 'explanation' field.
-7. If the input contains a local draft JSON (containing parsed questions/options/keys), use it as the source of truth for the answers, options, and question numbers, but reorganize them into the proper section type and extract the passages for reading/cloze tasks.";
+7. If the input contains a local draft JSON (containing parsed questions/options/keys), use it as the source of truth for the answers, options, and question numbers, but reorganize them into the proper section type and extract the passages for reading/cloze tasks.
+8. For listening sections (e.g. 'Listening', 'Nghe hiểu', 'You will hear...', 'Listen to the recording...', or questions referencing listening audio/conversations), parse them as a 'listening' section with type: 'listening', layout: 'default', and items with kind: 'mc' (or 'fill_blank' if filling in blanks from listening). Set audio_url and task_image to empty strings.";
     }
 
     /**

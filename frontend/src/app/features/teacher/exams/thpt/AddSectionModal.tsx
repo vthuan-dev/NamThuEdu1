@@ -119,8 +119,8 @@ const MODAL_OPTIONS: OptionMeta[] = [
   },
   {
     type: 'listening',
-    label: 'Nghe trắc nghiệm',
-    description: 'Audio + câu hỏi chọn đáp án A/B/C/D — tự chấm',
+    label: 'Nghe hiểu / Nghe trắc nghiệm',
+    description: 'Audio + câu hỏi chọn đáp án A/B/C/D (hội thoại, thông báo...) — tự chấm',
     icon: 'Headphones',
     group: 'listening',
     initItemKind: 'mc',

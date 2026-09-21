@@ -1,6 +1,6 @@
 import type { ThptSection } from '../../../../../../types/thpt';
 import { useState, useEffect, type ClipboardEvent, type DragEvent } from 'react';
-import { Upload, Loader2, Volume2, Trash2, AlertTriangle } from 'lucide-react';
+import { Upload, Loader2, Volume2, Trash2, AlertTriangle, Headphones, ListChecks } from 'lucide-react';
 import { api } from '../../../../../../services/api';
 import {
   makeMcItem,
@@ -748,9 +748,69 @@ function McQuestionsEditor({ section, all, onChange }: { section: Extract<ThptSe
     });
   };
 
+  const isListeningCandidate =
+    /nghe|listen|audio|hội thoại|đoạn băng/i.test(section.title || '') ||
+    /nghe|listen|audio|hội thoại|đoạn băng/i.test(section.instructions || '') ||
+    section.items.some((it) => /hear|listen|nghe|audio|recording|conversation/i.test(it.prompt || ''));
+
+  const convertToListening = () => {
+    const listeningSection: Extract<ThptSection, { type: 'listening' }> = {
+      id: section.id,
+      type: 'listening',
+      title: section.title?.trim() || 'Nghe hiểu',
+      instructions: section.instructions?.trim() || 'Nghe đoạn ghi âm rồi chọn đáp án đúng.',
+      points_per_question: section.points_per_question ?? 1,
+      audio_url: '',
+      task_image: '',
+      layout: 'default',
+      items: section.items.map((item) => ({
+        question_number: item.question_number,
+        kind: 'mc' as const,
+        prompt: item.prompt || '',
+        options: item.options || [
+          { id: 'A', text: '' },
+          { id: 'B', text: '' },
+          { id: 'C', text: '' },
+          { id: 'D', text: '' },
+        ],
+        correct_id: item.correct_id || '',
+        explanation: item.explanation || '',
+      })),
+    };
+    onChange(listeningSection);
+  };
+
   return (
     <div className="space-y-4">
       <InlineGuide type="mc_questions" />
+
+      {/* Banner trợ giúp chuyển đổi sang Nghe nếu nhận diện tiêu đề/nội dung có yếu tố nghe */}
+      {isListeningCandidate && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50/90 p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-start gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Headphones className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-amber-950">
+                Phần này có nội dung Nghe hiểu ("{section.title || 'Nghe hiểu'}")?
+              </p>
+              <p className="text-[11px] text-amber-800 leading-relaxed mt-0.5">
+                Hiện phần này đang ở dạng <b>Trắc nghiệm đọc</b> nên không có ô tải Audio. Bấm nút bên cạnh để chuyển sang dạng <b>Nghe (Listening)</b> và chèn file Audio (giữ nguyên toàn bộ {section.items.length} câu hỏi và đáp án).
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={convertToListening}
+            className="flex-shrink-0 px-3.5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+          >
+            <Headphones className="w-3.5 h-3.5" />
+            Chuyển sang phần Nghe (Listening)
+          </button>
+        </div>
+      )}
+
       <div className="rounded-xl bg-white border border-slate-200 p-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-bold text-slate-500">Dạng:</span>
@@ -767,6 +827,15 @@ function McQuestionsEditor({ section, all, onChange }: { section: Extract<ThptSe
               {item.l}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={convertToListening}
+            title="Chuyển phần này sang dạng Nghe (Listening) để tải lên file audio"
+            className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-colors cursor-pointer"
+          >
+            <Headphones className="w-3.5 h-3.5" />
+            Chuyển sang Nghe (có Audio)
+          </button>
         </div>
         {/* Phản hồi rõ ràng cho lựa chọn hiện tại */}
         <p className="mt-2 text-[11px] text-slate-500 leading-relaxed">
@@ -927,6 +996,35 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
     update(items);
   };
 
+  const convertToMc = () => {
+    const mcSection: Extract<ThptSection, { type: 'mc_questions' }> = {
+      id: section.id,
+      type: 'mc_questions',
+      title: section.title?.trim() || 'Trắc nghiệm',
+      instructions: section.instructions?.trim() || 'Chọn phương án đúng (A, B, C hoặc D).',
+      variant: 'general',
+      points_per_question: section.points_per_question ?? 1,
+      items: section.items.map((item) => {
+        const anyItem = item as any;
+        return {
+          question_number: item.question_number,
+          prompt: item.prompt || '',
+          options: anyItem.options && anyItem.options.length > 0
+            ? anyItem.options
+            : [
+                { id: 'A', text: '' },
+                { id: 'B', text: '' },
+                { id: 'C', text: '' },
+                { id: 'D', text: '' },
+              ],
+          correct_id: anyItem.correct_id || '',
+          explanation: item.explanation || '',
+        };
+      }),
+    };
+    onChange(mcSection);
+  };
+
   return (
     <div className="space-y-4">
       <InlineGuide type="listening" />
@@ -959,6 +1057,15 @@ function ListeningEditor({ section, all, onChange }: { section: Extract<ThptSect
             Học viên: trái = ảnh đề · phải = câu trả lời
           </span>
         )}
+        <button
+          type="button"
+          onClick={convertToMc}
+          title="Chuyển phần này sang Trắc nghiệm đọc (bỏ audio)"
+          className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors cursor-pointer"
+        >
+          <ListChecks className="w-3.5 h-3.5" />
+          Chuyển sang Trắc nghiệm đọc
+        </button>
       </div>
 
       {/* Audio uploader */}

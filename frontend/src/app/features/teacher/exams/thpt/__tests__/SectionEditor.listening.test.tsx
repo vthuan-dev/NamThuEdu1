@@ -117,4 +117,100 @@ describe('SectionEditor — Listening image_block layout', () => {
     const updatedSec = onChange.mock.calls[0][0];
     expect(updatedSec.items[0].explanation).toBe('Speaker mentions age 12 to 16');
   });
+
+  it('detects listening candidate in mc_questions and converts to listening with 1 click', () => {
+    const onChange = vi.fn();
+    const mcSection: any = {
+      id: 'sec_mc_candidate',
+      type: 'mc_questions',
+      title: 'Nghe hiểu',
+      instructions: 'Nghe đoạn hội thoại và chọn câu trả lời đúng.',
+      variant: 'general',
+      items: [
+        {
+          question_number: 1,
+          prompt: "You will hear two friends talking about a film. Why didn't the boy enjoy it?",
+          options: [
+            { id: 'A', text: 'It was very frightening.' },
+            { id: 'B', text: 'It was too long.' },
+            { id: 'C', text: 'The sound was bad.' },
+            { id: 'D', text: 'The tickets were expensive.' },
+          ],
+          correct_id: 'A',
+          explanation: 'He was terrified.',
+        },
+      ],
+    };
+
+    render(
+      <SectionEditor
+        section={mcSection}
+        allSections={[mcSection]}
+        onChange={onChange}
+      />
+    );
+
+    // Banner should be visible because title has "Nghe hiểu" and prompt has "hear"
+    expect(screen.getByText(/Phần này có nội dung Nghe hiểu/i)).toBeInTheDocument();
+
+    const convertBtn = screen.getByRole('button', { name: /Chuyển sang phần Nghe \(Listening\)/i });
+    expect(convertBtn).toBeInTheDocument();
+
+    fireEvent.click(convertBtn);
+
+    expect(onChange).toHaveBeenCalled();
+    const converted = onChange.mock.calls[0][0];
+    expect(converted.type).toBe('listening');
+    expect(converted.title).toBe('Nghe hiểu');
+    expect(converted.audio_url).toBe('');
+    expect(converted.items).toHaveLength(1);
+    expect(converted.items[0].kind).toBe('mc');
+    expect(converted.items[0].correct_id).toBe('A');
+    expect(converted.items[0].options[0].text).toBe('It was very frightening.');
+  });
+
+  it('allows converting listening section back to mc_questions', () => {
+    const onChange = vi.fn();
+    const listeningSec: any = {
+      id: 'sec_listen_to_mc',
+      type: 'listening',
+      title: 'Nghe hiểu',
+      instructions: 'Nghe đoạn ghi âm',
+      audio_url: 'https://example.com/audio.mp3',
+      layout: 'default',
+      items: [
+        {
+          question_number: 1,
+          kind: 'mc',
+          prompt: 'Question 1',
+          options: [
+            { id: 'A', text: 'Opt A' },
+            { id: 'B', text: 'Opt B' },
+          ],
+          correct_id: 'B',
+          explanation: 'Exp',
+        },
+      ],
+    };
+
+    render(
+      <SectionEditor
+        section={listeningSec}
+        allSections={[listeningSec]}
+        onChange={onChange}
+      />
+    );
+
+    const convertBackBtn = screen.getByRole('button', { name: /Chuyển sang Trắc nghiệm đọc/i });
+    expect(convertBackBtn).toBeInTheDocument();
+
+    fireEvent.click(convertBackBtn);
+
+    expect(onChange).toHaveBeenCalled();
+    const converted = onChange.mock.calls[0][0];
+    expect(converted.type).toBe('mc_questions');
+    expect(converted.items[0].prompt).toBe('Question 1');
+    expect(converted.items[0].correct_id).toBe('B');
+  });
 });
+

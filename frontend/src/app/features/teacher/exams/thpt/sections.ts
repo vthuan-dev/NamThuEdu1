@@ -400,7 +400,7 @@ export function createSection(
           ? 'Nghe + ảnh đề'
           : initItemKind === 'fill_blank'
             ? 'Nghe điền chỗ trống'
-            : 'Nghe trắc nghiệm',
+            : 'Nghe hiểu',
         instructions: isImageBlock
           ? 'Nghe đoạn ghi âm, xem ảnh đề và trả lời các câu hỏi (trắc nghiệm / điền từ).'
           : initItemKind === 'fill_blank'
