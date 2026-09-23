@@ -1143,62 +1143,7 @@ const SPEAKING_TIMES: Record<number, { prepSec: number; recSec: number }> = {
   3: { prepSec: 90,  recSec: 5 * 60  }, // 90s prep · 5min record
 };
 
-/* ── Prep full-screen overlay ──────────────────────────── */
-function SpeakingPrepOverlay({
-  prepSec,
-  partNumber,
-  onDone,
-  onSkip,
-}: {
-  prepSec: number;
-  partNumber: number;
-  onDone: () => void;
-  onSkip: () => void;
-}) {
-  const [left, setLeft] = useState(prepSec);
-  useEffect(() => {
-    setLeft(prepSec);
-    const id = setInterval(() => {
-      setLeft((s) => {
-        if (s <= 1) { clearInterval(id); onDone(); return 0; }
-        return s - 1;
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, [prepSec, partNumber]);
 
-  return (
-    <div className="fixed inset-0 z-[100] bg-white flex flex-col items-center justify-center px-6">
-      <img
-        src="https://luyenthivstep.vn/assets/image/headphone-man.png"
-        alt="headphone"
-        className="w-24 h-24 mb-6 object-contain"
-        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-      />
-      <p className="text-slate-700 text-[15px] text-center max-w-md">
-        Bài thi sẽ được thu âm trực tiếp trên trình duyệt.
-      </p>
-      <p className="text-slate-700 text-[15px] text-center mb-8">
-        Vui lòng bật tiếng, cấp quyền thu âm (nếu có).
-      </p>
-      <p className="text-pink-600 text-xs font-bold uppercase tracking-widest mb-2">
-        THỜI GIAN CHUẨN BỊ CÒN
-      </p>
-      <p className="text-pink-600 text-5xl font-bold tabular-nums">
-        {left} <span className="text-2xl font-semibold">GIÂY</span>
-      </p>
-      <div className="mt-10 flex gap-3">
-        <button
-          onClick={onSkip}
-          className="px-5 py-2 bg-pink-600 text-white rounded-lg text-sm font-semibold hover:bg-pink-700 transition-colors"
-        >
-          Bỏ qua chuẩn bị →
-        </button>
-      </div>
-      <p className="mt-4 text-[11px] text-slate-400 uppercase tracking-wider">Part {partNumber}</p>
-    </div>
-  );
-}
 
 /* ── Generate a beep sound via Web Audio API ──────────── */
 function playBeep(durationMs = 350, freq = 880, volume = 0.25): Promise<void> {
@@ -1581,10 +1526,9 @@ function SpeakingQuestionScreen({
   onComplete?: (pn: number) => void;
 }) {
   const times = SPEAKING_TIMES[partNumber] ?? { prepSec: 30, recSec: 180 };
-  type Phase = "intro" | "countdown3" | "recording" | "done";
-  const [phase, setPhase] = useState<Phase>("intro");
+  type Phase = "idle" | "intro" | "recording" | "done";
+  const [phase, setPhase] = useState<Phase>("idle");
   const [recLeft, setRecLeft] = useState(times.recSec);
-  const [count3, setCount3] = useState(3);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [micStream, setMicStream] = useState<MediaStream | null>(null);
   const [ttsProgress, setTtsProgress] = useState(0); // 0..1 during intro
@@ -1600,45 +1544,38 @@ function SpeakingQuestionScreen({
     : partNumber === 2 ? "Question 2: Solution Discussion (4 minutes)."
     : "Question 3: Topic Development (5 minutes).";
 
-  // TTS on mount / partNumber change
+  // Reset when partNumber changes - no auto TTS / countdown in preview mode
   useEffect(() => {
-    setPhase("intro");
+    clearTimer();
+    window.speechSynthesis?.cancel();
+    mediaRef.current?.stop();
+    setPhase("idle");
     setAudioUrl(null);
+    setMicStream(null);
     setTtsProgress(0);
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-      setPhase("countdown3"); return;
-    }
+    return () => { window.speechSynthesis?.cancel(); };
+  }, [partNumber]);
+
+  const playTts = () => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     const text = buildSpeakingPrompt(part, partNumber);
-    if (!text) { setPhase("countdown3"); return; }
+    if (!text) return;
     const total = Math.max(1, text.length);
     window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(text);
-    utt.lang = "en-US"; utt.rate = 0.95;
+    utt.lang = "en-US";
+    utt.rate = 0.95;
     utt.onboundary = (e: SpeechSynthesisEvent) => {
       setTtsProgress(Math.min(1, e.charIndex / total));
     };
-    utt.onend = async () => {
+    utt.onend = () => {
       setTtsProgress(1);
-      await playBeep();
-      setPhase("countdown3");
+      setPhase("idle");
     };
-    utt.onerror = () => setPhase("countdown3");
+    utt.onerror = () => setPhase("idle");
+    setPhase("intro");
     window.speechSynthesis.speak(utt);
-    return () => { window.speechSynthesis.cancel(); };
-  }, [partNumber]);
-
-  // 3-2-1 countdown → auto record
-  useEffect(() => {
-    if (phase !== "countdown3") return;
-    setCount3(3);
-    const id = setInterval(() => {
-      setCount3((c) => {
-        if (c <= 1) { clearInterval(id); startRecording(); return 0; }
-        return c - 1;
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, [phase]);
+  };
 
   const startRecording = async () => {
     try {
@@ -1673,7 +1610,6 @@ function SpeakingQuestionScreen({
   };
 
   const stopRecording = () => { clearTimer(); mediaRef.current?.stop(); };
-  const skipIntro = () => { window.speechSynthesis?.cancel(); setPhase("countdown3"); };
   const reset = () => {
     clearTimer();
     window.speechSynthesis?.cancel();
@@ -1681,25 +1617,8 @@ function SpeakingQuestionScreen({
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     setAudioUrl(null);
     setMicStream(null);
-    setPhase("intro");
+    setPhase("idle");
     setTtsProgress(0);
-    setTimeout(() => {
-      const text = buildSpeakingPrompt(part, partNumber);
-      if (!text || !("speechSynthesis" in window)) { setPhase("countdown3"); return; }
-      const total = Math.max(1, text.length);
-      const utt = new SpeechSynthesisUtterance(text);
-      utt.lang = "en-US"; utt.rate = 0.95;
-      utt.onboundary = (e: SpeechSynthesisEvent) => {
-        setTtsProgress(Math.min(1, e.charIndex / total));
-      };
-      utt.onend = async () => {
-        setTtsProgress(1);
-        await playBeep();
-        setPhase("countdown3");
-      };
-      utt.onerror = () => setPhase("countdown3");
-      window.speechSynthesis.speak(utt);
-    }, 100);
   };
 
   useEffect(() => () => {
@@ -1709,7 +1628,7 @@ function SpeakingQuestionScreen({
   }, []);
 
   const isRecording = phase === "recording";
-  const showRightPanel = isRecording || phase === "done" || phase === "countdown3";
+  const showRightPanel = isRecording || phase === "done";
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-6">
@@ -1721,14 +1640,6 @@ function SpeakingQuestionScreen({
           </div>
         </div>
       )}
-      {phase === "countdown3" && (
-        <div className="flex justify-center mb-5">
-          <div className="bg-amber-50 border border-amber-200 px-5 py-1.5 rounded-md">
-            <span className="text-xs font-semibold text-amber-700 mr-2">Bắt đầu sau</span>
-            <span className="text-2xl font-bold tabular-nums text-amber-600">{count3}</span>
-          </div>
-        </div>
-      )}
 
       <div className={`grid gap-6 ${showRightPanel ? "grid-cols-1 md:grid-cols-[1fr_360px]" : "grid-cols-1"}`}>
         {/* LEFT — question + audio + text */}
@@ -1737,8 +1648,18 @@ function SpeakingQuestionScreen({
             {partTitle.split(":")[0]}: <em className="font-semibold">{partTitle.substring(partTitle.indexOf(":") + 1).trim()}</em>
           </p>
 
-          {/* Fake audio-player UI for TTS — auto-play, no controls */}
-          <div className="bg-slate-100 rounded-full px-4 py-2 flex items-center gap-3 mb-3 max-w-md select-none">
+          {/* Audio-player UI for TTS */}
+          <div
+            onClick={() => {
+              if (phase === "intro") {
+                window.speechSynthesis?.cancel();
+                setPhase("idle");
+              } else {
+                playTts();
+              }
+            }}
+            className="bg-slate-100 rounded-full px-4 py-2 flex items-center gap-3 mb-3 max-w-md select-none cursor-pointer hover:bg-slate-200/80 transition-colors"
+          >
             <div className="w-7 h-7 rounded-full bg-slate-300 flex items-center justify-center" aria-hidden>
               {phase === "intro"
                 ? <Pause className="w-3.5 h-3.5 text-slate-700" />
@@ -1749,7 +1670,7 @@ function SpeakingQuestionScreen({
                 className="h-full bg-slate-600 transition-[width] duration-200 ease-linear"
                 style={{
                   width: `${
-                    phase === "intro" ? Math.round(ttsProgress * 100) : 100
+                    phase === "intro" ? Math.round(ttsProgress * 100) : 0
                   }%`,
                 }}
               />
@@ -1757,8 +1678,8 @@ function SpeakingQuestionScreen({
             <Volume2 className="w-4 h-4 text-slate-500" />
           </div>
 
-          <p className="italic text-red-500 text-[12px] mb-4">
-            "Nếu trình duyệt không tự động phát, vui lòng bấm nút Play để nghe câu hỏi."
+          <p className="italic text-slate-500 text-[12px] mb-4">
+            Bấm nút Play để nghe đọc đề bài (nếu cần).
           </p>
 
           {/* Question content */}
@@ -1776,6 +1697,12 @@ function SpeakingQuestionScreen({
 
           {/* Controls */}
           <div className="mt-5 flex gap-2">
+            {phase === "idle" && (
+              <button onClick={startRecording}
+                className="flex items-center gap-2 px-5 py-2.5 bg-pink-600 text-white rounded-lg text-sm font-semibold hover:bg-pink-700 transition-colors shadow-sm">
+                <Mic className="w-4 h-4" /> Bắt đầu thu âm thử
+              </button>
+            )}
             {phase === "recording" && (
               <button onClick={stopRecording}
                 className="flex items-center gap-2 px-5 py-2.5 bg-slate-700 text-white rounded-lg text-sm font-semibold hover:bg-slate-800 transition-colors">
@@ -1799,7 +1726,7 @@ function SpeakingQuestionScreen({
                 <LiveMicWaveform stream={micStream} />
               ) : (
                 <div className="w-full h-[150px] flex items-center justify-center text-slate-400 text-xs">
-                  {phase === "countdown3" ? "Chuẩn bị ghi âm..." : "Đã ghi âm xong"}
+                  Đã ghi âm xong
                 </div>
               )}
             </div>
@@ -1832,36 +1759,8 @@ function SpeakingView({
   partNumber: number;
   onComplete?: (pn: number) => void;
 }) {
-  const { examId } = useParams();
-  const LS_PREP = `vstep_speaking_prep_${examId}`;
-
-  const [viewPhase, setViewPhase] = useState<"prep" | "questions">(() => {
-    try {
-      const done = JSON.parse(localStorage.getItem(LS_PREP) || "{}");
-      return done[partNumber] ? "questions" : "prep";
-    } catch { return "prep"; }
-  });
-
-  // Reset phase when partNumber changes
-  useEffect(() => {
-    try {
-      const done = JSON.parse(localStorage.getItem(LS_PREP) || "{}");
-      setViewPhase(done[partNumber] ? "questions" : "prep");
-    } catch { setViewPhase("prep"); }
-  }, [partNumber]);
-
-  const finishPrep = () => {
-    try {
-      const done = JSON.parse(localStorage.getItem(LS_PREP) || "{}");
-      done[partNumber] = true;
-      localStorage.setItem(LS_PREP, JSON.stringify(done));
-    } catch {}
-    setViewPhase("questions");
-  };
-
   if (!part) return <EmptyState skill="speaking" />;
   const subtitle = partNumber === 1 ? "Social Interaction" : partNumber === 2 ? "Solution Discussion" : "Topic Development";
-  const times = SPEAKING_TIMES[partNumber] ?? { prepSec: 30, recSec: 180 };
 
   // Question count
   const questionCount =
@@ -1869,17 +1768,6 @@ function SpeakingView({
     : partNumber === 2 ? 1
     : partNumber === 3 ? 1 + (part.part3Data?.followUpQuestions.length || 0)
     : 0;
-
-  if (viewPhase === "prep") {
-    return (
-      <SpeakingPrepOverlay
-        prepSec={times.prepSec}
-        partNumber={partNumber}
-        onDone={finishPrep}
-        onSkip={finishPrep}
-      />
-    );
-  }
 
   return (
     <div className="h-full overflow-y-auto">
