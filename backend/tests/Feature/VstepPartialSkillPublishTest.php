@@ -141,6 +141,32 @@ class VstepPartialSkillPublishTest extends TestCase
         $publish->assertJson(['status' => 'success']);
     }
 
+    /** @test */
+    public function save_speaking_part_autocreates_exam_for_string_code()
+    {
+        $examCode = 'vstep-speaking-' . time();
+
+        $save = $this->withHeaders($this->authHeader())
+            ->postJson("/api/teacher/exams/{$examCode}/vstep/speaking/parts/2", [
+                'partName'  => 'Part 2 - Solution Discussion',
+                'timeLimit' => 4,
+                'part2Data' => [
+                    'situation'   => 'Your friend wants to learn English.',
+                    'solutions'   => ['Take a course', 'Watch movies', 'Practice daily'],
+                    'question'    => 'Which solution is best and why?',
+                    'explanation' => 'Encourage structured learning.',
+                ],
+            ]);
+
+        $save->assertStatus(200);
+
+        $exam = \App\Models\Exam::where('exam_code', $examCode)->first();
+        $this->assertNotNull($exam, 'Đề phải được tạo tự động từ exam_code.');
+        $this->assertSame('speaking', $exam->eSkill);
+        $this->assertSame(1, \App\Models\Question::where('exam_id', $exam->eId)
+            ->where('qSkill', 'speaking')->count());
+    }
+
     // ===================== DELETE TASK/PART =====================
 
     /** @test */

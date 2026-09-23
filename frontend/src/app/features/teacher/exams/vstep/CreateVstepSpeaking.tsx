@@ -631,19 +631,26 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
       const data = part.part2Data || createDefaultPart2Data();
       
       if (!data.situation.trim()) {
-        error("Part 2: Please provide a situation");
+        error("Part 2: Vui lòng nhập tình huống (Situation)");
         return;
       }
 
       isValid = true;
+      // Ensure solutions always has exactly 3 items (empty string is allowed)
+      const solutions3: [string, string, string] = [
+        data.solutions?.[0] ?? "",
+        data.solutions?.[1] ?? "",
+        data.solutions?.[2] ?? "",
+      ];
       partData = {
         partNumber: part.partNumber,
         partName: part.partName,
         timeLimit: part.timeLimit,
         part2Data: {
-          ...data,
-          solutions: data.solutions?.length === 3 ? data.solutions : ["", "", ""],
+          situation: data.situation,
+          solutions: solutions3,
           question: data.question?.trim() || "Which option do you think is the best? Why?",
+          explanation: data.explanation || "",
         },
       };
     } else if (partNumber === 3) {
@@ -689,6 +696,16 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
       const response = await saveVstepSpeakingPart(examId, partNumber, partData);
       console.log('✅ Save response:', response);
       success(`Part ${partNumber} saved successfully!`);
+
+      if (response?.data?.exam_id) {
+        const newId = String(response.data.exam_id);
+        if (newId !== examId) {
+          setExamId(newId);
+          if (!isFullTest) {
+            setSearchParams({ id: newId }, { replace: true });
+          }
+        }
+      }
 
       // Track part đã lưu và tự động gọi onComplete khi đủ 3 part
       if (isFullTest && onComplete) {
@@ -737,8 +754,8 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
         }
       } else if (part.partNumber === 2) {
         const data = part.part2Data || createDefaultPart2Data();
-        if (!data.situation.trim() || data.solutions.filter((s) => s.trim()).length < 3) {
-          error("Part 2: Please complete situation and all 3 solutions");
+        if (!data.situation.trim()) {
+          error("Part 2: Vui lòng nhập tình huống (Situation)");
           return;
         }
       } else if (part.partNumber === 3) {
@@ -756,6 +773,53 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
 
     setIsSaving(true);
     try {
+      let currentExamId = examId;
+
+      // 1. Lưu từng part đã nhập vào database trước khi xuất bản
+      for (const part of partsWithData) {
+        let partPayload: any = {
+          partNumber: part.partNumber,
+          partName: part.partName,
+          timeLimit: part.timeLimit,
+        };
+
+        if (part.partNumber === 1) {
+          const validTopics = (part.part1Data || []).filter(
+            (t) => t.topicName.trim() && t.questions.some((q) => q.trim())
+          );
+          partPayload.part1Data = validTopics;
+        } else if (part.partNumber === 2) {
+          const d2 = part.part2Data || createDefaultPart2Data();
+          partPayload.part2Data = {
+            situation: d2.situation,
+            solutions: [
+              d2.solutions?.[0] ?? "",
+              d2.solutions?.[1] ?? "",
+              d2.solutions?.[2] ?? "",
+            ],
+            question: d2.question?.trim() || "Which option do you think is the best? Why?",
+            explanation: d2.explanation || "",
+          };
+        } else if (part.partNumber === 3) {
+          const d3 = part.part3Data || createDefaultPart3Data();
+          partPayload.part3Data = {
+            ...d3,
+            suggestedIdeas: d3.suggestedIdeas.filter((i) => i.trim()),
+            followUpQuestions: d3.followUpQuestions.filter((q) => q.trim()),
+          };
+        }
+
+        const res = await saveVstepSpeakingPart(currentExamId, part.partNumber, partPayload);
+        if (res?.data?.exam_id) {
+          currentExamId = String(res.data.exam_id);
+          setExamId(currentExamId);
+          if (!isFullTest) {
+            setSearchParams({ id: currentExamId }, { replace: true });
+          }
+        }
+      }
+
+      // 2. Xuất bản đề thi
       const examData = {
         title: examTitle,
         parts: partsWithData.map((part) => {
@@ -771,9 +835,19 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
               part1Data: part.part1Data,
             };
           } else if (part.partNumber === 2) {
+            const d2 = part.part2Data || createDefaultPart2Data();
             return {
               ...basePart,
-              part2Data: part.part2Data,
+              part2Data: {
+                situation: d2.situation,
+                solutions: [
+                  d2.solutions?.[0] ?? "",
+                  d2.solutions?.[1] ?? "",
+                  d2.solutions?.[2] ?? "",
+                ],
+                question: d2.question?.trim() || "Which option do you think is the best? Why?",
+                explanation: d2.explanation || "",
+              },
             };
           } else {
             return {
@@ -784,7 +858,7 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
         }),
       };
 
-      await publishVstepSpeakingExam(examId, examData);
+      await publishVstepSpeakingExam(currentExamId, examData);
       success(t('vstep.speaking.toast.publishSuccess'));
       
       if (!isFullTest) {
@@ -1034,53 +1108,82 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
           </div>
         </div>
 
-        <div className="border border-gray-200 rounded-xl p-7 bg-white">
+        <div className="border border-gray-200 rounded-xl p-7 bg-white space-y-6">
+
+          {/* Situation */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               <span className="inline-flex items-center gap-2">
-                <span className="w-7 h-7 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center text-sm font-medium">
-                  💡
-                </span>
-                Đề bài Part 2 (Situation, Solutions & Question)
+                <span className="w-7 h-7 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center text-sm font-bold">S</span>
+                Tình huống (Situation) <span className="text-red-400 text-xs ml-1">*bắt buộc</span>
               </span>
             </label>
             <textarea
               value={data.situation}
-              onChange={(e) => {
-                const val = e.target.value;
-                setParts((prev) =>
-                  prev.map((p) =>
-                    p.partNumber === 2
-                      ? {
-                          ...p,
-                          part2Data: {
-                            ...(p.part2Data || createDefaultPart2Data()),
-                            situation: val,
-                            solutions: p.part2Data?.solutions || ["", "", ""],
-                            question: p.part2Data?.question || "Which option do you think is the best? Why?",
-                          },
-                        }
-                      : p
-                  )
-                );
-              }}
-              rows={6}
-              placeholder="Describe the situation, proposed solutions, and discussion question..."
+              onChange={(e) => updatePart2Field("situation", e.target.value)}
+              rows={4}
+              placeholder="VD: You and your friend are planning a trip to a new city. You have 3 options..."
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 text-gray-900 placeholder:text-gray-400 transition-all font-sans"
             />
-            <div className="mt-4">
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-                Gợi ý trả lời / Từ vựng (Giải thích) - Tuỳ chọn
-              </label>
-              <textarea
-                value={data.explanation || ""}
-                onChange={(e) => updatePart2Field("explanation", e.target.value)}
-                placeholder="VD: Nên lựa chọn giải pháp nào và giải thích lý do..."
-                rows={3}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 text-gray-900 placeholder:text-gray-400 transition-all font-sans text-sm bg-emerald-50/10"
-              />
+          </div>
+
+          {/* 3 Solutions */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              <span className="inline-flex items-center gap-2">
+                <span className="w-7 h-7 bg-amber-100 text-amber-700 rounded-lg flex items-center justify-center text-sm font-bold">3</span>
+                3 Giải pháp (Solutions) <span className="text-gray-400 text-xs ml-1">- tuỳ chọn</span>
+              </span>
+            </label>
+            <div className="space-y-3">
+              {[0, 1, 2].map((idx) => (
+                <div key={idx} className="flex items-center gap-3">
+                  <span className="flex-shrink-0 w-7 h-7 bg-amber-50 text-amber-600 border border-amber-200 rounded-lg flex items-center justify-center text-sm font-semibold">
+                    {idx + 1}
+                  </span>
+                  <input
+                    type="text"
+                    value={data.solutions?.[idx] ?? ""}
+                    onChange={(e) => updatePart2Solution(idx, e.target.value)}
+                    placeholder={`Giải pháp ${idx + 1}: VD: Take the bus...`}
+                    className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 text-gray-900 placeholder:text-gray-400 transition-all text-sm"
+                  />
+                </div>
+              ))}
             </div>
           </div>
+
+          {/* Discussion Question */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <span className="inline-flex items-center gap-2">
+                <span className="w-7 h-7 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center text-sm font-bold">Q</span>
+                Câu hỏi thảo luận (Question)
+              </span>
+            </label>
+            <input
+              type="text"
+              value={data.question}
+              onChange={(e) => updatePart2Field("question", e.target.value)}
+              placeholder="VD: Which option do you think is the best? Why?"
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 text-gray-900 placeholder:text-gray-400 transition-all"
+            />
+          </div>
+
+          {/* Explanation / Gợi ý */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+              Gợi ý trả lời / Từ vựng (Giải thích) - Tuỳ chọn
+            </label>
+            <textarea
+              value={data.explanation || ""}
+              onChange={(e) => updatePart2Field("explanation", e.target.value)}
+              placeholder="VD: Nên lựa chọn giải pháp nào và giải thích lý do..."
+              rows={3}
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400 text-gray-900 placeholder:text-gray-400 transition-all font-sans text-sm bg-emerald-50/10"
+            />
+          </div>
+
         </div>
       </div>
     );

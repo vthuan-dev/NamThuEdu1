@@ -3549,6 +3549,50 @@ class ExamController extends Controller
      * ======================================== */
 
     /**
+     * Tra cứu đề VSTEP Speaking cho các endpoint save/publish/load/delete.
+     *
+     * Editor Speaking tự sinh ID tạm dạng "vstep-speaking-<timestamp>" khi giáo
+     * viên vào trang tạo mới, nên $examId có thể là:
+     *  - số      → khoá chính eId. KHÔNG auto-create: ID số không tồn tại nghĩa là
+     *              đề đã bị xoá hoặc link sai, tạo mới sẽ che mất lỗi thật.
+     *  - chuỗi   → exam_code do frontend sinh. Tạo đề nháp nếu chưa có khi $autoCreate = true
+     *              (cùng cách saveVstepWritingTask và resolveListeningExam đang làm).
+     *
+     * @param  bool  $autoCreate  false khi chỉ đọc (load/publish) hoặc xoá.
+     * @return \App\Models\Exam|null
+     */
+    private function resolveSpeakingExam($examId, $user, bool $autoCreate = false)
+    {
+        if (is_numeric($examId)) {
+            return Exam::where('eId', $examId)->first();
+        }
+
+        $exam = Exam::where('exam_code', $examId)
+            ->where('eType', 'VSTEP')
+            ->where('eSkill', 'speaking')
+            ->first();
+
+        if ($exam || !$autoCreate) {
+            return $exam;
+        }
+
+        $initialStatus = Exam::resolveModerationStatus();
+        return Exam::create([
+            'exam_code'         => $examId,
+            'eTitle'            => 'Đề VSTEP Speaking mới',
+            'eType'             => 'VSTEP',
+            'eSkill'            => 'speaking',
+            'eScope'            => 'skill',
+            'eTeacher_id'       => $user->uId,
+            'eDuration_minutes' => 12,
+            'eIs_private'       => true,
+            'eSource_type'      => 'manual',
+            'age_group'         => 'adults',
+            'eStatus'           => $initialStatus,
+        ]);
+    }
+
+    /**
      * POST /api/teacher/exams/{examId}/vstep/speaking/parts/{partNumber}
      * Lưu một part của đề VSTEP Speaking (NEW FORMAT)
      */
@@ -3602,11 +3646,8 @@ class ExamController extends Controller
 
         DB::beginTransaction();
         try {
-            // Part/task save APIs must never create a new exam. The exam scope
-            // is decided once at the parent exam level.
-            $exam = Exam::where('eId', $examId)
-                       
-                       ->first();
+            // Tra cứu đề theo eId hoặc exam_code (tự động tạo đề nháp cho chuỗi vstep-speaking-TIMESTAMP)
+            $exam = $this->resolveSpeakingExam($examId, $user, true);
 
             if (!$exam) {
                 DB::rollBack();
@@ -3814,10 +3855,8 @@ class ExamController extends Controller
 
         DB::beginTransaction();
         try {
-            // Find exam
-            $exam = Exam::where('eId', $examId)
-                       
-                       ->first();
+            // Find exam by numeric eId OR by exam_code
+            $exam = $this->resolveSpeakingExam($examId, $user, false);
 
             if (!$exam) {
                 return response()->json([
@@ -3904,8 +3943,9 @@ class ExamController extends Controller
 
         $isAdmin = $user->uRole === 'admin';
 
-        $exam = Exam::where('eId', $examId)
-                   ->when(false, fn($q) => $q)
+        $exam = (is_numeric($examId)
+            ? Exam::where('eId', $examId)
+            : Exam::where('exam_code', $examId)->where('eType', 'VSTEP')->where('eSkill', 'speaking'))
                    ->with([
                        'contentBlocks' => function($q) {
                            $q->orderBy('display_order');
@@ -4086,7 +4126,7 @@ class ExamController extends Controller
 
         DB::beginTransaction();
         try {
-            $exam = Exam::where('eId', $examId)->first();
+            $exam = $this->resolveSpeakingExam($examId, $user, false);
 
             if (!$exam) {
                 DB::rollBack();
