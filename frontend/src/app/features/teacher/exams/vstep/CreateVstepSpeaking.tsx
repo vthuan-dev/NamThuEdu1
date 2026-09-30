@@ -58,6 +58,7 @@ const createDefaultPart2Data = (): Part2Data => ({
 
 const createDefaultPart3Data = (): Part3Data => ({
   mainTopic: "",
+  centralTopic: "",
   suggestedIdeas: ["", "", "", ""], // Exactly 4 ideas for mind map (top, right, bottom, left)
   followUpQuestions: ["", ""], // 2 empty questions
 });
@@ -180,7 +181,7 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
                 const hasData =
                   (p.part1Data && p.part1Data.some((tp: any) => tp.topicName?.trim() || (tp.questions || []).some((q: string) => q?.trim()))) ||
                   (p.part2Data && (p.part2Data.situation?.trim() || (p.part2Data.solutions || []).some((s: string) => s?.trim()))) ||
-                  (p.part3Data && (p.part3Data.mainTopic?.trim() || (p.part3Data.suggestedIdeas || []).some((i: string) => i?.trim())));
+                  (p.part3Data && (p.part3Data.mainTopic?.trim() || p.part3Data.centralTopic?.trim() || (p.part3Data.suggestedIdeas || []).some((i: string) => i?.trim())));
                 if (hasData) active.add(p.partNumber);
               });
               setActiveParts(active);
@@ -557,19 +558,19 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
   const handleGeneratePart3FromTopic = async () => {
     console.log('🚀 handleGeneratePart3FromTopic called');
     const data = parts.find(p => p.partNumber === 3)?.part3Data;
-    const mainTopic = data?.mainTopic?.trim();
+    const topicPrompt = data?.mainTopic?.trim() || data?.centralTopic?.trim();
 
-    console.log('📝 Main topic:', mainTopic);
+    console.log('📝 Main topic prompt for AI:', topicPrompt);
 
-    if (!mainTopic) {
-      error("Vui lòng nhập Main Topic trước");
+    if (!topicPrompt) {
+      error("Vui lòng nhập Main Topic hoặc Central Idea trước");
       return;
     }
 
     setIsGenerating(true);
     try {
-      console.log('📡 Calling generatePart3FromTopic with:', mainTopic);
-      const content = await generatePart3FromTopic(mainTopic);
+      console.log('📡 Calling generatePart3FromTopic with:', topicPrompt);
+      const content = await generatePart3FromTopic(topicPrompt);
       console.log('✅ Generated content:', content);
       if (content.suggestedIdeas.length > 0) {
         setParts((prev) =>
@@ -579,7 +580,8 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
                   ...p,
                   part3Data: {
                     ...(p.part3Data || createDefaultPart3Data()),
-                    mainTopic: mainTopic, // Keep existing main topic
+                    mainTopic: data?.mainTopic?.trim() || topicPrompt,
+                    centralTopic: content.centralTopic || p.part3Data?.centralTopic || "",
                     suggestedIdeas: content.suggestedIdeas,
                     followUpQuestions: content.followUpQuestions,
                   },
@@ -588,14 +590,14 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
           )
         );
         
-        success("✨ AI đã tạo ideas và questions thành công!");
+        success("✨ AI đã tạo ý tưởng và câu hỏi thành công!");
       } else {
         console.warn('⚠️ No ideas generated');
         error("AI không tạo được ideas. Vui lòng thử lại.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Error generating from topic:', err);
-      error(`Không thể tạo nội dung: ${err.message || 'Unknown error'}`);
+      error(`Không thể tạo nội dung: ${err?.message || 'Unknown error'}`);
     } finally {
       setIsGenerating(false);
       console.log('✅ Generation complete, isGenerating set to false');
@@ -894,6 +896,7 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
       return !!(
         data &&
         (data.mainTopic.trim() ||
+          data.centralTopic?.trim() ||
           data.suggestedIdeas.some((i) => i.trim()) ||
           data.followUpQuestions.some((q) => q.trim()))
       );
@@ -1236,19 +1239,33 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
           </div>
         </div>
 
-        {/* Main Topic Field */}
-        <div className="border border-purple-200 rounded-xl p-6 bg-purple-50/40">
+        {/* Main Topic & Central Idea Field */}
+        <div className="border border-purple-200 rounded-xl p-6 bg-purple-50/40 space-y-5">
           <div>
             <label className="block text-sm font-semibold text-purple-800 mb-2 flex items-center gap-2">
               <span className="w-6 h-6 bg-purple-600 text-white rounded-lg flex items-center justify-center text-xs font-bold">T</span>
-              Main Topic <span className="text-purple-400 font-normal text-xs">(câu chủ đề – học viên phải phát triển)</span>
+              Main Topic <span className="text-purple-500 font-normal text-xs">(câu chủ đề đầy đủ – học viên phải phát triển)</span>
             </label>
             <textarea
               value={data.mainTopic}
               onChange={(e) => updatePart3Field("mainTopic", e.target.value)}
               rows={2}
-              placeholder="e.g., The impact of social media on young people's communication skills"
+              placeholder="VD: Stopping deforestation brings tremendous environmental benefits."
               className="w-full px-4 py-3 border-2 border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-400/30 focus:border-purple-500 text-gray-900 font-semibold placeholder:text-purple-300 transition-all resize-none bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-purple-800 mb-2 flex items-center gap-2">
+              <span className="w-6 h-6 bg-purple-200 text-purple-700 rounded-lg flex items-center justify-center text-xs font-bold">C</span>
+              Central Idea / Từ khóa trung tâm sơ đồ <span className="text-purple-500 font-normal text-xs">(cụm từ ngắn 2–4 từ hiển thị ở giữa sơ đồ tư duy)</span>
+            </label>
+            <input
+              type="text"
+              value={data.centralTopic || ""}
+              onChange={(e) => updatePart3Field("centralTopic", e.target.value)}
+              placeholder="VD: Stopping deforestation (hoặc Benefits of stopping deforestation)"
+              className="w-full px-4 py-2.5 border-2 border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-400/30 focus:border-purple-500 text-gray-900 font-semibold placeholder:text-purple-300 transition-all bg-white text-sm"
             />
           </div>
         </div>
@@ -1257,13 +1274,14 @@ export const CreateVstepSpeaking = ({ examId: propExamId, onComplete, isFullTest
         <div className="border border-gray-200 rounded-xl p-7 bg-white">
           <p className="text-xs text-gray-500 mb-4 flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-purple-400 inline-block" />
-            Nhập 4 ý tưởng gợi ý xung quanh. Ô giữa tự đồng bộ từ Main Topic bên trên.
+            Nhập 4 ý tưởng gợi ý xung quanh và từ khóa trung tâm của sơ đồ tư duy (bạn có thể gõ trực tiếp vào ô giữa sơ đồ).
           </p>
           <MindMapEditor
-            mainTopic={data.mainTopic}
+            centralTopic={data.centralTopic || ""}
             ideas={ideas}
-            onMainTopicChange={(value) => updatePart3Field("mainTopic", value)}
+            onCentralTopicChange={(value) => updatePart3Field("centralTopic", value)}
             onIdeaChange={(index, value) => updatePart3Idea(index, value)}
+            mainTopicForAi={data.mainTopic}
             onGenerateFromTopic={handleGeneratePart3FromTopic}
             isGenerating={isGenerating}
           />

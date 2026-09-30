@@ -48,7 +48,7 @@ interface SpeakingPart {
   partNumber: number;
   part1Data?: Array<{ topicName: string; questions: string[] }>;
   part2Data?: { situation: string; solutions: string[]; question: string };
-  part3Data?: { mainTopic: string; suggestedIdeas: string[]; followUpQuestions: string[] };
+  part3Data?: { mainTopic: string; centralTopic?: string; suggestedIdeas: string[]; followUpQuestions: string[] };
   qExplanation?: string;
 }
 
@@ -2670,7 +2670,7 @@ function SpeakingMindmap({ part }: { part: SpeakingPart }) {
 
   if (!part.part3Data) return null;
   const ideas = part.part3Data.suggestedIdeas || [];
-  const mainTopic = part.part3Data.mainTopic;
+  const centerTopic = part.part3Data.centralTopic?.trim() || part.part3Data.mainTopic;
 
   return (
     <div ref={wrapperRef} className="w-full flex justify-center overflow-hidden" style={{ height: `${340 * scale}px` }}>
@@ -2759,10 +2759,10 @@ function SpeakingMindmap({ part }: { part: SpeakingPart }) {
           </div>
         )}
 
-        {/* Center - Main Topic */}
-        <div className="relative z-20 w-44 text-center">
-          <div className="px-4 py-3 text-sm sm:text-base font-extrabold text-white bg-purple-600 border-2 border-purple-500 rounded-2xl shadow-md uppercase tracking-wider">
-            {mainTopic}
+        {/* Center - Central Topic / Main Topic */}
+        <div className="relative z-20 w-48 max-w-[210px] text-center">
+          <div className="px-3.5 py-2.5 text-xs sm:text-sm font-extrabold text-white bg-purple-600 border-2 border-purple-500 rounded-2xl shadow-md uppercase tracking-wider break-words line-clamp-3 leading-snug">
+            {centerTopic}
           </div>
         </div>
 

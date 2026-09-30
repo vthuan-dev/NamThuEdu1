@@ -3630,6 +3630,7 @@ class ExamController extends Controller
             'part2Data.explanation' => 'nullable|string',
             'part3Data' => 'nullable|array',
             'part3Data.mainTopic' => 'required_with:part3Data|string',
+            'part3Data.centralTopic' => 'nullable|string',
             'part3Data.suggestedIdeas' => 'required_with:part3Data|array|min:3',
             'part3Data.followUpQuestions' => 'required_with:part3Data|array|min:2',
             'part3Data.explanation' => 'nullable|string',
@@ -3766,6 +3767,7 @@ class ExamController extends Controller
                     'qData' => [
                         'part_number' => $partNumber,
                         'main_topic' => $part3['mainTopic'],
+                        'central_topic' => $part3['centralTopic'] ?? null,
                         'suggested_ideas' => $part3['suggestedIdeas'],
                         'question_type' => 'main_topic',
                     ],

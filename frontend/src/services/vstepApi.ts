@@ -340,9 +340,10 @@ export interface Part2Data {
   explanation?: string;
 }
 
-// Part 3: Topic Development - Main Topic + Suggested Ideas + Follow-up Questions
+// Part 3: Topic Development - Main Topic + Central Topic + Suggested Ideas + Follow-up Questions
 export interface Part3Data {
   mainTopic: string;
+  centralTopic?: string; // Cụm từ/từ khóa ngắn gọn hiển thị ở ô trung tâm sơ đồ tư duy (Mind Map)
   suggestedIdeas: string[]; // 4-5 ideas
   followUpQuestions: string[]; // 2-3 questions
   explanation?: string;

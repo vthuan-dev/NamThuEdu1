@@ -1,19 +1,21 @@
 import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, X, Sparkles } from "lucide-react";
 
 interface MindMapEditorProps {
-  mainTopic: string;
+  centralTopic: string;
   ideas: [string, string, string, string]; // [top, right, bottom, left]
-  onMainTopicChange: (value: string) => void;
+  onCentralTopicChange: (value: string) => void;
   onIdeaChange: (index: number, value: string) => void;
+  mainTopicForAi?: string;
   onGenerateFromTopic?: () => void;
   isGenerating?: boolean;
 }
 
 export const MindMapEditor = ({
-  mainTopic,
+  centralTopic,
   ideas,
-  onMainTopicChange,
+  onCentralTopicChange,
   onIdeaChange,
+  mainTopicForAi = "",
   onGenerateFromTopic,
   isGenerating = false,
 }: MindMapEditorProps) => {
@@ -102,20 +104,20 @@ export const MindMapEditor = ({
         </div>
       </div>
 
-      {/* Center - Main Topic with AI Generate Button */}
+      {/* Center - Central Topic with AI Generate Button */}
       <div className="relative z-20 flex flex-col items-center gap-2">
-        <div className="relative group w-52">
+        <div className="relative group w-56">
           <div className="absolute -top-2 -left-2 -right-2 -bottom-2 bg-purple-300 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
           <input
             type="text"
-            value={mainTopic}
-            onChange={(e) => onMainTopicChange(e.target.value)}
-            placeholder="Main Topic"
-            className="relative w-full px-5 py-3 text-center border-3 border-purple-500 bg-white rounded-2xl focus:ring-4 focus:ring-purple-400/50 focus:border-purple-600 text-gray-900 font-bold placeholder:text-gray-400 transition-all shadow-lg"
+            value={centralTopic}
+            onChange={(e) => onCentralTopicChange(e.target.value)}
+            placeholder="Central Idea (2-4 từ)..."
+            className="relative w-full px-4 py-3 text-center border-3 border-purple-500 bg-white rounded-2xl focus:ring-4 focus:ring-purple-400/50 focus:border-purple-600 text-gray-900 font-bold placeholder:text-purple-300 transition-all shadow-lg text-sm"
           />
-          {mainTopic && (
+          {centralTopic && (
             <button
-              onClick={() => onMainTopicChange("")}
+              onClick={() => onCentralTopicChange("")}
               className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-purple-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
               title="Clear"
             >
@@ -124,8 +126,8 @@ export const MindMapEditor = ({
           )}
         </div>
         
-        {/* AI Generate Button - appears when main topic is filled */}
-        {mainTopic.trim() && onGenerateFromTopic && (
+        {/* AI Generate Button - appears when main topic or central topic is filled */}
+        {(mainTopicForAi.trim() || centralTopic.trim()) && onGenerateFromTopic && (
           <button
             onClick={onGenerateFromTopic}
             disabled={isGenerating}

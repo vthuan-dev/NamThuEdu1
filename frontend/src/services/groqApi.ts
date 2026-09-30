@@ -359,21 +359,26 @@ Return ONLY a JSON array of 2-3 questions, nothing else. Example format:
  * Used when teacher already has a main topic and wants AI to suggest ideas + questions
  */
 export const generatePart3FromTopic = async (mainTopic: string): Promise<{
+  centralTopic?: string;
   suggestedIdeas: string[];
   followUpQuestions: string[];
 }> => {
   const messages: GroqMessage[] = [
     {
       role: 'system',
-      content: 'You are an expert VSTEP Speaking test creator. Generate ideas and questions for Part 3 based on a given main topic.',
+      content: 'You are an expert VSTEP Speaking test creator. Generate mind map center topic, ideas and questions for Part 3 based on a given main topic statement.',
     },
     {
       role: 'user',
-      content: `Generate ideas and questions for VSTEP Speaking Part 3 based on this main topic: "${mainTopic}"
+      content: `Generate central mind map phrase, ideas and questions for VSTEP Speaking Part 3 based on this main topic statement: "${mainTopic}"
 
 Requirements:
-- 4 suggested ideas: SHORT phrases (2-4 words each) that relate to the main topic
-  * These will be displayed in a mind map around the center
+- 1 centralTopic: A SHORT concise noun phrase (2-4 words) capturing the core subject for the center circle of the mind map diagram.
+  * Must NOT be a full sentence.
+  * Examples: If main topic is "Stopping deforestation brings tremendous environmental benefits.", centralTopic should be "Stopping deforestation" or "Benefits of stopping deforestation".
+  * Examples: If main topic is "Online learning is becoming more popular than traditional learning.", centralTopic should be "Online learning".
+- 4 suggested ideas: SHORT phrases (2-4 words each) that branch out from the central topic
+  * These will be displayed in the 4 outer bubbles of the mind map
   * Keep them brief, clear, and diverse
   * Cover different aspects: benefits, challenges, personal experience, opinions
   * Examples: "Saves time", "More convenient", "Expensive", "Popular choice"
@@ -384,6 +389,7 @@ Requirements:
 
 Return ONLY a JSON object:
 {
+  "centralTopic": "Central Topic Phrase (2-4 words)",
   "suggestedIdeas": ["Idea 1 (2-4 words)", "Idea 2", "Idea 3", "Idea 4"],
   "followUpQuestions": ["Question 1 (10-15 words)", "Question 2 (10-15 words)"]
 }`,
@@ -395,12 +401,14 @@ Return ONLY a JSON object:
   try {
     const content = JSON.parse(response);
     return {
+      centralTopic: typeof content.centralTopic === 'string' ? content.centralTopic.trim() : undefined,
       suggestedIdeas: Array.isArray(content.suggestedIdeas) ? content.suggestedIdeas.slice(0, 4) : ['', '', '', ''],
       followUpQuestions: Array.isArray(content.followUpQuestions) ? content.followUpQuestions.slice(0, 3) : ['', ''],
     };
   } catch (error) {
     console.error('Failed to generate ideas from topic:', error);
     return {
+      centralTopic: undefined,
       suggestedIdeas: ['', '', '', ''],
       followUpQuestions: ['', ''],
     };
