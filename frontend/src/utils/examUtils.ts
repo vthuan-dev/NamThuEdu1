@@ -149,23 +149,45 @@ export const sanitizePassageHtml = (html: string): string => {
     preCleaned
       // Remove invisible break characters (soft hyphen, zero-width spaces, BOM)
       .replace(/[\u00AD\u200B\u200C\u200D\u2060\uFEFF]/g, "")
-      // Convert non-breaking spaces (&nbsp;, &#160;, U+00A0, narrow/figure NBSP)
-      // to normal spaces. This is the primary cause of mid-word breaking:
-      // with `white-space: pre-wrap`, the browser refuses to wrap at a NBSP, so
-      // whole phrases become one unbreakable token and get broken mid-character.
+      // Convert non-breaking spaces (&nbsp;, &#160;, U+00A0, narrow/figure NBSP) to normal spaces
       .replace(/&nbsp;/gi, " ")
       .replace(/&#160;|&#xA0;/gi, " ")
       .replace(/[\u00A0\u202F\u2007]/g, " ")
       // Remove <wbr> word-break opportunity tags
       .replace(/<wbr\s*\/?>/gi, "")
-      // Neutralize inline declarations that force mid-word breaks.
-      // Matches e.g. `word-break:break-all;`, `overflow-wrap: anywhere !important;`,
-      // `hyphens:auto;` inside any style="..." attribute.
+      // Neutralize inline declarations that force mid-word breaks
       .replace(
         /(word-break|word-wrap|overflow-wrap|-webkit-hyphens|hyphens|line-break)\s*:\s*[^;"']*(\s*!important)?\s*;?/gi,
         ""
       )
+      // Remove completely empty paragraph blocks created by rich editors (e.g. <p></p>, <p><br></p>)
+      .replace(/<(p|div)\b[^>]*>\s*(?:<br\s*\/?>|\s|&nbsp;)*<\/\1>/gi, "")
   );
+};
+
+/**
+ * Định dạng nội dung bài đọc thành HTML hoàn chỉnh:
+ * - Bảo toàn các thẻ HTML cấu trúc (p, div, strong, b, u, em, mark, span...).
+ * - Nếu là plain text chưa có thẻ khối, tự động tách đoạn (bằng \n\n hoặc \n) và bọc vào thẻ <p>.
+ * - Loại bỏ các thẻ paragraph rỗng gây mất thẩm mỹ hoặc dính đoạn.
+ */
+export const formatPassageToHtml = (raw: string): string => {
+  if (!raw) return "";
+  const cleaned = sanitizePassageHtml(raw);
+  const hasBlocks = /<(?:p|div|h[1-6]|li)\b/i.test(cleaned);
+  if (hasBlocks) {
+    return cleaned;
+  }
+  // Plain text: tách đoạn bằng \n\n hoặc \n
+  const text = cleaned.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+  const chunks = text.includes("\n\n")
+    ? text.split(/\n{2,}/)
+    : text.split(/\n/);
+  return chunks
+    .map((c) => c.trim())
+    .filter(Boolean)
+    .map((c) => `<p>${c}</p>`)
+    .join("");
 };
 
 /**

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router";
 import { ArrowLeft, Save, BookOpen, FileText, CheckCircle2, Sparkles, Plus, X } from "lucide-react";
 import { useToastContext } from "../../../../../contexts/ToastContext";
@@ -328,14 +328,16 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
   };
 
 
-  const updatePassage = (content: string) => {
+  const updatePassageForPart = useCallback((partNum: 1 | 2 | 3 | 4, content: string) => {
     const cleaned = cleanPassageStyles(content);
     setParts((prev) =>
       prev.map((p) =>
-        p.partNumber === currentPart ? { ...p, passage: cleaned } : p
+        p.partNumber === partNum ? { ...p, passage: cleaned } : p
       )
     );
-  };
+  }, []);
+
+  const updatePassage = (content: string) => updatePassageForPart(currentPart, content);
 
   const updateQuestion = (questionId: string, field: string, value: any) => {
     setParts((prev) =>
@@ -845,9 +847,10 @@ export const CreateVstepReading = ({ examId: propExamId, onComplete, isFullTest 
               <div className="flex-1 p-4 overflow-hidden">
                 <div className="h-full vstep-reading-editor">
                   <QuillEditor
+                    key={`vstep-reading-passage-part-${currentPart}`}
                     ref={quillRef}
                     value={currentPartData.passage}
-                    onChange={updatePassage}
+                    onChange={(content) => updatePassageForPart(currentPart, content)}
                     theme="snow"
                     placeholder={t('vstep.reading.passage.placeholder')}
                     modules={{

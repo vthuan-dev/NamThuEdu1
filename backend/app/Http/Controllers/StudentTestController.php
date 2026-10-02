@@ -4337,7 +4337,12 @@ class StudentTestController extends Controller
             $partQuestions = $exam->questions->where('qPart', $i)->where('qSkill', 'reading')->values();
             $contentBlock = $exam->contentBlocks->first(function ($block) use ($i) {
                 $metadata = $block->metadata ?? [];
-                return isset($metadata['part_number']) && $metadata['part_number'] == $i && isset($metadata['word_count']);
+                $partNum = $metadata['part_number'] ?? $metadata['part'] ?? null;
+                return $block->block_type === 'passage' && $partNum == $i;
+            }) ?? $exam->contentBlocks->first(function ($block) use ($i) {
+                $metadata = $block->metadata ?? [];
+                $partNum = $metadata['part_number'] ?? $metadata['part'] ?? null;
+                return $partNum == $i && !empty(trim($block->content ?? ''));
             });
 
             // Bỏ qua các part không có nội dung và không có câu hỏi (hỗ trợ đề bán phần 1-3 part)
@@ -4345,11 +4350,17 @@ class StudentTestController extends Controller
                 continue;
             }
 
+            $rawPassage = $contentBlock->content ?? '';
+            $wordCount = $contentBlock->metadata['word_count'] ?? 0;
+            if (!$wordCount && !empty($rawPassage)) {
+                $wordCount = str_word_count(strip_tags($rawPassage));
+            }
+
             $parts[] = [
                 'partNumber' => $i,
                 'partName' => $contentBlock->metadata['part_name'] ?? "Part $i",
-                'passage' => $contentBlock->content ?? '',
-                'wordCount' => $contentBlock->metadata['word_count'] ?? 0,
+                'passage' => $rawPassage,
+                'wordCount' => $wordCount,
                 'questions' => $partQuestions->map(fn($q) => [
                     'qId' => $q->qId,
                     'questionNumber' => $q->qData['question_number'] ?? $q->qSection_order,

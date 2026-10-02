@@ -436,7 +436,7 @@ export function IeltsListeningEditor({
         prev.map((s) => {
           if (s.sectionNumber !== secNum) return s;
           const [start, end] = groupRangeOf(s.questions, qIdx);
-          const base = s.questions[start].options || {};
+          const base = s.questions[qIdx]?.options || s.questions[start]?.options || {};
           const keys = Object.keys(base).filter((k) => /^[A-Za-z]$/.test(k)).sort();
           if (keys.length >= LETTERS.length) return s;
           const nextLetter = LETTERS[keys.length];
@@ -468,7 +468,7 @@ export function IeltsListeningEditor({
         prev.map((s) => {
           if (s.sectionNumber !== secNum) return s;
           const [start, end] = groupRangeOf(s.questions, qIdx);
-          const base = s.questions[start].options || {};
+          const base = s.questions[qIdx]?.options || s.questions[start]?.options || {};
           const keys = Object.keys(base).filter((k) => /^[A-Za-z]$/.test(k)).sort();
           if (keys.length <= 2) return s; // giữ tối thiểu 2 đáp án
 
@@ -1344,10 +1344,30 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
     textarea.style.overflowY = textarea.scrollHeight > maxHeight ? "auto" : "hidden";
   }, [formText, isGroupStart, isInlineForm]);
 
-  const optionKeys = Object.keys(question.options || {})
-    .filter((k) => /^[A-Za-z]+$/.test(k))
-    .sort();
   const LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"];
+  const groupStartQuestion = groupQuestions?.[0];
+  const groupStartKeys = groupStartQuestion?.options
+    ? Object.keys(groupStartQuestion.options).filter((k) => /^[A-Za-z]$/.test(k)).sort()
+    : ["A", "B", "C", "D"];
+
+  const currentOptionKeys = Object.keys(question.options || {})
+    .filter((k) => /^[A-Za-z]$/.test(k))
+    .sort();
+
+  // Đảm bảo MCQ luôn có bộ keys đáp án hợp lệ (ít nhất A, B, C hoặc theo groupStartKeys)
+  const optionKeys = isMcq
+    ? (currentOptionKeys.length >= 2 ? currentOptionKeys : (groupStartKeys.length >= 2 ? groupStartKeys : ["A", "B", "C", "D"]))
+    : currentOptionKeys;
+
+  const currentOptions: Record<string, string> = { ...(question.options || {}) };
+  optionKeys.forEach((k) => {
+    if (currentOptions[k] === undefined) {
+      currentOptions[k] = "";
+    }
+  });
+
+  const isGroupedMcqFollower = isGrouped && !isGroupStart && question.questionType === "multiple-choice-group";
+
   // Multi-select MCQ lưu "A,C".
   const selectedSet = new Set(
     (question.correctAnswer || "").split(",").map((s) => s.trim()).filter(Boolean)
@@ -1668,10 +1688,10 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
                 </select>
               </div>
             </div>
-          ) : isMcq && question.options ? (
+          ) : isMcq ? (
             isMultiMcq ? (
-              isGrouped && !isGroupStart ? (
-                // Câu sau trong nhóm multi-select: chỉ hiện hàng nút chữ cái gọn
+              isGroupedMcqFollower ? (
+                // Câu sau trong nhóm multi-select dạng group: chỉ hiện hàng nút chữ cái gọn
                 // để tick chọn nhiều đáp án đúng (tối đa selectCount). Text đáp án
                 // A/B/C/D đã nhập 1 lần ở câu đầu nhóm nên KHÔNG lặp lại ở đây.
                 <div className="flex items-center gap-2 p-2 rounded-lg border border-gray-200 bg-gray-50/50">
@@ -1719,12 +1739,15 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
                       <span className="font-bold text-gray-700">{k}.</span>
                       <input
                         type="text"
-                        value={(question.options as any)![k] || ""}
-                        onChange={(e) =>
-                          handleChange({
-                            options: { ...question.options!, [k]: e.target.value } as any,
-                          })
-                        }
+                        value={currentOptions[k] || ""}
+                        onChange={(e) => {
+                          const nextOptions = { ...currentOptions, [k]: e.target.value };
+                          if (question.questionType === "multiple-choice-group") {
+                            handleGroup({ options: nextOptions });
+                          } else {
+                            handleChange({ options: nextOptions });
+                          }
+                        }}
                         placeholder={`Đáp án ${k}`}
                         className="flex-1 bg-transparent text-xs outline-none"
                       />
@@ -1757,7 +1780,7 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
               )
             ) : (
               <div className="space-y-2">
-                {isGrouped && !isGroupStart ? (
+                {isGroupedMcqFollower ? (
                   <div className="flex items-center gap-2 p-2 rounded-lg border border-gray-200 bg-gray-50/50">
                     <span className="text-xs font-semibold text-gray-600 mr-2">Đáp án đúng cho câu {question.questionNumber}:</span>
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -1780,9 +1803,7 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
                 ) : (
                   <>
                     <div className="grid grid-cols-2 gap-2">
-                      {(Object.keys(question.options).filter((k) => k.length === 1) as string[])
-                        .sort()
-                        .map((k) => (
+                      {optionKeys.map((k) => (
                         <label
                           key={k}
                           className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-gray-200 hover:border-blue-300 transition-all cursor-pointer text-xs"
@@ -1801,12 +1822,15 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
                           <span className="font-bold text-gray-700">{k}.</span>
                           <input
                             type="text"
-                            value={(question.options as any)![k] || ""}
-                            onChange={(e) =>
-                              handleChange({
-                                options: { ...question.options!, [k]: e.target.value } as any,
-                              })
-                            }
+                            value={currentOptions[k] || ""}
+                            onChange={(e) => {
+                              const nextOptions = { ...currentOptions, [k]: e.target.value };
+                              if (question.questionType === "multiple-choice-group") {
+                                handleGroup({ options: nextOptions });
+                              } else {
+                                handleChange({ options: nextOptions });
+                              }
+                            }}
                             placeholder={`Đáp án ${k}`}
                             className="flex-1 bg-transparent text-xs outline-none"
                           />

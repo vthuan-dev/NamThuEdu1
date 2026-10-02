@@ -11,6 +11,8 @@
  *   WRITING   (Task 1 + Task 2)
  */
 
+import { formatPassageToHtml } from '../../../../../utils/examUtils';
+
 interface ParsedQ {
   number: number;
   text: string;
@@ -194,7 +196,7 @@ const parseListening = (text: string): VstepParsedPayload['listening'] => {
 // ─── READING ──────────────────────────────────────────────────────────────────
 
 const parseReading = (text: string): VstepParsedPayload['reading'] => {
-  const passageRe = /^[ \t]*PASSAGE[ \t]+(\d+)[ \t]*$/gm;
+  const passageRe = /^[ \t]*(?:PASSAGE|PART|ĐOẠN|BÀI\s+ĐỌC)[ \t]+(\d+)[ \t.:-]*$/gmi;
   const positions: Array<{ num: number; pos: number }> = [];
   let m;
   while ((m = passageRe.exec(text)) !== null) positions.push({ num: parseInt(m[1], 10), pos: m.index });
@@ -231,7 +233,7 @@ const parseReading = (text: string): VstepParsedPayload['reading'] => {
     parts.push({
       partNumber: num,
       partName:   `Part ${num}`,
-      passage,
+      passage:    formatPassageToHtml(passage),
       wordCount:  passage ? passage.split(/\s+/).length : 0,
       questions:  qs.map(q => ({
         questionNumber: q.number,

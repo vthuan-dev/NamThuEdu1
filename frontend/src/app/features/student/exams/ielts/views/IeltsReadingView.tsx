@@ -7,7 +7,7 @@
  *  • 60 minutes total, no automatic skill end (managed by parent timer)
  */
 import { useMemo, useState, useEffect } from "react";
-import { FileText } from "lucide-react";
+import { FileText, ZoomIn, X, Image as ImageIcon } from "lucide-react";
 import { PassageSplitLayout } from "../../../components/PassageSplitLayout";
 import type { IeltsReadingPayload, AnswerMap } from "../types";
 import { IeltsQuestionRenderer } from "../components/IeltsQuestionRenderer";
@@ -33,6 +33,80 @@ interface IeltsReadingViewProps {
   correctAnswers?: Record<number, string>;
   isCorrectMap?: Record<number, boolean>;
   explanations?: Record<number, string>;
+}
+
+function ReadingDiagramBlock({
+  taskImage,
+  rangeLabel,
+}: {
+  taskImage: string;
+  rangeLabel: string;
+}) {
+  const [zoomed, setZoomed] = useState(false);
+
+  return (
+    <div className="mb-3 rounded-xl border border-blue-200 bg-blue-50/40 p-3 shadow-xs">
+      <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-blue-100">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-xs font-bold">
+            {rangeLabel}
+          </span>
+          <span className="text-xs font-semibold text-blue-900 flex items-center gap-1.5">
+            <ImageIcon className="w-3.5 h-3.5 text-blue-600" />
+            Sơ đồ / Diagram
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setZoomed(true)}
+          className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-800 cursor-pointer"
+        >
+          <ZoomIn className="w-3.5 h-3.5" />
+          Phóng to
+        </button>
+      </div>
+
+      <div className="relative group max-w-full overflow-hidden rounded-lg bg-white border border-blue-100 p-1">
+        <img
+          src={taskImage}
+          alt={`Diagram ${rangeLabel}`}
+          className="max-h-[360px] w-auto max-w-full mx-auto object-contain cursor-zoom-in rounded transition-transform group-hover:scale-[1.01]"
+          onClick={() => setZoomed(true)}
+          title="Bấm vào ảnh để xem toàn màn hình"
+        />
+      </div>
+
+      {zoomed && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setZoomed(false)}
+        >
+          <div
+            className="relative max-w-5xl max-h-[92vh] bg-white rounded-2xl overflow-hidden shadow-2xl p-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 px-2 border-b border-gray-200 mb-2">
+              <span className="text-sm font-bold text-gray-800">
+                Sơ đồ {rangeLabel}
+              </span>
+              <button
+                type="button"
+                onClick={() => setZoomed(false)}
+                className="p-1 rounded-md text-gray-500 hover:text-gray-800 hover:bg-gray-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <img
+              src={taskImage}
+              alt={`Diagram zoomed ${rangeLabel}`}
+              className="max-w-full max-h-[80vh] object-contain mx-auto rounded"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function IeltsReadingView({
@@ -213,6 +287,33 @@ export function IeltsReadingView({
                         ?.task_instruction || ""
                     : null;
                 const showInstruction = instr && instr !== prevInstr;
+
+                const taskImg = (q as any).data?.task_image || (q as any).taskImage || "";
+                const prevTaskImg =
+                  idx > 0
+                    ? (currentPassage.questions[idx - 1] as any).data?.task_image ||
+                      (currentPassage.questions[idx - 1] as any).taskImage || ""
+                    : "";
+                const showImage = !!taskImg && taskImg !== prevTaskImg;
+
+                let rangeLabel = `Câu ${q.questionNumber}`;
+                if (showImage) {
+                  let groupCount = 1;
+                  for (let j = idx + 1; j < currentPassage.questions.length; j++) {
+                    const nextImg =
+                      (currentPassage.questions[j] as any).data?.task_image ||
+                      (currentPassage.questions[j] as any).taskImage || "";
+                    if (nextImg === taskImg) {
+                      groupCount++;
+                    } else {
+                      break;
+                    }
+                  }
+                  if (groupCount > 1) {
+                    rangeLabel = `Câu ${q.questionNumber}–${q.questionNumber + groupCount - 1}`;
+                  }
+                }
+
                 const qExplanation = explanations[q.qId] || q.explanation || (q as any).qExplanation;
                 const enrichedQ = qExplanation ? { ...q, explanation: qExplanation } : q;
                 return (
@@ -221,6 +322,12 @@ export function IeltsReadingView({
                       <div className="mb-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-100 text-xs text-blue-900 leading-relaxed whitespace-pre-line">
                         {instr}
                       </div>
+                    )}
+                    {showImage && (
+                      <ReadingDiagramBlock
+                        taskImage={taskImg}
+                        rangeLabel={rangeLabel}
+                      />
                     )}
                     <IeltsQuestionRenderer
                       question={enrichedQ}

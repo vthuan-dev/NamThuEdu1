@@ -261,6 +261,12 @@ export function StudentVstepExamPage() {
   const [answers, setAnswers] = useState<Record<string, "A" | "B" | "C" | "D">>({});
   const [writingDrafts, setWritingDrafts] = useState<Record<number, string>>({});
   const [speakingDone, setSpeakingDone] = useState<Record<number, boolean>>({});
+  /* ── Speaking lock state (prevent switching parts while prep or recording is in progress) ── */
+  const [speakingBusy, setSpeakingBusy] = useState<{ isBusy: boolean; reason?: string }>({ isBusy: false });
+
+  useEffect(() => {
+    setSpeakingBusy({ isBusy: false });
+  }, [current.skill, current.partNumber]);
   const [flagged, setFlagged] = useState<Record<number, boolean>>({});
   const [restored, setRestored] = useState(false);
 
@@ -782,8 +788,8 @@ export function StudentVstepExamPage() {
   /* ── Reset timer when skill (or speaking part) changes ────── */
   useEffect(() => {
     if (current.skill === "speaking") {
-      // Speaking is timed per part (Part 1 = 3m, Part 2 = 4m, Part 3 = 5m).
-      const recSec = SPEAKING_TIMES[current.partNumber]?.recSec ?? SKILL_TIME.speaking * 60;
+      // Speaking is timed per part (prep + rec).
+      const recSec = (SPEAKING_TIMES[current.partNumber]?.prepSec ?? 0) + (SPEAKING_TIMES[current.partNumber]?.recSec ?? (SKILL_TIME.speaking * 60));
       setSkillTimeLeft(recSec);
     } else {
       setSkillTimeLeft(SKILL_TIME[current.skill] * 60);
@@ -806,10 +812,14 @@ export function StudentVstepExamPage() {
     if (skillTimeLeft > 0) return;
     // Speaking: each part is timed separately → advance part-by-part first.
     if (current.skill === "speaking") {
+      if (speakingBusy.isBusy) {
+        // Đang thu âm hoặc chuẩn bị dở, không ngắt bài của học viên
+        return;
+      }
       const spNums = speakingParts.map((p) => p.partNumber).sort((a, b) => a - b);
       const pIdx = spNums.indexOf(current.partNumber);
       if (pIdx >= 0 && pIdx < spNums.length - 1) {
-        navigate2("speaking", spNums[pIdx + 1]);
+        navigate2("speaking", spNums[pIdx + 1], true);
         return;
       }
       // last speaking part done → submit
@@ -886,7 +896,11 @@ export function StudentVstepExamPage() {
   }, [submissionId, examId, navigate, answers, writingDrafts, writingTasks]);
 
   /* ── Navigate ───────────────────────────────────────────── */
-  const navigate2 = (skill: SkillKey, partNumber: number) => {
+  const navigate2 = (skill: SkillKey, partNumber: number, force?: boolean) => {
+    if (!force && !reviewMode && current.skill === "speaking" && speakingBusy.isBusy) {
+      console.warn("[VSTEP] Navigation blocked: Speaking is currently busy", speakingBusy.reason);
+      return;
+    }
     setMaxSkillIdx((prev) => Math.max(prev, SKILL_ORDER.indexOf(skill)));
     setVisitedParts((prev) => ({ ...prev, [skill]: new Set([...prev[skill], partNumber]) }));
     setCurrent({ skill, partNumber });
@@ -1159,6 +1173,9 @@ export function StudentVstepExamPage() {
   // async vì hộp xác nhận chuyển kỹ năng trả promise. Hàm này chỉ được dùng làm
   // onClick nên không có chỗ gọi nào cần giá trị trả về.
   const goNext = async () => {
+    if (!reviewMode && current.skill === "speaking" && speakingBusy.isBusy) {
+      return;
+    }
     const idx = examPartOrder.findIndex((o) => o.skill === current.skill && o.part === current.partNumber);
     const next = examPartOrder[idx + 1];
     if (!next) return;
@@ -1243,12 +1260,13 @@ export function StudentVstepExamPage() {
         examId={examId || ""}
         submissionId={submissionId}
         onComplete={(pn) => setSpeakingDone((prev) => ({ ...prev, [pn]: true }))}
+        onBusyChange={(busy, reason) => setSpeakingBusy({ isBusy: busy, reason })}
         reviewMode={reviewMode}
         reviewAudioUrl={reviewSpeakingAudio[String(current.partNumber)]}
         reviewSpeakingScore={reviewSpeakingScore}
         reviewSpeakingResults={reviewMode ? reviewSpeakingResults : undefined}
         isGradingPending={reviewMode ? reviewGradingPending : false}
-        teacherOverallFeedback={reviewMode ? reviewTeacherOverall : null}
+        teacherOverallFeedback={reviewTeacherOverall}
       />
     );
   };
@@ -1395,19 +1413,25 @@ export function StudentVstepExamPage() {
                 {/* min-h-11 = 44px. Nút này là đường nộp bài duy nhất trên
                     mobile (cột navigator bên phải ẩn dưới lg), nên phải luôn
                     vừa đủ to để bấm. */}
-                <button
-                  onClick={() => setShowSubmit(true)}
-                  disabled={!submitGate.canSubmit}
-                  title={submitGate.tooltip}
-                  className={`inline-flex items-center justify-center gap-1.5 sm:gap-2 min-h-11 px-3 sm:px-5 text-sm sm:text-base font-semibold rounded-lg active:scale-[0.97] transition-all shadow-sm ${
-                    submitGate.canSubmit
-                      ? "bg-sky-600 text-white hover:bg-sky-700 cursor-pointer"
-                      : "bg-slate-200 text-slate-400 cursor-not-allowed"
-                  }`}
-                >
-                  <Send className="w-4 h-4 flex-shrink-0" />
-                  Nộp bài
-                </button>
+                {(() => {
+                  const isSpeakingLocked = !reviewMode && current.skill === "speaking" && speakingBusy.isBusy;
+                  const canSubmitHeader = submitGate.canSubmit && !isSpeakingLocked;
+                  return (
+                    <button
+                      onClick={() => setShowSubmit(true)}
+                      disabled={!canSubmitHeader}
+                      title={isSpeakingLocked ? (speakingBusy.reason || "Đang trong bài nói, không thể nộp bài") : submitGate.tooltip}
+                      className={`inline-flex items-center justify-center gap-1.5 sm:gap-2 min-h-11 px-3 sm:px-5 text-sm sm:text-base font-semibold rounded-lg active:scale-[0.97] transition-all shadow-sm ${
+                        canSubmitHeader
+                          ? "bg-sky-600 text-white hover:bg-sky-700 cursor-pointer"
+                          : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                      }`}
+                    >
+                      <Send className="w-4 h-4 flex-shrink-0" />
+                      Nộp bài
+                    </button>
+                  );
+                })()}
               </>
             )}
           </div>
@@ -1488,8 +1512,11 @@ export function StudentVstepExamPage() {
                         const isActive = current.skill === s && current.partNumber === pn;
                         const isVisited = visitedParts[s]?.has(pn);
                         const sameSkill = s === current.skill;
-                        const canClick = reviewMode || (!pastSkill && (sameSkill || isVisited));
-                        const tooltip = !reviewMode && pastSkill
+                        const isSpeakingLocked = !reviewMode && current.skill === "speaking" && speakingBusy.isBusy;
+                        const canClick = reviewMode || (!pastSkill && (sameSkill || isVisited) && !isSpeakingLocked);
+                        const tooltip = !reviewMode && isSpeakingLocked
+                          ? speakingBusy.reason || "Đang ghi âm bài nói, vui lòng hoàn thành trước khi chuyển phần"
+                          : !reviewMode && pastSkill
                           ? "Không thể quay lại skill đã hoàn thành"
                           : !reviewMode && (!isVisited && !sameSkill)
                           ? "Nhấn Tiếp tục để chuyển đến phần này"
@@ -1506,6 +1533,8 @@ export function StudentVstepExamPage() {
                                     : `${meta.bg} ${meta.color} hover:brightness-95 cursor-pointer`)
                                   : isActive
                                   ? "bg-amber-400 text-slate-900 shadow-sm scale-105"
+                                  : isSpeakingLocked
+                                  ? `${meta.bg} ${meta.color} opacity-40 cursor-not-allowed`
                                   : pastSkill
                                   ? `${meta.bg} ${meta.color} opacity-40 cursor-not-allowed`
                                   : canClick
@@ -1562,20 +1591,33 @@ export function StudentVstepExamPage() {
               })}
             </div>
             <div className="flex items-center justify-center sm:justify-end gap-2 w-full lg:w-auto lg:absolute lg:right-4 lg:top-1/2 lg:-translate-y-1/2 flex-shrink-0">
-              <button
-                onClick={isLastPart && !reviewMode ? () => setShowSubmit(true) : goNext}
-                disabled={isLastPart && !reviewMode && !submitGate.canSubmit}
-                title={isLastPart && !reviewMode ? submitGate.tooltip : undefined}
-                className={`px-4 py-2 text-white active:scale-[0.97] rounded-md text-sm font-semibold transition-all shadow-sm ${
-                  isLastPart && !reviewMode
-                    ? submitGate.canSubmit
-                      ? "bg-emerald-600 hover:bg-emerald-700 animate-pulse"
-                      : "bg-slate-300 text-slate-500 cursor-not-allowed"
-                    : "bg-sky-600 hover:bg-sky-700"
-                }`}
-              >
-                {isLastPart && !reviewMode ? "✓ Nộp bài" : "Tiếp tục →"}
-              </button>
+              {(() => {
+                const isSpeakingLocked = !reviewMode && current.skill === "speaking" && speakingBusy.isBusy;
+                const nextDisabled = isSpeakingLocked || (isLastPart && !reviewMode && !submitGate.canSubmit);
+                const nextTooltip = isSpeakingLocked
+                  ? speakingBusy.reason || "Đang ghi âm bài nói, vui lòng hoàn thành trước khi chuyển phần"
+                  : isLastPart && !reviewMode
+                  ? submitGate.tooltip
+                  : undefined;
+                return (
+                  <button
+                    onClick={isSpeakingLocked ? undefined : isLastPart && !reviewMode ? () => setShowSubmit(true) : goNext}
+                    disabled={nextDisabled}
+                    title={nextTooltip}
+                    className={`px-4 py-2 text-white active:scale-[0.97] rounded-md text-sm font-semibold transition-all shadow-sm ${
+                      isSpeakingLocked
+                        ? "bg-slate-300 text-slate-500 cursor-not-allowed opacity-60 pointer-events-none"
+                        : isLastPart && !reviewMode
+                        ? submitGate.canSubmit
+                          ? "bg-emerald-600 hover:bg-emerald-700 animate-pulse"
+                          : "bg-slate-300 text-slate-500 cursor-not-allowed"
+                        : "bg-sky-600 hover:bg-sky-700"
+                    }`}
+                  >
+                    {isLastPart && !reviewMode ? "✓ Nộp bài" : "Tiếp tục →"}
+                  </button>
+                );
+              })()}
               <button
                 onClick={() => setBottomVisible(false)}
                 className="px-3 py-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-md text-sm font-medium transition-colors inline-flex items-center gap-1"
@@ -1872,49 +1914,60 @@ function HighlightablePassage({
       .catch(() => {});
   }, [examId, partNumber]);
 
-  /* Stable plain text derived once from original html — normalizes soft line breaks */
-  const plainText = useMemo(() => {
-    // Step 1: Convert block-level tags to newlines BEFORE stripping.
-    // This preserves paragraph structure from the original HTML.
-    const withBreaks = html
-      .replace(/<\/p\s*>/gi, "\n\n")       // </p> → paragraph break
-      .replace(/<br\s*\/?>/gi, "\n")        // <br> → line break
-      .replace(/<\/div\s*>/gi, "\n\n")      // </div> → paragraph break
-      .replace(/<\/li\s*>/gi, "\n")         // </li> → line break
-      .replace(/<\/h[1-6]\s*>/gi, "\n\n");  // </h1-6> → paragraph break
+  /* Clean paragraph strings extracted from html, preserving inline tags (b, strong, u, em, i, span) */
+  const paragraphs = useMemo(() => {
+    if (!html) return [];
+    // 1. Clean spaces and invisible characters
+    let s = html
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&#160;|&#xA0;/gi, " ")
+      .replace(/[\u00A0\u202F\u2007\u00AD\u200B\u200C\u200D\u2060\uFEFF]/g, " ");
 
-    // Step 2: Strip remaining HTML tags
-    const stripped = withBreaks.replace(/<[^>]*>/g, "");
-
-    /* Decode HTML entities (&nbsp;, &amp;, &#39;, …) that may come from pasted/imported content.
-       Without this, entities like &nbsp; would render as literal text on screen. */
-    let decoded = stripped;
-    if (typeof document !== "undefined") {
-      const ta = document.createElement("textarea");
-      ta.innerHTML = stripped;
-      decoded = ta.value;
+    // Check if HTML has block elements (<p>, <div>, <h1-6>, <li>)
+    const hasBlocks = /<(?:p|div|h[1-6]|li)\b/i.test(s);
+    if (hasBlocks) {
+      // Convert double <br> to paragraph break
+      s = s.replace(/<br\s*\/?>\s*<br\s*\/?>/gi, "</p><p>");
+      // Remove empty paragraphs e.g. <p></p> or <p><br></p> or <p>&nbsp;</p>
+      s = s.replace(/<(p|div|h[1-6])\b[^>]*>\s*(?:<br\s*\/?>|\s|&nbsp;)*<\/\1>/gi, "");
+      // Split by closing block tags
+      const rawChunks = s.split(/<\/(?:p|div|h[1-6]|li)\s*>/i);
+      const paras: string[] = [];
+      for (const chunk of rawChunks) {
+        // Strip opening block tags, keeping inline formatting: strong, b, u, em, i, span
+        const stripped = chunk.replace(/<(?:p|div|h[1-6]|li)\b[^>]*>/gi, "").trim();
+        if (stripped) {
+          paras.push(stripped);
+        }
+      }
+      if (paras.length > 0) return paras;
     }
-    /* Replace double newlines (paragraph breaks) with a placeholder, collapse single \n into space */
-    return decoded
-      .replace(/\u00a0/g, " ")              // non-breaking space → normal space
-      .replace(/\r\n/g, "\n")
-      .replace(/\n{2,}/g, "\x00PARA\x00")   // paragraph break → placeholder
-      .replace(/\n/g, " ")                  // mid-sentence \n → space
-      .replace(/  +/g, " ")                 // collapse multiple spaces
-      .replace(/\x00PARA\x00/g, "\n\n");    // restore paragraph breaks
+
+    // Fallback: Plain text / text with newlines
+    const normalized = s.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+    if (normalized.includes("\n\n")) {
+      return normalized.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+    }
+    // Single newlines
+    const lines = normalized.split("\n").map((p) => p.trim()).filter(Boolean);
+    return lines.length > 0 ? lines : [normalized];
   }, [html]);
+
+  /* Stable plain text across all paragraphs for highlight offsets */
+  const plainText = useMemo(() => {
+    return paragraphs.map((p) => p.replace(/<[^>]*>/g, "")).join("\n\n");
+  }, [paragraphs]);
 
   /* Escape HTML special chars in plain text segments */
   const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   /* Detect if a paragraph is a passage boundary label:
    * e.g. "PASSAGE 1", "Passage 2", "Text 1", "Reading 1", "Đoạn 1"
-   * Returns true for short (≤60 chars) lines matching these patterns.
    */
   const isPassageDivider = (para: string): boolean => {
-    const t = para.trim();
-    if (!t || t.length > 60) return false;
-    return /^(passage|text|reading|đoạn|bài đọc)\s*\d+/i.test(t);
+    const t = para.replace(/<[^>]*>/g, "").trim();
+    if (!t || t.length > 50) return false;
+    return /^(passage|text|reading|đoạn|bài đọc)\s*\d+[:\s-]*$/i.test(t);
   };
 
   /* Bold paragraph identifiers like A, B, C, D... at the start of a paragraph */
@@ -1928,26 +1981,23 @@ function HighlightablePassage({
     );
   };
 
-  /* Render one paragraph — divider lines become a visual <hr> separator */
-  const renderPara = (para: string): string => {
-    const t = para.trim();
+  /* Render one paragraph with clear paragraph spacing and typography */
+  const renderPara = (paraContent: string): string => {
+    const t = paraContent.trim();
     if (!t) return "";
-    if (isPassageDivider(t)) {
-      return `<div style="margin:2em 0 1.5em;display:flex;align-items:center;gap:12px">`
-        + `<div style="flex:1;border-top:2px dashed #cbd5e1"></div>`
-        + `</div>`;
+    const plain = t.replace(/<[^>]*>/g, "").trim();
+    if (isPassageDivider(plain)) {
+      return `<div class="mb-4 text-xs font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-1.5 inline-block">${plain}</div>`;
     }
-    const escaped = escHtml(t);
-    const formatted = boldSectionPrefix(escaped);
-    return `<p style="font-size:17px;line-height:1.8;margin-bottom:1em;color:#0f172a">${formatted}</p>`;
+    const formatted = boldSectionPrefix(t);
+    return `<p class="vstep-passage-p mb-5 text-[16.5px] leading-[1.85] text-slate-800 text-justify">${formatted}</p>`;
   };
 
   /* Build rendered HTML with <mark> tags and paragraph support */
   const renderedHtml = useMemo(() => {
-    const toHtml = (s: string) =>
-      s.split("\n\n").map((para) => renderPara(para)).join("");
-
-    if (!highlights.length) return toHtml(plainText);
+    if (!highlights.length) {
+      return paragraphs.map((para) => renderPara(para)).join("");
+    }
 
     const sorted = [...highlights].sort((a, b) => a.start_offset - b.start_offset);
 
@@ -1962,18 +2012,16 @@ function HighlightablePassage({
       cursor = h.end_offset;
     }
     flat += escHtml(plainText.slice(cursor));
+
     return flat.split("\n\n").map((para) => {
-      /* Divider lines don't contain highlights — safe to render as divider */
       const plain = para.replace(/<[^>]*>/g, "").trim();
       if (isPassageDivider(plain)) {
-        return `<div style="margin:2em 0 1.5em;display:flex;align-items:center;gap:12px">`
-          + `<div style="flex:1;border-top:2px dashed #cbd5e1"></div>`
-          + `</div>`;
+        return `<div class="mb-4 text-xs font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-1.5 inline-block">${plain}</div>`;
       }
       const formatted = boldSectionPrefix(para.trim());
-      return `<p style="font-size:17px;line-height:1.8;margin-bottom:1em;color:#0f172a">${formatted}</p>`;
+      return `<p class="vstep-passage-p mb-5 text-[16.5px] leading-[1.85] text-slate-800 text-justify">${formatted}</p>`;
     }).join("");
-  }, [plainText, highlights]);
+  }, [paragraphs, plainText, highlights]);
 
   /* Click on existing mark to delete */
   const handleClick = useCallback((e: React.MouseEvent<HTMLElement>) => {
@@ -2228,10 +2276,10 @@ function ReadingView({
   correctAnswersMap?: Record<number, string>;
   examId?: number;
 }) {
-  const [mobileTab, setMobileTab] = useState<'question' | 'passage'>('question');
+  const [mobileTab, setMobileTab] = useState<'question' | 'passage'>('passage');
 
   useEffect(() => {
-    setMobileTab('question');
+    setMobileTab('passage');
   }, [partNumber]);
 
   if (!part || !part.questions?.length) return <EmptyState skill="reading" />;
@@ -2247,21 +2295,12 @@ function ReadingView({
       passageTitle={`Reading Passage - Part ${partNumber}`}
       passageSubtitle={part.partName}
       passageContent={
-        examId ? (
-          <HighlightablePassage
-            html={part.passage || ""}
-            examId={examId}
-            partNumber={partNumber}
-            reviewMode={reviewMode}
-          />
-        ) : (
-          <div className="flex-1 overflow-y-auto px-6 py-5">
-            <article
-              className="vstep-passage prose prose-sm max-w-none text-slate-800 leading-relaxed whitespace-pre-wrap"
-              dangerouslySetInnerHTML={{ __html: sanitizePassageHtml(part.passage || "") }}
-            />
-          </div>
-        )
+        <HighlightablePassage
+          html={part.passage || ""}
+          examId={examId || 0}
+          partNumber={partNumber}
+          reviewMode={reviewMode}
+        />
       }
       questionsTitle={`Questions (${part.questions.length})`}
       questionsHeaderExtra={
@@ -2933,7 +2972,21 @@ function SpeakingPrepOverlay({ prepSec, partNumber, onDone, onSkip }: { prepSec:
   );
 }
 
-function SpeakingQuestionScreen({ part, partNumber, submissionId, onComplete, reviewMode }: { part: SpeakingPart; partNumber: number; submissionId: number | null; onComplete?: (pn: number) => void; reviewMode?: boolean }) {
+function SpeakingQuestionScreen({
+  part,
+  partNumber,
+  submissionId,
+  onComplete,
+  onBusyChange,
+  reviewMode,
+}: {
+  part: SpeakingPart;
+  partNumber: number;
+  submissionId: number | null;
+  onComplete?: (pn: number) => void;
+  onBusyChange?: (isBusy: boolean, reason?: string) => void;
+  reviewMode?: boolean;
+}) {
   const times = SPEAKING_TIMES[partNumber] ?? { prepSec: 30, recSec: 180 };
   type Phase = "intro" | "countdown3" | "recording" | "done";
   const [phase, setPhase] = useState<Phase>(reviewMode ? "done" : "intro");
@@ -2951,6 +3004,29 @@ function SpeakingQuestionScreen({ part, partNumber, submissionId, onComplete, re
   const fmtSec = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
   const clearTimer = () => { if (timerRef.current) clearInterval(timerRef.current); };
   const partTitle = partNumber === 1 ? "Question 1: Social Interaction (3 minutes): Now, the test begins." : partNumber === 2 ? "Question 2: Solution Discussion (4 minutes)." : "Question 3: Topic Development (5 minutes).";
+
+  /* ── Notify parent of busy recording state ── */
+  useEffect(() => {
+    if (reviewMode) {
+      onBusyChange?.(false);
+      return;
+    }
+    if (phase === "countdown3") {
+      onBusyChange?.(true, "Đang chuẩn bị ghi âm bài nói, vui lòng chờ...");
+    } else if (phase === "recording") {
+      onBusyChange?.(true, "Đang ghi âm bài nói, vui lòng hoàn thành trước khi chuyển phần.");
+    } else if (uploading) {
+      onBusyChange?.(true, "Đang tải bài ghi âm lên hệ thống, vui lòng chờ trong giây lát...");
+    } else {
+      onBusyChange?.(false);
+    }
+  }, [phase, uploading, reviewMode, onBusyChange]);
+
+  useEffect(() => {
+    return () => {
+      onBusyChange?.(false);
+    };
+  }, [onBusyChange]);
 
   useEffect(() => {
     if (reviewMode) { window.speechSynthesis?.cancel(); setPhase("done"); setTtsProgress(0); return; }
@@ -3175,13 +3251,14 @@ function SpeakingQuestionScreen({ part, partNumber, submissionId, onComplete, re
 }
 
 function SpeakingView({
-  part, partNumber, examId, submissionId, onComplete, reviewMode, reviewAudioUrl, reviewSpeakingScore, reviewSpeakingResults, isGradingPending, teacherOverallFeedback,
+  part, partNumber, examId, submissionId, onComplete, onBusyChange, reviewMode, reviewAudioUrl, reviewSpeakingScore, reviewSpeakingResults, isGradingPending, teacherOverallFeedback,
 }: {
   part?: SpeakingPart;
   partNumber: number;
   examId: string;
   submissionId: number | null;
   onComplete?: (pn: number) => void;
+  onBusyChange?: (isBusy: boolean, reason?: string) => void;
   reviewMode?: boolean;
   reviewAudioUrl?: string;
   reviewSpeakingScore?: number | null;
@@ -3194,6 +3271,28 @@ function SpeakingView({
   const [viewPhase, setViewPhase] = useState<"prep" | "questions">(() => {
     try { const done = JSON.parse(localStorage.getItem(LS_PREP) || "{}"); return done[partNumber] ? "questions" : "prep"; } catch { return "prep"; }
   });
+  const [screenBusy, setScreenBusy] = useState<{ isBusy: boolean; reason?: string }>({ isBusy: false });
+
+  useEffect(() => {
+    if (reviewMode) {
+      onBusyChange?.(false);
+      return;
+    }
+    if (viewPhase === "prep") {
+      onBusyChange?.(true, "Đang trong thời gian chuẩn bị bài nói, vui lòng hoàn thành trước khi chuyển phần.");
+    } else if (screenBusy.isBusy) {
+      onBusyChange?.(true, screenBusy.reason || "Đang ghi âm bài nói, vui lòng hoàn thành trước khi chuyển phần.");
+    } else {
+      onBusyChange?.(false);
+    }
+  }, [viewPhase, screenBusy, reviewMode, onBusyChange]);
+
+  useEffect(() => {
+    return () => {
+      onBusyChange?.(false);
+    };
+  }, [onBusyChange]);
+
   useEffect(() => {
     if (reviewMode) { setViewPhase("questions"); return; }
     try { const done = JSON.parse(localStorage.getItem(LS_PREP) || "{}"); setViewPhase(done[partNumber] ? "questions" : "prep"); } catch { setViewPhase("prep"); }
@@ -3255,7 +3354,14 @@ function SpeakingView({
               )}
             </div>
           )}
-          <SpeakingQuestionScreen part={part} partNumber={partNumber} submissionId={reviewMode ? null : submissionId} onComplete={reviewMode ? undefined : onComplete} reviewMode={reviewMode} />
+          <SpeakingQuestionScreen
+            part={part}
+            partNumber={partNumber}
+            submissionId={reviewMode ? null : submissionId}
+            onComplete={reviewMode ? undefined : onComplete}
+            onBusyChange={(busy, reason) => setScreenBusy({ isBusy: busy, reason })}
+            reviewMode={reviewMode}
+          />
         </div>
 
         {/* Grading banner or review panel */}

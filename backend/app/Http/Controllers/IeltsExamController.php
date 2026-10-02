@@ -523,6 +523,10 @@ class IeltsExamController extends Controller
                             'taskInstruction'=> $data['task_instruction'] ?? '',
                             'wordLimit'      => $data['word_limit'] ?? '',
                             'selectCount'    => $data['select_count'] ?? 1,
+                            'useWordBank'    => $data['use_word_bank'] ?? false,
+                            'taskImage'      => $data['task_image'] ?? '',
+                            'taskImageFileName' => $data['task_image_file_name'] ?? '',
+                            'explanation'    => $q->qExplanation ?? ($data['explanation'] ?? ''),
                         ];
                     })
                     ->toArray();

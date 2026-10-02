@@ -9,8 +9,13 @@ import {
   Plus,
   Layers,
   X,
+  Image as ImageIcon,
+  Upload,
+  ZoomIn,
+  Loader2,
 } from "lucide-react";
 import { IELTS_STRUCTURE, IELTS_READING_QUESTION_TYPES, type IeltsTestType } from "../structure";
+import { api } from "../../../../../../services/api";
 import { RichTextInput } from "../../../../../../components/ui/RichTextInput";
 
 // ─── Types ───────────────────────────────────────────────────────────────
@@ -38,6 +43,10 @@ interface ReadingGroup {
   wordLimit?: string;
   /** Completion: dùng word bank (chọn từ danh sách cho sẵn) thay vì gõ tự do. */
   useWordBank?: boolean;
+  /** Ảnh sơ đồ/đề bài dùng chung của nhóm (diagram-labelling, v.v.) */
+  taskImage?: string;
+  /** Tên file ảnh gốc */
+  taskImageFileName?: string;
   questions: ReadingQuestion[];
 }
 
@@ -175,6 +184,8 @@ function emptyGroup(type = "multiple-choice"): ReadingGroup {
     choices: isMatchingType(type) ? defaultChoices(type) : undefined,
     selectCount: (type === "multiple-choice" || type === "multiple-choice-group") ? 1 : undefined,
     wordLimit: isCompletionType(type) ? "" : undefined,
+    taskImage: "",
+    taskImageFileName: "",
     questions: [emptyQuestion(type)],
   };
 }
@@ -196,15 +207,21 @@ function toQuestion(raw: any, type: string): ReadingQuestion {
 
 /**
  * Suy ra danh sách nhóm từ mảng câu hỏi phẳng (đề cũ / import).
- * Gom các câu liền nhau cùng questionType + cùng chỉ dẫn.
+ * Gom các câu liền nhau cùng questionType + cùng chỉ dẫn + cùng ảnh.
  */
 function deriveGroups(questions: any[]): ReadingGroup[] {
   const groups: ReadingGroup[] = [];
   for (const q of questions || []) {
     const type = q.questionType || "multiple-choice";
     const instr = q.taskInstruction || q.task_instruction || "";
+    const taskImg = q.taskImage || q.task_image || "";
     const last = groups[groups.length - 1];
-    if (last && last.questionType === type && last.instruction === instr) {
+    if (
+      last &&
+      last.questionType === type &&
+      last.instruction === instr &&
+      (last.taskImage || "") === taskImg
+    ) {
       last.questions.push(toQuestion(q, type));
       if (
         isMatchingType(type) &&
@@ -218,6 +235,8 @@ function deriveGroups(questions: any[]): ReadingGroup[] {
         id: uid("g"),
         questionType: type,
         instruction: instr,
+        taskImage: taskImg,
+        taskImageFileName: q.taskImageFileName || q.task_image_file_name || "",
         choices: isMatchingType(type)
           ? q.options
             ? { ...q.options }
@@ -241,6 +260,8 @@ function normalizeGroup(raw: any): ReadingGroup {
     selectCount: (type === "multiple-choice" || type === "multiple-choice-group") ? raw.selectCount || 1 : undefined,
     wordLimit: isCompletionType(type) ? raw.wordLimit || "" : undefined,
     useWordBank: isCompletionType(type) ? !!raw.useWordBank : undefined,
+    taskImage: raw.taskImage || raw.task_image || "",
+    taskImageFileName: raw.taskImageFileName || raw.task_image_file_name || "",
     choices:
       isMatchingType(type) || (isCompletionType(type) && raw.useWordBank)
         ? raw.choices && Object.keys(raw.choices).length
@@ -305,6 +326,8 @@ function flattenPassages(passages: ReadingPassage[]) {
             wordLimit: g.wordLimit || "",
             selectCount: g.selectCount || 1,
             useWordBank: wordBank,
+            taskImage: g.taskImage || "",
+            taskImageFileName: g.taskImageFileName || "",
             explanation: q.explanation || "",
           });
         });
@@ -732,6 +755,8 @@ export function IeltsReadingEditor({
                 key={g.id}
                 group={g}
                 startNumber={groupStartNumbers[gIdx]}
+                passageNumber={activePassage}
+                examId={examId}
                 onChange={(patch) => updateGroup(activePassage, gIdx, patch)}
                 onRemove={() => removeGroup(activePassage, gIdx)}
                 onAddQuestion={() => addQuestion(activePassage, gIdx)}
@@ -769,10 +794,197 @@ export function IeltsReadingEditor({
   );
 }
 
+// ─── Reading Image Block ───────────────────────────────────────────────────
+function ReadingImageBlock({
+  taskImage,
+  taskImageFileName,
+  startNumber,
+  endNumber,
+  passageNumber,
+  examId,
+  onChange,
+}: {
+  taskImage?: string;
+  taskImageFileName?: string;
+  startNumber: number;
+  endNumber: number;
+  passageNumber: number;
+  examId?: string;
+  onChange: (patch: { taskImage: string; taskImageFileName: string }) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [zoomed, setZoomed] = useState(false);
+
+  const handleUpload = async (file: File) => {
+    if (!examId) {
+      alert("Vui lòng đợi bài thi được tạo trước khi upload ảnh");
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      fd.append("passage", String(passageNumber));
+      const res = await api.post(
+        `/teacher/exams/${examId}/ielts/reading/passages/${passageNumber}/question-image`,
+        fd,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+      const url = res.data?.image_url || res.data?.data?.image_url || URL.createObjectURL(file);
+      onChange({ taskImage: url, taskImageFileName: file.name });
+    } catch {
+      const url = URL.createObjectURL(file);
+      onChange({ taskImage: url, taskImageFileName: file.name });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const rangeLabel = startNumber === endNumber ? `Câu ${startNumber}` : `Câu ${startNumber}–${endNumber}`;
+
+  return (
+    <div
+      className="rounded-xl border-2 border-dashed border-emerald-400/80 bg-emerald-50/40 p-4 space-y-3 outline-none focus:border-emerald-500 focus:bg-emerald-50/70 transition-colors"
+      tabIndex={0}
+      onPaste={(e) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.startsWith("image/")) {
+            e.preventDefault();
+            const blob = items[i].getAsFile();
+            if (blob) handleUpload(blob);
+            return;
+          }
+        }
+      }}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 uppercase tracking-wide">
+          <ImageIcon className="w-4 h-4 text-emerald-600" />
+          Ảnh sơ đồ / Diagram — {rangeLabel}
+        </div>
+        <span className="text-[11px] font-medium text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">
+          Dán Ctrl+V hoặc chọn file
+        </span>
+      </div>
+
+      {taskImage ? (
+        <div className="space-y-2">
+          <div className="relative group max-w-xl mx-auto">
+            <img
+              src={taskImage}
+              alt="Diagram preview"
+              className="max-w-full max-h-[300px] w-auto object-contain mx-auto rounded-lg border border-emerald-200 bg-white shadow-xs cursor-zoom-in"
+              onClick={() => setZoomed(true)}
+            />
+            <button
+              type="button"
+              onClick={() => setZoomed(true)}
+              className="absolute top-2 right-2 p-1.5 rounded-md bg-white/90 text-emerald-700 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-white"
+              title="Phóng to sơ đồ"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="flex items-center justify-between gap-2 pt-1 border-t border-emerald-200/60">
+            <span className="text-[11px] text-gray-500 truncate flex-1" title={taskImageFileName}>
+              {taskImageFileName || "Ảnh sơ đồ đã upload"}
+            </span>
+            <div className="flex items-center gap-3">
+              <label className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 cursor-pointer">
+                Đổi ảnh khác
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleUpload(f);
+                  }}
+                />
+              </label>
+              <span className="text-gray-300">|</span>
+              <button
+                type="button"
+                onClick={() => onChange({ taskImage: "", taskImageFileName: "" })}
+                className="text-[11px] font-semibold text-rose-500 hover:text-rose-700 cursor-pointer"
+              >
+                Xoá ảnh
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <label className="flex flex-col items-center justify-center gap-2 py-6 cursor-pointer hover:bg-emerald-50/80 rounded-lg transition-all border border-emerald-200/50 bg-white/60">
+          {uploading ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
+              <span className="text-xs font-semibold text-emerald-700">Đang tải ảnh lên...</span>
+            </>
+          ) : (
+            <>
+              <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
+                <Upload className="w-4 h-4" />
+              </div>
+              <div className="text-center">
+                <span className="text-xs font-bold text-emerald-800 block">
+                  Kéo thả ảnh sơ đồ vào đây hoặc bấm để chọn file
+                </span>
+                <span className="text-[11px] text-gray-500 block mt-0.5">
+                  Hỗ trợ PNG, JPG, WEBP, PDF (tối đa 20MB) — hoặc bấm phím <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px]">Ctrl+V</kbd> để dán ảnh
+                </span>
+              </div>
+            </>
+          )}
+          <input
+            type="file"
+            accept="image/*,.pdf"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleUpload(f);
+            }}
+          />
+        </label>
+      )}
+
+      {zoomed && taskImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setZoomed(false)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] bg-white rounded-xl overflow-hidden shadow-2xl p-2" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between pb-2 px-2 border-b border-gray-200 mb-2">
+              <span className="text-xs font-bold text-gray-700">
+                Sơ đồ {rangeLabel} (Passage {passageNumber})
+              </span>
+              <button
+                type="button"
+                onClick={() => setZoomed(false)}
+                className="p-1 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <img
+              src={taskImage}
+              alt="Diagram zoomed"
+              className="max-w-full max-h-[75vh] object-contain mx-auto rounded"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Group card ──────────────────────────────────────────────────────────────
 function GroupCard({
   group,
   startNumber,
+  passageNumber,
+  examId,
   onChange,
   onRemove,
   onAddQuestion,
@@ -781,15 +993,20 @@ function GroupCard({
 }: {
   group: ReadingGroup;
   startNumber: number;
+  passageNumber: number;
+  examId?: string;
   onChange: (patch: Partial<ReadingGroup>) => void;
   onRemove: () => void;
   onAddQuestion: () => void;
   onRemoveQuestion: (qIdx: number) => void;
   onChangeQuestion: (qIdx: number, patch: Partial<ReadingQuestion>) => void;
 }) {
+  const [showImageUpload, setShowImageUpload] = useState(false);
   const matching = isMatchingType(group.questionType);
   const isMcq = group.questionType === "multiple-choice" || group.questionType === "multiple-choice-group";
   const completion = isCompletionType(group.questionType);
+  const isDiagram = group.questionType === "diagram-labelling";
+  const hasImage = !!group.taskImage && group.taskImage.trim() !== "";
   const endNumber = startNumber + group.questions.length - 1;
   const hint = TYPE_HINTS[group.questionType];
 
@@ -881,6 +1098,38 @@ function GroupCard({
           rows={2}
           className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none bg-white"
         />
+
+        {/* Sơ đồ / Image Block cho nhóm câu hỏi */}
+        {(isDiagram || hasImage || showImageUpload) && (
+          <div className="mt-3">
+            <ReadingImageBlock
+              taskImage={group.taskImage}
+              taskImageFileName={group.taskImageFileName}
+              startNumber={startNumber}
+              endNumber={endNumber}
+              passageNumber={passageNumber}
+              examId={examId}
+              onChange={(patch) => {
+                onChange(patch);
+                if (!patch.taskImage) setShowImageUpload(false);
+              }}
+            />
+          </div>
+        )}
+
+        {/* Nút đính kèm ảnh cho các dạng câu hỏi khác nếu chưa mở block */}
+        {!isDiagram && !hasImage && !showImageUpload && (
+          <div className="mt-2.5">
+            <button
+              type="button"
+              onClick={() => setShowImageUpload(true)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer"
+            >
+              <ImageIcon className="w-3.5 h-3.5" />
+              + Đính kèm ảnh sơ đồ / biểu đồ cho nhóm này
+            </button>
+          </div>
+        )}
       </div>
 
       {(matching || (completion && group.useWordBank)) && (

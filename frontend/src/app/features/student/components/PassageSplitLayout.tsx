@@ -67,9 +67,20 @@ export function PassageSplitLayout({
 
   return (
     <div className={`${className}`}>
-      {/* Mobile Tab Switcher */}
+      {/* Mobile Tab Switcher (< md screen) */}
       {mobileActiveTab && onMobileTabChange && (
-        <div className="lg:hidden flex rounded-lg bg-slate-100 p-1 mb-3 border border-slate-200/50">
+        <div className="md:hidden flex rounded-lg bg-slate-100 p-1 mb-3 border border-slate-200/50">
+          <button
+            type="button"
+            onClick={() => onMobileTabChange("passage")}
+            className={`flex-1 py-2 text-center text-xs font-bold rounded-md transition-all cursor-pointer ${
+              mobileActiveTab === "passage"
+                ? "bg-white text-emerald-600 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            📖 Bài đọc (Passage)
+          </button>
           <button
             type="button"
             onClick={() => onMobileTabChange("question")}
@@ -79,25 +90,14 @@ export function PassageSplitLayout({
                 : "text-slate-500 hover:text-slate-700"
             }`}
           >
-            ❓ Questions
-          </button>
-          <button
-            type="button"
-            onClick={() => onMobileTabChange("passage")}
-            className={`flex-1 py-2 text-center text-xs font-bold rounded-md transition-all cursor-pointer ${
-              mobileActiveTab === "passage"
-                ? "bg-white text-blue-600 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            📖 Passage
+            ❓ Câu hỏi (Questions)
           </button>
         </div>
       )}
 
       <div className={`grid ${gridClassName} gap-4 ${heightClassName}`}>
         <section className={`bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col min-h-0 ${
-          mobileActiveTab ? (mobileActiveTab === "passage" ? "flex" : "hidden lg:flex") : "flex"
+          mobileActiveTab ? (mobileActiveTab === "passage" ? "flex" : "hidden md:flex") : "flex"
         }`}>
           <div className={`px-5 py-3 border-b border-slate-100 bg-gradient-to-r ${toneClass.passageHeader}`}>
             <div className="flex items-center gap-2 mb-0.5">
@@ -109,7 +109,7 @@ export function PassageSplitLayout({
           {passageContent ?? (
             <div className={`flex-1 overflow-y-auto px-6 py-4 ${passageBodyClassName}`}>
               <article
-                className="prose prose-sm max-w-none text-slate-800 leading-relaxed [&>p]:mb-4"
+                className="vstep-passage prose prose-sm max-w-none text-slate-800 leading-relaxed [&>p]:mb-4"
                 dangerouslySetInnerHTML={{ __html: passageHtml || "<p><em>No passage</em></p>" }}
               />
             </div>
@@ -117,7 +117,7 @@ export function PassageSplitLayout({
         </section>
 
         <section className={`bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex flex-col min-h-0 ${
-          mobileActiveTab ? (mobileActiveTab === "question" ? "flex" : "hidden lg:flex") : "flex"
+          mobileActiveTab ? (mobileActiveTab === "question" ? "flex" : "hidden md:flex") : "flex"
         }`}>
           <div className={`px-5 py-3 border-b border-slate-100 bg-gradient-to-r ${toneClass.questionHeader} flex items-center justify-between gap-3`}>
             <div className="min-w-0">

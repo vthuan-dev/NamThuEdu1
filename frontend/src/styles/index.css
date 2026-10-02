@@ -869,6 +869,17 @@
   opacity: 1 !important;
 }
 
+/* Ensure clean paragraph separation for reading passages */
+.vstep-passage p {
+  margin-bottom: 1.25em !important;
+  line-height: 1.85 !important;
+  font-size: 16.5px !important;
+}
+
+.vstep-passage p:empty {
+  display: none !important;
+}
+
 .vstep-reading-editor .ql-editor p,
 .vstep-reading-editor .ql-editor span,
 .vstep-reading-editor .ql-editor li {

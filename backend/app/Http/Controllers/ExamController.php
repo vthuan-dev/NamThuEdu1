@@ -1274,8 +1274,7 @@ class ExamController extends Controller
                 ->get()
                 ->first(function ($b) use ($partNumber) {
                     $meta = $b->metadata ?? [];
-                    return ($meta['part_number'] ?? null) == $partNumber
-                        && isset($meta['word_count']);
+                    return ($meta['part_number'] ?? $meta['part'] ?? null) == $partNumber;
                 });
 
             $blockData = [
@@ -1631,19 +1630,27 @@ class ExamController extends Controller
                 })
                 ->values();
             
-            // FIXED: Filter content blocks to only get reading parts (those with word_count)
             $contentBlock = $exam->contentBlocks->first(function($block) use ($i) {
                 $metadata = $block->metadata ?? [];
-                return isset($metadata['part_number']) && 
-                       $metadata['part_number'] == $i &&
-                       isset($metadata['word_count']); // Reading blocks have word_count
+                $partNum = $metadata['part_number'] ?? $metadata['part'] ?? null;
+                return $block->block_type === 'passage' && $partNum == $i;
+            }) ?? $exam->contentBlocks->first(function($block) use ($i) {
+                $metadata = $block->metadata ?? [];
+                $partNum = $metadata['part_number'] ?? $metadata['part'] ?? null;
+                return $partNum == $i && !empty(trim($block->content ?? ''));
             });
+
+            $rawPassage = $contentBlock->content ?? '';
+            $wordCount = $contentBlock->metadata['word_count'] ?? 0;
+            if (!$wordCount && !empty($rawPassage)) {
+                $wordCount = str_word_count(strip_tags($rawPassage));
+            }
 
             $parts[] = [
                 'partNumber' => $i,
                 'partName' => $contentBlock->metadata['part_name'] ?? "Part $i",
-                'passage' => $contentBlock->content ?? '',
-                'wordCount' => $contentBlock->metadata['word_count'] ?? 0,
+                'passage' => $rawPassage,
+                'wordCount' => $wordCount,
                 'questions' => $partQuestions->map(function($q) {
                     return [
                         'questionNumber' => $q->qData['question_number'] ?? $q->qSection_order,
@@ -2398,6 +2405,48 @@ class ExamController extends Controller
             $file      = $request->file('image');
             $ext       = $file->getClientOriginalExtension() ?: 'jpg';
             $filename  = 'ielts_q_img_' . $examId . '_sec' . $sectionNumber . '_' . time() . '_' . \Illuminate\Support\Str::random(8) . '.' . $ext;
+            $path      = $file->storeAs('exam_images', $filename, 'public');
+            $imageUrl  = \Storage::disk('public')->url($path);
+
+            return response()->json([
+                'status'    => 'success',
+                'image_url' => $imageUrl,
+                'data'      => ['image_url' => $imageUrl, 'filename' => $filename],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['status' => 'error', 'message' => 'Lỗi upload ảnh: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * POST /api/teacher/exams/{examId}/ielts/reading/passages/{passageNumber}/question-image
+     * Upload a diagram/question image for a reading question group (e.g. diagram-labelling).
+     */
+    public function uploadIeltsReadingQuestionImage(Request $request, $examId, $passageNumber)
+    {
+        $user = $request->user();
+        $passageNumber = (int) $passageNumber;
+
+        if (!$user || !in_array($user->uRole, ['teacher', 'admin'])) {
+            return response()->json(['status' => 'error', 'message' => 'Bạn không có quyền truy cập.'], 401);
+        }
+
+        $exam = Exam::where('eId', $examId)->first();
+        if (!$exam) {
+            return response()->json(['status' => 'error', 'message' => 'Không tìm thấy bài thi.'], 404);
+        }
+
+        $validator = \Validator::make($request->all(), [
+            'image' => 'required|file|mimes:jpg,jpeg,png,gif,webp,pdf|max:20480',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['status' => 'error', 'message' => 'File ảnh không hợp lệ.', 'errors' => $validator->errors()], 400);
+        }
+
+        try {
+            $file      = $request->file('image');
+            $ext       = $file->getClientOriginalExtension() ?: 'jpg';
+            $filename  = 'ielts_reading_img_' . $examId . '_p' . $passageNumber . '_' . time() . '_' . \Illuminate\Support\Str::random(8) . '.' . $ext;
             $path      = $file->storeAs('exam_images', $filename, 'public');
             $imageUrl  = \Storage::disk('public')->url($path);
 

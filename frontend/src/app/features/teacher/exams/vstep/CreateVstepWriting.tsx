@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams, useParams } from "react-router";
 import { ArrowLeft, Save, PenTool, FileText, CheckCircle2, X, Plus } from "lucide-react";
 import { useToastContext } from "../../../../../contexts/ToastContext";
@@ -137,21 +137,24 @@ export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest 
     }
   }, [propExamId]); // Re-run when propExamId changes (important for Full Test)
 
-  const updatePrompt = (content: string) => {
+  const updatePromptForTask = useCallback((taskNum: 1 | 2, content: string) => {
     setTasks((prev) =>
       prev.map((t) =>
-        t.taskNumber === currentTask ? { ...t, prompt: content } : t
+        t.taskNumber === taskNum ? { ...t, prompt: content } : t
       )
     );
-  };
+  }, []);
 
-  const updateExplanation = (content: string) => {
+  const updateExplanationForTask = useCallback((taskNum: 1 | 2, content: string) => {
     setTasks((prev) =>
       prev.map((t) =>
-        t.taskNumber === currentTask ? { ...t, explanation: content } : t
+        t.taskNumber === taskNum ? { ...t, explanation: content } : t
       )
     );
-  };
+  }, []);
+
+  const updatePrompt = (content: string) => updatePromptForTask(currentTask, content);
+  const updateExplanation = (content: string) => updateExplanationForTask(currentTask, content);
 
   const handleSaveTask = async (taskNumber: 1 | 2) => {
     const task = tasks.find(t => t.taskNumber === taskNumber);
@@ -419,8 +422,9 @@ export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest 
               <div className="flex-1 p-4 overflow-hidden">
                 <div className="h-full vstep-writing-editor">
                   <QuillEditor
+                    key={`vstep-writing-prompt-task-${currentTask}`}
                     value={currentTaskData.prompt}
-                    onChange={updatePrompt}
+                    onChange={(content) => updatePromptForTask(currentTask, content)}
                     theme="snow"
                     placeholder={t('vstep.writing.prompt.placeholder')}
                     modules={{
@@ -448,8 +452,9 @@ export const CreateVstepWriting = ({ examId: propExamId, onComplete, isFullTest 
               <div className="flex-1 p-4 overflow-hidden">
                 <div className="h-full vstep-writing-editor">
                   <QuillEditor
+                    key={`vstep-writing-explanation-task-${currentTask}`}
                     value={currentTaskData.explanation || ""}
-                    onChange={updateExplanation}
+                    onChange={(content) => updateExplanationForTask(currentTask, content)}
                     theme="snow"
                     placeholder="Nhập dàn ý chi tiết, từ vựng khuyên dùng, hoặc bài mẫu..."
                     modules={{
