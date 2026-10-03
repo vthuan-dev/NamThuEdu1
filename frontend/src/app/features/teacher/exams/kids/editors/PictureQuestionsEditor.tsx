@@ -23,13 +23,14 @@ interface QuestionItem {
   sampleAnswer: string;
 }
 
+
 const PictureQuestionsEditor: React.FC<PictureQuestionsEditorProps> = ({
   onSave,
   onCancel,
   initialData,
   examId,
 }) => {
-  const [title, setTitle] = useState(initialData?.title || '');
+  const [title, setTitle] = useState(initialData?.title || 'Trả lời câu hỏi về hình');
   // BUG FIX: trước đây khởi tạo mảng RỖNG khi tạo mới → editor mở ra không có
   // mục nào, tức không có ô tải ảnh nào ("phần Nói không nhập được ảnh").
   // Luôn cho sẵn 1 mục để giáo viên nhập/tải ảnh được ngay.
@@ -57,20 +58,15 @@ const PictureQuestionsEditor: React.FC<PictureQuestionsEditorProps> = ({
   const updateQuestion = (id: string, field: keyof QuestionItem, value: string) =>
     setQuestions(questions.map((q) => (q.id === id ? { ...q, [field]: value } : q)));
 
-  const canSave =
-    !!title.trim() &&
-    questions.length > 0 &&
-    questions.every((q) => q.imageUrl && q.question && q.sampleAnswer);
-
   const handleSave = () => {
-    if (!title.trim()) return alert('Vui lòng nhập tiêu đề!');
+    const finalTitle = title.trim() || 'Trả lời câu hỏi về hình';
     if (questions.length === 0) return alert('Vui lòng thêm ít nhất 1 câu hỏi!');
     if (questions.some((q) => !q.imageUrl || !q.question || !q.sampleAnswer))
-      return alert('Vui lòng điền đầy đủ thông tin cho tất cả câu hỏi!');
+      return alert('Vui lòng điền đầy đủ hình ảnh, câu hỏi và câu trả lời mẫu!');
 
     onSave({
       type: 'picture_questions',
-      title,
+      title: finalTitle,
       points: questions.length,
       config: {
         questions: questions.map((q) => ({
@@ -87,7 +83,6 @@ const PictureQuestionsEditor: React.FC<PictureQuestionsEditorProps> = ({
       title="Trả lời câu hỏi về hình"
       badge="Speaking · Picture Questions"
       instruction="Học sinh nhìn hình và trả lời câu hỏi. Mỗi mục gồm 1 hình, 1 câu hỏi và 1 đáp án mẫu. Gợi ý: What is this? → It's a ball · What colour is it? → It's red."
-      saveDisabled={!canSave}
       onSave={handleSave}
       onCancel={onCancel}
     >

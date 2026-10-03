@@ -789,6 +789,22 @@ PROMPT;
     }
 
 
+    private function hasWritingAnswers(Submission $submission): bool
+    {
+        if ($submission->relationLoaded('answers')) {
+            return $submission->answers->contains(function ($a) {
+                $sec = strtolower($a->question->qSkill ?? $a->question->qSection ?? '');
+                return $sec === 'writing' && trim($a->saAnswer_text ?? '') !== '';
+            });
+        }
+        return $submission->answers()->whereHas('question', function ($q) {
+            $q->where(function ($sub) {
+                $sub->where('qSkill', 'writing')
+                    ->orWhere('qSection', 'writing');
+            });
+        })->whereNotNull('saAnswer_text')->where('saAnswer_text', '!=', '')->exists();
+    }
+
     private function hasSpeakingAudio(Submission $submission): bool
     {
         $raw = $this->decodeGeminiField($submission);

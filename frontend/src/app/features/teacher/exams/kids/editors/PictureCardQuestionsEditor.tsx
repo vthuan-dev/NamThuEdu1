@@ -29,7 +29,7 @@ const PictureCardQuestionsEditor: React.FC<PictureCardQuestionsEditorProps> = ({
   initialData,
   examId,
 }) => {
-  const [title, setTitle] = useState(initialData?.title || '');
+  const [title, setTitle] = useState(initialData?.title || 'Hỏi-đáp về thẻ hình');
   // Luôn có sẵn 1 thẻ khi tạo mới — trước đây mảng rỗng nên editor mở ra
   // không có ô tải ảnh nào.
   const [cards, setCards] = useState<CardItem[]>(() => {
@@ -55,20 +55,15 @@ const PictureCardQuestionsEditor: React.FC<PictureCardQuestionsEditorProps> = ({
   const updateCard = (id: string, field: keyof CardItem, value: string) =>
     setCards(cards.map((c) => (c.id === id ? { ...c, [field]: value } : c)));
 
-  const canSave =
-    !!title.trim() &&
-    cards.length > 0 &&
-    cards.every((c) => c.imageUrl && c.question && c.sampleAnswer);
-
   const handleSave = () => {
-    if (!title.trim()) return alert('Vui lòng nhập tiêu đề!');
+    const finalTitle = title.trim() || 'Hỏi-đáp về thẻ hình';
     if (cards.length === 0) return alert('Vui lòng thêm ít nhất 1 thẻ hình!');
     if (cards.some((c) => !c.imageUrl || !c.question || !c.sampleAnswer))
-      return alert('Vui lòng điền đầy đủ thông tin cho tất cả thẻ hình!');
+      return alert('Vui lòng điền đầy đủ hình ảnh, câu hỏi và đáp án mẫu cho tất cả thẻ hình!');
 
     onSave({
       type: 'picture_card_questions',
-      title,
+      title: finalTitle,
       points: cards.length,
       config: {
         cards: cards.map((c) => ({
@@ -85,7 +80,6 @@ const PictureCardQuestionsEditor: React.FC<PictureCardQuestionsEditorProps> = ({
       title="Hỏi-đáp về thẻ hình"
       badge="Speaking · Picture Cards"
       instruction="Học sinh nhìn thẻ hình và trả lời câu hỏi. Gợi ý: What is this? → It's a cat · Have you got a cat? → Yes, I have / No, I haven't."
-      saveDisabled={!canSave}
       onSave={handleSave}
       onCancel={onCancel}
     >

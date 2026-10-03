@@ -3932,6 +3932,9 @@ class StudentTestController extends Controller
             }
 
             $deadlineAt = \Carbon\Carbon::parse($startTime)->addSeconds($totalSeconds)->toIso8601String();
+            $rawFeedback = json_decode($existing->sGemini_feedback ?? '{}', true) ?: [];
+            $speakingAudio = $rawFeedback['speaking_audio'] ?? [];
+
             return response()->json([
                 'status' => 'success',
                 'data' => [
@@ -3942,6 +3945,7 @@ class StudentTestController extends Controller
                     'time_remaining_seconds' => $remaining,
                     'deadline_at' => $deadlineAt,
                     'savedAnswers' => $savedAnswers, // ← NEW: return saved answers
+                    'speaking_audio' => $speakingAudio,
                     'practice_scope' => $existing->submission_payload['practice_scope'] ?? null,
                     // backward-compat (phút)
                     'timeRemaining' => round($remaining / 60),

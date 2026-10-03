@@ -24,7 +24,7 @@ const OddOneOutEditor: React.FC<OddOneOutEditorProps> = ({
   examId,
   questionId,
 }) => {
-  const [title, setTitle] = useState(initialData?.title || '');
+  const [title, setTitle] = useState(initialData?.title || 'Tìm hình khác loại');
   const [images, setImages] = useState<ImageItem[]>(
     (initialData?.config ?? initialData?.question_data)?.images || [
       { id: 1, url: '', category: '' },
@@ -44,14 +44,8 @@ const OddOneOutEditor: React.FC<OddOneOutEditorProps> = ({
     setImages(updated);
   };
 
-  const canSave =
-    !!title.trim() &&
-    images.every((img) => img.url.trim() && img.category.trim()) &&
-    correctOddOne >= 1 &&
-    correctOddOne <= 4;
-
   const handleSave = () => {
-    if (!title.trim()) return setError('Vui lòng nhập tiêu đề câu hỏi');
+    const finalTitle = title.trim() || 'Tìm hình khác loại';
     if (images.some((img) => !img.url.trim() || !img.category.trim()))
       return setError('Vui lòng tải đủ 4 hình và điền loại (category)');
     if (!correctOddOne || correctOddOne < 1 || correctOddOne > 4)
@@ -61,7 +55,7 @@ const OddOneOutEditor: React.FC<OddOneOutEditorProps> = ({
     onSave({
       id: questionId,
       type: 'odd_one_out',
-      title,
+      title: finalTitle,
       points: 10,
       // `config` là shape Step2AddQuestions gửi lên API; giữ `question_data`
       // để tương thích dữ liệu cũ.
@@ -75,7 +69,6 @@ const OddOneOutEditor: React.FC<OddOneOutEditorProps> = ({
       title="Tìm hình khác loại"
       badge="Speaking · Odd-one-out"
       instruction="Tải 4 hình: 3 hình cùng loại + 1 hình khác loại. Đánh dấu hình khác loại bằng nút chọn. VD: cat, dog, bird (động vật) + car (phương tiện) → car là đáp án."
-      saveDisabled={!canSave}
       onSave={handleSave}
       onCancel={onCancel}
     >

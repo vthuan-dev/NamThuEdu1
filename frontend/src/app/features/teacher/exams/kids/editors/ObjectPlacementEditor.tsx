@@ -30,7 +30,7 @@ const ObjectPlacementEditor: React.FC<ObjectPlacementEditorProps> = ({
   initialData,
   examId,
 }) => {
-  const [title, setTitle] = useState(initialData?.title || '');
+  const [title, setTitle] = useState(initialData?.title || 'Đặt thẻ hình vào tranh');
   const [baseImageUrl, setBaseImageUrl] = useState(
     initialData?.config?.base_image_url || initialData?.config?.imageUrl || initialData?.config?.image_url || ''
   );
@@ -60,18 +60,16 @@ const ObjectPlacementEditor: React.FC<ObjectPlacementEditorProps> = ({
   const updateItem = (id: string, field: keyof PlacementItem, value: any) =>
     setItems(items.map((it) => (it.id === id ? { ...it, [field]: value } : it)));
 
-  const canSave = !!title.trim() && !!baseImageUrl && items.length > 0;
-
   const handleSave = () => {
-    if (!title.trim()) return alert('Vui lòng nhập tiêu đề!');
+    const finalTitle = title.trim() || 'Đặt thẻ hình vào tranh';
     if (!baseImageUrl) return alert('Vui lòng tải tranh lớn lên!');
     if (items.length === 0) return alert('Vui lòng thêm ít nhất 1 thẻ hình!');
     if (items.some((it) => !it.name || !it.cardImageUrl))
-      return alert('Vui lòng điền đầy đủ thông tin cho tất cả thẻ hình!');
+      return alert('Vui lòng điền đầy đủ tên và ảnh cho tất cả thẻ hình!');
 
     onSave({
       type: 'object_placement',
-      title,
+      title: finalTitle,
       points: items.length,
       config: {
         base_image_url: baseImageUrl,
@@ -89,7 +87,6 @@ const ObjectPlacementEditor: React.FC<ObjectPlacementEditorProps> = ({
       title="Đặt thẻ hình vào tranh"
       badge="Starters · Speaking · Part 1"
       instruction="Học sinh đặt các thẻ hình nhỏ vào đúng vị trí trên tranh lớn. Tải tranh nền, sau đó thêm các thẻ và chỉnh vị trí đúng cho mỗi thẻ."
-      saveDisabled={!canSave}
       onSave={handleSave}
       onCancel={onCancel}
     >

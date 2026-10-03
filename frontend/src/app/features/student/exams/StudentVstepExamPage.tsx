@@ -141,7 +141,7 @@ function SubmitDialog({
             </div>
             {!allDone && (
               <p className="mt-3 text-xs text-amber-700 font-medium">
-                Bạn còn phần chưa làm xong. Hãy hoàn thành 100% câu hỏi trong đề rồi mới nộp.
+                Bạn còn phần chưa hoàn thành. Các câu hoặc phần chưa làm sẽ tính 0 điểm. Bạn vẫn có thể nộp bài ngay nếu muốn kết thúc.
               </p>
             )}
           </div>
@@ -150,9 +150,9 @@ function SubmitDialog({
               className="flex-1 py-3 rounded-xl font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition text-sm">
               Tiếp tục làm
             </button>
-            <button onClick={onConfirm} disabled={loading || !allDone}
+            <button onClick={onConfirm} disabled={loading}
               className="flex-1 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition text-sm disabled:opacity-60 disabled:cursor-not-allowed">
-              {loading ? "Đang nộp..." : allDone ? "Nộp bài" : "Chưa hoàn thành"}
+              {loading ? "Đang nộp..." : allDone ? "Nộp bài" : "Xác nhận nộp bài"}
             </button>
           </div>
         </div>
@@ -255,12 +255,14 @@ export function StudentVstepExamPage() {
   /* ── localStorage keys (per submission, NOT per exam) ──── */
   const LS_ANSWERS  = submissionId ? `svstep_answers_sid_${submissionId}` : null;
   const LS_WRITING  = submissionId ? `svstep_writing_sid_${submissionId}` : null;
+  const LS_SPEAKING_DONE = submissionId ? `svstep_speaking_done_sid_${submissionId}` : null;
   const LS_NAV_STATE = submissionId ? `svstep_nav_sid_${submissionId}` : null;
 
   /* ── Answers state — start EMPTY, restored after submissionId is set ── */
   const [answers, setAnswers] = useState<Record<string, "A" | "B" | "C" | "D">>({});
   const [writingDrafts, setWritingDrafts] = useState<Record<number, string>>({});
   const [speakingDone, setSpeakingDone] = useState<Record<number, boolean>>({});
+  const [speakingAudios, setSpeakingAudios] = useState<Record<number, string>>({});
   /* ── Speaking lock state (prevent switching parts while prep or recording is in progress) ── */
   const [speakingBusy, setSpeakingBusy] = useState<{ isBusy: boolean; reason?: string }>({ isBusy: false });
 
@@ -345,6 +347,20 @@ export function StudentVstepExamPage() {
       }
       const savedF = localStorage.getItem(`svstep_flags_sid_${submissionId}`);
       if (savedF) setFlagged(JSON.parse(savedF));
+      const savedS = localStorage.getItem(`svstep_speaking_done_sid_${submissionId}`);
+      if (savedS) {
+        const parsed = JSON.parse(savedS);
+        if (parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) {
+          setSpeakingDone((prev) => ({ ...prev, ...parsed }));
+        }
+      }
+      const savedSAudios = localStorage.getItem(`svstep_speaking_audios_sid_${submissionId}`);
+      if (savedSAudios) {
+        const parsed = JSON.parse(savedSAudios);
+        if (parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) {
+          setSpeakingAudios((prev) => ({ ...prev, ...parsed }));
+        }
+      }
     } catch {} finally {
       setRestored(true);
     }
@@ -370,6 +386,22 @@ export function StudentVstepExamPage() {
       }
     } catch {}
   }, [writingDrafts, LS_WRITING, restored]);
+  useEffect(() => {
+    if (!LS_SPEAKING_DONE || !restored) return;
+    try {
+      if (Object.keys(speakingDone).length > 0) {
+        localStorage.setItem(LS_SPEAKING_DONE, JSON.stringify(speakingDone));
+      }
+    } catch {}
+  }, [speakingDone, LS_SPEAKING_DONE, restored]);
+  useEffect(() => {
+    if (!submissionId || !restored) return;
+    try {
+      if (Object.keys(speakingAudios).length > 0) {
+        localStorage.setItem(`svstep_speaking_audios_sid_${submissionId}`, JSON.stringify(speakingAudios));
+      }
+    } catch {}
+  }, [speakingAudios, submissionId, restored]);
   useEffect(() => {
     if (submissionId && restored) {
       try {
@@ -736,6 +768,37 @@ export function StudentVstepExamPage() {
             }
             if (Object.keys(writingMap).length > 0) {
               setWritingDrafts((prev) => ({ ...writingMap, ...prev }));
+            }
+
+            // Restore speaking audio and done status from backend
+            const spAudios = data.speaking_audio ?? {};
+            const spDoneMap: Record<number, boolean> = {};
+            const spUrlMap: Record<number, string> = {};
+            for (const [partKey, url] of Object.entries(spAudios)) {
+              const pNum = Number(partKey);
+              if (pNum > 0 && url) {
+                spDoneMap[pNum] = true;
+                spUrlMap[pNum] = String(url);
+              }
+            }
+            if (data.savedAnswers) {
+              for (const [, val] of Object.entries(data.savedAnswers)) {
+                const text = String(val);
+                if (text.includes('/speaking-recordings/speaking_') || text.includes('speaking_')) {
+                  const match = text.match(/part(\d+)/i);
+                  if (match && match[1]) {
+                    const pNum = Number(match[1]);
+                    spDoneMap[pNum] = true;
+                    if (!spUrlMap[pNum]) spUrlMap[pNum] = text;
+                  }
+                }
+              }
+            }
+            if (Object.keys(spDoneMap).length > 0) {
+              setSpeakingDone((prev) => ({ ...spDoneMap, ...prev }));
+            }
+            if (Object.keys(spUrlMap).length > 0) {
+              setSpeakingAudios((prev) => ({ ...spUrlMap, ...prev }));
             }
           }
         } else {
@@ -1259,7 +1322,14 @@ export function StudentVstepExamPage() {
         partNumber={current.partNumber}
         examId={examId || ""}
         submissionId={submissionId}
-        onComplete={(pn) => setSpeakingDone((prev) => ({ ...prev, [pn]: true }))}
+        onComplete={(pn, audioUrl) => {
+          setSpeakingDone((prev) => ({ ...prev, [pn]: true }));
+          if (audioUrl) {
+            setSpeakingAudios((prev) => ({ ...prev, [pn]: audioUrl }));
+          }
+        }}
+        initialDone={!reviewMode && !!speakingDone[current.partNumber]}
+        initialAudioUrl={!reviewMode ? speakingAudios[current.partNumber] : undefined}
         onBusyChange={(busy, reason) => setSpeakingBusy({ isBusy: busy, reason })}
         reviewMode={reviewMode}
         reviewAudioUrl={reviewSpeakingAudio[String(current.partNumber)]}
@@ -1415,14 +1485,13 @@ export function StudentVstepExamPage() {
                     vừa đủ to để bấm. */}
                 {(() => {
                   const isSpeakingLocked = !reviewMode && current.skill === "speaking" && speakingBusy.isBusy;
-                  const canSubmitHeader = submitGate.canSubmit && !isSpeakingLocked;
                   return (
                     <button
                       onClick={() => setShowSubmit(true)}
-                      disabled={!canSubmitHeader}
-                      title={isSpeakingLocked ? (speakingBusy.reason || "Đang trong bài nói, không thể nộp bài") : submitGate.tooltip}
+                      disabled={isSpeakingLocked}
+                      title={isSpeakingLocked ? (speakingBusy.reason || "Đang trong bài nói, không thể nộp bài") : "Nộp bài"}
                       className={`inline-flex items-center justify-center gap-1.5 sm:gap-2 min-h-11 px-3 sm:px-5 text-sm sm:text-base font-semibold rounded-lg active:scale-[0.97] transition-all shadow-sm ${
-                        canSubmitHeader
+                        !isSpeakingLocked
                           ? "bg-sky-600 text-white hover:bg-sky-700 cursor-pointer"
                           : "bg-slate-200 text-slate-400 cursor-not-allowed"
                       }`}
@@ -1478,8 +1547,8 @@ export function StudentVstepExamPage() {
             answeredCount={stats.answeredMCQ}
             totalCount={stats.totalMCQ}
             onSubmit={reviewMode ? undefined : () => setShowSubmit(true)}
-            canSubmit={submitGate.canSubmit}
-            submitTooltip={submitGate.tooltip}
+            canSubmit={true}
+            submitTooltip="Nộp bài"
             onJump={(pn, qId) => {
               if (pn !== current.partNumber) navigate2(current.skill, pn);
               setTimeout(() => {
@@ -1593,11 +1662,9 @@ export function StudentVstepExamPage() {
             <div className="flex items-center justify-center sm:justify-end gap-2 w-full lg:w-auto lg:absolute lg:right-4 lg:top-1/2 lg:-translate-y-1/2 flex-shrink-0">
               {(() => {
                 const isSpeakingLocked = !reviewMode && current.skill === "speaking" && speakingBusy.isBusy;
-                const nextDisabled = isSpeakingLocked || (isLastPart && !reviewMode && !submitGate.canSubmit);
+                const nextDisabled = isSpeakingLocked;
                 const nextTooltip = isSpeakingLocked
                   ? speakingBusy.reason || "Đang ghi âm bài nói, vui lòng hoàn thành trước khi chuyển phần"
-                  : isLastPart && !reviewMode
-                  ? submitGate.tooltip
                   : undefined;
                 return (
                   <button
@@ -1608,9 +1675,7 @@ export function StudentVstepExamPage() {
                       isSpeakingLocked
                         ? "bg-slate-300 text-slate-500 cursor-not-allowed opacity-60 pointer-events-none"
                         : isLastPart && !reviewMode
-                        ? submitGate.canSubmit
-                          ? "bg-emerald-600 hover:bg-emerald-700 animate-pulse"
-                          : "bg-slate-300 text-slate-500 cursor-not-allowed"
+                        ? "bg-emerald-600 hover:bg-emerald-700 animate-pulse"
                         : "bg-sky-600 hover:bg-sky-700"
                     }`}
                   >
@@ -2979,20 +3044,24 @@ function SpeakingQuestionScreen({
   onComplete,
   onBusyChange,
   reviewMode,
+  initialDone,
+  initialAudioUrl,
 }: {
   part: SpeakingPart;
   partNumber: number;
   submissionId: number | null;
-  onComplete?: (pn: number) => void;
+  onComplete?: (pn: number, audioUrl?: string) => void;
   onBusyChange?: (isBusy: boolean, reason?: string) => void;
   reviewMode?: boolean;
+  initialDone?: boolean;
+  initialAudioUrl?: string;
 }) {
   const times = SPEAKING_TIMES[partNumber] ?? { prepSec: 30, recSec: 180 };
   type Phase = "intro" | "countdown3" | "recording" | "done";
-  const [phase, setPhase] = useState<Phase>(reviewMode ? "done" : "intro");
+  const [phase, setPhase] = useState<Phase>(reviewMode || initialDone ? "done" : "intro");
   const [recLeft, setRecLeft] = useState(times.recSec);
   const [count3, setCount3] = useState(3);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(initialAudioUrl || null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [micStream, setMicStream] = useState<MediaStream | null>(null);
@@ -3029,7 +3098,13 @@ function SpeakingQuestionScreen({
   }, [onBusyChange]);
 
   useEffect(() => {
-    if (reviewMode) { window.speechSynthesis?.cancel(); setPhase("done"); setTtsProgress(0); return; }
+    if (reviewMode || initialDone) {
+      window.speechSynthesis?.cancel();
+      setPhase("done");
+      if (initialAudioUrl) setAudioUrl(initialAudioUrl);
+      setTtsProgress(0);
+      return;
+    }
     setPhase("intro"); setAudioUrl(null); setTtsProgress(0); setIsTtsPaused(false);
     if (typeof window === "undefined" || !("speechSynthesis" in window)) { return; }
     const text = buildSpeakingPrompt(part, partNumber);
@@ -3043,7 +3118,7 @@ function SpeakingQuestionScreen({
     utt.onerror = () => {};
     window.speechSynthesis.speak(utt);
     return () => { window.speechSynthesis.cancel(); };
-  }, [partNumber, reviewMode]);
+  }, [partNumber, reviewMode, initialDone, initialAudioUrl]);
 
   useEffect(() => {
     if (phase !== "countdown3") return;
@@ -3129,14 +3204,20 @@ function SpeakingQuestionScreen({
         const localUrl = URL.createObjectURL(blob);
         setAudioUrl(localUrl);
         stream.getTracks().forEach((t) => t.stop());
-        setMicStream(null); setPhase("done"); onComplete?.(partNumber);
+        setMicStream(null); setPhase("done"); onComplete?.(partNumber, localUrl);
         
         const sid = submissionId;
         if (sid && blob.size > 0) {
           setUploading(true);
           setUploadError(null);
           studentApi.uploadSpeakingAudio(sid, partNumber, blob)
-            .then(() => { setUploading(false); })
+            .then((res: any) => {
+              setUploading(false);
+              const serverUrl = res?.data?.data?.url;
+              if (serverUrl) {
+                onComplete?.(partNumber, serverUrl);
+              }
+            })
             .catch((err) => {
               console.error('[Speaking] Upload failed:', err);
               setUploading(false);
@@ -3251,13 +3332,13 @@ function SpeakingQuestionScreen({
 }
 
 function SpeakingView({
-  part, partNumber, examId, submissionId, onComplete, onBusyChange, reviewMode, reviewAudioUrl, reviewSpeakingScore, reviewSpeakingResults, isGradingPending, teacherOverallFeedback,
+  part, partNumber, examId, submissionId, onComplete, onBusyChange, reviewMode, reviewAudioUrl, reviewSpeakingScore, reviewSpeakingResults, isGradingPending, teacherOverallFeedback, initialDone, initialAudioUrl,
 }: {
   part?: SpeakingPart;
   partNumber: number;
   examId: string;
   submissionId: number | null;
-  onComplete?: (pn: number) => void;
+  onComplete?: (pn: number, audioUrl?: string) => void;
   onBusyChange?: (isBusy: boolean, reason?: string) => void;
   reviewMode?: boolean;
   reviewAudioUrl?: string;
@@ -3266,9 +3347,12 @@ function SpeakingView({
   isGradingPending?: boolean;
   /** Nhận xét tổng quát của giáo viên (sTeacher_feedback) */
   teacherOverallFeedback?: string | null;
+  initialDone?: boolean;
+  initialAudioUrl?: string;
 }) {
   const LS_PREP = `svstep_speaking_prep_${examId}`;
   const [viewPhase, setViewPhase] = useState<"prep" | "questions">(() => {
+    if (initialDone) return "questions";
     try { const done = JSON.parse(localStorage.getItem(LS_PREP) || "{}"); return done[partNumber] ? "questions" : "prep"; } catch { return "prep"; }
   });
   const [screenBusy, setScreenBusy] = useState<{ isBusy: boolean; reason?: string }>({ isBusy: false });
@@ -3294,9 +3378,9 @@ function SpeakingView({
   }, [onBusyChange]);
 
   useEffect(() => {
-    if (reviewMode) { setViewPhase("questions"); return; }
+    if (reviewMode || initialDone) { setViewPhase("questions"); return; }
     try { const done = JSON.parse(localStorage.getItem(LS_PREP) || "{}"); setViewPhase(done[partNumber] ? "questions" : "prep"); } catch { setViewPhase("prep"); }
-  }, [partNumber, reviewMode]);
+  }, [partNumber, reviewMode, initialDone]);
   const finishPrep = () => {
     try { const done = JSON.parse(localStorage.getItem(LS_PREP) || "{}"); done[partNumber] = true; localStorage.setItem(LS_PREP, JSON.stringify(done)); } catch {}
     setViewPhase("questions");
@@ -3361,6 +3445,8 @@ function SpeakingView({
             onComplete={reviewMode ? undefined : onComplete}
             onBusyChange={(busy, reason) => setScreenBusy({ isBusy: busy, reason })}
             reviewMode={reviewMode}
+            initialDone={initialDone}
+            initialAudioUrl={initialAudioUrl}
           />
         </div>
 

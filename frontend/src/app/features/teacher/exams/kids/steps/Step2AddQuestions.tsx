@@ -895,12 +895,21 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
             <span>Quay lại</span>
           </button>
           <button
-            onClick={onNext}
-            disabled={examData.questions.length === 0}
+            onClick={() => {
+              if (showEditor) {
+                alert('Bạn đang mở khung soạn thảo câu hỏi. Vui lòng bấm nút "Lưu câu hỏi" hoặc "Hủy" trước khi tiếp tục!');
+                return;
+              }
+              if (examData.questions.length === 0) {
+                alert('Vui lòng thêm và lưu ít nhất 1 câu hỏi trước khi chuyển sang bước Xem trước & Xuất bản!');
+                return;
+              }
+              onNext();
+            }}
             className={`flex items-center gap-2 rounded-lg px-6 py-2.5 text-xs font-bold shadow-sm transition-all ${
-              examData.questions.length > 0
-                ? 'bg-orange-500 text-white hover:bg-orange-600'
-                : 'cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400 shadow-none'
+              examData.questions.length > 0 && !showEditor
+                ? 'bg-orange-500 text-white hover:bg-orange-600 cursor-pointer'
+                : 'border border-slate-200 bg-slate-100 text-slate-500 hover:bg-slate-200 cursor-pointer'
             }`}
           >
             <span>Tiếp theo: Xem trước</span>

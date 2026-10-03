@@ -18,7 +18,7 @@ const PictureStoryNarrationEditor: React.FC<PictureStoryNarrationEditorProps> = 
   examId,
   questionId,
 }) => {
-  const [title, setTitle] = useState(initialData?.title || '');
+  const [title, setTitle] = useState(initialData?.title || 'Kể chuyện theo tranh');
   const [images, setImages] = useState<string[]>(
     (initialData?.config ?? initialData?.question_data)?.images || ['', '', '']
   );
@@ -50,10 +50,8 @@ const PictureStoryNarrationEditor: React.FC<PictureStoryNarrationEditorProps> = 
     setPrompts(prompts.filter((_, i) => i !== index));
   };
 
-  const canSave = !!title.trim() && images.filter((img) => img.trim()).length >= 3;
-
   const handleSave = () => {
-    if (!title.trim()) return setError('Vui lòng nhập tiêu đề câu hỏi');
+    const finalTitle = title.trim() || 'Kể chuyện theo tranh';
     const validImages = images.filter((img) => img.trim());
     if (validImages.length < 3) return setError('Vui lòng tải ít nhất 3 hình');
 
@@ -61,7 +59,7 @@ const PictureStoryNarrationEditor: React.FC<PictureStoryNarrationEditorProps> = 
     onSave({
       id: questionId,
       type: 'picture_story_narration',
-      title,
+      title: finalTitle,
       points: 10,
       // `config` là shape Step2AddQuestions gửi lên API; `question_data` giữ
       // tương thích với dữ liệu đã lưu trước đây.
@@ -81,7 +79,6 @@ const PictureStoryNarrationEditor: React.FC<PictureStoryNarrationEditorProps> = 
       title="Kể chuyện theo tranh"
       badge="Speaking · Picture Story"
       instruction="Học sinh nhìn 3-6 tranh theo thứ tự và kể lại câu chuyện. Mỗi tranh kèm 1 câu hỏi gợi ý."
-      saveDisabled={!canSave}
       onSave={handleSave}
       onCancel={onCancel}
     >

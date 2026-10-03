@@ -21,7 +21,7 @@ const FindDifferencesEditor: React.FC<FindDifferencesEditorProps> = ({
   // Dữ liệu đã lưu có thể nằm ở `config` (chuẩn hiện tại) hoặc `question_data`
   // (shape cũ của riêng editor này) — đọc cả hai để mở lại không mất ảnh.
   const saved = initialData?.config ?? initialData?.question_data ?? {};
-  const [title, setTitle] = useState(initialData?.title || '');
+  const [title, setTitle] = useState(initialData?.title || 'Tìm điểm khác biệt');
   const [imageAUrl, setImageAUrl] = useState(saved.image_a_url || '');
   const [imageBUrl, setImageBUrl] = useState(saved.image_b_url || '');
   const [differences, setDifferences] = useState<string[]>(
@@ -35,15 +35,9 @@ const FindDifferencesEditor: React.FC<FindDifferencesEditorProps> = ({
   const removeDifference = (index: number) =>
     setDifferences(differences.filter((_, i) => i !== index));
 
-  const canSave =
-    !!title.trim() &&
-    !!imageAUrl &&
-    !!imageBUrl &&
-    differences.some((d) => d.trim());
-
   const handleSave = () => {
-    if (!title.trim()) return setError('Vui lòng nhập tiêu đề câu hỏi');
-    if (!imageAUrl || !imageBUrl) return setError('Vui lòng tải cả 2 hình');
+    const finalTitle = title.trim() || 'Tìm điểm khác biệt';
+    if (!imageAUrl || !imageBUrl) return setError('Vui lòng tải cả 2 hình A và B');
     const valid = differences.filter((d) => d.trim());
     if (valid.length === 0) return setError('Vui lòng thêm ít nhất 1 điểm khác biệt');
 
@@ -56,7 +50,7 @@ const FindDifferencesEditor: React.FC<FindDifferencesEditorProps> = ({
     onSave({
       id: questionId,
       type: 'find_differences',
-      title,
+      title: finalTitle,
       points: 10,
       // `config` là shape chuẩn mà Step2AddQuestions gửi lên API.
       config: payload,
@@ -69,7 +63,6 @@ const FindDifferencesEditor: React.FC<FindDifferencesEditorProps> = ({
       title="Tìm điểm khác biệt"
       badge="Speaking · Find the Differences"
       instruction="Học sinh so sánh 2 bức tranh và nói ra điểm khác biệt. Tải 2 hình rồi liệt kê các điểm khác biệt để giáo viên dễ chấm."
-      saveDisabled={!canSave}
       onSave={handleSave}
       onCancel={onCancel}
     >
