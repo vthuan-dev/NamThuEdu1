@@ -93,15 +93,19 @@ export function GroupedChooseManyBlock({
   }, [questions, correctAnswers]);
 
   // Handle toggling an option and auto-distributing to questions in alphabetical order
-  const handleToggle = (letter: string) => {
+  const handleToggle = (letter: string, shouldCheck?: boolean) => {
     if (reviewMode) return;
     const upper = letter.toUpperCase();
     const next = new Set(selectedLetters);
 
-    if (next.has(upper)) {
+    const isCurrentlySelected = next.has(upper);
+    const targetState =
+      shouldCheck !== undefined ? shouldCheck : !isCurrentlySelected;
+
+    if (!targetState) {
       next.delete(upper);
     } else {
-      if (next.size >= selectCount) {
+      if (next.size >= selectCount && !isCurrentlySelected) {
         // Đã chọn đủ số lượng tối đa -> không cho chọn thêm trừ khi bỏ bớt
         return;
       }
@@ -316,8 +320,8 @@ export function GroupedChooseManyBlock({
           const isStudentRight = reviewMode && selected && isTarget;
           const isStudentWrong = reviewMode && selected && !isTarget;
           const isMissed = reviewMode && !selected && isTarget;
-          const isDisabled =
-            reviewMode || (!selected && isFull);
+          const isDisabled = reviewMode || (!selected && isFull);
+          const inputId = `group_${first.qId}_opt_${letter}`;
 
           let containerStyle =
             "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50/70";
@@ -344,11 +348,7 @@ export function GroupedChooseManyBlock({
           return (
             <label
               key={letter}
-              onClick={() => {
-                if (!isDisabled || selected) {
-                  handleToggle(letter);
-                }
-              }}
+              htmlFor={inputId}
               className={`flex items-start gap-3 p-3 rounded-lg border transition-all ${
                 reviewMode
                   ? "cursor-default"
@@ -358,13 +358,16 @@ export function GroupedChooseManyBlock({
               } ${containerStyle}`}
             >
               <input
+                id={inputId}
                 type="checkbox"
+                name={`group_${first.qId}`}
+                value={letter}
                 checked={selected}
-                onChange={() => handleToggle(letter)}
-                disabled={reviewMode || (!selected && isFull)}
+                onChange={(e) => handleToggle(letter, e.target.checked)}
+                disabled={isDisabled}
                 className="mt-1 w-4 h-4 rounded text-blue-600 accent-blue-600 focus:ring-blue-500 cursor-pointer disabled:cursor-not-allowed"
               />
-              <div className="flex items-start gap-2.5 flex-1 min-w-0">
+              <div className="flex items-start gap-2.5 flex-1 min-w-0 select-none">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span
                     className={`font-bold text-sm tracking-wide ${
