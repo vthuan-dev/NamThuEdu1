@@ -9,10 +9,66 @@
 import { useMemo, useState, useEffect } from "react";
 import { FileText, ZoomIn, X, Image as ImageIcon } from "lucide-react";
 import { PassageSplitLayout } from "../../../components/PassageSplitLayout";
-import type { IeltsReadingPayload, AnswerMap } from "../types";
+import type { IeltsReadingPayload, AnswerMap, IeltsQuestion } from "../types";
 import { IeltsQuestionRenderer } from "../components/IeltsQuestionRenderer";
+import { GroupedChooseManyBlock } from "../components/GroupedChooseManyBlock";
 import { type QuestionMeta } from "../components/IeltsBottomNav";
 import { IeltsQuestionNavigator } from "../components/IeltsQuestionNavigator";
+
+type QuestionSlot =
+  | { type: "single"; question: IeltsQuestion; index: number }
+  | { type: "group"; questions: IeltsQuestion[]; startIndex: number };
+
+function isGroupMcqType(rawType?: string): boolean {
+  const s = (rawType || "").toLowerCase().replace(/[-_]/g, "");
+  return s === "multiplechoicegroup";
+}
+
+function areGroupMembers(qA: IeltsQuestion, qB: IeltsQuestion): boolean {
+  if (!isGroupMcqType(qA.questionType) || !isGroupMcqType(qB.questionType)) {
+    return false;
+  }
+  const instrA = (qA as any).data?.task_instruction || (qA as any).taskInstruction || "";
+  const instrB = (qB as any).data?.task_instruction || (qB as any).taskInstruction || "";
+  if (instrA !== instrB) {
+    return false;
+  }
+  const imgA = (qA as any).data?.task_image || (qA as any).taskImage || "";
+  const imgB = (qB as any).data?.task_image || (qB as any).taskImage || "";
+  if (imgA !== imgB) {
+    return false;
+  }
+  const textA = (qA.questionText || "").trim();
+  const textB = (qB.questionText || "").trim();
+  if (textA && textB && textA !== textB) {
+    return false;
+  }
+  return true;
+}
+
+function groupPassageQuestions(questions: IeltsQuestion[]): QuestionSlot[] {
+  const slots: QuestionSlot[] = [];
+  let i = 0;
+  while (i < questions.length) {
+    const q = questions[i];
+    if (isGroupMcqType(q.questionType)) {
+      const group: IeltsQuestion[] = [q];
+      let j = i + 1;
+      while (j < questions.length && areGroupMembers(q, questions[j])) {
+        group.push(questions[j]);
+        j++;
+      }
+      if (group.length > 1) {
+        slots.push({ type: "group", questions: group, startIndex: i });
+        i = j;
+        continue;
+      }
+    }
+    slots.push({ type: "single", question: q, index: i });
+    i++;
+  }
+  return slots;
+}
 import { HighlightablePassage } from "../../../components/HighlightablePassage";
 import { useTextHighlight } from "../../../../../../hooks/exam/useTextHighlight";
 
@@ -175,6 +231,11 @@ export function IeltsReadingView({
     );
   }
 
+  const questionSlots = useMemo(() => {
+    if (!currentPassage) return [];
+    return groupPassageQuestions(currentPassage.questions);
+  }, [currentPassage]);
+
   const currentAnswered = currentPassage.questions.filter(
     (q) => answers[q.qId] != null && answers[q.qId] !== ""
   ).length;
@@ -279,12 +340,51 @@ export function IeltsReadingView({
           questionsBodyClassName="space-y-3"
           questionsContent={
             <>
-              {currentPassage.questions.map((q, idx) => {
+              {questionSlots.map((slot) => {
+                if (slot.type === "group") {
+                  const firstQ = slot.questions[0];
+                  const lastQ = slot.questions[slot.questions.length - 1];
+
+                  const taskImg =
+                    (firstQ as any).data?.task_image || (firstQ as any).taskImage || "";
+                  const prevTaskImg =
+                    slot.startIndex > 0
+                      ? (currentPassage.questions[slot.startIndex - 1] as any).data?.task_image ||
+                        (currentPassage.questions[slot.startIndex - 1] as any).taskImage ||
+                        ""
+                      : "";
+                  const showImage = !!taskImg && taskImg !== prevTaskImg;
+                  const rangeLabel = `Câu ${firstQ.questionNumber}–${lastQ.questionNumber}`;
+
+                  return (
+                    <div key={`group-${firstQ.qId}`} className="space-y-3">
+                      {showImage && (
+                        <ReadingDiagramBlock
+                          taskImage={taskImg}
+                          rangeLabel={rangeLabel}
+                        />
+                      )}
+                      <GroupedChooseManyBlock
+                        questions={slot.questions}
+                        answers={answers}
+                        onAnswer={onAnswer}
+                        flagged={flagged}
+                        onToggleFlag={onToggleFlag}
+                        reviewMode={reviewMode}
+                        correctAnswers={correctAnswers}
+                        isCorrectMap={isCorrectMap}
+                        explanations={explanations}
+                      />
+                    </div>
+                  );
+                }
+
+                const q = slot.question;
+                const idx = slot.index;
                 const instr = (q as any).data?.task_instruction || "";
                 const prevInstr =
                   idx > 0
-                    ? (currentPassage.questions[idx - 1] as any).data
-                        ?.task_instruction || ""
+                    ? (currentPassage.questions[idx - 1] as any).data?.task_instruction || ""
                     : null;
                 const showInstruction = instr && instr !== prevInstr;
 
@@ -292,7 +392,8 @@ export function IeltsReadingView({
                 const prevTaskImg =
                   idx > 0
                     ? (currentPassage.questions[idx - 1] as any).data?.task_image ||
-                      (currentPassage.questions[idx - 1] as any).taskImage || ""
+                      (currentPassage.questions[idx - 1] as any).taskImage ||
+                      ""
                     : "";
                 const showImage = !!taskImg && taskImg !== prevTaskImg;
 
@@ -302,7 +403,8 @@ export function IeltsReadingView({
                   for (let j = idx + 1; j < currentPassage.questions.length; j++) {
                     const nextImg =
                       (currentPassage.questions[j] as any).data?.task_image ||
-                      (currentPassage.questions[j] as any).taskImage || "";
+                      (currentPassage.questions[j] as any).taskImage ||
+                      "";
                     if (nextImg === taskImg) {
                       groupCount++;
                     } else {
@@ -314,8 +416,10 @@ export function IeltsReadingView({
                   }
                 }
 
-                const qExplanation = explanations[q.qId] || q.explanation || (q as any).qExplanation;
+                const qExplanation =
+                  explanations[q.qId] || q.explanation || (q as any).qExplanation;
                 const enrichedQ = qExplanation ? { ...q, explanation: qExplanation } : q;
+
                 return (
                   <div key={q.qId} id={`ielts-q-${q.qId}`}>
                     {showInstruction && (
