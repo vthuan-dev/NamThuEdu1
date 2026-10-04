@@ -166,7 +166,7 @@ class IeltsExamController extends Controller
         if ($request->has('ielts_test_type')) {
             $testType = $request->input('ielts_test_type');
             $updates['ielts_test_type'] = $testType;
-            // Giữ eType = 'IELTS' (enum không có _ACADEMIC/_GENERAL)
+            // Giữ eType = 'IELTS'; Academic/General phân biệt bằng ielts_test_type
         }
 
         // Merge ielts_config (giữ nguyên những field không update)
