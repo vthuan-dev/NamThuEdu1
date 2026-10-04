@@ -236,6 +236,17 @@ class IeltsExamController extends Controller
         $data = $request->input('ielts_data');
         $playModes = $request->input('play_modes', $this->defaultPlayModes());
 
+        // Lọc bỏ passages/sections rỗng chưa được thêm ở đề thi đơn kỹ năng linh hoạt
+        if ($skill === 'reading' && isset($data['passages']) && is_array($data['passages'])) {
+            $data['passages'] = array_values(array_filter($data['passages'], function ($p, $idx) {
+                if ($idx === 0 || ($p['passageNumber'] ?? 1) == 1) return true;
+                $hasBody = !empty(trim((string) ($p['body'] ?? $p['passageText'] ?? '')));
+                $hasQs = !empty($p['questions']) || !empty($p['groups']);
+                $hasTitle = !empty(trim((string) ($p['title'] ?? $p['passageTitle'] ?? '')));
+                return $hasBody || $hasQs || hasTitle;
+            }, ARRAY_FILTER_USE_BOTH));
+        }
+
         // Validate ít nhất 1 mode được bật
         if (!($playModes['practice_enabled'] ?? false) && !($playModes['full_test_enabled'] ?? false)) {
             return $this->errorResponse(
@@ -397,6 +408,18 @@ class IeltsExamController extends Controller
         }
         if (!$ieltsData) {
             $ieltsData = $this->reconstructIeltsDraftFromExam($exam);
+        }
+
+        if ($ieltsData && is_array($ieltsData)) {
+            if (isset($ieltsData['passages']) && is_array($ieltsData['passages'])) {
+                $ieltsData['passages'] = array_values(array_filter($ieltsData['passages'], function ($p, $idx) {
+                    if ($idx === 0 || ($p['passageNumber'] ?? 1) == 1) return true;
+                    $hasBody = !empty(trim((string) ($p['body'] ?? $p['passageText'] ?? '')));
+                    $hasQs = !empty($p['questions']) || !empty($p['groups']);
+                    $hasTitle = !empty(trim((string) ($p['title'] ?? $p['passageTitle'] ?? '')));
+                    return $hasBody || $hasQs || hasTitle;
+                }, ARRAY_FILTER_USE_BOTH));
+            }
         }
 
         return response()->json([

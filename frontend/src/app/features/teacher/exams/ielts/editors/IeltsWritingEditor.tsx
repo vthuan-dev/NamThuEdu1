@@ -400,8 +400,8 @@ export function IeltsWritingEditor({ initialData, onSave, testType, isFullTest =
       <div className="flex items-center justify-end bg-white rounded-2xl border border-gray-200 p-4 sticky bottom-0">
         <button
           type="button"
-          onClick={() => onSave({ tasks })}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 transition-all cursor-pointer"
+          onClick={() => onSave({ tasks: tasks.filter((t) => activeTasks.has(t.taskNumber)) })}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 transition-all cursor-pointer shadow-sm hover:shadow"
         >
           <Save className="w-4 h-4" />
           Lưu Writing

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { IELTS_STRUCTURE, IELTS_READING_QUESTION_TYPES, type IeltsTestType } from "../structure";
 import { api } from "../../../../../../services/api";
+import { useToastContext } from "../../../../../../contexts/ToastContext";
 import { RichTextInput } from "../../../../../../components/ui/RichTextInput";
 
 // ─── Types ───────────────────────────────────────────────────────────────
@@ -276,29 +277,38 @@ function normalizeGroup(raw: any): ReadingGroup {
 
 function buildPassages(initialData: any): ReadingPassage[] {
   const arr = initialData?.passages;
-  if (Array.isArray(arr) && arr.length) {
-    return arr.map((p: any, i: number) => {
+  const existingMap = new Map<number, any>();
+  if (Array.isArray(arr)) {
+    arr.forEach((p: any, i: number) => {
+      const num = Number(p?.passageNumber) || (i + 1);
+      existingMap.set(num, p);
+    });
+  }
+
+  return ([1, 2, 3] as const).map((n) => {
+    const p = existingMap.get(n);
+    if (p) {
       const body = p.body || p.passageText || "";
       const groups =
         Array.isArray(p.groups) && p.groups.length
           ? p.groups.map(normalizeGroup)
           : deriveGroups(p.questions || []);
       return {
-        passageNumber: (p.passageNumber || i + 1) as 1 | 2 | 3,
+        passageNumber: n,
         title: p.title || p.passageTitle || "",
         body,
         wordCount: p.wordCount || countWords(body),
         groups,
       };
-    });
-  }
-  return [1, 2, 3].map((n) => ({
-    passageNumber: n as 1 | 2 | 3,
-    title: "",
-    body: "",
-    wordCount: 0,
-    groups: [],
-  }));
+    }
+    return {
+      passageNumber: n,
+      title: "",
+      body: "",
+      wordCount: 0,
+      groups: [],
+    };
+  });
 }
 
 /**
@@ -351,6 +361,7 @@ export function IeltsReadingEditor({
   testType,
   isFullTest = false,
 }: Props) {
+  const { success } = useToastContext();
   const [passages, setPassages] = useState<ReadingPassage[]>(() =>
     buildPassages(initialData)
   );
@@ -358,10 +369,17 @@ export function IeltsReadingEditor({
   const [activePassages, setActivePassages] = useState<Set<1 | 2 | 3>>(() => {
     if (isFullTest) return new Set<1 | 2 | 3>([1, 2, 3]);
     if (initialData?.passages?.length) {
-      const nums = initialData.passages
+      const activeNums = initialData.passages
+        .filter((p: any, idx: number) => {
+          if (idx === 0 || p.passageNumber === 1) return true;
+          const hasBody = !!p.body?.trim() || !!p.passageText?.trim();
+          const hasQs = (p.questions?.length > 0) || (p.groups?.length > 0);
+          const hasTitle = !!p.title?.trim() || !!p.passageTitle?.trim();
+          return hasBody || hasQs || hasTitle;
+        })
         .map((p: any) => p.passageNumber as 1 | 2 | 3)
         .filter((n: number) => n >= 1 && n <= 3);
-      if (nums.length) return new Set<1 | 2 | 3>(nums);
+      if (activeNums.length) return new Set<1 | 2 | 3>(activeNums);
     }
     return new Set<1 | 2 | 3>([1]);
   });
@@ -866,8 +884,14 @@ export function IeltsReadingEditor({
       <div className="flex items-center justify-end bg-white rounded-2xl border border-gray-200 p-4 sticky bottom-0">
         <button
           type="button"
-          onClick={() => onSave({ passages: flattenPassages(passages) })}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-all cursor-pointer"
+          onClick={() => {
+            const activePassageList = flattenPassages(
+              passages.filter((p) => activePassages.has(p.passageNumber))
+            );
+            onSave({ passages: activePassageList });
+            success("Đã cập nhật nội dung Reading");
+          }}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-all cursor-pointer shadow-sm hover:shadow"
         >
           <Save className="w-4 h-4" />
           Lưu Reading

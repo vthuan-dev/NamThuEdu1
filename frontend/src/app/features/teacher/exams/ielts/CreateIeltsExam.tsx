@@ -219,7 +219,20 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
           if (data.age_group) setAgeGroup(data.age_group);
           // Restore skill data từ draft → editor sẽ render với initialData
           if (data.ielts_data) {
-            setSkillData(data.ielts_data);
+            let cleanData = data.ielts_data;
+            if (skill === "reading" && Array.isArray(cleanData.passages)) {
+              cleanData = {
+                ...cleanData,
+                passages: cleanData.passages.filter((p: any, idx: number) => {
+                  if (idx === 0 || p.passageNumber === 1) return true;
+                  const hasBody = !!p.body?.trim() || !!p.passageText?.trim();
+                  const hasQs = (p.questions?.length > 0) || (p.groups?.length > 0);
+                  const hasTitle = !!p.title?.trim() || !!p.passageTitle?.trim();
+                  return hasBody || hasQs || hasTitle;
+                }),
+              };
+            }
+            setSkillData(cleanData);
             setEditorVersion((v) => v + 1); // force remount để áp dụng data
             setValidationEnabled(true); // có data sẵn → bật validation
           }
@@ -262,7 +275,20 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
   // Editors gọi onSave từ useEffect mỗi lần state thay đổi → KHÔNG toast
   // ở đây để tránh spam. Toast chỉ hiển thị khi bấm "Lưu nháp" (backend save).
   const handleSaveSkill = (data: any) => {
-    setSkillData(data);
+    let clean = data;
+    if (skill === "reading" && Array.isArray(data?.passages)) {
+      clean = {
+        ...data,
+        passages: data.passages.filter((p: any, idx: number) => {
+          if (idx === 0 || p.passageNumber === 1) return true;
+          const hasBody = !!p.body?.trim() || !!p.passageText?.trim();
+          const hasQs = (p.questions?.length > 0) || (p.groups?.length > 0);
+          const hasTitle = !!p.title?.trim() || !!p.passageTitle?.trim();
+          return hasBody || hasQs || hasTitle;
+        }),
+      };
+    }
+    setSkillData(clean);
     setHasUnsavedChanges(true);
   };
 
@@ -307,8 +333,25 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
       return;
     }
     if (hasUnsavedChanges) {
-      error("Đề đang có chỉnh sửa chưa lưu. Vui lòng bấm 'Lưu nháp' trước khi xuất bản nhé!");
-      return;
+      // Tự động lưu nháp trước khi xuất bản để không mất bất kỳ thay đổi nào
+      try {
+        await api.put(`/teacher/exams/${examId}/ielts`, {
+          eTitle: examTitle,
+          eDescription: examDescription,
+          ielts_test_type: testType,
+          eScope: "skill",
+          age_group: ageGroup,
+          ielts_config: {
+            test_type: testType,
+            skill,
+            play_modes: playMode,
+          },
+          ielts_data: skillData ? { [getDataKey(skill)]: extractSkillItems(skill, skillData) } : null,
+        });
+        setHasUnsavedChanges(false);
+      } catch (err) {
+        console.warn("[CreateIeltsExam] auto-save draft before publish failed:", err);
+      }
     }
     if (!skillData) {
       error("Chưa có nội dung — vui lòng nhập đầy đủ trước khi xuất bản");
@@ -708,12 +751,42 @@ function extractSkillItems(skill: IeltsSkill, data: any): any[] {
   if (!data) return [];
   if (Array.isArray(data)) return data;
   const key = getDataKey(skill);
-  if (Array.isArray(data[key])) return data[key];
-  // Fallback: tìm field array đầu tiên
-  for (const v of Object.values(data)) {
-    if (Array.isArray(v)) return v;
+  let items = Array.isArray(data[key]) ? data[key] : [];
+  if (!items.length) {
+    for (const v of Object.values(data)) {
+      if (Array.isArray(v)) { items = v; break; }
+    }
   }
-  return [];
+  // Loại bỏ các placeholder items chưa nhập ở đề linh hoạt
+  if (skill === "reading") {
+    return items.filter((p: any, idx: number) => {
+      if (idx === 0 || p.passageNumber === 1) return true;
+      const hasBody = !!p.body?.trim() || !!p.passageText?.trim();
+      const hasQs = (p.questions?.length > 0) || (p.groups?.length > 0);
+      const hasTitle = !!p.title?.trim() || !!p.passageTitle?.trim();
+      return hasBody || hasQs || hasTitle;
+    });
+  }
+  if (skill === "listening") {
+    return items.filter((s: any, idx: number) => {
+      if (idx === 0 || s.sectionNumber === 1) return true;
+      return !!s.audioUrl || (s.questions?.length > 0 && s.questions.some((q: any) => q.questionText?.trim()));
+    });
+  }
+  if (skill === "writing") {
+    return items.filter((t: any, idx: number) => {
+      if (idx === 0 || t.taskNumber === 1) return true;
+      return !!t.prompt?.trim();
+    });
+  }
+  if (skill === "speaking") {
+    return items.filter((p: any, idx: number) => {
+      if (idx === 0 || p.partNumber === 1) return true;
+      return (p.partNumber === 2 && !!p.cueCard?.topic?.trim()) ||
+             (p.questions?.length > 0 && p.questions.some((q: any) => q.text?.trim()));
+    });
+  }
+  return items;
 }
 
 // ─── Validation ────────────────────────────────────────────────────────────
@@ -809,7 +882,15 @@ export function validateIeltsSkillData(skill: IeltsSkill, data: any): Validation
   }
 
   if (skill === "reading") {
-    const passages = data.passages || [];
+    const rawPassages = data.passages || [];
+    // Chỉ validate các passage thực tế đã thêm: passage 1 hoặc các passage có nội dung/câu hỏi/tiêu đề
+    const passages = rawPassages.filter((p: any, idx: number) => {
+      if (idx === 0 || p.passageNumber === 1) return true;
+      const hasBody = !!p.body?.trim() || !!p.passageText?.trim();
+      const hasQs = (p.questions?.length > 0) || (p.groups?.length > 0);
+      const hasTitle = !!p.title?.trim() || !!p.passageTitle?.trim();
+      return hasBody || hasQs || hasTitle;
+    });
     if (passages.length < 1) {
       issues.push({ severity: "error", location: "Tổng quát", message: "Cần ít nhất 1 passage" });
     }

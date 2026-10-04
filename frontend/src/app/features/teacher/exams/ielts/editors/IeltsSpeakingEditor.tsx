@@ -296,8 +296,8 @@ export function IeltsSpeakingEditor({
       <div className="flex items-center justify-end bg-white rounded-2xl border border-gray-200 p-4 sticky bottom-0">
         <button
           type="button"
-          onClick={() => onSave({ parts })}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700 transition-all cursor-pointer"
+          onClick={() => onSave({ parts: parts.filter((p) => activeParts.has(p.partNumber)) })}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700 transition-all cursor-pointer shadow-sm hover:shadow"
         >
           <Save className="w-4 h-4" />
           Lưu Speaking
