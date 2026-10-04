@@ -236,7 +236,7 @@ class IeltsExamController extends Controller
         $data = $request->input('ielts_data');
         $playModes = $request->input('play_modes', $this->defaultPlayModes());
 
-        // Lọc bỏ passages/sections rỗng chưa được thêm ở đề thi đơn kỹ năng linh hoạt
+        // Lọc bỏ passages/sections/tasks/parts rỗng chưa được thêm ở đề thi đơn kỹ năng linh hoạt
         if ($skill === 'reading' && isset($data['passages']) && is_array($data['passages'])) {
             $data['passages'] = array_values(array_filter($data['passages'], function ($p, $idx) {
                 if ($idx === 0 || ($p['passageNumber'] ?? 1) == 1) return true;
@@ -244,6 +244,26 @@ class IeltsExamController extends Controller
                 $hasQs = !empty($p['questions']) || !empty($p['groups']);
                 $hasTitle = !empty(trim((string) ($p['title'] ?? $p['passageTitle'] ?? '')));
                 return $hasBody || $hasQs || hasTitle;
+            }, ARRAY_FILTER_USE_BOTH));
+        } elseif ($skill === 'listening' && isset($data['sections']) && is_array($data['sections'])) {
+            $data['sections'] = array_values(array_filter($data['sections'], function ($s, $idx) {
+                if ($idx === 0 || ($s['sectionNumber'] ?? 1) == 1) return true;
+                $hasAudio = !empty(trim((string) ($s['audioUrl'] ?? '')));
+                $hasQs = !empty($s['questions']) && count(array_filter($s['questions'], fn($q) => !empty(trim((string) ($q['questionText'] ?? ''))))) > 0;
+                return $hasAudio || $hasQs;
+            }, ARRAY_FILTER_USE_BOTH));
+        } elseif ($skill === 'writing' && isset($data['tasks']) && is_array($data['tasks'])) {
+            $data['tasks'] = array_values(array_filter($data['tasks'], function ($t, $idx) {
+                if ($idx === 0 || ($t['taskNumber'] ?? 1) == 1) return true;
+                return !empty(trim((string) ($t['prompt'] ?? '')));
+            }, ARRAY_FILTER_USE_BOTH));
+        } elseif ($skill === 'speaking' && isset($data['parts']) && is_array($data['parts'])) {
+            $data['parts'] = array_values(array_filter($data['parts'], function ($p, $idx) {
+                if ($idx === 0 || ($p['partNumber'] ?? 1) == 1) return true;
+                $isPart2 = ($p['partNumber'] ?? 0) == 2;
+                $hasCueCard = !empty(trim((string) ($p['cueCard']['topic'] ?? '')));
+                $hasQs = !empty($p['questions']) && count(array_filter($p['questions'], fn($q) => !empty(trim((string) ($q['text'] ?? ''))))) > 0;
+                return ($isPart2 && $hasCueCard) || $hasQs;
             }, ARRAY_FILTER_USE_BOTH));
         }
 
@@ -418,6 +438,29 @@ class IeltsExamController extends Controller
                     $hasQs = !empty($p['questions']) || !empty($p['groups']);
                     $hasTitle = !empty(trim((string) ($p['title'] ?? $p['passageTitle'] ?? '')));
                     return $hasBody || $hasQs || hasTitle;
+                }, ARRAY_FILTER_USE_BOTH));
+            }
+            if (isset($ieltsData['sections']) && is_array($ieltsData['sections'])) {
+                $ieltsData['sections'] = array_values(array_filter($ieltsData['sections'], function ($s, $idx) {
+                    if ($idx === 0 || ($s['sectionNumber'] ?? 1) == 1) return true;
+                    $hasAudio = !empty(trim((string) ($s['audioUrl'] ?? '')));
+                    $hasQs = !empty($s['questions']) && count(array_filter($s['questions'], fn($q) => !empty(trim((string) ($q['questionText'] ?? ''))))) > 0;
+                    return $hasAudio || $hasQs;
+                }, ARRAY_FILTER_USE_BOTH));
+            }
+            if (isset($ieltsData['tasks']) && is_array($ieltsData['tasks'])) {
+                $ieltsData['tasks'] = array_values(array_filter($ieltsData['tasks'], function ($t, $idx) {
+                    if ($idx === 0 || ($t['taskNumber'] ?? 1) == 1) return true;
+                    return !empty(trim((string) ($t['prompt'] ?? '')));
+                }, ARRAY_FILTER_USE_BOTH));
+            }
+            if (isset($ieltsData['parts']) && is_array($ieltsData['parts'])) {
+                $ieltsData['parts'] = array_values(array_filter($ieltsData['parts'], function ($p, $idx) {
+                    if ($idx === 0 || ($p['partNumber'] ?? 1) == 1) return true;
+                    $isPart2 = ($p['partNumber'] ?? 0) == 2;
+                    $hasCueCard = !empty(trim((string) ($p['cueCard']['topic'] ?? '')));
+                    $hasQs = !empty($p['questions']) && count(array_filter($p['questions'], fn($q) => !empty(trim((string) ($q['text'] ?? ''))))) > 0;
+                    return ($isPart2 && $hasCueCard) || $hasQs;
                 }, ARRAY_FILTER_USE_BOTH));
             }
         }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { PenLine, Save, Image as ImageIcon, Upload, Sparkles, AlertCircle, Plus, X } from "lucide-react";
 import { IELTS_STRUCTURE, type IeltsTestType } from "../structure";
+import { useToastContext } from "../../../../../../contexts/ToastContext";
 
 interface WritingTask {
   taskNumber: 1 | 2;
@@ -32,6 +33,7 @@ const buildEmptyTasks = (): WritingTask[] => [
 ];
 
 export function IeltsWritingEditor({ initialData, onSave, testType, isFullTest = false }: Props) {
+  const { success } = useToastContext();
   // Luôn giữ cấu hình đầy đủ 2 task trong state để bật/tắt không mất dữ liệu đã nhập.
   const [tasks, setTasks] = useState<WritingTask[]>(() => {
     const empty = buildEmptyTasks();
@@ -48,7 +50,11 @@ export function IeltsWritingEditor({ initialData, onSave, testType, isFullTest =
   const [activeTasks, setActiveTasks] = useState<Set<1 | 2>>(() => {
     if (isFullTest) return new Set<1 | 2>([1, 2]);
     if (initialData?.tasks?.length) {
-      return new Set<1 | 2>(initialData.tasks.map((t: WritingTask) => t.taskNumber));
+      const activeNums = initialData.tasks
+        .filter((t: any, idx: number) => idx === 0 || t.taskNumber === 1 || !!t.prompt?.trim())
+        .map((t: any) => t.taskNumber as 1 | 2)
+        .filter((n: number) => n === 1 || n === 2);
+      if (activeNums.length) return new Set<1 | 2>(activeNums);
     }
     return new Set<1 | 2>([1]);
   });
@@ -400,7 +406,10 @@ export function IeltsWritingEditor({ initialData, onSave, testType, isFullTest =
       <div className="flex items-center justify-end bg-white rounded-2xl border border-gray-200 p-4 sticky bottom-0">
         <button
           type="button"
-          onClick={() => onSave({ tasks: tasks.filter((t) => activeTasks.has(t.taskNumber)) })}
+          onClick={() => {
+            onSave({ tasks: tasks.filter((t) => activeTasks.has(t.taskNumber)) });
+            success("Đã cập nhật nội dung Writing");
+          }}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 transition-all cursor-pointer shadow-sm hover:shadow"
         >
           <Save className="w-4 h-4" />

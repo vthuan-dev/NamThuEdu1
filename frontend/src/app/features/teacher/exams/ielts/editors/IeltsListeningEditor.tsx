@@ -11,9 +11,11 @@ import {
   ZoomIn,
   Plus,
   X,
+  Save,
 } from "lucide-react";
 import { IELTS_STRUCTURE, IELTS_LISTENING_QUESTION_TYPES, type IeltsTestType } from "../structure";
 import { api } from "../../../../../../services/api";
+import { useToastContext } from "../../../../../../contexts/ToastContext";
 import { transcribeAudio as transcribeGroq } from "../../../../../../services/groqApi";
 import { transcribeLocal } from "../../../../../../services/whisperLocal";
 import { RichTextInput } from "../../../../../../components/ui/RichTextInput";
@@ -273,6 +275,7 @@ export function IeltsListeningEditor({
   onSave,
   isFullTest = false,
 }: Props) {
+  const { success } = useToastContext();
   const [sections, setSections] = useState<ListeningSection[]>(() => {
     const empty = [1, 2, 3, 4].map((n) => buildEmptySection(n as 1 | 2 | 3 | 4));
     if (!initialData?.sections) return empty;
@@ -315,10 +318,14 @@ export function IeltsListeningEditor({
   const [activeSections, setActiveSections] = useState<Set<1 | 2 | 3 | 4>>(() => {
     if (isFullTest) return new Set<1 | 2 | 3 | 4>([1, 2, 3, 4]);
     if (initialData?.sections?.length) {
-      const nums = initialData.sections
+      const activeNums = initialData.sections
+        .filter((s: any, idx: number) => {
+          if (idx === 0 || s.sectionNumber === 1) return true;
+          return !!s.audioUrl || (s.questions?.length > 0 && s.questions.some((q: any) => q.questionText?.trim()));
+        })
         .map((s: any) => s.sectionNumber as 1 | 2 | 3 | 4)
         .filter((n: number) => n >= 1 && n <= 4);
-      if (nums.length) return new Set<1 | 2 | 3 | 4>(nums);
+      if (activeNums.length) return new Set<1 | 2 | 3 | 4>(activeNums);
     }
     return new Set<1 | 2 | 3 | 4>([1]);
   });
@@ -1354,41 +1361,52 @@ export function IeltsListeningEditor({
         </div>
       </div>
 
-      {/* ── Bottom progress ─────────────────────────────────── */}
-      <div className="flex items-center justify-between bg-white rounded-2xl border border-gray-200 p-4 sticky bottom-0">
+      {/* ── Bottom progress & Save ─────────────────────────────────── */}
+      <div className="flex items-center justify-between bg-white rounded-2xl border border-gray-200 p-4 sticky bottom-0 z-10 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="flex -space-x-1">
-            {sections.map((s) => {
-              const done =
-                !!s.audioUrl && s.questions.every((q) =>
-                  isImageCompletion(q.questionType) ? !!q.correctAnswer.trim() : !!q.questionText.trim()
+            {sections
+              .filter((s) => activeSections.has(s.sectionNumber))
+              .map((s) => {
+                const done =
+                  !!s.audioUrl && s.questions.every((q) =>
+                    isImageCompletion(q.questionType) ? !!q.correctAnswer.trim() : !!q.questionText.trim()
+                  );
+                return (
+                  <div
+                    key={s.sectionNumber}
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white"
+                    style={{
+                      background: done
+                        ? "#10B981"
+                        : s.sectionNumber === activeSection
+                        ? "#2563EB"
+                        : "#E5E7EB",
+                      color: done || s.sectionNumber === activeSection ? "#FFF" : "#6B7280",
+                    }}
+                  >
+                    {s.sectionNumber}
+                  </div>
                 );
-              return (
-                <div
-                  key={s.sectionNumber}
-                  className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white"
-                  style={{
-                    background: done
-                      ? "#10B981"
-                      : s.sectionNumber === activeSection
-                      ? "#2563EB"
-                      : "#E5E7EB",
-                    color: done || s.sectionNumber === activeSection ? "#FFF" : "#6B7280",
-                  }}
-                >
-                  {s.sectionNumber}
-                </div>
-              );
-            })}
+              })}
           </div>
           <p className="text-xs text-gray-600 font-medium">
-            {completedSections}/4 sections hoàn thành
+            {completedSections}/{activeSections.size} section{activeSections.size > 1 ? "s" : ""} hoàn thành
           </p>
         </div>
-        <p className="text-xs text-gray-400">
-          Dùng nút <span className="font-semibold text-gray-600">Lưu nháp</span> hoặc{" "}
-          <span className="font-semibold text-gray-600">Xuất bản</span> ở thanh trên cùng để lưu.
-        </p>
+        <button
+          type="button"
+          onClick={() => {
+            onSave({
+              sections: sections.filter((s) => activeSections.has(s.sectionNumber)),
+            });
+            success("Đã cập nhật nội dung Listening");
+          }}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-all cursor-pointer shadow-sm hover:shadow"
+        >
+          <Save className="w-4 h-4" />
+          Lưu Listening
+        </button>
       </div>
 
     </div>

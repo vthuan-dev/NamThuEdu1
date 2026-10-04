@@ -828,7 +828,11 @@ export function validateIeltsSkillData(skill: IeltsSkill, data: any): Validation
   }
 
   if (skill === "listening") {
-    const sections = data.sections || [];
+    const rawSections = data.sections || [];
+    const sections = rawSections.filter((s: any, idx: number) => {
+      if (idx === 0 || s.sectionNumber === 1) return true;
+      return !!s.audioUrl || (s.questions?.length > 0 && s.questions.some((q: any) => q.questionText?.trim()));
+    });
     if (sections.length < 1) {
       issues.push({ severity: "error", location: "Tổng quát", message: "Cần ít nhất 1 section" });
     }
@@ -961,7 +965,11 @@ export function validateIeltsSkillData(skill: IeltsSkill, data: any): Validation
   }
 
   if (skill === "writing") {
-    const tasks = data.tasks || [];
+    const rawTasks = data.tasks || [];
+    const tasks = rawTasks.filter((t: any, idx: number) => {
+      if (idx === 0 || t.taskNumber === 1) return true;
+      return !!t.prompt?.trim();
+    });
     // Đề đơn kỹ năng cho phép giáo viên chỉ tạo phần đang dạy (tối thiểu 1 task).
     if (tasks.length < 1) {
       issues.push({ severity: "error", location: "Tổng quát", message: "Cần ít nhất 1 task" });
@@ -980,7 +988,12 @@ export function validateIeltsSkillData(skill: IeltsSkill, data: any): Validation
   }
 
   if (skill === "speaking") {
-    const parts = data.parts || [];
+    const rawParts = data.parts || [];
+    const parts = rawParts.filter((p: any, idx: number) => {
+      if (idx === 0 || p.partNumber === 1) return true;
+      return (p.partNumber === 2 && !!p.cueCard?.topic?.trim()) ||
+             (p.questions?.length > 0 && p.questions.some((q: any) => q.text?.trim()));
+    });
     if (parts.length < 1) {
       issues.push({ severity: "error", location: "Tổng quát", message: "Cần ít nhất 1 part" });
     }

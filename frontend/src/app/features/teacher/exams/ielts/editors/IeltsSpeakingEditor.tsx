@@ -5,6 +5,7 @@ import {
   SPEAKING_CUE_CARD_TEMPLATE,
   type IeltsTestType,
 } from "../structure";
+import { useToastContext } from "../../../../../../contexts/ToastContext";
 
 interface SpeakingPart {
   partNumber: 1 | 2 | 3;
@@ -84,6 +85,7 @@ export function IeltsSpeakingEditor({
   onSave,
   isFullTest = false,
 }: Props) {
+  const { success } = useToastContext();
   const [parts, setParts] = useState<SpeakingPart[]>(
     () => initialData?.parts || buildEmptyParts()
   );
@@ -91,10 +93,15 @@ export function IeltsSpeakingEditor({
   const [activeParts, setActiveParts] = useState<Set<1 | 2 | 3>>(() => {
     if (isFullTest) return new Set<1 | 2 | 3>([1, 2, 3]);
     if (initialData?.parts?.length) {
-      const nums = initialData.parts
+      const activeNums = initialData.parts
+        .filter((p: any, idx: number) => {
+          if (idx === 0 || p.partNumber === 1) return true;
+          return (p.partNumber === 2 && !!p.cueCard?.topic?.trim()) ||
+                 (p.questions?.length > 0 && p.questions.some((q: any) => q.text?.trim()));
+        })
         .map((p: any) => p.partNumber as 1 | 2 | 3)
         .filter((n: number) => n >= 1 && n <= 3);
-      if (nums.length) return new Set<1 | 2 | 3>(nums);
+      if (activeNums.length) return new Set<1 | 2 | 3>(activeNums);
     }
     return new Set<1 | 2 | 3>([1]);
   });
@@ -296,7 +303,10 @@ export function IeltsSpeakingEditor({
       <div className="flex items-center justify-end bg-white rounded-2xl border border-gray-200 p-4 sticky bottom-0">
         <button
           type="button"
-          onClick={() => onSave({ parts: parts.filter((p) => activeParts.has(p.partNumber)) })}
+          onClick={() => {
+            onSave({ parts: parts.filter((p) => activeParts.has(p.partNumber)) });
+            success("Đã cập nhật nội dung Speaking");
+          }}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700 transition-all cursor-pointer shadow-sm hover:shadow"
         >
           <Save className="w-4 h-4" />
