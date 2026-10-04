@@ -324,7 +324,7 @@ function flattenPassages(passages: ReadingPassage[]) {
             options: matching || wordBank ? g.choices : q.options,
             correctAnswer: q.correctAnswer,
             wordLimit: g.wordLimit || "",
-            selectCount: g.selectCount || 1,
+            selectCount: g.questionType === "multiple-choice-group" ? undefined : (g.selectCount || 1),
             useWordBank: wordBank,
             taskImage: g.taskImage || "",
             taskImageFileName: g.taskImageFileName || "",
@@ -345,6 +345,7 @@ function flattenPassages(passages: ReadingPassage[]) {
 
 // ─── Main editor ─────────────────────────────────────────────────────────────
 export function IeltsReadingEditor({
+  examId,
   initialData,
   onSave,
   testType,
@@ -453,17 +454,43 @@ export function IeltsReadingEditor({
             ? g.choices
             : defaultChoices(t)
           : undefined;
-        g.selectCount = (t === "multiple-choice" || t === "multiple-choice-group") ? 1 : undefined;
-        g.wordLimit = isCompletionType(t) ? "" : undefined;
-        g.useWordBank = isCompletionType(t) ? false : undefined;
-        g.questions = g.questions.map((q) => ({
-          ...q,
-          options:
-            (t === "multiple-choice" || t === "multiple-choice-group")
-              ? q.options ?? { A: "", B: "", C: "", D: "" }
-              : undefined,
-          correctAnswer: "",
-        }));
+        if (t === "multiple-choice-group") {
+          g.selectCount = undefined;
+          const defaultOptions = { A: "", B: "", C: "", D: "", E: "" };
+          const q0 = g.questions[0];
+          const baseOpts =
+            q0?.options && Object.keys(q0.options).length >= 5
+              ? q0.options
+              : defaultOptions;
+          const q1 = g.questions[1] ?? {
+            id: `rq-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            questionText: q0?.questionText || "",
+            options: { ...baseOpts },
+            correctAnswer: "B",
+          };
+          g.questions = [
+            {
+              ...q0,
+              options: { ...baseOpts },
+              correctAnswer: q0?.correctAnswer?.trim() || "A",
+            },
+            {
+              ...q1,
+              options: { ...baseOpts },
+              correctAnswer: q1.correctAnswer?.trim() || "B",
+            },
+          ];
+        } else {
+          g.selectCount = t === "multiple-choice" ? 1 : undefined;
+          g.questions = g.questions.map((q) => ({
+            ...q,
+            options:
+              t === "multiple-choice"
+                ? q.options ?? { A: "", B: "", C: "", D: "" }
+                : undefined,
+            correctAnswer: "",
+          }));
+        }
       }
       // Bật/tắt word bank cho dạng completion.
       if (patch.useWordBank !== undefined && !patch.questionType) {
@@ -502,6 +529,44 @@ export function IeltsReadingEditor({
       return groups;
     });
 
+  const setGroupSize = (pNum: number, gIdx: number, newSize: number) =>
+    mutateGroups(pNum, (groups) => {
+      const g = groups[gIdx];
+      if (g.questionType !== "multiple-choice-group") return groups;
+      const curQuestions = [...g.questions];
+      const q0 = curQuestions[0];
+      const baseOpts = q0?.options ?? { A: "", B: "", C: "", D: "", E: "" };
+      const baseText = q0?.questionText ?? "";
+      const letters = ["A", "B", "C", "D", "E", "F", "G", "H"];
+      if (newSize > curQuestions.length) {
+        while (curQuestions.length < newSize) {
+          const nextIdx = curQuestions.length;
+          curQuestions.push({
+            id: `rq-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            questionText: baseText,
+            options: { ...baseOpts },
+            correctAnswer: letters[nextIdx] ?? "",
+          });
+        }
+      } else if (newSize < curQuestions.length) {
+        curQuestions.splice(newSize);
+      }
+      groups[gIdx] = { ...g, questions: curQuestions };
+      return groups;
+    });
+
+  const setGroupAnswers = (pNum: number, gIdx: number, selectedLetters: string[]) =>
+    mutateGroups(pNum, (groups) => {
+      const g = groups[gIdx];
+      if (g.questionType !== "multiple-choice-group") return groups;
+      const questions = g.questions.map((q, idx) => ({
+        ...q,
+        correctAnswer: selectedLetters[idx] ?? "",
+      }));
+      groups[gIdx] = { ...g, questions };
+      return groups;
+    });
+
   const updateQuestion = (
     pNum: number,
     gIdx: number,
@@ -511,7 +576,23 @@ export function IeltsReadingEditor({
     mutateGroups(pNum, (groups) => {
       const g = groups[gIdx];
       const questions = [...g.questions];
-      questions[qIdx] = { ...questions[qIdx], ...patch };
+      if (g.questionType === "multiple-choice-group") {
+        if (qIdx === 0 && (patch.questionText !== undefined || patch.options !== undefined)) {
+          const updatedQ0 = { ...questions[0], ...patch };
+          questions[0] = updatedQ0;
+          for (let i = 1; i < questions.length; i++) {
+            questions[i] = {
+              ...questions[i],
+              ...(patch.options !== undefined ? { options: { ...patch.options } } : {}),
+              ...(patch.questionText !== undefined ? { questionText: patch.questionText } : {}),
+            };
+          }
+        } else {
+          questions[qIdx] = { ...questions[qIdx], ...patch };
+        }
+      } else {
+        questions[qIdx] = { ...questions[qIdx], ...patch };
+      }
       groups[gIdx] = { ...g, questions };
       return groups;
     });
@@ -759,6 +840,8 @@ export function IeltsReadingEditor({
                 examId={examId}
                 onChange={(patch) => updateGroup(activePassage, gIdx, patch)}
                 onRemove={() => removeGroup(activePassage, gIdx)}
+                onSetGroupSize={(size) => setGroupSize(activePassage, gIdx, size)}
+                onSetGroupAnswers={(letters) => setGroupAnswers(activePassage, gIdx, letters)}
                 onAddQuestion={() => addQuestion(activePassage, gIdx)}
                 onRemoveQuestion={(qIdx) => removeQuestion(activePassage, gIdx, qIdx)}
                 onChangeQuestion={(qIdx, patch) =>
@@ -987,6 +1070,8 @@ function GroupCard({
   examId,
   onChange,
   onRemove,
+  onSetGroupSize,
+  onSetGroupAnswers,
   onAddQuestion,
   onRemoveQuestion,
   onChangeQuestion,
@@ -997,18 +1082,24 @@ function GroupCard({
   examId?: string;
   onChange: (patch: Partial<ReadingGroup>) => void;
   onRemove: () => void;
+  onSetGroupSize?: (size: number) => void;
+  onSetGroupAnswers?: (letters: string[]) => void;
   onAddQuestion: () => void;
   onRemoveQuestion: (qIdx: number) => void;
   onChangeQuestion: (qIdx: number, patch: Partial<ReadingQuestion>) => void;
 }) {
   const [showImageUpload, setShowImageUpload] = useState(false);
   const matching = isMatchingType(group.questionType);
-  const isMcq = group.questionType === "multiple-choice" || group.questionType === "multiple-choice-group";
+  const isGroupedMcq = group.questionType === "multiple-choice-group";
   const completion = isCompletionType(group.questionType);
   const isDiagram = group.questionType === "diagram-labelling";
   const hasImage = !!group.taskImage && group.taskImage.trim() !== "";
   const endNumber = startNumber + group.questions.length - 1;
   const hint = TYPE_HINTS[group.questionType];
+
+  const groupSelectedLetters = isGroupedMcq
+    ? group.questions.map((item) => item.correctAnswer?.trim().toUpperCase()).filter(Boolean)
+    : [];
 
   return (
     <div className="rounded-xl border border-gray-200 overflow-hidden">
@@ -1042,18 +1133,17 @@ function GroupCard({
             ))}
           </select>
 
-          {/* MCQ: số đáp án cần chọn */}
-          {isMcq && (
-            <label className="flex items-center gap-1.5 text-[11px] text-gray-600">
-              Số đáp án chọn:
+          {/* Grouped MCQ (Choose TWO/THREE): Quy mô nhóm xác định số câu và số đáp án */}
+          {isGroupedMcq && (
+            <label className="flex items-center gap-1.5 text-[11px] text-emerald-800 bg-white px-2.5 py-1 rounded-md border border-emerald-300 shadow-xs">
+              <span className="font-semibold">Quy mô nhóm:</span>
               <select
-                value={group.selectCount ?? 1}
-                onChange={(e) => onChange({ selectCount: Number(e.target.value) })}
-                className="px-2 py-1 border border-gray-300 rounded-md bg-white text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                value={group.questions.length}
+                onChange={(e) => onSetGroupSize?.(Number(e.target.value))}
+                className="px-2 py-0.5 border border-gray-300 rounded text-xs bg-white font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
               >
-                <option value={1}>1 (chọn 1)</option>
-                <option value={2}>2 (Choose TWO)</option>
-                <option value={3}>3 (Choose THREE)</option>
+                <option value={2}>2 câu (Choose TWO - 2 điểm)</option>
+                <option value={3}>3 câu (Choose THREE - 3 điểm)</option>
               </select>
             </label>
           )}
@@ -1146,29 +1236,43 @@ function GroupCard({
       )}
 
       <div className="p-4 space-y-2">
-        {group.questions.map((q, qIdx) => (
-          <QuestionRow
-            key={q.id}
-            number={startNumber + qIdx}
-            question={q}
-            groupType={group.questionType}
-            choices={group.choices}
-            selectCount={group.selectCount ?? 1}
-            useWordBank={!!group.useWordBank}
-            canRemove={group.questions.length > 1}
-            onChange={(patch) => onChangeQuestion(qIdx, patch)}
-            onRemove={() => onRemoveQuestion(qIdx)}
-          />
-        ))}
+        {group.questions.map((q, qIdx) => {
+          const isFollower = isGroupedMcq && qIdx > 0;
+          const isLead = isGroupedMcq && qIdx === 0;
 
-        <button
-          type="button"
-          onClick={onAddQuestion}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800 cursor-pointer mt-1"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Thêm câu vào nhóm
-        </button>
+          return (
+            <QuestionRow
+              key={q.id}
+              number={startNumber + qIdx}
+              question={q}
+              groupType={group.questionType}
+              choices={group.choices}
+              useWordBank={!!group.useWordBank}
+              canRemove={!isGroupedMcq && group.questions.length > 1}
+              isGroupedMcq={isGroupedMcq}
+              isGroupedMcqLead={isLead}
+              isGroupedMcqFollower={isFollower}
+              leadNumber={startNumber}
+              groupEndNumber={endNumber}
+              groupSize={group.questions.length}
+              groupSelectedLetters={groupSelectedLetters}
+              onGroupAnswersChange={(letters) => onSetGroupAnswers?.(letters)}
+              onChange={(patch) => onChangeQuestion(qIdx, patch)}
+              onRemove={() => onRemoveQuestion(qIdx)}
+            />
+          );
+        })}
+
+        {!isGroupedMcq && (
+          <button
+            type="button"
+            onClick={onAddQuestion}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800 cursor-pointer mt-1"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Thêm câu vào nhóm
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1180,9 +1284,16 @@ function QuestionRow({
   question,
   groupType,
   choices,
-  selectCount,
   useWordBank,
   canRemove,
+  isGroupedMcq,
+  isGroupedMcqLead,
+  isGroupedMcqFollower,
+  leadNumber,
+  groupEndNumber,
+  groupSize,
+  groupSelectedLetters = [],
+  onGroupAnswersChange,
   onChange,
   onRemove,
 }: {
@@ -1190,39 +1301,27 @@ function QuestionRow({
   question: ReadingQuestion;
   groupType: string;
   choices?: Record<string, string>;
-  selectCount: number;
   useWordBank?: boolean;
   canRemove: boolean;
+  isGroupedMcq?: boolean;
+  isGroupedMcqLead?: boolean;
+  isGroupedMcqFollower?: boolean;
+  leadNumber?: number;
+  groupEndNumber?: number;
+  groupSize?: number;
+  groupSelectedLetters?: string[];
+  onGroupAnswersChange?: (letters: string[]) => void;
   onChange: (patch: Partial<ReadingQuestion>) => void;
   onRemove: () => void;
 }) {
-  const isMcq = groupType === "multiple-choice" || groupType === "multiple-choice-group";
-  const isMultiMcq = isMcq && selectCount > 1;
+  const isSingleMcq = groupType === "multiple-choice";
   const isTrueFalse = TRUE_FALSE_TYPES.includes(groupType);
   const matching = isMatchingType(groupType);
-  // Completion dùng word bank → chọn đáp án từ danh sách (dropdown như matching).
   const wordBank = isCompletionType(groupType) && !!useWordBank;
   const choiceKeys = Object.keys(choices ?? {});
   const matchingKeys = choiceKeys;
 
-  // Multi-select MCQ: correctAnswer lưu "A,C" → set tiện thao tác.
-  const selectedSet = new Set(
-    (question.correctAnswer || "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean)
-  );
-  const toggleMulti = (k: string) => {
-    const next = new Set(selectedSet);
-    if (next.has(k)) next.delete(k);
-    else {
-      if (next.size >= selectCount) return; // không vượt quá số cần chọn
-      next.add(k);
-    }
-    onChange({ correctAnswer: Array.from(next).sort().join(",") });
-  };
-
-  // MCQ: các key đáp án hiện có (A,B,C…) của RIÊNG câu này.
+  // MCQ: các key đáp án hiện có (A,B,C…) của câu này / nhóm này.
   const optionKeys = Object.keys(question.options ?? {})
     .filter((k) => /^[A-Za-z]$/.test(k))
     .sort();
@@ -1236,8 +1335,7 @@ function QuestionRow({
     });
   };
 
-  // Xóa 1 đáp án → đánh lại chữ cái liên tục + map lại correctAnswer
-  // (hỗ trợ cả multi-select "A,C"). Giữ tối thiểu 2 đáp án.
+  // Xóa 1 đáp án → đánh lại chữ cái liên tục + map lại đáp án đúng
   const removeOption = (keyToRemove: string) => {
     if (optionKeys.length <= 2) return;
     const remaining = optionKeys.filter((k) => k !== keyToRemove);
@@ -1248,17 +1346,23 @@ function QuestionRow({
       nextOptions[newKey] = question.options?.[oldKey] ?? "";
       remap[oldKey] = newKey;
     });
-    const nextAnswer = (question.correctAnswer || "")
-      .split(",")
-      .map((p) => p.trim())
-      .filter(Boolean)
-      .filter((p) => p !== keyToRemove)
-      .map((p) => remap[p] ?? p)
-      .join(",");
-    onChange({
-      options: nextOptions,
-      correctAnswer: isMultiMcq ? nextAnswer : nextAnswer || "",
-    });
+
+    if (isGroupedMcqLead) {
+      const nextGroupAnswers = groupSelectedLetters
+        .filter((l) => l !== keyToRemove)
+        .map((l) => remap[l] ?? l)
+        .sort();
+      onGroupAnswersChange?.(nextGroupAnswers);
+      onChange({ options: nextOptions });
+    } else {
+      const nextAnswer =
+        remap[question.correctAnswer] ??
+        (question.correctAnswer === keyToRemove ? "" : question.correctAnswer);
+      onChange({
+        options: nextOptions,
+        correctAnswer: nextAnswer || "",
+      });
+    }
   };
 
   return (
@@ -1270,12 +1374,21 @@ function QuestionRow({
 
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-start gap-2">
-            <RichTextInput
-              value={question.questionText}
-              onChange={(html) => onChange({ questionText: html })}
-              placeholder="Nội dung câu hỏi (statement / question)..."
-              className="flex-1 min-w-0"
-            />
+            {isGroupedMcqFollower ? (
+              <div className="flex-1 min-w-0 text-xs text-emerald-800 italic bg-emerald-50/60 border border-dashed border-emerald-300 p-2.5 rounded-lg flex items-center gap-2">
+                <span>
+                  ℹ️ Đề bài và các lựa chọn A–{LETTER_SYMBOLS[optionKeys.length - 1] || "E"} được kế thừa từ{" "}
+                  <strong>Câu {leadNumber}</strong>
+                </span>
+              </div>
+            ) : (
+              <RichTextInput
+                value={question.questionText}
+                onChange={(html) => onChange({ questionText: html })}
+                placeholder="Nội dung câu hỏi (statement / question)..."
+                className="flex-1 min-w-0"
+              />
+            )}
             {canRemove && (
               <button
                 type="button"
@@ -1313,18 +1426,136 @@ function QuestionRow({
                 </span>
               )}
             </div>
-          ) : isMcq && question.options ? (
-            <>
-              {isMultiMcq && (
-                <p className="text-[11px] text-emerald-600 font-medium">
-                  Chọn đúng {selectCount} đáp án ({selectedSet.size}/{selectCount} đã chọn)
-                </p>
-              )}
+          ) : isGroupedMcq ? (
+            isGroupedMcqFollower ? (
+              // Câu thành viên trong nhóm Choose TWO/THREE: hiển thị banner kế thừa & nút đổi nhanh đáp án nếu muốn
+              <div className="flex items-center justify-between p-3 rounded-lg border border-emerald-200 bg-emerald-50/60 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded bg-emerald-600 text-white font-bold text-[11px]">
+                    Thuộc nhóm {leadNumber}–{groupEndNumber}
+                  </span>
+                  <span className="text-gray-700">
+                    Kế thừa đề bài & lựa chọn A–{LETTER_SYMBOLS[optionKeys.length - 1] || "E"} từ{" "}
+                    <strong>Câu {leadNumber}</strong>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-gray-700">Đáp án của câu này:</span>
+                  <div className="flex items-center gap-1">
+                    {optionKeys.map((k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => onChange({ correctAnswer: k })}
+                        className={`w-7 h-7 rounded text-xs font-bold transition-all cursor-pointer flex items-center justify-center border ${
+                          question.correctAnswer === k
+                            ? "bg-emerald-600 border-emerald-700 text-white shadow-xs font-extrabold"
+                            : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
+                        }`}
+                        title={`Gán đáp án ${k} cho câu ${number}`}
+                      >
+                        {k}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // Câu đầu của nhóm Choose TWO/THREE: hiển thị bộ checkbox để tích đủ số lượng đáp án
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-50/80 border border-emerald-200 text-xs">
+                  <span className="font-semibold text-emerald-950">
+                    Tích chọn đúng {groupSize} đáp án cho nhóm câu {leadNumber}–{groupEndNumber} (Choose {groupSize === 2 ? "TWO" : "THREE"}):
+                  </span>
+                  <span
+                    className={`px-2.5 py-0.5 rounded font-bold text-xs ${
+                      groupSelectedLetters.length === groupSize
+                        ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                        : "bg-amber-100 text-amber-800 border border-amber-300"
+                    }`}
+                  >
+                    Đã chọn {groupSelectedLetters.length}/{groupSize} đáp án
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {optionKeys.map((k) => {
+                    const isChecked = groupSelectedLetters.includes(k);
+                    return (
+                      <label
+                        key={k}
+                        className="flex items-center gap-2 px-2.5 py-2 rounded-md border text-xs cursor-pointer transition-all"
+                        style={{
+                          background: isChecked ? "#ECFDF5" : "#FFFFFF",
+                          borderColor: isChecked ? "#10B981" : "#E5E7EB",
+                          boxShadow: isChecked ? "0 1px 2px rgba(16, 185, 129, 0.1)" : undefined,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            let next = [...groupSelectedLetters];
+                            if (next.includes(k)) {
+                              next = next.filter((x) => x !== k);
+                            } else {
+                              if (next.length >= (groupSize ?? 2)) {
+                                return;
+                              }
+                              next.push(k);
+                            }
+                            next.sort();
+                            onGroupAnswersChange?.(next);
+                          }}
+                          className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                        />
+                        <span className="font-bold text-gray-800">{k}.</span>
+                        <input
+                          type="text"
+                          value={question.options?.[k] ?? ""}
+                          onChange={(e) =>
+                            onChange({
+                              options: { ...(question.options ?? {}), [k]: e.target.value },
+                            })
+                          }
+                          placeholder={`Đáp án ${k}`}
+                          className="flex-1 bg-transparent text-xs outline-none"
+                        />
+                        {optionKeys.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              removeOption(k);
+                            }}
+                            className="p-0.5 rounded text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-all cursor-pointer flex-shrink-0"
+                            title="Xoá đáp án (áp dụng cho cả nhóm)"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+
+                {optionKeys.length < LETTER_SYMBOLS.length && (
+                  <button
+                    type="button"
+                    onClick={addOption}
+                    className="inline-flex items-center gap-1 text-[12px] font-semibold text-emerald-700 hover:text-emerald-800 cursor-pointer mt-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Thêm đáp án ({LETTER_SYMBOLS[optionKeys.length]})
+                  </button>
+                )}
+              </div>
+            )
+          ) : isSingleMcq && question.options ? (
+            <div className="space-y-2">
               <div className="grid grid-cols-2 gap-2">
                 {optionKeys.map((k) => {
-                  const checked = isMultiMcq
-                    ? selectedSet.has(k)
-                    : question.correctAnswer === k;
+                  const checked = question.correctAnswer === k;
                   return (
                     <label
                       key={k}
@@ -1335,18 +1566,16 @@ function QuestionRow({
                       }}
                     >
                       <input
-                        type={isMultiMcq ? "checkbox" : "radio"}
+                        type="radio"
                         name={`correct-${question.id}`}
                         checked={checked}
-                        onChange={() =>
-                          isMultiMcq ? toggleMulti(k) : onChange({ correctAnswer: k })
-                        }
+                        onChange={() => onChange({ correctAnswer: k })}
                         className="w-3.5 h-3.5 accent-emerald-500"
                       />
                       <span className="font-bold text-gray-700">{k}.</span>
                       <input
                         type="text"
-                        value={question.options![k] ?? ""}
+                        value={question.options?.[k] ?? ""}
                         onChange={(e) =>
                           onChange({
                             options: { ...question.options!, [k]: e.target.value },
@@ -1382,7 +1611,7 @@ function QuestionRow({
                   Thêm đáp án
                 </button>
               )}
-            </>
+            </div>
           ) : isTrueFalse ? (
             <div className="flex flex-wrap gap-2">
               {(groupType === "true-false-not-given"

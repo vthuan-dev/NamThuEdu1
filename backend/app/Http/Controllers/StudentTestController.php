@@ -3455,11 +3455,27 @@ class StudentTestController extends Controller
                 $q = $loadedQuestions[$qId] ?? null;
                 if (!$q)
                     continue;
+
+                // Priority A: check direct correct_answer in qData
+                $qDataLetter = strtoupper(trim((string)($q->qData['correct_answer'] ?? '')));
+                if ($qDataLetter !== '' && preg_match('/^[A-H]$/', $qDataLetter)) {
+                    $correctLetters[] = $qDataLetter;
+                    continue;
+                }
+
+                // Priority B: check answers table rows
                 $sorted = $q->answers->sortBy(fn($a) => $a->aOrder !== null ? $a->aOrder : $a->aId)->values();
                 $letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-                foreach ($sorted as $idx => $ans) {
-                    if ($ans->aIs_correct && isset($letters[$idx])) {
-                        $correctLetters[] = $letters[$idx];
+                if ($sorted->count() > 1) {
+                    foreach ($sorted as $idx => $ans) {
+                        if ($ans->aIs_correct && isset($letters[$idx])) {
+                            $correctLetters[] = $letters[$idx];
+                        }
+                    }
+                } elseif ($sorted->count() === 1) {
+                    $singleLetter = strtoupper(trim((string)$sorted[0]->aContent));
+                    if (preg_match('/^[A-H]$/', $singleLetter)) {
+                        $correctLetters[] = $singleLetter;
                     }
                 }
             }
@@ -4822,6 +4838,8 @@ class StudentTestController extends Controller
         $mcqTypes = [
             'multiple_choice',
             'multiple_choice_multi',
+            'multiple_choice_group',
+            'multiple-choice-group',
             'mcq',
             'true_false_not_given',
             'yes_no_not_given',

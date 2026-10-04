@@ -575,6 +575,83 @@ export function IeltsListeningEditor({
     [groupRangeOf]
   );
 
+  const setGroupSizeAt = useCallback(
+    (secNum: number, qIdx: number, targetSize: number) => {
+      const LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"];
+      setSections((prev) =>
+        prev.map((s) => {
+          if (s.sectionNumber !== secNum) return s;
+          const [start, end] = groupRangeOf(s.questions, qIdx);
+          const currentSize = end - start + 1;
+          if (targetSize === currentSize) return s;
+
+          const baseQ = s.questions[start];
+          const baseOptions =
+            baseQ?.options && Object.keys(baseQ.options).length >= 5
+              ? baseQ.options
+              : { A: "", B: "", C: "", D: "", E: "" };
+
+          let nextQuestions = [...s.questions];
+          if (targetSize > currentSize) {
+            const limit = Math.min(s.questions.length, start + targetSize);
+            for (let i = start; i < limit; i++) {
+              nextQuestions[i] = {
+                ...nextQuestions[i],
+                questionType: "multiple-choice-group",
+                questionText: baseQ.questionText,
+                taskTitle: baseQ.taskTitle,
+                taskInstruction: baseQ.taskInstruction,
+                options: { ...baseOptions },
+                correctAnswer: nextQuestions[i].correctAnswer?.trim() || (LETTERS[i - start] ?? "A"),
+                selectCount: undefined,
+              };
+            }
+          } else {
+            for (let i = start + targetSize; i <= end; i++) {
+              nextQuestions[i] = {
+                ...nextQuestions[i],
+                questionType: "multiple-choice",
+                options: { A: "", B: "", C: "", D: "" },
+                correctAnswer: "A",
+                selectCount: undefined,
+              };
+            }
+          }
+
+          return { ...s, questions: nextQuestions };
+        })
+      );
+    },
+    [groupRangeOf]
+  );
+
+  const setGroupAnswersAt = useCallback(
+    (secNum: number, qIdx: number, selectedLetters: string[]) => {
+      setSections((prev) =>
+        prev.map((s) => {
+          if (s.sectionNumber !== secNum) return s;
+          const [start, end] = groupRangeOf(s.questions, qIdx);
+
+          return {
+            ...s,
+            questions: s.questions.map((q, i) => {
+              if (i >= start && i <= end) {
+                const assigned = selectedLetters[i - start] ?? "";
+                return {
+                  ...q,
+                  correctAnswer: assigned,
+                  selectCount: undefined,
+                };
+              }
+              return q;
+            }),
+          };
+        })
+      );
+    },
+    [groupRangeOf]
+  );
+
   const changeQuestionType = useCallback(
     (secNum: number, qIdx: number, newType: string) => {
       setSections((prev) =>
@@ -596,20 +673,76 @@ export function IeltsListeningEditor({
             options: isListeningMatching(newType)
               ? (q.options && Object.keys(q.options).length ? q.options : { A: "", B: "", C: "" })
               : (newType === "multiple-choice" || newType === "multiple-choice-group")
-                ? (q.options ?? { A: "", B: "", C: "", D: "" })
+                ? (q.options && Object.keys(q.options).length >= 5
+                    ? q.options
+                    : (newType === "multiple-choice-group"
+                        ? { A: "", B: "", C: "", D: "", E: "" }
+                        : { A: "", B: "", C: "", D: "" }))
                 : undefined,
           });
+
+          // Nếu chọn multiple-choice-group: Tự động gom ít nhất 2 câu (qIdx và qIdx+1 nếu có)
+          if (newType === "multiple-choice-group") {
+            const nextIdx = qIdx + 1 < s.questions.length ? qIdx + 1 : null;
+            const q0 = s.questions[qIdx];
+            const baseOptions =
+              q0.options && Object.keys(q0.options).length >= 5
+                ? q0.options
+                : { A: "", B: "", C: "", D: "", E: "" };
+
+            return {
+              ...s,
+              questions: s.questions.map((q, i) => {
+                if (i === qIdx) {
+                  return {
+                    ...q,
+                    questionType: "multiple-choice-group",
+                    selectCount: undefined,
+                    options: baseOptions,
+                    correctAnswer: q.correctAnswer?.trim() || "A",
+                  };
+                }
+                if (i === nextIdx) {
+                  return {
+                    ...q,
+                    questionType: "multiple-choice-group",
+                    selectCount: undefined,
+                    questionText: q0.questionText,
+                    taskTitle: q0.taskTitle,
+                    taskInstruction: q0.taskInstruction,
+                    options: { ...baseOptions },
+                    correctAnswer: "B",
+                  };
+                }
+                return q;
+              }),
+            };
+          }
+
+          // Khi đổi từ multiple-choice-group sang loại khác: nếu nhóm cũ bị tách chỉ còn 1 câu
+          const [start, end] = groupRangeOf(s.questions, qIdx);
+          const wasGroupedMcq = s.questions[qIdx]?.questionType === "multiple-choice-group";
 
           return {
             ...s,
             questions: s.questions.map((q, i) => {
-              return i === qIdx ? normalizeForType(q) : q;
+              if (i === qIdx) return normalizeForType(q);
+              if (wasGroupedMcq && end - start === 1 && (i === start || i === end)) {
+                return {
+                  ...q,
+                  questionType: "multiple-choice",
+                  selectCount: undefined,
+                  options: q.options ?? { A: "", B: "", C: "", D: "" },
+                  correctAnswer: q.correctAnswer?.trim() || "A",
+                };
+              }
+              return q;
             }),
           };
         })
       );
     },
-    []
+    [groupRangeOf]
   );
 
   const handleAudioUpload = async (file: File) => {
@@ -1211,6 +1344,8 @@ export function IeltsListeningEditor({
                   onChangeQuestionType={changeQuestionType}
                   onAddOption={addOptionAt}
                   onRemoveOption={removeOptionAt}
+                  onSetGroupSize={setGroupSizeAt}
+                  onGroupAnswersChange={setGroupAnswersAt}
                   groupQuestions={groupQuestions}
                 />
               </>
@@ -1280,6 +1415,8 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
   onChangeQuestionType,
   onAddOption,
   onRemoveOption,
+  onSetGroupSize,
+  onGroupAnswersChange,
 }: {
   question: ListeningQuestion;
   sectionNumber: number;
@@ -1299,8 +1436,11 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
   onChangeQuestionType: (secNum: number, qIdx: number, newType: string) => void;
   onAddOption?: (secNum: number, qIdx: number) => void;
   onRemoveOption?: (secNum: number, qIdx: number, key: string) => void;
+  onSetGroupSize?: (secNum: number, qIdx: number, size: number) => void;
+  onGroupAnswersChange?: (secNum: number, qIdx: number, answers: string[]) => void;
 }) {
   const isMcq = question.questionType === "multiple-choice" || question.questionType === "multiple-choice-group";
+  const isGroupedMcq = question.questionType === "multiple-choice-group";
   const isMatching = isListeningMatching(question.questionType);
   const completion = isListeningCompletion(question.questionType);
   const isImgCompletion = isImageCompletion(question.questionType);
@@ -1366,7 +1506,9 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
     }
   });
 
-  const isGroupedMcqFollower = isGrouped && !isGroupStart && question.questionType === "multiple-choice-group";
+  const isGroupedMcqFollower = isGrouped && !isGroupStart && isGroupedMcq;
+  const groupAnswers = groupQuestions.map((gq) => gq.correctAnswer?.trim()).filter(Boolean);
+  const groupSelectedLetters = new Set(groupAnswers);
 
   // Multi-select MCQ lưu "A,C".
   const selectedSet = new Set(
@@ -1437,22 +1579,23 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
               ))}
             </select>
 
-            {/* Cài đặt dùng chung của nhóm — chỉ hiện ở câu đầu nhóm */}
-            {isGroupStart && isMcq && (
-              <label className="flex items-center gap-1.5 text-[11px] text-gray-600">
-                Số đáp án chọn:
+            {/* Cài đặt dùng chung của nhóm MCQ nhiều đáp án — chỉ hiện ở câu đầu nhóm */}
+            {isGroupStart && isGroupedMcq && (
+              <label className="flex items-center gap-1.5 text-[11px] text-indigo-700 font-semibold bg-indigo-50/80 px-2 py-1 rounded-md border border-indigo-200">
+                Quy mô nhóm:
                 <select
-                  value={selectCount}
+                  value={groupSize >= 3 ? 3 : 2}
                   onChange={(e) =>
-                    handleGroup({
-                      selectCount: Number(e.target.value) > 1 ? Number(e.target.value) : undefined,
-                    })
+                    onSetGroupSize?.(sectionNumber, index, Number(e.target.value))
                   }
-                  className="px-2 py-1 border border-gray-300 rounded-md bg-white text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-2 py-0.5 border border-indigo-300 rounded bg-white text-xs font-bold text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                 >
-                  <option value={1}>1 (chọn 1)</option>
-                  <option value={2}>2 (Choose TWO)</option>
-                  <option value={3}>3 (Choose THREE)</option>
+                  <option value={2}>
+                    2 câu (Choose TWO: Câu {groupStartNumber}–{(groupStartNumber ?? question.questionNumber) + 1})
+                  </option>
+                  <option value={3}>
+                    3 câu (Choose THREE: Câu {groupStartNumber}–{(groupStartNumber ?? question.questionNumber) + 2})
+                  </option>
                 </select>
               </label>
             )}
@@ -1545,12 +1688,27 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
 
           {!isImgCompletion && (
             !isInlineForm && (
-              <RichTextInput
-                value={question.questionText}
-                onChange={(html) => handleChange({ questionText: html })}
-                placeholder={isMatching ? "Tên mục cần ghép (vd: kettle, alarm clock...)" : "Nội dung câu hỏi..."}
-                className="w-full"
-              />
+              isGroupedMcqFollower ? (
+                <div className="text-xs text-indigo-700 italic bg-indigo-50/60 border border-dashed border-indigo-200 p-2.5 rounded-lg flex items-center gap-2">
+                  <span>
+                    ℹ️ Đề bài và các lựa chọn A–{LETTERS[optionKeys.length - 1]} được kế thừa từ{" "}
+                    <strong>Câu {groupStartNumber}</strong>
+                  </span>
+                </div>
+              ) : (
+                <RichTextInput
+                  value={question.questionText}
+                  onChange={(html) => {
+                    if (isGroupedMcq) {
+                      handleGroup({ questionText: html });
+                    } else {
+                      handleChange({ questionText: html });
+                    }
+                  }}
+                  placeholder={isMatching ? "Tên mục cần ghép (vd: kettle, alarm clock...)" : "Nội dung câu hỏi..."}
+                  className="w-full"
+                />
+              )
             )
           )}
 
@@ -1688,181 +1846,184 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
                 </select>
               </div>
             </div>
-          ) : isMcq ? (
-            isMultiMcq ? (
-              isGroupedMcqFollower ? (
-                // Câu sau trong nhóm multi-select dạng group: chỉ hiện hàng nút chữ cái gọn
-                // để tick chọn nhiều đáp án đúng (tối đa selectCount). Text đáp án
-                // A/B/C/D đã nhập 1 lần ở câu đầu nhóm nên KHÔNG lặp lại ở đây.
-                <div className="flex items-center gap-2 p-2 rounded-lg border border-gray-200 bg-gray-50/50">
-                  <span className="text-xs font-semibold text-gray-600 mr-2">
-                    Đáp án đúng cho câu {question.questionNumber} (chọn {selectCount}):
+          ) : isGroupedMcq ? (
+            isGroupedMcqFollower ? (
+              // Câu thành viên trong nhóm Choose TWO/THREE: hiển thị banner gọn, không lặp lại bộ đáp án
+              <div className="flex items-center justify-between p-3 rounded-lg border border-indigo-200 bg-indigo-50/60 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded bg-indigo-600 text-white font-bold text-[11px]">
+                    Thuộc nhóm {groupStartNumber}–{groupEndNumber}
                   </span>
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-gray-700">
+                    Kế thừa đề bài & lựa chọn A–{LETTERS[optionKeys.length - 1]} từ <strong>Câu {groupStartNumber}</strong>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-gray-700">Đáp án của câu này:</span>
+                  <div className="flex items-center gap-1">
                     {optionKeys.map((k) => (
                       <button
                         key={k}
                         type="button"
-                        onClick={() => toggleMulti(k)}
-                        className={`w-8 h-8 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center justify-center border ${
-                          selectedSet.has(k)
-                            ? "bg-emerald-500 border-emerald-600 text-white shadow-sm font-extrabold"
-                            : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                        onClick={() => handleChange({ correctAnswer: k })}
+                        className={`w-7 h-7 rounded text-xs font-bold transition-all cursor-pointer flex items-center justify-center border ${
+                          question.correctAnswer === k
+                            ? "bg-emerald-600 border-emerald-700 text-white shadow-sm font-extrabold"
+                            : "bg-white border-gray-200 text-gray-700 hover:bg-gray-100"
                         }`}
+                        title={`Chọn ${k} làm đáp án cho câu ${question.questionNumber}`}
                       >
                         {k}
                       </button>
                     ))}
                   </div>
                 </div>
-              ) : (
-              <div className="space-y-1.5">
-                <p className="text-[11px] text-gray-500">
-                  Chọn đúng {selectCount} đáp án (Choose {selectCount === 2 ? "TWO" : "THREE"}):
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  {optionKeys.map((k) => (
-                    <label
-                      key={k}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-md border text-xs cursor-pointer transition-all"
-                      style={{
-                        background: selectedSet.has(k) ? "#ECFDF5" : "#FFFFFF",
-                        borderColor: selectedSet.has(k) ? "#86EFAC" : "#E5E7EB",
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedSet.has(k)}
-                        onChange={() => toggleMulti(k)}
-                        className="w-3.5 h-3.5 accent-emerald-500"
-                      />
-                      <span className="font-bold text-gray-700">{k}.</span>
-                      <input
-                        type="text"
-                        value={currentOptions[k] || ""}
-                        onChange={(e) => {
-                          const nextOptions = { ...currentOptions, [k]: e.target.value };
-                          if (question.questionType === "multiple-choice-group") {
-                            handleGroup({ options: nextOptions });
-                          } else {
-                            handleChange({ options: nextOptions });
-                          }
-                        }}
-                        placeholder={`Đáp án ${k}`}
-                        className="flex-1 bg-transparent text-xs outline-none"
-                      />
-                      {optionKeys.length > 2 && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            onRemoveOption?.(sectionNumber, index, k);
-                          }}
-                          className="p-0.5 rounded text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-all cursor-pointer flex-shrink-0"
-                          title="Xoá đáp án (áp dụng cho cả nhóm)"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </label>
-                  ))}
+              </div>
+            ) : (
+              // Câu ĐẦU của nhóm Choose TWO/THREE: hiển thị bộ checkbox để tích đủ số lượng đáp án
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-2.5 rounded-lg bg-indigo-50/80 border border-indigo-200 text-xs">
+                  <span className="font-semibold text-indigo-950">
+                    Tích chọn đúng {groupSize} đáp án cho nhóm câu {groupStartNumber}–{groupEndNumber} (Choose {groupSize === 2 ? "TWO" : "THREE"}):
+                  </span>
+                  <span
+                    className={`px-2.5 py-0.5 rounded font-bold text-xs ${
+                      groupSelectedLetters.size === groupSize
+                        ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                        : "bg-amber-100 text-amber-800 border border-amber-300"
+                    }`}
+                  >
+                    Đã chọn {groupSelectedLetters.size}/{groupSize} đáp án
+                  </span>
                 </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {optionKeys.map((k) => {
+                    const isChecked = groupSelectedLetters.has(k);
+                    return (
+                      <label
+                        key={k}
+                        className="flex items-center gap-2 px-2.5 py-2 rounded-md border text-xs cursor-pointer transition-all"
+                        style={{
+                          background: isChecked ? "#ECFDF5" : "#FFFFFF",
+                          borderColor: isChecked ? "#10B981" : "#E5E7EB",
+                          boxShadow: isChecked ? "0 1px 2px rgba(16, 185, 129, 0.1)" : undefined,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            const next = new Set(groupSelectedLetters);
+                            if (next.has(k)) {
+                              next.delete(k);
+                            } else {
+                              if (next.size >= groupSize) {
+                                return;
+                              }
+                              next.add(k);
+                            }
+                            const sorted = Array.from(next).sort();
+                            onGroupAnswersChange?.(sectionNumber, index, sorted);
+                          }}
+                          className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                        />
+                        <span className="font-bold text-gray-800">{k}.</span>
+                        <input
+                          type="text"
+                          value={currentOptions[k] || ""}
+                          onChange={(e) => {
+                            const nextOptions = { ...currentOptions, [k]: e.target.value };
+                            handleGroup({ options: nextOptions });
+                          }}
+                          placeholder={`Đáp án ${k}`}
+                          className="flex-1 bg-transparent text-xs outline-none"
+                        />
+                        {optionKeys.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              onRemoveOption?.(sectionNumber, index, k);
+                            }}
+                            className="p-0.5 rounded text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-all cursor-pointer flex-shrink-0"
+                            title="Xoá đáp án (áp dụng cho cả nhóm)"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+
                 {optionKeys.length < LETTERS.length && (
                   <button
                     type="button"
                     onClick={() => onAddOption?.(sectionNumber, index)}
-                    className="text-[12px] font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                    className="text-[12px] font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer mt-1"
                   >
-                    + Thêm đáp án
+                    + Thêm đáp án ({LETTERS[optionKeys.length]})
                   </button>
                 )}
               </div>
-              )
-            ) : (
-              <div className="space-y-2">
-                {isGroupedMcqFollower ? (
-                  <div className="flex items-center gap-2 p-2 rounded-lg border border-gray-200 bg-gray-50/50">
-                    <span className="text-xs font-semibold text-gray-600 mr-2">Đáp án đúng cho câu {question.questionNumber}:</span>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {optionKeys.map((k) => (
-                        <button
-                          key={k}
-                          type="button"
-                          onClick={() => handleChange({ correctAnswer: k })}
-                          className={`w-8 h-8 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center justify-center border ${
-                            question.correctAnswer === k
-                              ? "bg-emerald-500 border-emerald-600 text-white shadow-sm font-extrabold"
-                              : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-                          }`}
-                        >
-                          {k}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-2 gap-2">
-                      {optionKeys.map((k) => (
-                        <label
-                          key={k}
-                          className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-gray-200 hover:border-blue-300 transition-all cursor-pointer text-xs"
-                          style={{
-                            background: question.correctAnswer === k ? "#ECFDF5" : "#FFFFFF",
-                            borderColor: question.correctAnswer === k ? "#86EFAC" : "#E5E7EB",
-                          }}
-                        >
-                          <input
-                            type="radio"
-                            name={`correct-${question.id}`}
-                            checked={question.correctAnswer === k}
-                            onChange={() => handleChange({ correctAnswer: k })}
-                            className="w-3.5 h-3.5 accent-emerald-500"
-                          />
-                          <span className="font-bold text-gray-700">{k}.</span>
-                          <input
-                            type="text"
-                            value={currentOptions[k] || ""}
-                            onChange={(e) => {
-                              const nextOptions = { ...currentOptions, [k]: e.target.value };
-                              if (question.questionType === "multiple-choice-group") {
-                                handleGroup({ options: nextOptions });
-                              } else {
-                                handleChange({ options: nextOptions });
-                              }
-                            }}
-                            placeholder={`Đáp án ${k}`}
-                            className="flex-1 bg-transparent text-xs outline-none"
-                          />
-                          {optionKeys.length > 2 && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                onRemoveOption?.(sectionNumber, index, k);
-                              }}
-                              className="p-0.5 rounded text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-all cursor-pointer flex-shrink-0"
-                              title="Xoá đáp án (áp dụng cho cả nhóm)"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </label>
-                      ))}
-                    </div>
-                    {optionKeys.length < LETTERS.length && (
+            )
+          ) : isMcq ? (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                {optionKeys.map((k) => (
+                  <label
+                    key={k}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-md border border-gray-200 hover:border-blue-300 transition-all cursor-pointer text-xs"
+                    style={{
+                      background: question.correctAnswer === k ? "#ECFDF5" : "#FFFFFF",
+                      borderColor: question.correctAnswer === k ? "#86EFAC" : "#E5E7EB",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name={`correct-${question.id}`}
+                      checked={question.correctAnswer === k}
+                      onChange={() => handleChange({ correctAnswer: k })}
+                      className="w-3.5 h-3.5 accent-emerald-500"
+                    />
+                    <span className="font-bold text-gray-700">{k}.</span>
+                    <input
+                      type="text"
+                      value={currentOptions[k] || ""}
+                      onChange={(e) => {
+                        const nextOptions = { ...currentOptions, [k]: e.target.value };
+                        handleChange({ options: nextOptions });
+                      }}
+                      placeholder={`Đáp án ${k}`}
+                      className="flex-1 bg-transparent text-xs outline-none"
+                    />
+                    {optionKeys.length > 2 && (
                       <button
                         type="button"
-                        onClick={() => onAddOption?.(sectionNumber, index)}
-                        className="text-[12px] font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer mt-1"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          onRemoveOption?.(sectionNumber, index, k);
+                        }}
+                        className="p-0.5 rounded text-gray-400 hover:text-rose-500 hover:bg-rose-50 transition-all cursor-pointer flex-shrink-0"
+                        title="Xoá đáp án"
                       >
-                        + Thêm đáp án
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     )}
-                  </>
-                )}
+                  </label>
+                ))}
               </div>
-            )
+              {optionKeys.length < LETTERS.length && (
+                <button
+                  type="button"
+                  onClick={() => onAddOption?.(sectionNumber, index)}
+                  className="text-[12px] font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer mt-1"
+                >
+                  + Thêm đáp án
+                </button>
+              )}
+            </div>
           ) : !isImgCompletion ? (
             <div className="space-y-1">
               {question.wordLimit && (

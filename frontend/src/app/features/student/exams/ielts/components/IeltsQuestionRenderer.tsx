@@ -202,8 +202,14 @@ function renderInput(
   const data = q.data ?? {};
 
   // ─── Multiple choice (A/B/C/D) — single or multi-select ───────────────
-  if (type === "multiple_choice" && q.options) {
-    const letters = Object.keys(q.options);
+  const isMcq =
+    (type === "multiple_choice" ||
+      type === "multiple_choice_group" ||
+      type === "multiple-choice-group" ||
+      type === "mcq") &&
+    !!q.options;
+  if (isMcq) {
+    const letters = Object.keys(q.options!);
     const selectCount = Number(data.select_count ?? data.selectCount ?? 1);
     const multi = selectCount > 1;
     // Multi-select: đáp án lưu "A,C". Tách thành Set để thao tác.

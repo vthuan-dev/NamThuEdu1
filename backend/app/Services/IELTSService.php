@@ -541,6 +541,7 @@ class IELTSService
     /** Map frontend kebab-case question types to DB snake_case enums */
     private const QUESTION_TYPE_MAP = [
         'multiple-choice'        => 'multiple_choice',
+        'multiple-choice-group'  => 'multiple_choice_group',
         'fill-in-the-blank'      => 'fill_blank',
         'fill-blank'             => 'fill_blank',
         'true-false-not-given'   => 'true_false_not_given',
@@ -883,8 +884,10 @@ class IELTSService
         $options,
         string $correctAnswer
     ): void {
+        $isMcqType = in_array($qType, ['multiple_choice', 'multiple_choice_group', 'multiple-choice-group'], true);
+
         // Multi-select MCQ ("A,C") → 1 row gộp, chấm theo tập hợp ở gradeAnswers.
-        if ($qType === 'multiple_choice' && strpos($correctAnswer, ',') !== false) {
+        if ($isMcqType && strpos($correctAnswer, ',') !== false) {
             Answer::create([
                 'question_id' => $question->qId,
                 'aContent'    => strtoupper(str_replace(' ', '', $correctAnswer)),
@@ -893,7 +896,7 @@ class IELTSService
             return;
         }
 
-        if ($qType === 'multiple_choice' && is_array($options)) {
+        if ($isMcqType && is_array($options)) {
             // Lặp theo CÁC KEY ĐÁP ÁN THỰC TẾ (A–H), không cứng A–D. Đề dạng
             // "Choose TWO/THREE letters" có 5–8 lựa chọn nên phải tạo đủ row.
             $letters = array_values(array_filter(
