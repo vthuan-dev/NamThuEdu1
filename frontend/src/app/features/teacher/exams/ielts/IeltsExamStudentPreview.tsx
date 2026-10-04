@@ -55,7 +55,7 @@ interface Props {
    * Khi truyền vào, nút "LUYỆN TẬP"/"BẮT ĐẦU THI" sẽ gọi callback này
    * để render demo INLINE (không điều hướng route). Ưu tiên hơn navigate.
    */
-  onStartDemo?: () => void;
+  onStartDemo?: (selectedIndices?: number[], timeLimitMinutes?: number | null) => void;
 }
 
 type ModeTab = "practice" | "full_test";
@@ -79,20 +79,28 @@ export function IeltsExamStudentPreview({
 
   // Mở demo làm bài. Ưu tiên callback inline (onStartDemo) — tránh lỗi
   // routing khi nhúng trong iframe/modal. Fallback sang navigate khi standalone.
-  const openDemoPlayer = () => {
+  const openDemoPlayer = (selectedIndices?: number[], timeLimitMinutes?: number | null) => {
     if (!examId) {
       toast.warning("Tính năng xem thử chỉ khả dụng khi mở từ trang Xem đề thi");
       return;
     }
     toast.info("🔍 Chế độ xem thử · Đáp án sẽ không được lưu");
     if (onStartDemo) {
-      onStartDemo();
+      onStartDemo(selectedIndices, timeLimitMinutes);
       return;
     }
+    const query = new URLSearchParams();
+    if (selectedIndices && selectedIndices.length > 0) {
+      query.set("sections", selectedIndices.map((i) => i + 1).join(","));
+    }
+    if (timeLimitMinutes) {
+      query.set("time", String(timeLimitMinutes));
+    }
+    const qStr = query.toString() ? `?${query.toString()}` : "";
     navigate(
       admin
-        ? `/admin/de-thi/xem/ielts/${skill}/thu/${examId}`
-        : `/giao-vien/de-thi/ielts/${skill}/thu/${examId}`
+        ? `/admin/de-thi/xem/ielts/${skill}/thu/${examId}${qStr}`
+        : `/giao-vien/de-thi/ielts/${skill}/thu/${examId}${qStr}`
     );
   };
 
@@ -210,7 +218,7 @@ function PracticeModeView({
   sections: SectionPreview[];
   timeLimitOptions: (number | null)[];
   enabled: boolean;
-  onStart?: () => void;
+  onStart?: (selectedIndices?: number[], timeLimitMinutes?: number | null) => void;
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [timeLimit, setTimeLimit] = useState<string>("");
@@ -222,6 +230,23 @@ function PracticeModeView({
     next.has(idx) ? next.delete(idx) : next.add(idx);
     setSelected(next);
   };
+
+  const handleSelectAll = () => {
+    if (selected.size === sections.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(sections.map((_, i) => i)));
+    }
+  };
+
+  const handleStart = () => {
+    if (selected.size === 0) return;
+    const timeNum = timeLimit === "" ? null : Number(timeLimit);
+    onStart?.(Array.from(selected).sort((a, b) => a - b), timeNum);
+  };
+
+  const isAllSelected = sections.length > 0 && selected.size === sections.length;
+  const isNoneSelected = selected.size === 0;
 
   return (
     <>
@@ -237,9 +262,23 @@ function PracticeModeView({
 
       {/* Section list */}
       <div className="mb-5">
-        <p className="text-sm font-semibold text-gray-900 mb-3">
-          Chọn phần thi bạn muốn làm
-        </p>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-semibold text-gray-900">
+            Chọn phần thi bạn muốn làm{" "}
+            <span className="text-xs font-normal text-gray-500">
+              ({selected.size}/{sections.length} đã chọn)
+            </span>
+          </p>
+          {sections.length > 1 && (
+            <button
+              type="button"
+              onClick={handleSelectAll}
+              className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+            >
+              {isAllSelected ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+            </button>
+          )}
+        </div>
 
         {sections.length === 0 ? (
           <EmptyState
@@ -249,36 +288,43 @@ function PracticeModeView({
           />
         ) : (
           <div className="space-y-2">
-            {sections.map((sec, idx) => (
-              <label
-                key={idx}
-                className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:border-gray-300 cursor-pointer transition-all"
-              >
-                <input
-                  type="checkbox"
-                  checked={selected.has(idx)}
-                  onChange={() => toggle(idx)}
-                  className="mt-1 w-4 h-4 rounded text-blue-600 cursor-pointer"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900">
-                    {sec.name} <span className="text-gray-500 font-normal">({sec.questionCount} câu hỏi)</span>
-                  </p>
-                  {sec.questionTypes.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-1.5">
-                      {sec.questionTypes.map((qt, i) => (
-                        <span
-                          key={i}
-                          className="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-700"
-                        >
-                          #[{capitalize(sec.skill)}] {qt}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </label>
-            ))}
+            {sections.map((sec, idx) => {
+              const isChecked = selected.has(idx);
+              return (
+                <label
+                  key={idx}
+                  className={`flex items-start gap-3 p-3 rounded-lg border transition-all cursor-pointer ${
+                    isChecked
+                      ? "border-blue-500 bg-blue-50/40 ring-1 ring-blue-200"
+                      : "border-gray-200 hover:border-gray-300 hover:bg-gray-50/50"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => toggle(idx)}
+                    className="mt-1 w-4 h-4 rounded text-blue-600 cursor-pointer"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">
+                      {sec.name} <span className="text-gray-500 font-normal">({sec.questionCount} câu hỏi)</span>
+                    </p>
+                    {sec.questionTypes.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        {sec.questionTypes.map((qt, i) => (
+                          <span
+                            key={i}
+                            className="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-700"
+                          >
+                            #[{capitalize(sec.skill)}] {qt}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </label>
+              );
+            })}
           </div>
         )}
       </div>
@@ -307,14 +353,24 @@ function PracticeModeView({
         </div>
       )}
 
-      {/* CTA */}
-      <button
-        type="button"
-        onClick={onStart}
-        className="px-6 py-2.5 rounded-lg font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-sm cursor-pointer"
-      >
-        LUYỆN TẬP
-      </button>
+      {/* CTA Button & Validation Hint */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <button
+          type="button"
+          onClick={handleStart}
+          disabled={isNoneSelected}
+          title={isNoneSelected ? "Vui lòng chọn ít nhất 1 phần thi để luyện tập" : undefined}
+          className="px-6 py-2.5 rounded-lg font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed transition-all shadow-sm cursor-pointer"
+        >
+          LUYỆN TẬP
+        </button>
+        {isNoneSelected && (
+          <span className="text-xs text-amber-600 font-medium flex items-center gap-1.5">
+            <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+            Vui lòng chọn ít nhất 1 phần thi để bắt đầu luyện tập
+          </span>
+        )}
+      </div>
     </>
   );
 }

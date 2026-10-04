@@ -57,7 +57,7 @@ interface StudentIeltsExamPageProps {
   fullTest?: boolean;
 }
 
-function applyPracticeScope(
+export function applyPracticeScope(
   rawPayload: any,
   skill: IeltsSkill,
   sectionNumbers: Set<number> | null,

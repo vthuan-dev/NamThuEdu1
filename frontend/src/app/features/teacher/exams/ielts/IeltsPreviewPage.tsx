@@ -61,6 +61,11 @@ export function IeltsPreviewPage({ admin = false, backTo }: { admin?: boolean; b
 
   const goBack = () => (backTo ? navigate(backTo) : navigate(-1));
 
+  const [demoPracticeScope, setDemoPracticeScope] = useState<{
+    sections?: number[];
+    timeLimitMinutes?: number | null;
+  } | null>(null);
+
   // Demo làm bài render inline (cả admin lẫn giáo viên) — chỉ xem, không điều hướng.
   if (demoActive && examId) {
     return (
@@ -68,7 +73,12 @@ export function IeltsPreviewPage({ admin = false, backTo }: { admin?: boolean; b
         admin={admin}
         examId={examId}
         skill={skill}
-        onBack={() => setDemoActive(false)}
+        practiceSections={demoPracticeScope?.sections}
+        timeLimitMinutes={demoPracticeScope?.timeLimitMinutes}
+        onBack={() => {
+          setDemoActive(false);
+          setDemoPracticeScope(null);
+        }}
       />
     );
   }
@@ -124,7 +134,17 @@ export function IeltsPreviewPage({ admin = false, backTo }: { admin?: boolean; b
             playMode={playMode}
             examId={examId}
             admin={admin}
-            onStartDemo={() => setDemoActive(true)}
+            onStartDemo={(selectedIndices, timeLimitMinutes) => {
+              setDemoPracticeScope(
+                selectedIndices && selectedIndices.length > 0
+                  ? {
+                      sections: selectedIndices.map((i) => i + 1),
+                      timeLimitMinutes,
+                    }
+                  : null
+              );
+              setDemoActive(true);
+            }}
           />
         )}
       </div>

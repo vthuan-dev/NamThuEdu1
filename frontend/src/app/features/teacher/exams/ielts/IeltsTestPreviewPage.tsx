@@ -9,7 +9,7 @@
  * Route: /giao-vien/de-thi/ielts/:skill/thu/:examId
  */
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useParams, useNavigate, useSearchParams } from "react-router";
 import { ArrowLeft, Loader2, AlertCircle, Eye } from "lucide-react";
 import { api } from "../../../../../services/api";
 import { usePageTitle } from "../../../../../hooks/usePageTitle";
@@ -18,6 +18,7 @@ import { IeltsListeningView } from "../../../student/exams/ielts/views/IeltsList
 import { IeltsReadingView } from "../../../student/exams/ielts/views/IeltsReadingView";
 import { IeltsWritingView } from "../../../student/exams/ielts/views/IeltsWritingView";
 import { IeltsSpeakingView } from "../../../student/exams/ielts/views/IeltsSpeakingView";
+import { applyPracticeScope } from "../../../student/exams/ielts/StudentIeltsExamPage";
 
 import type {
   IeltsSkill,
@@ -39,17 +40,22 @@ export function IeltsTestPreviewPage({
   admin = false,
   examId: examIdProp,
   skill: skillProp,
+  practiceSections,
+  timeLimitMinutes,
   onBack,
 }: {
   admin?: boolean;
   examId?: number | string;
   skill?: string;
+  practiceSections?: number[];
+  timeLimitMinutes?: number | null;
   onBack?: () => void;
 } = {}) {
   const params = useParams<{
     examId: string;
     skill: string;
   }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const examId = Number(examIdProp ?? params.examId);
   const skill = ((skillProp ?? params.skill) || "listening") as IeltsSkill;
@@ -109,6 +115,36 @@ export function IeltsTestPreviewPage({
     // Trang demo: không submit, không hỏi gì cả
   };
 
+  const effectiveSections = useMemo(() => {
+    if (practiceSections && practiceSections.length > 0) return practiceSections;
+    const secParam = searchParams.get("sections");
+    if (secParam) {
+      return secParam.split(",").map(Number).filter((n) => !isNaN(n) && n > 0);
+    }
+    return undefined;
+  }, [practiceSections, searchParams]);
+
+  const effectiveTime = useMemo(() => {
+    if (timeLimitMinutes !== undefined && timeLimitMinutes !== null) return timeLimitMinutes;
+    const tParam = searchParams.get("time");
+    if (tParam) {
+      const parsed = Number(tParam);
+      return !isNaN(parsed) && parsed > 0 ? parsed : null;
+    }
+    return null;
+  }, [timeLimitMinutes, searchParams]);
+
+  const activePayload = useMemo(() => {
+    if (!payload) return null;
+    if (!effectiveSections || effectiveSections.length === 0) return payload;
+    return applyPracticeScope(
+      payload,
+      skill,
+      new Set(effectiveSections),
+      effectiveTime
+    );
+  }, [payload, skill, effectiveSections, effectiveTime]);
+
   const skillTitle = useMemo(() => SKILL_LABELS[skill] ?? skill, [skill]);
 
   return (
@@ -125,7 +161,7 @@ export function IeltsTestPreviewPage({
 
         <span className="text-gray-300">|</span>
 
-        <div className="flex items-center gap-2 min-w-0 flex-1">
+        <div className="flex items-center gap-2 min-w-0 flex-1 flex-wrap">
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-100">
             <Eye className="w-3 h-3" />
             Chế độ xem thử
@@ -133,6 +169,16 @@ export function IeltsTestPreviewPage({
           <span className="text-sm font-semibold text-gray-800 truncate">
             IELTS {skillTitle}
           </span>
+          {effectiveSections && effectiveSections.length > 0 && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-100">
+              Luyện tập: Phần {effectiveSections.join(", ")}
+            </span>
+          )}
+          {effectiveTime && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-gray-100 text-gray-700">
+              ⏱ {effectiveTime} phút
+            </span>
+          )}
         </div>
 
         <p className="hidden md:block text-xs text-gray-500">
@@ -160,13 +206,13 @@ export function IeltsTestPreviewPage({
         </div>
       )}
 
-      {!loading && !error && payload && (() => {
+      {!loading && !error && activePayload && (() => {
         // Đề chưa có dữ liệu (sections/passages/tasks/parts đều rỗng)
         const isEmpty =
-          (skill === "listening" && (!payload.sections?.length || payload.sections.every((s: any) => !s.questions?.length))) ||
-          (skill === "reading" && (!payload.passages?.length || payload.passages.every((p: any) => !p.questions?.length))) ||
-          (skill === "writing" && !payload.tasks?.length) ||
-          (skill === "speaking" && !payload.parts?.length);
+          (skill === "listening" && (!activePayload.sections?.length || activePayload.sections.every((s: any) => !s.questions?.length))) ||
+          (skill === "reading" && (!activePayload.passages?.length || activePayload.passages.every((p: any) => !p.questions?.length))) ||
+          (skill === "writing" && !activePayload.tasks?.length) ||
+          (skill === "speaking" && !activePayload.parts?.length);
 
         if (isEmpty) {
           return (
@@ -179,7 +225,7 @@ export function IeltsTestPreviewPage({
                   Đề thi chưa có nội dung
                 </h3>
                 <p className="text-sm text-gray-600 leading-relaxed mb-5">
-                  Đề "{payload.title || "IELTS"}" hiện chưa có câu hỏi nào. Vui lòng quay
+                  Đề "{activePayload.title || "IELTS"}" hiện chưa có câu hỏi nào. Vui lòng quay
                   lại trang soạn thảo để thêm câu hỏi trước khi xem thử giao diện làm bài.
                 </p>
                 <button
@@ -198,7 +244,7 @@ export function IeltsTestPreviewPage({
           <div className="flex-1">
             {skill === "listening" && (
               <IeltsListeningView
-                payload={payload as IeltsListeningPayload}
+                payload={activePayload as IeltsListeningPayload}
                 answers={answers}
                 flagged={flagged}
                 onAnswer={handleAnswer}
@@ -212,7 +258,7 @@ export function IeltsTestPreviewPage({
             )}
             {skill === "reading" && (
               <IeltsReadingView
-                payload={payload as IeltsReadingPayload}
+                payload={activePayload as IeltsReadingPayload}
                 answers={answers}
                 flagged={flagged}
                 onAnswer={handleAnswer}
@@ -225,7 +271,7 @@ export function IeltsTestPreviewPage({
             )}
             {skill === "writing" && (
               <IeltsWritingView
-                payload={payload as IeltsWritingPayload}
+                payload={activePayload as IeltsWritingPayload}
                 answers={answers}
                 onAnswer={handleAnswer}
                 onSubmit={handleNoopSubmit}
@@ -234,7 +280,7 @@ export function IeltsTestPreviewPage({
             )}
             {skill === "speaking" && (
               <IeltsSpeakingView
-                payload={payload as IeltsSpeakingPayload}
+                payload={activePayload as IeltsSpeakingPayload}
                 submissionId={null}
                 onSubmit={handleNoopSubmit}
                 hideSubmit
