@@ -73,73 +73,11 @@ const THEME_DEFAULT = { PRIMARY: '#7C3AED', PRIMARY_LIGHT: '#EDE9FE', PRIMARY_MI
 const STUDENT_BASE_PATH = "/hoc-vien";
 
 /**
- * Gộp các phần skill rời của cùng một lượt VSTEP (listening/reading/writing/speaking)
- * thành 1 card "Full Skills".
- *
- * QUAN TRỌNG: KHÔNG gộp các assignment VSTEP độc lập (giao lại / đề full riêng).
- * Trước đây dùng Math.max(attempts_used) trên MỌI item VSTEP → bài mới bị dính
- * "Hết lượt" từ bài cũ dù assignment_id khác và attempts_used = 0.
+ * Trả về danh sách bài tập giữ nguyên theo từng assignment độc lập.
+ * Mỗi đề (dù là VSTEP, IELTS, THPT...) hiển thị đúng số câu hỏi, thời gian và lượt làm của chính đề đó.
  */
 function mergeVstepIntoSingleTest(items: any[]) {
-  const vstepItems = items.filter((t) => String(t.exam_type || "").toUpperCase() === "VSTEP");
-  if (vstepItems.length <= 1) return items;
-
-  // Nếu mỗi item đã là full-test độc lập (skill mixed/rỗng hoặc duration ≥ 100'),
-  // giữ nguyên từng card — mỗi assignment_id có lượt riêng.
-  const isIndependentFull = (t: any) => {
-    const skill = String(t.exam_skill || "").toLowerCase();
-    return skill === "mixed" || skill === "" || Number(t.exam_duration || 0) >= 100;
-  };
-  if (vstepItems.every(isIndependentFull)) {
-    return items;
-  }
-
-  // Chỉ gộp các skill-split (nghe/đọc/viết/nói) thành 1 card.
-  // Chọn primary theo độ ưu tiên hành động: in_progress → pending còn lượt → mới nhất.
-  const rank = (t: any) => {
-    const used = Number(t.attempts_used || 0);
-    const allowed = Number(t.attempts_allowed || 1);
-    const hasAttempts = used < allowed;
-    if (t.status === "in_progress") return 0;
-    if (t.status === "pending" && hasAttempts) return 1;
-    if (t.status === "pending") return 2;
-    if (t.status === "completed" && hasAttempts) return 3;
-    return 4;
-  };
-  const primary = [...vstepItems].sort((a, b) => {
-    const rd = rank(a) - rank(b);
-    if (rd !== 0) return rd;
-    return Number(b.assignment_id || 0) - Number(a.assignment_id || 0);
-  })[0];
-
-  const nonVstep = items.filter((t) => String(t.exam_type || "").toUpperCase() !== "VSTEP");
-  const status = primary?.status
-    || (vstepItems.some((t) => t.status === "in_progress")
-      ? "in_progress"
-      : vstepItems.some((t) => t.status === "pending")
-      ? "pending"
-      : "completed");
-
-  const merged = {
-    ...primary,
-    assignment_id: primary?.assignment_id,
-    submission_id: primary?.submission_id ?? vstepItems.find((t) => t.submission_id)?.submission_id,
-    exam_title: primary?.exam_title || "VSTEP Full Skills Test",
-    exam_type: "VSTEP",
-    exam_skill: primary?.exam_skill || "mixed",
-    exam_duration: vstepItems.reduce((sum, t) => sum + Number(t.exam_duration || 0), 0) || 179,
-    total_questions: vstepItems.reduce((sum, t) => sum + Number(t.total_questions || 0), 0) || 80,
-    // Lấy đúng lượt của assignment primary — không Math.max xuyên assignment
-    attempts_allowed: Number(primary?.attempts_allowed || 1),
-    attempts_used: Number(primary?.attempts_used || 0),
-    is_urgent: vstepItems.some((t) => Boolean(t.is_urgent)),
-    deadline: primary?.deadline ?? vstepItems.find((t) => t.deadline)?.deadline,
-    assigned_at: primary?.assigned_at ?? primary?.start_time,
-    start_time: primary?.start_time ?? primary?.assigned_at,
-    status,
-  };
-
-  return [...nonVstep, merged];
+  return items;
 }
 
 function isOverdue(test: any): boolean {
