@@ -29,6 +29,7 @@ import { api } from "../../../../services/api";
 import { usePageTitle } from "../../../../hooks/usePageTitle";
 import { useExamSession } from "../../../../hooks/exam/useExamSession";
 import { useConfirm } from "../../../../contexts/ConfirmContext";
+import { useToastContext } from "../../../../contexts/ToastContext";
 import { PassageSplitLayout } from "../components/PassageSplitLayout";
 import { sanitizePassageHtml, normalizeAudioUrl } from "../../../../utils/examUtils";
 import { getFullMediaUrl } from "../../../../utils/mediaUtils";
@@ -168,6 +169,7 @@ export function StudentVstepExamPage() {
   const { examId } = useParams<{ examId: string }>();
   const navigate = useNavigate();
   const confirm = useConfirm();
+  const toast = useToastContext();
   const location = useLocation();
 
   /* ── Query params (from ExamLobby flow) ─────────────────── */
@@ -224,7 +226,8 @@ export function StudentVstepExamPage() {
     enableAutoSubmitOnUnload: !reviewMode,
     onAutoSubmitted: () => {
       if (!reviewMode && submissionId) {
-        navigate(`${STUDENT_BASE_PATH}/lam-bai-vstep/${examId}?review=${submissionId}`);
+        setShowSubmit(false);
+        navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${submissionId}`, { replace: true });
       }
     },
   });
@@ -872,7 +875,7 @@ export function StudentVstepExamPage() {
 
   /* ── Auto-advance skill when per-skill timer hits 0 ──────── */
   useEffect(() => {
-    if (skillTimeLeft > 0) return;
+    if (skillTimeLeft > 0 || submittedRef.current) return;
     // Speaking: each part is timed separately → advance part-by-part first.
     if (current.skill === "speaking") {
       if (speakingBusy.isBusy) {
@@ -911,6 +914,7 @@ export function StudentVstepExamPage() {
   const handleAutoSubmit = useCallback(async () => {
     if (!submissionId || submittedRef.current) return;
     submittedRef.current = true;
+    setShowSubmit(false);
 
     // Force-flush all local answers with retry
     try {
@@ -950,13 +954,17 @@ export function StudentVstepExamPage() {
       console.warn("[VSTEP] auto-submit flush error", err);
     }
 
-    studentApi.submitTest(submissionId)
-      .then((res: any) => {
-        const sid = res?.data?.data?.submissionId ?? submissionId;
-        navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${sid}`);
-      })
-      .catch(() => navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${submissionId}`));
-  }, [submissionId, examId, navigate, answers, writingDrafts, writingTasks]);
+    try {
+      const res: any = await studentApi.submitTest(submissionId);
+      const sid = res?.data?.data?.submissionId ?? submissionId;
+      try { localStorage.removeItem(LS_ANSWERS!); } catch {}
+      try { localStorage.removeItem(LS_WRITING!); } catch {}
+      navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${sid}`, { replace: true });
+    } catch (err: any) {
+      console.warn("[VSTEP] auto-submit submitTest error, navigating to results anyway", err);
+      navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${submissionId}`, { replace: true });
+    }
+  }, [submissionId, examId, navigate, answers, writingDrafts, writingTasks, LS_ANSWERS, LS_WRITING]);
 
   /* ── Navigate ───────────────────────────────────────────── */
   const navigate2 = (skill: SkillKey, partNumber: number, force?: boolean) => {
@@ -1008,8 +1016,15 @@ export function StudentVstepExamPage() {
   // KHÔNG navigate đi nếu lưu thất bại — để user còn cơ hội nộp lại.
   const handleSubmit = async () => {
     if (!submissionId) return;
-    if (submittedRef.current) return;
+    if (submittedRef.current) {
+      setShowSubmit(false);
+      navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${submissionId}`, { replace: true });
+      return;
+    }
+
     setSubmitting(true);
+    setShowSubmit(false);
+
     try {
       // ─── Build full bulk payload (MCQ + writing) ──────────────────────
       const bulkPayload: Array<{ question_id: number; saAnswer_text: string }> = [];
@@ -1064,9 +1079,6 @@ export function StudentVstepExamPage() {
       // ─── Nếu có chunk thất bại → CHẶN submit, alert user, để user retry ──
       if (failedChunks.length > 0) {
         const lostCount = failedChunks.reduce((s, c) => s + c.length, 0);
-        // Nội dung cũ phải hướng dẫn theo tên nút của trình duyệt ("Bấm OK để…",
-        // "Bấm Cancel để…") vì window.confirm không cho đặt nhãn. Giờ nhãn nút
-        // nói thẳng hành động nên không cần giải thích.
         const ok = await confirm({
           tone: 'warning',
           title: 'Một số câu chưa lưu được',
@@ -1077,6 +1089,7 @@ export function StudentVstepExamPage() {
           cancelLabel: 'Dừng để kiểm tra mạng',
         });
         if (!ok) {
+          setShowSubmit(true);
           setSubmitting(false);
           return;
         }
@@ -1089,12 +1102,28 @@ export function StudentVstepExamPage() {
       // ✅ Chỉ remove localStorage SAU khi submit thành công
       try { localStorage.removeItem(LS_ANSWERS!); } catch {}
       try { localStorage.removeItem(LS_WRITING!); } catch {}
-      navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${sid}`);
+      navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${sid}`, { replace: true });
     } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.message ?? "Không nộp bài được. Vui lòng thử lại.";
+      const isAlreadySubmitted =
+        typeof msg === 'string' &&
+        (msg.includes('đã được nộp') ||
+         msg.includes('đã nộp') ||
+         msg.includes('already submitted') ||
+         msg.includes('đã kết thúc'));
+
+      if (isAlreadySubmitted) {
+        submittedRef.current = true;
+        try { localStorage.removeItem(LS_ANSWERS!); } catch {}
+        try { localStorage.removeItem(LS_WRITING!); } catch {}
+        navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${submissionId}`, { replace: true });
+        return;
+      }
+
       // Submit FAILED — KHÔNG navigate, KHÔNG xóa localStorage
       submittedRef.current = false;
-      const msg = err?.response?.data?.message ?? "Không nộp bài được. Vui lòng thử lại.";
       console.error("[VSTEP] submitTest failed", err);
+      setShowSubmit(true);
       window.alert(`${msg}\n\nDữ liệu của bạn vẫn được lưu lại trong trình duyệt. Hãy thử nộp lại sau ít phút.`);
     } finally {
       setSubmitting(false);

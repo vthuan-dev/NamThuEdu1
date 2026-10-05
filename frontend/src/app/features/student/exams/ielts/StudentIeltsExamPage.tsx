@@ -806,12 +806,27 @@ export function StudentIeltsExamPage({ skill, fullTest = false }: StudentIeltsEx
 
       // Single-skill / last skill: dùng session.submit() — force-flush + retry +
       // submit atomically. Nếu user huỷ trong confirm dialog (do save fail), throw.
+      setSubmitOpen(false);
       await session.submit();
 
       // Single-skill: navigate to results
-      navigate(`/hoc-vien/ket-qua-ielts/${submissionId}`);
+      navigate(`/hoc-vien/ket-qua-ielts/${submissionId}`, { replace: true });
     } catch (e: any) {
       const msg = e?.response?.data?.message ?? e?.message ?? "Submit failed. Please try again.";
+      const isAlreadySubmitted =
+        typeof msg === 'string' &&
+        (msg.includes('đã được nộp') ||
+         msg.includes('đã nộp') ||
+         msg.includes('already submitted') ||
+         msg.includes('đã kết thúc'));
+
+      if (isAlreadySubmitted) {
+        setSubmitOpen(false);
+        navigate(`/hoc-vien/ket-qua-ielts/${submissionId}`, { replace: true });
+        return;
+      }
+
+      setSubmitOpen(true);
       alert(`${msg}\n\nDữ liệu vẫn được giữ trong trình duyệt — bạn có thể thử nộp lại sau ít phút.`);
     } finally {
       setSubmitting(false);
