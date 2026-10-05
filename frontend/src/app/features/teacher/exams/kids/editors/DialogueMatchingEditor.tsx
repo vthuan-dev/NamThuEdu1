@@ -199,7 +199,6 @@ const DialogueMatchingEditor: React.FC<DialogueMatchingEditorProps> = ({
       title="Ghép hội thoại"
       badge="Reading & Writing · Dialogue"
       instruction="Học sinh chọn câu trả lời phù hợp cho mỗi câu nói. Flyers Part 2: 7 câu dùng CHUNG 8 lựa chọn A-H (có lựa chọn dư làm nhiễu). Movers Part 3: dùng ít lựa chọn hơn."
-      saveDisabled={!canSave}
       onSave={handleSave}
       onCancel={onCancel}
     >

@@ -92,22 +92,51 @@ const EditorShell: React.FC<EditorShellProps> = ({
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 cursor-pointer"
         >
           Hủy
         </button>
         <button
           type="button"
-          onClick={onSave}
+          id="editor-save-btn"
+          onClick={() => {
+            if (context?.setPendingAdvance) {
+              context.setPendingAdvance(null);
+            }
+            onSave();
+          }}
           disabled={saveDisabled}
-          className={`rounded-lg px-5 py-2 text-sm font-semibold transition-colors ${
+          className={`rounded-lg px-5 py-2 text-sm font-semibold transition-colors cursor-pointer ${
             saveDisabled
               ? 'cursor-not-allowed bg-slate-200 text-slate-400'
+              : context?.nextAction
+              ? 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
               : 'bg-orange-500 text-white hover:bg-orange-600'
           }`}
         >
           {saveLabel}
         </button>
+        {context?.nextAction && (
+          <button
+            type="button"
+            id="editor-save-and-next-btn"
+            onClick={() => {
+              if (context?.triggerSaveAndAdvance) {
+                context.triggerSaveAndAdvance(context.nextAction.onExecute, onSave);
+              } else {
+                onSave();
+              }
+            }}
+            disabled={saveDisabled}
+            className={`flex items-center gap-1.5 rounded-lg px-5 py-2 text-sm font-semibold transition-colors cursor-pointer ${
+              saveDisabled
+                ? 'cursor-not-allowed bg-slate-200 text-slate-400'
+                : 'bg-orange-500 text-white hover:bg-orange-600 shadow-sm shadow-orange-500/20'
+            }`}
+          >
+            <span>{context.nextAction.label}</span>
+          </button>
+        )}
       </div>
     </div>
   );

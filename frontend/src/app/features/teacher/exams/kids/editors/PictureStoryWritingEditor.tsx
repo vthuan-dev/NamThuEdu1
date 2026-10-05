@@ -57,7 +57,6 @@ const PictureStoryWritingEditor: React.FC<PictureStoryWritingEditorProps> = ({
       title="Viết câu chuyện theo tranh"
       badge="Flyers · Writing · Picture Story"
       instruction="Học sinh nhìn 3-6 tranh theo thứ tự và viết câu chuyện (tối thiểu 20 từ). Chấm theo nội dung (3đ) + ngôn ngữ (3đ) + tổ chức (2đ) = 8 điểm."
-      saveDisabled={!canSave}
       onSave={handleSave}
       onCancel={onCancel}
     >

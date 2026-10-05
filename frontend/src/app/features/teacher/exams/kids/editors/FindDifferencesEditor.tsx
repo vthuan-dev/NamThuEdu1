@@ -29,6 +29,17 @@ const FindDifferencesEditor: React.FC<FindDifferencesEditorProps> = ({
   );
   const [error, setError] = useState('');
 
+  React.useEffect(() => {
+    if (!initialData) return;
+    const s = initialData.config ?? initialData.question_data ?? {};
+    setTitle(initialData.title || 'Tìm điểm khác biệt');
+    setImageAUrl(s.image_a_url || '');
+    setImageBUrl(s.image_b_url || '');
+    if (Array.isArray(s.differences) && s.differences.length > 0) {
+      setDifferences(s.differences);
+    }
+  }, [initialData]);
+
   const addDifference = () => setDifferences([...differences, '']);
   const updateDifference = (index: number, value: string) =>
     setDifferences(differences.map((d, i) => (i === index ? value : d)));

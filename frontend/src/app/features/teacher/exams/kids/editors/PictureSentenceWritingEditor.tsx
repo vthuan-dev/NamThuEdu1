@@ -99,7 +99,6 @@ const PictureSentenceWritingEditor: React.FC<PictureSentenceWritingEditorProps> 
       title="Viết câu mô tả tranh"
       badge="Writing · Picture Sentence"
       instruction="Học sinh nhìn tranh và viết câu mô tả hoàn chỉnh. Mỗi câu có 1 ảnh, 1 câu hỏi gợi ý và nhiều đáp án mẫu để giáo viên chấm linh hoạt."
-      saveDisabled={!canSave}
       onSave={handleSave}
       onCancel={onCancel}
     >

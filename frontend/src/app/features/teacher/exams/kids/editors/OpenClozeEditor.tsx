@@ -98,7 +98,6 @@ const OpenClozeEditor: React.FC<OpenClozeEditorProps> = ({ onSave, onCancel, ini
       title="Điền từ tự do (Open Cloze)"
       badge="Flyers · Reading & Writing"
       instruction="Học sinh tự nghĩ và điền 1 từ vào mỗi chỗ trống (không có lựa chọn). Dùng __1__, __2__... trong đoạn văn. Mỗi chỗ trống có thể nhận nhiều đáp án đúng (không phân biệt hoa thường)."
-      saveDisabled={!canSave}
       onSave={handleSave}
       onCancel={onCancel}
     >

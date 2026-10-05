@@ -92,7 +92,6 @@ const WordDefinitionMatchingEditor: React.FC<WordDefinitionMatchingEditorProps> 
       title="Ghép định nghĩa với từ"
       badge="Reading & Writing · Matching"
       instruction="Học sinh đọc từng định nghĩa rồi chọn từ đúng trong hộp từ. Movers: 5-8 từ · Flyers Part 1: 10 định nghĩa + 15 từ (5 từ nhiễu). Thêm từ nhiễu ở mục dưới cùng."
-      saveDisabled={!canSave}
       onSave={handleSave}
       onCancel={onCancel}
     >

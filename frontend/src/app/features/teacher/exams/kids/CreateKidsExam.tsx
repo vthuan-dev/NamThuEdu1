@@ -221,10 +221,27 @@ const CreateKidsExam: React.FC = () => {
   }, [examData.questions, currentExamId]);
 
   const handleNext = async () => {
-    if (currentStep === 1 && !currentExamId) {
-      // Create draft exam when moving from Step 1 to Step 2
-      const newExamId = await createDraftExam();
-      if (!newExamId) return; // Failed to create
+    if (currentStep === 1) {
+      if (!currentExamId) {
+        // Create draft exam when moving from Step 1 to Step 2
+        const newExamId = await createDraftExam();
+        if (!newExamId) return; // Failed to create
+      } else {
+        // Update draft exam with any updated scope, title, duration
+        try {
+          await updateKidsExam(parseInt(currentExamId), {
+            eTitle: examData.title,
+            eDescription: examData.description,
+            eDuration: examData.duration,
+            mode: examData.mode,
+            scope: examData.scope || 'full',
+            scope_skill: examData.scopeSkill ?? null,
+            scope_part: examData.scopePart ?? null,
+          });
+        } catch (error) {
+          console.error('Failed to sync draft exam settings:', error);
+        }
+      }
     }
     
     if (currentStep < 3) {

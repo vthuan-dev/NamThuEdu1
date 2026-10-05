@@ -88,7 +88,6 @@ const InformationExchangeEditor: React.FC<InformationExchangeEditorProps> = ({
       title="Trao đổi thông tin"
       badge="Flyers · Speaking · Information Exchange"
       instruction="Học sinh hỏi và trả lời để hoàn thành bảng thông tin. Tải hình minh họa, nhập tiêu đề thẻ, thông tin đã biết (để trả lời) và các câu hỏi cần hỏi."
-      saveDisabled={!canSave}
       onSave={handleSave}
       onCancel={onCancel}
     >

@@ -83,7 +83,6 @@ const UnscrambleWordsEditor: React.FC<UnscrambleWordsEditorProps> = ({
       title="Sắp xếp chữ thành từ"
       badge="Reading & Writing · Unscramble"
       instruction="Học sinh nhìn hình và sắp xếp chữ cái lộn xộn thành từ đúng. Nhập từ đúng, hệ thống tự xáo trộn chữ cái (có thể chỉnh tay)."
-      saveDisabled={!canSave}
       onSave={handleSave}
       onCancel={onCancel}
     >

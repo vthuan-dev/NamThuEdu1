@@ -28,10 +28,18 @@ import ListeningLetterMatchEditor from '../editors/ListeningLetterMatchEditor';
 import TaskTypeSelectorModal from '../components/TaskTypeSelectorModal';
 import { addKidsQuestion, updateKidsQuestion } from '../../../../../../services/kidsExamApi';
 
-export const KidsExplanationContext = React.createContext<{
+export interface KidsEditorContextType {
   explanation: string;
   setExplanation: (val: string) => void;
-} | null>(null);
+  nextAction?: {
+    label: string;
+    onExecute: () => void;
+  } | null;
+  triggerSaveAndAdvance?: (advanceFn: () => void, doSave: () => void) => void;
+  setPendingAdvance?: (fn: (() => void) | null) => void;
+}
+
+export const KidsExplanationContext = React.createContext<KidsEditorContextType | null>(null);
 
 interface Step2AddQuestionsProps {
   examData: any;
@@ -323,6 +331,7 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
   const [selectedPart, setSelectedPart] = useState<number | null>(null);
   const [selectedSubPart, setSelectedSubPart] = useState<number | null>(null);
   const [expandedParts, setExpandedParts] = useState<number[]>([]);
+  const pendingAdvanceRef = React.useRef<(() => void) | null>(null);
 
   // 3 phần cố định (dùng khi không có blueprint Cambridge)
   const EXAM_PARTS = [
@@ -370,7 +379,7 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
 
   // Tiến độ: số sub-part đã có câu hỏi / tổng sub-part TRONG PHẠM VI
   const allSubParts = scopedSections.flatMap((s) =>
-    s.data.parts.map((p: any) => ({ part: s.partId, sub: p.partNumber }))
+    s.data.parts.map((p: any) => ({ part: s.partId, sub: p.partNumber, subPart: p, section: s }))
   );
   const totalSubParts = allSubParts.length;
   const filledSubParts = allSubParts.filter((sp) =>
@@ -448,6 +457,57 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
     setSelectedTaskType(taskType.code);
     setShowTaskTypeSelector(false);
     setShowEditor(true);
+  };
+
+  // Tìm sub-part kế tiếp trong phạm vi đề để tự động chuyển tiếp sau khi lưu
+  const currentSubPartIndex = showSubParts
+    ? allSubParts.findIndex(
+        (sp: any) => sp.part === selectedPart && sp.sub === selectedSubPart
+      )
+    : -1;
+
+  let nextAction: { label: string; onExecute: () => void } | null = null;
+
+  if (showSubParts && currentSubPartIndex !== -1) {
+    if (currentSubPartIndex < allSubParts.length - 1) {
+      const nextSp = allSubParts[currentSubPartIndex + 1];
+      const nextLabel = nextSp.subPart?.name || `Part ${nextSp.sub}`;
+      nextAction = {
+        label: `Lưu & Sang ${nextLabel} →`,
+        onExecute: () => {
+          handleCambridgeSubPartClick(nextSp.part, nextSp.subPart);
+        },
+      };
+    } else {
+      nextAction = {
+        label: 'Lưu & Xem trước đề thi →',
+        onExecute: () => {
+          onNext();
+        },
+      };
+    }
+  } else if (!showSubParts && selectedPart !== null) {
+    if (selectedPart < 3) {
+      const nextPartId = selectedPart + 1;
+      nextAction = {
+        label: `Lưu & Sang Phần ${nextPartId} →`,
+        onExecute: () => {
+          handlePartClick(nextPartId);
+        },
+      };
+    } else {
+      nextAction = {
+        label: 'Lưu & Xem trước đề thi →',
+        onExecute: () => {
+          onNext();
+        },
+      };
+    }
+  }
+
+  const handleTriggerSaveAndAdvance = (advanceFn: () => void, doSave: () => void) => {
+    pendingAdvanceRef.current = advanceFn;
+    doSave();
   };
 
   // Tìm câu hỏi khớp với task type / part / subPart đang chọn
@@ -550,7 +610,14 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
       }
 
       setShowEditor(false);
+
+      if (pendingAdvanceRef.current) {
+        const advanceFn = pendingAdvanceRef.current;
+        pendingAdvanceRef.current = null;
+        advanceFn();
+      }
     } catch (error: any) {
+      pendingAdvanceRef.current = null;
       console.error('Failed to save question:', error);
       alert('Không thể lưu câu hỏi. Vui lòng thử lại!');
     }
@@ -562,6 +629,7 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
     );
     
     if (confirmed) {
+      pendingAdvanceRef.current = null;
       // Reset toàn bộ state khi cancel để cho phép chọn lại từ đầu
       setShowEditor(false);
       setSelectedTaskType(null);
@@ -607,6 +675,12 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
                 className="h-full rounded-full bg-orange-500 transition-all duration-500"
                 style={{ width: `${progressPct}%` }}
               />
+            </div>
+          )}
+          {showSubParts && scope === 'part' && (
+            <div className="mt-2.5 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-[11px] leading-snug text-amber-800">
+              <p className="mb-0.5 font-bold text-amber-900">ℹ️ Đề chỉ có 1 phần (Part {scopePart})</p>
+              Để soạn trọn vẹn cả 4 Part Nói, hãy bấm nút <strong>Quay lại</strong> và chọn phạm vi <strong>"Theo kỹ năng"</strong> ở Bước 1.
             </div>
           )}
         </div>
@@ -857,8 +931,19 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
           {/* Editor dạng bài */}
           {showEditor && selectedTaskType && (
             ActiveEditor ? (
-              <KidsExplanationContext.Provider value={{ explanation: kidsExplanation, setExplanation: setKidsExplanation }}>
+              <KidsExplanationContext.Provider
+                value={{
+                  explanation: kidsExplanation,
+                  setExplanation: setKidsExplanation,
+                  nextAction,
+                  triggerSaveAndAdvance: handleTriggerSaveAndAdvance,
+                  setPendingAdvance: (fn) => {
+                    pendingAdvanceRef.current = fn;
+                  },
+                }}
+              >
                 <ActiveEditor
+                  key={`${selectedPart}-${selectedSubPart}-${selectedTaskType}`}
                   onSave={handleSaveQuestion}
                   onCancel={handleCancelEditor}
                   initialData={getCurrentQuestion()}
@@ -889,7 +974,7 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
         <div className="mt-auto flex justify-between border-t border-slate-200 bg-white px-6 py-3.5">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 rounded-lg border border-slate-200 px-5 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50"
+            className="flex items-center gap-2 rounded-lg border border-slate-200 px-5 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50 cursor-pointer"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>Quay lại</span>
@@ -897,7 +982,22 @@ const Step2AddQuestions: React.FC<Step2AddQuestionsProps> = ({
           <button
             onClick={() => {
               if (showEditor) {
-                alert('Bạn đang mở khung soạn thảo câu hỏi. Vui lòng bấm nút "Lưu câu hỏi" hoặc "Hủy" trước khi tiếp tục!');
+                const saveNextBtn =
+                  document.getElementById('editor-save-and-next-btn') ||
+                  document.getElementById('editor-save-btn');
+                if (saveNextBtn) {
+                  saveNextBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  saveNextBtn.classList.add('ring-4', 'ring-orange-400', 'animate-pulse');
+                  setTimeout(() => {
+                    saveNextBtn.classList.remove('ring-4', 'ring-orange-400', 'animate-pulse');
+                  }, 2500);
+                }
+                const btnHint = nextAction?.label
+                  ? `nút "${nextAction.label.replace(' →', '')}" hoặc "Lưu câu hỏi"`
+                  : 'nút "Lưu câu hỏi"';
+                alert(
+                  `Bạn đang mở khung soạn thảo câu hỏi chưa lưu. Vui lòng bấm ${btnHint} ở góc dưới khung bài tập bên trên trước khi tiếp tục!`
+                );
                 return;
               }
               if (examData.questions.length === 0) {

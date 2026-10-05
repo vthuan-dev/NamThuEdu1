@@ -82,7 +82,6 @@ const ReadingComprehensionEditor: React.FC<ReadingComprehensionEditorProps> = ({
       title="Đọc hiểu và trả lời câu hỏi"
       badge="Flyers · Reading Comprehension"
       instruction="Học sinh đọc đoạn văn (tối thiểu 50 từ) rồi trả lời 3-10 câu hỏi. Dùng câu hỏi WH, Yes/No, chi tiết và suy luận."
-      saveDisabled={!canSave}
       onSave={handleSave}
       onCancel={onCancel}
     >
