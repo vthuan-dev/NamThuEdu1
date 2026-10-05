@@ -148,12 +148,13 @@ function SubmitDialog({
           </div>
           <div className="flex gap-3 w-full">
             <button onClick={onCancel} disabled={loading}
-              className="flex-1 py-3 rounded-xl font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition text-sm">
+              className="flex-1 py-3 rounded-xl font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed">
               Tiếp tục làm
             </button>
             <button onClick={onConfirm} disabled={loading}
-              className="flex-1 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition text-sm disabled:opacity-60 disabled:cursor-not-allowed">
-              {loading ? "Đang nộp..." : allDone ? "Nộp bài" : "Xác nhận nộp bài"}
+              className="flex-1 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition text-sm disabled:opacity-75 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+              {loading && <Loader2 className="w-4 h-4 animate-spin text-white" />}
+              {loading ? "Đang nộp bài..." : allDone ? "Nộp bài" : "Xác nhận nộp bài"}
             </button>
           </div>
         </div>
@@ -227,7 +228,7 @@ export function StudentVstepExamPage() {
     onAutoSubmitted: () => {
       if (!reviewMode && submissionId) {
         setShowSubmit(false);
-        navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${submissionId}`, { replace: true });
+        window.location.href = `${STUDENT_BASE_PATH}/ket-qua-vstep/${submissionId}`;
       }
     },
   });
@@ -720,7 +721,7 @@ export function StudentVstepExamPage() {
           const sid = data?.submissionId;
           if (sid) {
             toast.warning('Bài thi đã hết thời gian làm bài và đã được tự động nộp.', 5000);
-            navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${sid}`, { replace: true });
+            window.location.href = `${STUDENT_BASE_PATH}/ket-qua-vstep/${sid}`;
             return;
           }
         }
@@ -959,10 +960,10 @@ export function StudentVstepExamPage() {
       const sid = res?.data?.data?.submissionId ?? submissionId;
       try { localStorage.removeItem(LS_ANSWERS!); } catch {}
       try { localStorage.removeItem(LS_WRITING!); } catch {}
-      navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${sid}`, { replace: true });
+      window.location.href = `${STUDENT_BASE_PATH}/ket-qua-vstep/${sid}`;
     } catch (err: any) {
       console.warn("[VSTEP] auto-submit submitTest error, navigating to results anyway", err);
-      navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${submissionId}`, { replace: true });
+      window.location.href = `${STUDENT_BASE_PATH}/ket-qua-vstep/${submissionId}`;
     }
   }, [submissionId, examId, navigate, answers, writingDrafts, writingTasks, LS_ANSWERS, LS_WRITING]);
 
@@ -1018,12 +1019,12 @@ export function StudentVstepExamPage() {
     if (!submissionId) return;
     if (submittedRef.current) {
       setShowSubmit(false);
-      navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${submissionId}`, { replace: true });
+      window.location.href = `${STUDENT_BASE_PATH}/ket-qua-vstep/${submissionId}`;
       return;
     }
 
     setSubmitting(true);
-    setShowSubmit(false);
+    // Modal stays open with loading=true while submitting
 
     try {
       // ─── Build full bulk payload (MCQ + writing) ──────────────────────
@@ -1096,13 +1097,15 @@ export function StudentVstepExamPage() {
       }
 
       // ─── Submit ─────────────────────────────────────────────────────────
-      submittedRef.current = true;
+      // [FIX] submittedRef now set AFTER API success (see below)
       const res: any = await studentApi.submitTest(submissionId);
+      submittedRef.current = true; // Set AFTER confirmed success
       const sid = res?.data?.data?.submissionId ?? submissionId;
       // ✅ Chỉ remove localStorage SAU khi submit thành công
+      setShowSubmit(false);
       try { localStorage.removeItem(LS_ANSWERS!); } catch {}
       try { localStorage.removeItem(LS_WRITING!); } catch {}
-      navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${sid}`, { replace: true });
+      window.location.href = `${STUDENT_BASE_PATH}/ket-qua-vstep/${sid}`;
     } catch (err: any) {
       const msg = err?.response?.data?.message ?? err?.message ?? "Không nộp bài được. Vui lòng thử lại.";
       const isAlreadySubmitted =
@@ -1116,7 +1119,7 @@ export function StudentVstepExamPage() {
         submittedRef.current = true;
         try { localStorage.removeItem(LS_ANSWERS!); } catch {}
         try { localStorage.removeItem(LS_WRITING!); } catch {}
-        navigate(`${STUDENT_BASE_PATH}/ket-qua-vstep/${submissionId}`, { replace: true });
+        window.location.href = `${STUDENT_BASE_PATH}/ket-qua-vstep/${submissionId}`;
         return;
       }
 
@@ -1124,7 +1127,7 @@ export function StudentVstepExamPage() {
       submittedRef.current = false;
       console.error("[VSTEP] submitTest failed", err);
       setShowSubmit(true);
-      window.alert(`${msg}\n\nDữ liệu của bạn vẫn được lưu lại trong trình duyệt. Hãy thử nộp lại sau ít phút.`);
+      toast.error(`Lỗi nộp bài: ${msg}. Dữ liệu của bạn vẫn được lưu. Hãy thử nộp lại sau ít phút.`, 8000);
     } finally {
       setSubmitting(false);
     }
