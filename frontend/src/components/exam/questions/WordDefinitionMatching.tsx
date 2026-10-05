@@ -1,9 +1,12 @@
+import { getFullMediaUrl } from '../../../utils/mediaUtils';
+
 interface WordDefinitionMatchingProps {
   question: any;
   taskData: any;
   interactiveMode: boolean;
   userAnswer?: any;
   onAnswerChange?: (answer: any) => void;
+  mode?: string;
 }
 
 export function WordDefinitionMatching({
@@ -11,7 +14,8 @@ export function WordDefinitionMatching({
   taskData,
   interactiveMode,
   userAnswer,
-  onAnswerChange
+  onAnswerChange,
+  mode
 }: WordDefinitionMatchingProps) {
   const realTaskData = taskData.task_data || taskData;
   const config = taskData.config || realTaskData.config || {};
@@ -51,14 +55,29 @@ export function WordDefinitionMatching({
     });
   }
 
-  const instructions = realTaskData?.instructions || config?.instructions;
-  
+  const instructions = realTaskData?.instructions || config?.instructions || question.qContent;
+  const imageUrl = realTaskData?.imageUrl || config?.imageUrl || realTaskData?.image_url || config?.image_url || (question as any)?.qMedia_url;
+  const explanation = question.qExplanation || (question as any)?.explanation || taskData.explanation || config?.explanation;
+  const isTeacherReview = mode === 'preview' || mode === 'review' || !interactiveMode;
+
   return (
     <div className="space-y-4">
       {/* Instructions */}
       {instructions && (
         <div className="p-4 bg-indigo-50 rounded-lg border-2 border-indigo-200">
           <p className="text-indigo-900 font-medium text-lg">📚 {instructions}</p>
+        </div>
+      )}
+
+      {/* Optional Illustration Image */}
+      {imageUrl && (
+        <div className="border-4 border-indigo-200 rounded-xl overflow-hidden bg-white shadow-md max-w-xl mx-auto">
+          <img 
+            src={getFullMediaUrl(imageUrl)} 
+            alt="Word Definition Illustration" 
+            className="w-full h-auto object-contain"
+            style={{ maxHeight: '350px' }}
+          />
         </div>
       )}
       
@@ -68,7 +87,7 @@ export function WordDefinitionMatching({
           <p className="text-sm font-bold text-indigo-900 mb-3">📝 Ngân hàng từ:</p>
           <div className="flex flex-wrap gap-2">
             {wordBank.map((word: string, idx: number) => (
-              <span key={idx} className="px-3 py-2 bg-white border-2 border-indigo-300 rounded-lg font-medium text-indigo-900">
+              <span key={idx} className="px-3 py-2 bg-white border-2 border-indigo-300 rounded-lg font-medium text-indigo-900 shadow-sm">
                 {word}
               </span>
             ))}
@@ -82,6 +101,7 @@ export function WordDefinitionMatching({
           {questions.map((q: any, idx: number) => {
             const definition = q.definition || q.text || q.questionText;
             const isExample = q.isExample || q.is_example;
+            const correctAnswer = q.answer || q.correct_answer || q.correctAnswer || q.word;
             
             return (
               <div key={idx} className="p-5 bg-white rounded-xl border-3 border-indigo-200 shadow-md hover:shadow-lg transition-shadow">
@@ -97,9 +117,9 @@ export function WordDefinitionMatching({
                     
                     {/* Dropdown to select word */}
                     <select
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none text-lg font-medium"
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none text-lg font-medium bg-white"
                       disabled={!interactiveMode}
-                      value={userAnswer?.[idx] || ''}
+                      value={userAnswer?.[idx] || (mode === 'preview' && correctAnswer ? correctAnswer : '')}
                       onChange={(e) => {
                         if (onAnswerChange) {
                           onAnswerChange({
@@ -116,6 +136,14 @@ export function WordDefinitionMatching({
                         </option>
                       ))}
                     </select>
+
+                    {/* Preview / Review Answer Key */}
+                    {isTeacherReview && correctAnswer && (
+                      <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-sm font-semibold">
+                        <span>✓ Đáp án đúng:</span>
+                        <span className="font-bold underline">{correctAnswer}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -125,6 +153,14 @@ export function WordDefinitionMatching({
       ) : (
         <div className="p-6 bg-yellow-50 rounded-lg border-2 border-yellow-300">
           <p className="text-yellow-800 font-medium">⚠️ Không tìm thấy questions cho task này</p>
+        </div>
+      )}
+
+      {/* Explanation */}
+      {explanation && (
+        <div className="p-4 bg-amber-50 rounded-xl border-2 border-amber-200 text-amber-900 text-sm">
+          <p className="font-bold mb-1">💡 Giải thích / Hướng dẫn chấm:</p>
+          <p className="whitespace-pre-wrap">{explanation}</p>
         </div>
       )}
     </div>

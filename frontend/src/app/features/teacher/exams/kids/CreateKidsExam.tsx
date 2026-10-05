@@ -97,9 +97,12 @@ const CreateKidsExam: React.FC = () => {
             console.log('🔍 Instructions count:', baseConfig.instructions?.length);
           }
           
-          // Convert relative URLs to full URLs
-          const audioUrl = audioMedia ? getFullMediaUrl(audioMedia.file_url) : null;
-          const imageUrl = imageMedia ? getFullMediaUrl(imageMedia.file_url) : null;
+          const audioUrl = audioMedia
+            ? getFullMediaUrl(audioMedia.file_url)
+            : baseConfig.audioUrl || baseConfig.audio_url || baseConfig.mainAudioUrl || (q.qMedia_url ? getFullMediaUrl(q.qMedia_url) : null);
+          const imageUrl = imageMedia
+            ? getFullMediaUrl(imageMedia.file_url)
+            : baseConfig.imageUrl || baseConfig.image_url || baseConfig.mainImageUrl || baseConfig.main_image_url || baseConfig.sharedImageUrl || baseConfig.shared_image_url || (q.qMedia_url ? getFullMediaUrl(q.qMedia_url) : null);
           
           // Add media URLs to config if they exist
           const configWithMedia = ensureItemIds({
@@ -123,6 +126,8 @@ const CreateKidsExam: React.FC = () => {
             config: configWithMedia,
             part: q.qPart || 1, // Load part from qPart field
             subPart: q.qSubPart || null, // Load subPart from qSubPart field (Cambridge mode)
+            explanation: q.qExplanation || q.explanation || '',
+            qExplanation: q.qExplanation || q.explanation || '',
           };
         });
 

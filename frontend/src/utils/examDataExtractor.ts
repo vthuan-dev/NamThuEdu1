@@ -20,13 +20,15 @@ export function extractTaskData(question: Question): TaskData {
     task_type: taskData.task_type || realTaskData.task_type || config.task_type,
     task_data: realTaskData,
     config,
-    instructions: taskData.instructions || realTaskData.instructions || config.instructions,
+    instructions: taskData.instructions || realTaskData.instructions || config.instructions || question.qContent,
     imageUrl: realTaskData?.imageUrl || realTaskData?.image_url || realTaskData?.mainImage || 
               realTaskData?.mainImageUrl || realTaskData?.sharedImageUrl || realTaskData?.shared_image_url ||
               config?.imageUrl || config?.image_url || config?.mainImage || 
-              config?.mainImageUrl || config?.sharedImageUrl || config?.shared_image_url,
+              config?.mainImageUrl || config?.sharedImageUrl || config?.shared_image_url ||
+              (question as any)?.qMedia_url,
     audioUrl: realTaskData?.audioUrl || realTaskData?.audio_url || realTaskData?.mainAudioUrl ||
-              config?.audioUrl || config?.audio_url || config?.mainAudioUrl,
+              config?.audioUrl || config?.audio_url || config?.mainAudioUrl ||
+              (question as any)?.qMedia_url,
     items: realTaskData?.items || config?.items || [],
     questions: realTaskData?.questions || config?.questions || []
   };

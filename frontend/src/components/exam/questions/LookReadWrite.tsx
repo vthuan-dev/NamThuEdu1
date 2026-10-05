@@ -54,6 +54,8 @@ export function LookReadWrite({
               const itemImageUrl = q.imageUrl || q.image_url || q.image;
               const hintPrefix = q.hint_prefix || q.hintPrefix || q.hint || q.clue || q.prefix;
               const suffix = q.suffix;
+              const correctAnswer = q.correct_answer || q.correctAnswer || q.answer;
+              const isExample = q.is_example || q.isExample;
               
               return (
                 <div key={idx} className="p-5 bg-white rounded-xl border-3 border-purple-200 shadow-md hover:shadow-lg transition-shadow">
@@ -74,7 +76,14 @@ export function LookReadWrite({
                         </div>
                       )}
                       
-                      <p className="font-medium text-lg text-gray-800">{questionText}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-lg text-gray-800">{questionText}</p>
+                        {isExample && (
+                          <span className="text-xs font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                            📌 Ví dụ
+                          </span>
+                        )}
+                      </div>
                       
                       {/* Input field with hint/prefix/suffix */}
                       <div className="flex items-center gap-2 flex-wrap">
@@ -92,7 +101,7 @@ export function LookReadWrite({
                             className="px-3 py-1 border-0 border-b-2 border-dotted border-gray-500 focus:border-purple-600 focus:outline-none text-lg font-medium bg-transparent"
                             placeholder=""
                             disabled={!isInteractive}
-                            value={answer[idx] || ''}
+                            value={answer[idx] || (mode === 'preview' && correctAnswer ? correctAnswer : '')}
                             onChange={(e) => handleInputChange(idx, e.target.value)}
                             style={{ 
                               borderBottomStyle: 'dotted',
@@ -109,6 +118,14 @@ export function LookReadWrite({
                           </span>
                         )}
                       </div>
+
+                      {/* Preview / Review Answer Key */}
+                      {(mode === 'preview' || mode === 'review') && correctAnswer && (
+                        <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-sm font-semibold">
+                          <span>✓ Đáp án đúng:</span>
+                          <span className="font-bold underline">{correctAnswer}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -138,6 +155,8 @@ export function LookReadWrite({
                 const itemImageUrl = q.imageUrl || q.image_url || q.image;
                 const hintPrefix = q.hint_prefix || q.hintPrefix || q.hint || q.clue || q.prefix;
                 const suffix = q.suffix;
+                const correctAnswer = q.correct_answer || q.correctAnswer || q.answer;
+                const isExample = q.is_example || q.isExample;
                 
                 return (
                   <div key={idx} className="p-5 bg-white rounded-xl border-3 border-purple-200 shadow-md hover:shadow-lg transition-shadow">
@@ -158,7 +177,14 @@ export function LookReadWrite({
                           </div>
                         )}
                         
-                        <p className="font-medium text-lg text-gray-800">{questionText}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium text-lg text-gray-800">{questionText}</p>
+                          {isExample && (
+                            <span className="text-xs font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                              📌 Ví dụ
+                            </span>
+                          )}
+                        </div>
                         
                         {/* Input field with hint/prefix/suffix */}
                         <div className="flex items-center gap-2 flex-wrap">
@@ -176,7 +202,7 @@ export function LookReadWrite({
                               className="px-3 py-1 border-0 border-b-2 border-dotted border-gray-500 focus:border-purple-600 focus:outline-none text-lg font-medium bg-transparent"
                               placeholder=""
                               disabled={!isInteractive}
-                              value={answer[idx] || ''}
+                              value={answer[idx] || (mode === 'preview' && correctAnswer ? correctAnswer : '')}
                               onChange={(e) => handleInputChange(idx, e.target.value)}
                               style={{ 
                                 borderBottomStyle: 'dotted',
@@ -193,6 +219,14 @@ export function LookReadWrite({
                             </span>
                           )}
                         </div>
+
+                        {/* Preview / Review Answer Key */}
+                        {(mode === 'preview' || mode === 'review') && correctAnswer && (
+                          <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-sm font-semibold">
+                            <span>✓ Đáp án đúng:</span>
+                            <span className="font-bold underline">{correctAnswer}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -205,6 +239,16 @@ export function LookReadWrite({
             </div>
           )}
         </>
+      )}
+
+      {/* Explanation */}
+      {(question.qExplanation || (question as any)?.explanation || taskData.explanation || taskData.config?.explanation) && (
+        <div className="p-4 bg-amber-50 rounded-xl border-2 border-amber-200 text-amber-900 text-sm">
+          <p className="font-bold mb-1">💡 Giải thích / Hướng dẫn chấm:</p>
+          <p className="whitespace-pre-wrap">
+            {question.qExplanation || (question as any)?.explanation || taskData.explanation || taskData.config?.explanation}
+          </p>
+        </div>
       )}
     </div>
   );

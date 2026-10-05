@@ -17,14 +17,22 @@ export function WordBankFill({
   const text = (taskData as any).text;
   const questions = taskData.questions || [];
   const items = taskData.items || [];
+  const rawGaps = (taskData as any).gaps || (taskData.config as any)?.gaps || [];
+  const mappedGaps = rawGaps.map((g: any, idx: number) => ({
+    text: `Chỗ trống (${g.gapNumber ?? g.gap_number ?? g.gap_id ?? idx + 1})`,
+    correctAnswer: g.correctWord || g.correct_word || g.correct_answer || g.correctAnswer || '',
+    isExample: g.isExample || g.is_example,
+    ...g
+  }));
   
   const isInteractive = mode === 'student';
+  const explanation = question.qExplanation || (question as any)?.explanation || taskData.explanation || taskData.config?.explanation;
   
   // Get story text from multiple possible sources
   const storyText = story || text || question.qContent;
   
-  // Get questions/items for fill-in-the-blank
-  const fillQuestions = questions.length > 0 ? questions : items;
+  // Get questions/items for fill-in-the-blank (with gaps fallback)
+  const fillQuestions = questions.length > 0 ? questions : (items.length > 0 ? items : mappedGaps);
 
   const handleAnswerChange = (questionIndex: number, value: string) => {
     if (!isInteractive || !onAnswer) return;
@@ -116,7 +124,8 @@ export function WordBankFill({
                   const questionText = q.text || q.question || q.questionText || q.sentence;
                   const hint = q.hint || q.clue || q.prefix || '';
                   const suffix = q.suffix || '';
-                  const currentAnswer = answer[idx] || '';
+                  const correctAnswer = q.correctAnswer || q.correct_answer || q.correctWord || q.correct_word || q.answer;
+                  const currentAnswer = answer[idx] || (mode === 'preview' && correctAnswer ? correctAnswer : '');
                   
                   return (
                     <div key={idx} className="p-5 bg-white rounded-xl border-3 border-purple-200 shadow-md">
@@ -152,6 +161,14 @@ export function WordBankFill({
                           <span className="text-gray-600 font-medium text-lg">{suffix}</span>
                         )}
                       </div>
+
+                      {/* Preview Answer Key */}
+                      {(mode === 'preview' || mode === 'review') && correctAnswer && (
+                        <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-sm font-semibold">
+                          <span>✓ Đáp án đúng:</span>
+                          <span className="font-bold underline">{correctAnswer}</span>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -220,7 +237,8 @@ export function WordBankFill({
                 const questionText = q.text || q.question || q.questionText || q.sentence;
                 const hint = q.hint || q.clue || q.prefix || '';
                 const suffix = q.suffix || '';
-                const currentAnswer = answer[idx] || '';
+                const correctAnswer = q.correctAnswer || q.correct_answer || q.correctWord || q.correct_word || q.answer;
+                const currentAnswer = answer[idx] || (mode === 'preview' && correctAnswer ? correctAnswer : '');
                 
                 return (
                   <div key={idx} className="p-5 bg-white rounded-xl border-3 border-purple-200 shadow-md">
@@ -256,6 +274,14 @@ export function WordBankFill({
                         <span className="text-gray-600 font-medium text-lg">{suffix}</span>
                       )}
                     </div>
+
+                    {/* Preview Answer Key */}
+                    {(mode === 'preview' || mode === 'review') && correctAnswer && (
+                      <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-sm font-semibold">
+                        <span>✓ Đáp án đúng:</span>
+                        <span className="font-bold underline">{correctAnswer}</span>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -269,6 +295,14 @@ export function WordBankFill({
             </div>
           )}
         </>
+      )}
+
+      {/* Explanation */}
+      {explanation && (
+        <div className="p-4 bg-amber-50 rounded-xl border-2 border-amber-200 text-amber-900 text-sm">
+          <p className="font-bold mb-1">💡 Giải thích / Hướng dẫn chấm:</p>
+          <p className="whitespace-pre-wrap">{explanation}</p>
+        </div>
       )}
     </div>
   );

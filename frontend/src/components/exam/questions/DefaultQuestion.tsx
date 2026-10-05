@@ -68,6 +68,15 @@ export function DefaultQuestion({ question }: QuestionRendererProps) {
           <p className="text-sm text-yellow-700 mt-2">This question may need to be edited to add content</p>
         </div>
       )}
+      {/* Explanation */}
+      {(question.qExplanation || (question as any)?.explanation || taskData.explanation || taskData.config?.explanation) && (
+        <div className="p-4 bg-amber-50 rounded-xl border-2 border-amber-200 text-amber-900 text-sm">
+          <p className="font-bold mb-1">💡 Giải thích / Hướng dẫn chấm:</p>
+          <p className="whitespace-pre-wrap">
+            {question.qExplanation || (question as any)?.explanation || taskData.explanation || taskData.config?.explanation}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

@@ -6,6 +6,7 @@ interface UnscrambleWordsProps {
   interactiveMode: boolean;
   userAnswer?: any;
   onAnswerChange?: (answer: any) => void;
+  mode?: string;
 }
 
 export function UnscrambleWords({
@@ -13,14 +14,17 @@ export function UnscrambleWords({
   taskData,
   interactiveMode,
   userAnswer,
-  onAnswerChange
+  onAnswerChange,
+  mode
 }: UnscrambleWordsProps) {
   const realTaskData = taskData.task_data || taskData;
   const config = taskData.config || realTaskData.config || {};
   
-  const items = realTaskData?.items || config?.items || [];
-  const instructions = realTaskData?.instructions || config?.instructions;
-  
+  const items = realTaskData?.items || config?.items || realTaskData?.questions || config?.questions || [];
+  const instructions = realTaskData?.instructions || config?.instructions || question.qContent;
+  const explanation = question.qExplanation || (question as any)?.explanation || taskData.explanation || config?.explanation;
+  const isTeacherReview = mode === 'preview' || mode === 'review' || !interactiveMode;
+
   return (
     <div className="space-y-4">
       {/* Instructions */}
@@ -36,6 +40,7 @@ export function UnscrambleWords({
           {items.map((item: any, idx: number) => {
             const itemImageUrl = item.imageUrl || item.image_url || item.image;
             const scrambledWord = item.scrambled_word || item.scrambledWord || item.scrambled;
+            const correctWord = item.correct_answer || item.correctAnswer || item.word || item.answer;
             const isExample = item.isExample || item.is_example;
             
             return (
@@ -86,7 +91,7 @@ export function UnscrambleWords({
                         className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:outline-none text-lg font-medium"
                         placeholder="Nhập từ đã sắp xếp..."
                         disabled={!interactiveMode}
-                        value={userAnswer?.[idx] || ''}
+                        value={userAnswer?.[idx] || (mode === 'preview' && correctWord ? correctWord : '')}
                         onChange={(e) => {
                           if (onAnswerChange) {
                             onAnswerChange({
@@ -97,6 +102,14 @@ export function UnscrambleWords({
                         }}
                       />
                     </div>
+
+                    {/* Preview / Review Correct Word */}
+                    {isTeacherReview && correctWord && (
+                      <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-sm font-semibold">
+                        <span>✓ Đáp án đúng:</span>
+                        <span className="font-bold underline uppercase">{correctWord}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -106,6 +119,14 @@ export function UnscrambleWords({
       ) : (
         <div className="p-6 bg-yellow-50 rounded-lg border-2 border-yellow-300">
           <p className="text-yellow-800 font-medium">⚠️ Không tìm thấy items cho task này</p>
+        </div>
+      )}
+
+      {/* Explanation */}
+      {explanation && (
+        <div className="p-4 bg-amber-50 rounded-xl border-2 border-amber-200 text-amber-900 text-sm">
+          <p className="font-bold mb-1">💡 Giải thích / Hướng dẫn chấm:</p>
+          <p className="whitespace-pre-wrap">{explanation}</p>
         </div>
       )}
     </div>

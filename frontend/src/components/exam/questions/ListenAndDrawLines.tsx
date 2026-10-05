@@ -159,7 +159,7 @@ export function ListenAndDrawLines({
               {items.map((item: any, i: number) => {
                 if (!item.hotspot) return null;
                 const isExample = item.isExample || item.is_example;
-                const placedLabelIdx = isExample ? i : getPlacedLabelAt(i);
+                const placedLabelIdx = isExample ? i : (getPlacedLabelAt(i) ?? (mode === 'preview' ? i : null));
                 const placedName = placedLabelIdx !== null ? (items[placedLabelIdx]?.name ?? '') : null;
                 const isDragTarget = dragOverHotspot === i;
                 return (
@@ -176,6 +176,8 @@ export function ListenAndDrawLines({
                         className={`whitespace-nowrap rounded-xl border-2 px-3 py-1 text-sm font-bold shadow-md transition-all ${
                           isExample
                             ? 'border-sky-600 bg-sky-500 text-white'
+                            : mode === 'preview'
+                            ? 'border-emerald-600 bg-emerald-600 text-white'
                             : isInteractive
                             ? 'cursor-pointer border-green-600 bg-green-500 text-white hover:border-red-400 hover:bg-red-400'
                             : 'border-green-600 bg-green-500 text-white'
@@ -248,6 +250,34 @@ export function ListenAndDrawLines({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Preview Answer Key Summary */}
+      {(mode === 'preview' || mode === 'review') && items.length > 0 && (
+        <div className="p-4 bg-emerald-50 rounded-xl border-2 border-emerald-200 text-emerald-900 text-sm">
+          <p className="font-bold mb-2">📋 Đáp án vị trí (Vị trí nối tên):</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {items.map((it: any, idx: number) => {
+              const isEx = it.isExample || it.is_example;
+              return (
+                <div key={idx} className="bg-white px-3 py-1.5 rounded-lg border border-emerald-200 flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-700">{it.name}</span>
+                  <span className="text-emerald-700 font-semibold">{isEx ? '📌 Ví dụ' : `Hotspot (${it.hotspot?.x ?? '?'}%, ${it.hotspot?.y ?? '?'}%)`}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Explanation */}
+      {(question.qExplanation || (question as any)?.explanation || taskData.explanation || taskData.config?.explanation) && (
+        <div className="p-4 bg-amber-50 rounded-xl border-2 border-amber-200 text-amber-900 text-sm">
+          <p className="font-bold mb-1">💡 Giải thích / Hướng dẫn chấm:</p>
+          <p className="whitespace-pre-wrap">
+            {question.qExplanation || (question as any)?.explanation || taskData.explanation || taskData.config?.explanation}
+          </p>
         </div>
       )}
     </div>
