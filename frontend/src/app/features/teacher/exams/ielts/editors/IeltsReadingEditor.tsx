@@ -1346,16 +1346,26 @@ function QuestionRow({
   const matchingKeys = choiceKeys;
 
   // MCQ: các key đáp án hiện có (A,B,C…) của câu này / nhóm này.
-  const optionKeys = Object.keys(question.options ?? {})
+  const currentOptionKeys = Object.keys(question.options ?? {})
     .filter((k) => /^[A-Za-z]$/.test(k))
     .sort();
+  const optionKeys = (isSingleMcq || isGroupedMcq)
+    ? (currentOptionKeys.length >= 2 ? currentOptionKeys : ["A", "B", "C", "D"])
+    : currentOptionKeys;
+
+  const currentOptions: Record<string, string> = { ...(question.options ?? {}) };
+  optionKeys.forEach((k) => {
+    if (currentOptions[k] === undefined) {
+      currentOptions[k] = "";
+    }
+  });
 
   // Thêm 1 đáp án (chữ cái kế tiếp). Tối đa 8 (A–H) đủ cho Choose THREE.
   const addOption = () => {
     const nextLetter = LETTER_SYMBOLS[optionKeys.length];
     if (!nextLetter) return;
     onChange({
-      options: { ...(question.options ?? {}), [nextLetter]: "" },
+      options: { ...currentOptions, [nextLetter]: "" },
     });
   };
 
@@ -1367,7 +1377,7 @@ function QuestionRow({
     const remap: Record<string, string> = {};
     remaining.forEach((oldKey, i) => {
       const newKey = LETTER_SYMBOLS[i];
-      nextOptions[newKey] = question.options?.[oldKey] ?? "";
+      nextOptions[newKey] = currentOptions[oldKey] ?? "";
       remap[oldKey] = newKey;
     });
 
@@ -1575,7 +1585,7 @@ function QuestionRow({
                 )}
               </div>
             )
-          ) : isSingleMcq && question.options ? (
+          ) : isSingleMcq ? (
             <div className="space-y-2">
               <div className="grid grid-cols-2 gap-2">
                 {optionKeys.map((k) => {
@@ -1599,10 +1609,10 @@ function QuestionRow({
                       <span className="font-bold text-gray-700">{k}.</span>
                       <input
                         type="text"
-                        value={question.options?.[k] ?? ""}
+                        value={currentOptions[k] ?? ""}
                         onChange={(e) =>
                           onChange({
-                            options: { ...question.options!, [k]: e.target.value },
+                            options: { ...currentOptions, [k]: e.target.value },
                           })
                         }
                         placeholder={`Đáp án ${k}`}

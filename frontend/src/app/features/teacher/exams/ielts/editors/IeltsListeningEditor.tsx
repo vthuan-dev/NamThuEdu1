@@ -433,8 +433,9 @@ export function IeltsListeningEditor({
   );
 
   /**
-   * Thêm 1 đáp án (option) cho MCQ — áp cho cả nhóm. Chữ cái kế tiếp theo
-   * số option hiện có (A,B,C,D → E). correctAnswer không đổi.
+   * Thêm 1 đáp án (option) cho MCQ.
+   * Với MCQ đơn (multiple-choice): Thêm độc lập cho đúng câu này.
+   * Với MCQ nhóm (multiple-choice-group): Thêm cho cả nhóm câu hỏi.
    */
   const addOptionAt = useCallback(
     (secNum: number, qIdx: number) => {
@@ -442,6 +443,24 @@ export function IeltsListeningEditor({
       setSections((prev) =>
         prev.map((s) => {
           if (s.sectionNumber !== secNum) return s;
+          const targetQ = s.questions[qIdx];
+          const isGroupedMcq = targetQ?.questionType === "multiple-choice-group";
+
+          if (!isGroupedMcq) {
+            const base = targetQ?.options || {};
+            const keys = Object.keys(base).filter((k) => /^[A-Za-z]$/.test(k)).sort();
+            if (keys.length >= LETTERS.length) return s;
+            const nextLetter = LETTERS[keys.length];
+            return {
+              ...s,
+              questions: s.questions.map((item, i) =>
+                i === qIdx
+                  ? { ...item, options: { ...(item.options || {}), [nextLetter]: "" } }
+                  : item
+              ),
+            };
+          }
+
           const [start, end] = groupRangeOf(s.questions, qIdx);
           const base = s.questions[qIdx]?.options || s.questions[start]?.options || {};
           const keys = Object.keys(base).filter((k) => /^[A-Za-z]$/.test(k)).sort();
@@ -450,7 +469,6 @@ export function IeltsListeningEditor({
           return {
             ...s,
             questions: s.questions.map((q, i) =>
-              // Mỗi câu GIỮ NGUYÊN text riêng, chỉ thêm chữ cái mới (rỗng).
               i >= start && i <= end
                 ? { ...q, options: { ...(q.options || {}), [nextLetter]: "" } }
                 : q
@@ -463,10 +481,9 @@ export function IeltsListeningEditor({
   );
 
   /**
-   * Xóa 1 đáp án (option) cho MCQ — áp cho cả nhóm. Sau khi xóa sẽ ĐÁNH LẠI
-   * chữ cái liên tục (A,B,C…) tránh lỗ hổng, đồng thời cập nhật correctAnswer
-   * của TỪNG câu trong nhóm theo mapping mới (hỗ trợ cả multi-select "A,C").
-   * Mỗi câu giữ NGUYÊN text riêng của mình (Q17.A khác Q18.A).
+   * Xóa 1 đáp án (option) cho MCQ.
+   * Với MCQ đơn (multiple-choice): Xoá độc lập cho câu này.
+   * Với MCQ nhóm (multiple-choice-group): Xoá và map lại cho cả nhóm.
    */
   const removeOptionAt = useCallback(
     (secNum: number, qIdx: number, keyToRemove: string) => {
@@ -474,35 +491,67 @@ export function IeltsListeningEditor({
       setSections((prev) =>
         prev.map((s) => {
           if (s.sectionNumber !== secNum) return s;
-          const [start, end] = groupRangeOf(s.questions, qIdx);
-          const base = s.questions[qIdx]?.options || s.questions[start]?.options || {};
-          const keys = Object.keys(base).filter((k) => /^[A-Za-z]$/.test(k)).sort();
-          if (keys.length <= 2) return s; // giữ tối thiểu 2 đáp án
+          const targetQ = s.questions[qIdx];
+          const isGroupedMcq = targetQ?.questionType === "multiple-choice-group";
 
-          // Mapping chữ cái cũ → mới (dựa trên cấu trúc key của nhóm).
-          const remaining = keys.filter((k) => k !== keyToRemove);
-          const remap: Record<string, string> = {};
-          remaining.forEach((oldKey, i) => {
-            remap[oldKey] = LETTERS[i];
-          });
-
-          const remapAnswer = (ans: string): string => {
+          const remapAnswer = (ans: string, remapDict: Record<string, string>): string => {
             const parts = (ans || "")
               .split(",")
               .map((p) => p.trim())
               .filter(Boolean);
             const mapped = parts
               .filter((p) => p !== keyToRemove)
-              .map((p) => remap[p] ?? p);
+              .map((p) => remapDict[p] ?? p);
             return mapped.join(",");
           };
+
+          if (!isGroupedMcq) {
+            const base = targetQ?.options || {};
+            const keys = Object.keys(base).filter((k) => /^[A-Za-z]$/.test(k)).sort();
+            if (keys.length <= 2) return s;
+
+            const remaining = keys.filter((k) => k !== keyToRemove);
+            const remap: Record<string, string> = {};
+            remaining.forEach((oldKey, i) => {
+              remap[oldKey] = LETTERS[i];
+            });
+
+            const nextOptions: Record<string, string> = {};
+            remaining.forEach((oldKey, idx) => {
+              nextOptions[LETTERS[idx]] = (targetQ.options as any)?.[oldKey] ?? "";
+            });
+            const nextAnswer = remapAnswer(targetQ.correctAnswer, remap);
+
+            return {
+              ...s,
+              questions: s.questions.map((item, i) =>
+                i === qIdx
+                  ? {
+                      ...item,
+                      options: nextOptions,
+                      correctAnswer: nextOptions[nextAnswer] !== undefined ? nextAnswer : "A",
+                    }
+                  : item
+              ),
+            };
+          }
+
+          const [start, end] = groupRangeOf(s.questions, qIdx);
+          const base = s.questions[qIdx]?.options || s.questions[start]?.options || {};
+          const keys = Object.keys(base).filter((k) => /^[A-Za-z]$/.test(k)).sort();
+          if (keys.length <= 2) return s;
+
+          const remaining = keys.filter((k) => k !== keyToRemove);
+          const remap: Record<string, string> = {};
+          remaining.forEach((oldKey, i) => {
+            remap[oldKey] = LETTERS[i];
+          });
 
           return {
             ...s,
             questions: s.questions.map((q, i) => {
-               if (i < start || i > end) return q;
-               const isMcq = q.questionType === "multiple-choice" || q.questionType === "multiple-choice-group";
-              // Dựng lại options của TỪNG câu, giữ text riêng theo mapping.
+              if (i < start || i > end) return q;
+              const isMcq = q.questionType === "multiple-choice" || q.questionType === "multiple-choice-group";
               const qKeys = Object.keys(q.options || {})
                 .filter((k) => /^[A-Za-z]$/.test(k))
                 .sort();
@@ -511,14 +560,15 @@ export function IeltsListeningEditor({
               qRemaining.forEach((oldKey, idx) => {
                 nextOptions[LETTERS[idx]] = (q.options as any)?.[oldKey] ?? "";
               });
-              const nextAnswer = remapAnswer(q.correctAnswer);
+              const nextAnswer = remapAnswer(q.correctAnswer, remap);
               return {
                 ...q,
                 options: nextOptions,
-                // MCQ chọn 1: nếu đáp án đúng bị xóa → về A; multi/khác giữ mapping.
                 correctAnswer:
                   isMcq && (q.selectCount ?? 1) <= 1
-                    ? nextAnswer || "A"
+                    ? nextOptions[nextAnswer] !== undefined
+                      ? nextAnswer
+                      : "A"
                     : nextAnswer,
               };
             }),
@@ -1657,7 +1707,7 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
                 </label>
               </>
             )}
-            {isGrouped && !isGroupStart && (
+            {isGrouped && !isGroupStart && (isGroupedMcq || completion || isMatching) && (
               <span className="text-[11px] text-gray-500">
                 Dùng cài đặt chung ở câu {groupStartNumber}
               </span>
