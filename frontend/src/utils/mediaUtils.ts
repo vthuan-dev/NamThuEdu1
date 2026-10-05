@@ -25,15 +25,25 @@ export const getApiBaseUrl = (): string => {
  */
 export const getFullMediaUrl = (url: string | null | undefined): string | null => {
   if (!url) return null;
+
+  let cleanUrl = String(url).trim();
+  if (!cleanUrl) return null;
+
+  // Upgrade http:// to https:// when on https or for namthuedu.vn to prevent mixed content
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    cleanUrl = cleanUrl.replace(/^http:\/\//i, 'https://');
+  } else if (cleanUrl.startsWith('http://namthuedu.vn') || cleanUrl.startsWith('http://www.namthuedu.vn')) {
+    cleanUrl = cleanUrl.replace(/^http:\/\//i, 'https://');
+  }
   
   // If already a full URL, return as is
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    return url;
+  if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
+    return cleanUrl;
   }
   
   // Convert relative URL to full URL
   const baseUrl = getApiBaseUrl();
-  return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+  return `${baseUrl}${cleanUrl.startsWith('/') ? '' : '/'}${cleanUrl}`;
 };
 
 /**
