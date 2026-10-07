@@ -300,7 +300,7 @@ function highlightQuestionRow(num: number): void {
 function FormContent({ section }: { section: IeltsListeningSection }) {
   const classify = (q: IeltsQuestion): "image" | "form" | "matching" | "mcq" | "other" => {
     const type = normalizeQuestionType(q.questionType);
-    if (type === "image_completion") return "image";
+    if (type === "image_completion" || type === "plan_map_diagram" || !!(q.data?.task_image || q.data?.taskImage)) return "image";
     if (type === "form_completion") return "form";
     const hasOptions = !!q.options && Object.keys(q.options).length > 0;
     if (type.includes("matching") && hasOptions) return "matching";
@@ -417,18 +417,30 @@ function FormCompletionBlock({
 function ImageCompletionBlock({ questions }: { questions: IeltsQuestion[] }) {
   const [zoomed, setZoomed] = useState(false);
   const taskImage = (questions[0]?.data?.task_image as string) || (questions[0]?.data?.taskImage as string) || "";
+  const taskTitle = (questions[0]?.data?.task_title as string) || (questions[0]?.data?.taskTitle as string) || "";
+  const taskInstruction = (questions[0]?.data?.task_instruction as string) || (questions[0]?.data?.taskInstruction as string) || "";
   const firstNum = questions[0]?.questionNumber;
   const lastNum  = questions[questions.length - 1]?.questionNumber;
   const range    = firstNum === lastNum ? `${firstNum}` : `${firstNum}–${lastNum}`;
 
   return (
-    <div className="rounded-lg border border-amber-200 bg-amber-50/30 overflow-hidden shadow-sm">
-      <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200">
-        <span className="inline-flex items-center px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-xs font-bold">
-          Câu {range}
-        </span>
-        <span className="text-[11px] text-amber-700 font-medium">Xem ảnh đề và điền vào ô bên phải</span>
+    <div className="rounded-xl border border-amber-200 bg-amber-50/30 overflow-hidden shadow-sm">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-amber-50 border-b border-amber-200">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center px-2 py-0.5 rounded bg-amber-200 text-amber-900 text-xs font-bold">
+            Câu {range}
+          </span>
+          {taskTitle && (
+            <span className="text-xs font-bold text-gray-900">{taskTitle}</span>
+          )}
+        </div>
+        <span className="text-[11px] text-amber-800 font-medium">Xem sơ đồ / bản đồ và điền vào ô bên phải</span>
       </div>
+      {taskInstruction && (
+        <div className="px-4 py-2 bg-amber-50/60 border-b border-amber-100 text-xs text-gray-700 italic">
+          {taskInstruction}
+        </div>
+      )}
       {taskImage ? (
         <div className="p-3">
           <img
@@ -459,14 +471,24 @@ function ImageCompletionBlock({ questions }: { questions: IeltsQuestion[] }) {
       )}
       <ul className="divide-y divide-amber-100 border-t border-amber-200">
         {questions.map((q) => (
-          <li key={q.qId} id={`ielts-row-${q.questionNumber}`}
-            className="flex items-center gap-2 px-4 py-2">
-            <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded bg-amber-100 text-amber-800 font-bold text-xs border border-amber-200">
-              {q.questionNumber}
+          <li
+            key={q.qId}
+            id={`ielts-row-${q.questionNumber}`}
+            className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-amber-50/50 transition-colors"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="flex-shrink-0 inline-flex items-center justify-center min-w-[28px] h-7 px-2 rounded bg-amber-100 text-amber-800 font-bold text-xs border border-amber-200">
+                {q.questionNumber}
+              </span>
+              {q.questionText && (
+                <span className="text-[14px] text-gray-800 font-medium whitespace-pre-wrap">
+                  {q.questionText}
+                </span>
+              )}
+            </div>
+            <span className="text-xs text-gray-400 font-mono tracking-widest select-none hidden sm:inline">
+              ........................
             </span>
-            {q.questionText && (
-              <span className="text-[13px] text-gray-700 whitespace-pre-wrap">{q.questionText}</span>
-            )}
           </li>
         ))}
       </ul>

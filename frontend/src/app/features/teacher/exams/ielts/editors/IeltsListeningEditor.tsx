@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo, useCallback } from "react";
+import { useState, useEffect, useRef, memo, useCallback, Fragment } from "react";
 import {
   Headphones,
   Upload,
@@ -46,7 +46,17 @@ interface ListeningQuestion {
 }
 
 const isImageCompletion = (t: string) => t === "image-completion";
+const isMapLabelling = (t: string) => t === "plan-map-diagram";
 const isFormCompletion = (t: string) => t === "form-completion";
+
+const MAP_LETTERS_FULL = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M"];
+const createMapOptions = (count: number): Record<string, string> => {
+  const opts: Record<string, string> = {};
+  for (let i = 0; i < Math.min(count, MAP_LETTERS_FULL.length); i++) {
+    opts[MAP_LETTERS_FULL[i]] = MAP_LETTERS_FULL[i];
+  }
+  return opts;
+};
 
 // Các dạng điền từ trong Listening — có giới hạn từ + word bank.
 const LISTENING_COMPLETION_TYPES = [
@@ -151,11 +161,14 @@ const QUESTION_TYPE_GUIDES: Record<string, { title: string; steps: string[]; not
     note: "* Học viên sẽ thấy một bảng lựa chọn chung phía trên và các dropdown điền đáp án tương ứng ở từng câu.",
   },
   "plan-map-diagram": {
-    title: "Hướng dẫn soạn Plan / Map / Diagram labelling (Nhãn sơ đồ/bản đồ):",
+    title: "Hướng dẫn soạn Plan / Map / Diagram labelling (Dán nhãn sơ đồ/bản đồ):",
     steps: [
-      "Bước 1: Nhập nhãn hoặc mô tả câu hỏi cần dán nhãn tương ứng trên sơ đồ/bản đồ.",
-      "Bước 2: Điền đáp án đúng tương ứng với sơ đồ.",
+      "Bước 1 (Tại khung Sơ đồ phía trên): Tải lên ảnh bản đồ/sơ đồ có sẵn các chữ cái vị trí (A–J). Bạn có thể bấm chọn file hoặc bấm <strong>Ctrl+V</strong> để dán ảnh chụp màn hình trực tiếp từ clipboard.",
+      "Bước 2: Nhập tiêu đề sơ đồ (VD: <em>Plan of Stevenson's site</em>) và kiểm tra dải chữ cái lựa chọn (mặc định A–J gồm 10 chữ cái chuẩn Cambridge).",
+      "Bước 3 (Tại từng câu hỏi bên dưới): Nhập tên địa điểm cần xác định vị trí vào ô <strong>'Tên địa điểm / mục cần dán nhãn'</strong> (VD: <em>coffee room</em>, <em>warehouse</em>...).",
+      "Bước 4: Bấm chọn chữ cái tương ứng trên bản đồ từ hàng nút <strong>[A] [B] [C]... [J]</strong> để đặt làm đáp án đúng.",
     ],
+    note: "* Học viên sẽ nhìn thấy ảnh bản đồ phóng to rõ nét và chọn hoặc điền chữ cái tương ứng cho từng câu.",
   },
   "image-completion": {
     title: "Hướng dẫn soạn câu hỏi kèm hình ảnh (Image / Table):",
@@ -721,21 +734,28 @@ export function IeltsListeningEditor({
             selectCount: undefined,
             wordLimit: newType === "form-completion" ? "ONE WORD AND/OR A NUMBER" : undefined,
             useWordBank: undefined,
-            taskImage: isImageCompletion(newType) ? q.taskImage : undefined,
-            taskImageFileName: isImageCompletion(newType) ? q.taskImageFileName : undefined,
+            taskImage: (isImageCompletion(newType) || isMapLabelling(newType)) ? q.taskImage : undefined,
+            taskImageFileName: (isImageCompletion(newType) || isMapLabelling(newType)) ? q.taskImageFileName : undefined,
+            taskInstruction: isMapLabelling(newType) && !q.taskInstruction?.trim()
+              ? "Label the map below. Write the correct letter, A-J, next to Questions."
+              : q.taskInstruction,
             correctAnswer:
               (newType === "multiple-choice" || newType === "multiple-choice-group") && !q.correctAnswer?.trim()
                 ? "A"
-                : "",
-            options: isListeningMatching(newType)
-              ? (q.options && Object.keys(q.options).length ? q.options : { A: "", B: "", C: "" })
-              : (newType === "multiple-choice" || newType === "multiple-choice-group")
-                ? (q.options && Object.keys(q.options).length >= 5
-                    ? q.options
-                    : (newType === "multiple-choice-group"
-                        ? { A: "", B: "", C: "", D: "", E: "" }
-                        : { A: "", B: "", C: "", D: "" }))
-                : undefined,
+                : isMapLabelling(newType) && !q.correctAnswer?.trim()
+                  ? "A"
+                  : q.correctAnswer || "",
+            options: isMapLabelling(newType)
+              ? (q.options && Object.keys(q.options).length >= 5 ? q.options : createMapOptions(10))
+              : isListeningMatching(newType)
+                ? (q.options && Object.keys(q.options).length ? q.options : { A: "", B: "", C: "" })
+                : (newType === "multiple-choice" || newType === "multiple-choice-group")
+                  ? (q.options && Object.keys(q.options).length >= 5
+                      ? q.options
+                      : (newType === "multiple-choice-group"
+                          ? { A: "", B: "", C: "", D: "", E: "" }
+                          : { A: "", B: "", C: "", D: "" }))
+                  : undefined,
           });
 
           // Nếu chọn multiple-choice-group: Tự động gom ít nhất 2 câu (qIdx và qIdx+1 nếu có)
@@ -1363,13 +1383,14 @@ export function IeltsListeningEditor({
             const isGroupStart = idx === groupStart;
             const groupSize = groupEnd - groupStart + 1;
             const groupQuestions = current.questions.slice(groupStart, groupEnd + 1);
-            const isImgCompStart = isGroupStart && isImageCompletion(q.questionType);
+            const isImageTaskStart = isGroupStart && (isImageCompletion(q.questionType) || isMapLabelling(q.questionType));
             return (
-              <>
-                {isImgCompStart && (
+              <Fragment key={`row-wrap-${q.id}`}>
+                {isImageTaskStart && (
                   <ImageTaskBlock
                     key={`img-${q.id}`}
                     question={q}
+                    questionIndex={idx}
                     groupSize={groupSize}
                     sectionNumber={activeSection}
                     examId={examId}
@@ -1405,7 +1426,7 @@ export function IeltsListeningEditor({
                   onGroupAnswersChange={setGroupAnswersAt}
                   groupQuestions={groupQuestions}
                 />
-              </>
+              </Fragment>
             );
           })}
         </div>
@@ -1420,7 +1441,11 @@ export function IeltsListeningEditor({
               .map((s) => {
                 const done =
                   !!s.audioUrl && s.questions.every((q) =>
-                    isImageCompletion(q.questionType) ? !!q.correctAnswer.trim() : !!q.questionText.trim()
+                    isImageCompletion(q.questionType)
+                      ? !!q.correctAnswer.trim()
+                      : isMapLabelling(q.questionType)
+                        ? !!q.questionText.trim() && !!q.correctAnswer.trim()
+                        : !!q.questionText.trim()
                   );
                 return (
                   <div
@@ -1513,6 +1538,7 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
   const completion = isListeningCompletion(question.questionType);
   const isImgCompletion = isImageCompletion(question.questionType);
   const isInlineForm = isFormCompletion(question.questionType);
+  const isMapLabelling = question.questionType === "plan-map-diagram";
   const isGrouped = groupSize > 1;
   const groupLabel = isGrouped
     ? `Nhóm ${groupStartNumber ?? question.questionNumber}–${groupEndNumber ?? question.questionNumber}`
@@ -1523,6 +1549,13 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
         bg: "#EFF6FF",
         softBg: "#DBEAFE",
         text: "#1D4ED8",
+      }
+    : isMapLabelling
+    ? {
+        border: "#6EE7B7",
+        bg: "#ECFDF5",
+        softBg: "#D1FAE5",
+        text: "#065F46",
       }
     : {
         border: "#C7D2FE",
@@ -1557,6 +1590,16 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
   const groupStartKeys = groupStartQuestion?.options
     ? Object.keys(groupStartQuestion.options).filter((k) => /^[A-Za-z]$/.test(k)).sort()
     : ["A", "B", "C", "D"];
+
+  const mapOptionKeys = Object.keys(question.options || {})
+    .filter((k) => /^[A-Za-z]$/.test(k))
+    .sort();
+  const groupStartMapKeys = Object.keys(groupStartQuestion?.options || {})
+    .filter((k) => /^[A-Za-z]$/.test(k))
+    .sort();
+  const effectiveMapKeys = mapOptionKeys.length >= 2
+    ? mapOptionKeys
+    : (groupStartMapKeys.length >= 2 ? groupStartMapKeys : MAP_LETTERS_FULL.slice(0, 10));
 
   const currentOptionKeys = Object.keys(question.options || {})
     .filter((k) => /^[A-Za-z]$/.test(k))
@@ -1754,7 +1797,7 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
             );
           })()}
 
-          {!isImgCompletion && (
+          {!isImgCompletion && !isMapLabelling && (
             !isInlineForm && (
               isGroupedMcqFollower ? (
                 <div className="text-xs text-indigo-700 italic bg-indigo-50/60 border border-dashed border-indigo-200 p-2.5 rounded-lg flex items-center gap-2">
@@ -1778,6 +1821,21 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
                 />
               )
             )
+          )}
+
+          {isMapLabelling && (
+            <div className="space-y-1">
+              <label className="block text-[11px] font-bold text-emerald-800 uppercase tracking-wide">
+                Tên địa điểm / mục cần dán nhãn trên sơ đồ
+              </label>
+              <input
+                type="text"
+                value={question.questionText}
+                onChange={(e) => handleChange({ questionText: e.target.value })}
+                placeholder="VD: coffee room, warehouse, staff canteen..."
+                className="w-full px-3 py-2 text-sm border border-emerald-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+              />
+            </div>
           )}
 
           {isGroupStart && isInlineForm && (
@@ -1806,8 +1864,8 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
             </div>
           )}
 
-          {/* Chỉ dẫn chung của nhóm — hiện 1 lần ở câu đầu nhóm, áp cho mọi dạng (trừ image-completion tự có zone riêng phía trên) */}
-          {isGroupStart && !isImgCompletion && (
+          {/* Chỉ dẫn chung của nhóm — hiện 1 lần ở câu đầu nhóm, áp cho mọi dạng (trừ image-completion và plan-map-diagram tự có zone riêng phía trên) */}
+          {isGroupStart && !isImgCompletion && !isMapLabelling && (
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-wide text-indigo-700 mb-1">
                 Chỉ dẫn chung của nhóm (áp dụng cho cả nhóm)
@@ -2092,6 +2150,43 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
                 </button>
               )}
             </div>
+          ) : isMapLabelling ? (
+            <div className="p-3 rounded-lg border border-emerald-300 bg-emerald-50/60 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-900">
+                  Chọn chữ cái đáp án đúng trên sơ đồ:
+                </span>
+                {question.correctAnswer ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-600 text-white font-extrabold text-xs shadow-xs">
+                    Đáp án: {question.correctAnswer.toUpperCase()}
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-amber-700 font-semibold italic">
+                    ⚠️ Chưa chọn chữ cái đáp án
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {effectiveMapKeys.map((letter) => {
+                  const isSelected = question.correctAnswer?.trim().toUpperCase() === letter;
+                  return (
+                    <button
+                      key={letter}
+                      type="button"
+                      onClick={() => handleChange({ correctAnswer: letter })}
+                      className={`w-8 h-8 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center border ${
+                        isSelected
+                          ? "bg-emerald-600 border-emerald-700 text-white shadow-md font-extrabold scale-110 ring-2 ring-emerald-300"
+                          : "bg-white border-gray-300 text-gray-700 hover:bg-emerald-100 hover:border-emerald-400"
+                      }`}
+                      title={`Chọn chữ cái ${letter}`}
+                    >
+                      {letter}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           ) : !isImgCompletion ? (
             <div className="space-y-1">
               {question.wordLimit && (
@@ -2123,17 +2218,19 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
   );
 });
 
-// ─── Image task block (standalone, above the question rows) ───────────────
+// ─── Image / Map task block (standalone, above the question rows) ─────────
 // Rendered separately at group-start so teachers understand the image is
-// shared across the whole image-completion group, not just question 1.
+// shared across the whole group, not just question 1.
 const ImageTaskBlock = memo(function ImageTaskBlock({
   question,
+  questionIndex,
   groupSize = 1,
   sectionNumber,
   examId,
   onPatchGroup,
 }: {
   question: ListeningQuestion;
+  questionIndex?: number;
   groupSize?: number;
   sectionNumber: number;
   examId?: string;
@@ -2141,8 +2238,12 @@ const ImageTaskBlock = memo(function ImageTaskBlock({
 }) {
   const [imageUploading, setImageUploading] = useState(false);
   const [imageZoomed, setImageZoomed] = useState(false);
-  const handleGroup = (patch: Partial<ListeningQuestion>) =>
-    onPatchGroup(sectionNumber, (question.questionNumber - 1) % 10, patch);
+  const isMap = isMapLabelling(question.questionType);
+
+  const handleGroup = (patch: Partial<ListeningQuestion>) => {
+    const targetIdx = questionIndex ?? ((question.questionNumber - 1) % 10);
+    onPatchGroup(sectionNumber, targetIdx, patch);
+  };
 
   const handleImageUpload = async (file: File) => {
     if (!examId) {
@@ -2173,16 +2274,25 @@ const ImageTaskBlock = memo(function ImageTaskBlock({
   const lastNum = firstNum + groupSize - 1;
   const rangeLabel = groupSize > 1 ? `${firstNum}–${lastNum}` : `${firstNum}`;
 
+  const mapKeys = Object.keys(question.options || {})
+    .filter((k) => /^[A-Za-z]$/.test(k))
+    .sort();
+  const currentLetterCount = mapKeys.length >= 2 ? mapKeys.length : 10;
+
   return (
     <div
-      className="rounded-xl border-2 border-dashed border-amber-400 bg-amber-50/50 p-4 space-y-3 outline-none focus:border-amber-500 focus:bg-amber-50/70"
+      className={
+        isMap
+          ? "rounded-xl border-2 border-dashed border-emerald-400 bg-emerald-50/50 p-4 space-y-3.5 outline-none focus:border-emerald-500 focus:bg-emerald-50/70"
+          : "rounded-xl border-2 border-dashed border-amber-400 bg-amber-50/50 p-4 space-y-3 outline-none focus:border-amber-500 focus:bg-amber-50/70"
+      }
       tabIndex={0}
       onPaste={(e) => {
         e.preventDefault();
         const items = e.clipboardData?.items;
         if (!items) return;
         for (let i = 0; i < items.length; i++) {
-          if (items[i].type.startsWith('image/')) {
+          if (items[i].type.startsWith("image/")) {
             const blob = items[i].getAsFile();
             if (blob) handleImageUpload(blob);
             return;
@@ -2191,12 +2301,22 @@ const ImageTaskBlock = memo(function ImageTaskBlock({
       }}
     >
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs font-bold text-amber-800 uppercase tracking-wide">
+        <div
+          className={`flex items-center gap-2 text-xs font-bold uppercase tracking-wide ${
+            isMap ? "text-emerald-900" : "text-amber-800"
+          }`}
+        >
           <ImageIcon className="w-4 h-4" />
-          Ảnh đề chung — Câu {rangeLabel}
+          {isMap
+            ? `Sơ đồ / Bản đồ (Plan / Map / Diagram Labelling) — Câu ${rangeLabel}`
+            : `Ảnh đề chung — Câu ${rangeLabel}`}
         </div>
         {groupSize > 1 && (
-          <span className="text-[11px] font-semibold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+          <span
+            className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+              isMap ? "text-emerald-800 bg-emerald-100" : "text-amber-700 bg-amber-100"
+            }`}
+          >
             Nhóm {groupSize} câu
           </span>
         )}
@@ -2208,20 +2328,26 @@ const ImageTaskBlock = memo(function ImageTaskBlock({
             <img
               src={question.taskImage}
               alt="Question image"
-              className="max-w-full max-h-[320px] w-auto object-contain mx-auto rounded-lg border border-amber-200 cursor-zoom-in"
+              className={`max-w-full max-h-[320px] w-auto object-contain mx-auto rounded-lg border cursor-zoom-in ${
+                isMap ? "border-emerald-300" : "border-amber-200"
+              }`}
               onClick={() => setImageZoomed(true)}
             />
             <button
               type="button"
               onClick={() => setImageZoomed(true)}
-              className="absolute top-2 right-2 p-1.5 rounded-md bg-white/80 text-amber-700 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              className={`absolute top-2 right-2 p-1.5 rounded-md bg-white/80 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${
+                isMap ? "text-emerald-700" : "text-amber-700"
+              }`}
               title="Phóng to"
             >
               <ZoomIn className="w-3.5 h-3.5" />
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-gray-500 truncate flex-1">{question.taskImageFileName}</span>
+            <span className="text-[11px] text-gray-500 truncate flex-1">
+              {question.taskImageFileName || "Ảnh sơ đồ đã upload"}
+            </span>
             <button
               type="button"
               onClick={() => handleGroup({ taskImage: "", taskImageFileName: "" })}
@@ -2232,23 +2358,148 @@ const ImageTaskBlock = memo(function ImageTaskBlock({
           </div>
         </div>
       ) : (
-        <label className="flex items-center justify-center gap-2 py-5 cursor-pointer hover:bg-amber-50 rounded-lg transition-all">
+        <label
+          className={`flex items-center justify-center gap-2 py-6 cursor-pointer rounded-lg transition-all border border-dashed ${
+            isMap
+              ? "hover:bg-emerald-100/60 border-emerald-300 bg-white/60"
+              : "hover:bg-amber-100/60 border-amber-300 bg-white/60"
+          }`}
+        >
           {imageUploading ? (
-            <><Loader2 className="w-4 h-4 animate-spin text-amber-600" /><span className="text-sm text-amber-700">Đang upload...</span></>
+            <>
+              <Loader2
+                className={`w-4 h-4 animate-spin ${isMap ? "text-emerald-600" : "text-amber-600"}`}
+              />
+              <span className={`text-sm ${isMap ? "text-emerald-700" : "text-amber-700"}`}>
+                Đang tải ảnh lên...
+              </span>
+            </>
           ) : (
-            <><Upload className="w-4 h-4 text-amber-400" /><span className="text-sm font-medium text-amber-700">Upload ảnh đề (jpg, png, pdf...) hoặc paste (Ctrl+V)</span></>
+            <>
+              <Upload className={`w-4 h-4 ${isMap ? "text-emerald-500" : "text-amber-400"}`} />
+              <span className={`text-sm font-medium ${isMap ? "text-emerald-800" : "text-amber-700"}`}>
+                Tải ảnh sơ đồ/bản đồ (jpg, png, pdf...) hoặc bấm{" "}
+                <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-xs font-semibold">
+                  Ctrl+V
+                </kbd>{" "}
+                để dán ảnh
+              </span>
+            </>
           )}
           <input
             type="file"
             accept="image/*,.pdf"
             className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleImageUpload(f);
+            }}
           />
         </label>
       )}
+
+      {/* Map labelling controls: Tiêu đề, chỉ dẫn đề bài, và dải chữ cái trên bản đồ */}
+      {isMap && (
+        <div className="space-y-3 pt-2 border-t border-emerald-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wide text-emerald-800 mb-1">
+                Tiêu đề sơ đồ / bản đồ
+              </label>
+              <input
+                type="text"
+                value={question.taskTitle || ""}
+                onChange={(e) => handleGroup({ taskTitle: e.target.value })}
+                placeholder="VD: Plan of Stevenson's site"
+                className="w-full px-3 py-1.5 text-xs border border-emerald-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wide text-emerald-800 mb-1">
+                Chỉ dẫn làm bài của nhóm
+              </label>
+              <input
+                type="text"
+                value={question.taskInstruction || ""}
+                onChange={(e) => handleGroup({ taskInstruction: e.target.value })}
+                placeholder="VD: Label the map below. Write the correct letter, A-J, next to Questions 15-20."
+                className="w-full px-3 py-1.5 text-xs border border-emerald-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
+
+          <div className="p-3 rounded-lg border border-emerald-200 bg-white/90 space-y-2">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-emerald-950">
+                  Dải chữ cái trên bản đồ ({currentLetterCount} chữ cái: A–
+                  {MAP_LETTERS_FULL[currentLetterCount - 1] || "J"}):
+                </span>
+                <span className="text-[11px] text-gray-500">
+                  (Học viên sẽ chọn chữ cái từ danh sách này)
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-gray-500 mr-0.5">Mẫu nhanh:</span>
+                {[8, 10, 12].map((cnt) => (
+                  <button
+                    key={cnt}
+                    type="button"
+                    onClick={() => handleGroup({ options: createMapOptions(cnt) })}
+                    className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer border ${
+                      currentLetterCount === cnt
+                        ? "bg-emerald-600 text-white border-emerald-700 shadow-xs"
+                        : "bg-gray-50 text-gray-700 border-gray-300 hover:bg-emerald-50 hover:text-emerald-700"
+                    }`}
+                  >
+                    A–{MAP_LETTERS_FULL[cnt - 1]} ({cnt})
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  disabled={currentLetterCount <= 4}
+                  onClick={() =>
+                    handleGroup({ options: createMapOptions(Math.max(4, currentLetterCount - 1)) })
+                  }
+                  className="px-2 py-0.5 rounded text-[11px] font-bold bg-gray-50 text-gray-600 border border-gray-300 hover:bg-gray-100 disabled:opacity-40 cursor-pointer"
+                  title="Bớt 1 chữ cái"
+                >
+                  -
+                </button>
+                <button
+                  type="button"
+                  disabled={currentLetterCount >= MAP_LETTERS_FULL.length}
+                  onClick={() =>
+                    handleGroup({
+                      options: createMapOptions(
+                        Math.min(MAP_LETTERS_FULL.length, currentLetterCount + 1)
+                      ),
+                    })
+                  }
+                  className="px-2 py-0.5 rounded text-[11px] font-bold bg-gray-50 text-gray-600 border border-gray-300 hover:bg-gray-100 disabled:opacity-40 cursor-pointer"
+                  title="Thêm 1 chữ cái"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {MAP_LETTERS_FULL.slice(0, currentLetterCount).map((l) => (
+                <span
+                  key={l}
+                  className="w-7 h-7 rounded-md bg-emerald-100 text-emerald-900 font-bold text-xs flex items-center justify-center border border-emerald-300 shadow-2xs"
+                >
+                  {l}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {imageZoomed && question.taskImage && (
         <div
-          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 cursor-zoom-out"
+          className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4 cursor-zoom-out"
           onClick={() => setImageZoomed(false)}
         >
           <img

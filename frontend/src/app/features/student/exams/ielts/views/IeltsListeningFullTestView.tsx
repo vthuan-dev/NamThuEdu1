@@ -360,15 +360,15 @@ function SectionBody({
   isCorrectMap?: Record<number, boolean>;
   reviewMode?: boolean;
 }) {
-  const hasMixedQuestionTypes = new Set(
-    section.questions.map((q) => questionRenderKind(q))
-  ).size > 1;
-  const allImgCompletion = section.questions.every(
-    (q) => q.questionType === "image-completion" || q.questionType === "image_completion"
-  );
-  const hasImgCompletion = section.questions.some(
-    (q) => q.questionType === "image-completion" || q.questionType === "image_completion"
-  );
+  const isImageTask = (q: IeltsListeningSection["questions"][number]) =>
+    q.questionType === "image-completion" ||
+    q.questionType === "image_completion" ||
+    q.questionType === "plan-map-diagram" ||
+    q.questionType === "plan_map_diagram" ||
+    !!((q as any).data?.task_image || (q as any).data?.taskImage);
+
+  const allImgCompletion = section.questions.every(isImageTask);
+  const hasImgCompletion = section.questions.some(isImageTask);
   const allMcq = !hasImgCompletion && section.questions.every(
     (q) => hasRealOptions(q)
   );
@@ -475,6 +475,10 @@ function ImageCompletionBody({
   const [zoomed, setZoomed] = useState(false);
   const taskImage = (section.questions[0]?.data?.task_image as string)
     || (section.questions[0]?.data?.taskImage as string) || "";
+  const taskTitle = (section.questions[0]?.data?.task_title as string)
+    || (section.questions[0]?.data?.taskTitle as string) || "";
+  const taskInstruction = (section.questions[0]?.data?.task_instruction as string)
+    || (section.questions[0]?.data?.taskInstruction as string) || "";
 
   const handleZoom = useCallback(() => setZoomed(true), []);
   const handleUnzoom = useCallback(() => setZoomed(false), []);
@@ -484,11 +488,23 @@ function ImageCompletionBody({
       {/* ── Image ── */}
       {taskImage ? (
         <div className="rounded-xl border-2 border-amber-200 bg-amber-50/30 overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200">
-            <span className="text-[11px] font-bold text-amber-700 uppercase tracking-wide">
-              Xem ảnh đề bên dưới rồi điền đáp án vào các ô
-            </span>
+          <div className="flex items-center justify-between px-4 py-2 bg-amber-50 border-b border-amber-200">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wide">
+                Xem sơ đồ / bản đồ đề bên dưới rồi điền đáp án vào các ô
+              </span>
+              {taskTitle && (
+                <span className="text-xs font-bold text-gray-900 border-l border-amber-300 pl-2">
+                  {taskTitle}
+                </span>
+              )}
+            </div>
           </div>
+          {taskInstruction && (
+            <div className="px-4 py-2 bg-amber-50/60 border-b border-amber-100 text-xs text-gray-700 italic">
+              {taskInstruction}
+            </div>
+          )}
           <div className="p-3">
             <img
               src={taskImage}
