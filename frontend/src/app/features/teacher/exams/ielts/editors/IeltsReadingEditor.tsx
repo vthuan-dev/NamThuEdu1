@@ -217,12 +217,21 @@ function deriveGroups(questions: any[]): ReadingGroup[] {
     const instr = q.taskInstruction || q.task_instruction || "";
     const taskImg = q.taskImage || q.task_image || "";
     const last = groups[groups.length - 1];
-    if (
+    const isGroupedMcq = type === "multiple-choice-group";
+    const maxGroupSize = isGroupedMcq ? (last?.selectCount === 3 ? 3 : 2) : Infinity;
+
+    // Với multiple-choice-group: không gom nếu nhóm trước đã đủ 2 hoặc 3 câu, hoặc đề bài khác nhau
+    const canMerge =
       last &&
       last.questionType === type &&
       last.instruction === instr &&
-      (last.taskImage || "") === taskImg
-    ) {
+      (last.taskImage || "") === taskImg &&
+      (!isGroupedMcq || (
+        last.questions.length < maxGroupSize &&
+        (!q.questionText || !last.questions[0]?.questionText || q.questionText === last.questions[0]?.questionText)
+      ));
+
+    if (canMerge) {
       last.questions.push(toQuestion(q, type));
       if (
         isMatchingType(type) &&
@@ -243,7 +252,7 @@ function deriveGroups(questions: any[]): ReadingGroup[] {
             ? { ...q.options }
             : defaultChoices(type)
           : undefined,
-        selectCount: (type === "multiple-choice" || type === "multiple-choice-group") ? 1 : undefined,
+        selectCount: (type === "multiple-choice" || type === "multiple-choice-group") ? (q.selectCount || 1) : undefined,
         wordLimit: isCompletionType(type) ? q.wordLimit || q.word_limit || "" : undefined,
         questions: [toQuestion(q, type)],
       });
@@ -289,10 +298,26 @@ function buildPassages(initialData: any): ReadingPassage[] {
     const p = existingMap.get(n);
     if (p) {
       const body = p.body || p.passageText || "";
-      const groups =
+      const rawGroups =
         Array.isArray(p.groups) && p.groups.length
           ? p.groups.map(normalizeGroup)
           : deriveGroups(p.questions || []);
+
+      // Tách bất kỳ nhóm multiple-choice-group nào có > 3 câu thành các nhóm 2 câu chuẩn
+      const groups: ReadingGroup[] = [];
+      rawGroups.forEach((g) => {
+        if (g.questionType === "multiple-choice-group" && g.questions.length > 3) {
+          for (let qi = 0; qi < g.questions.length; qi += 2) {
+            groups.push({
+              ...g,
+              id: uid("g"),
+              questions: g.questions.slice(qi, qi + 2),
+            });
+          }
+        } else {
+          groups.push(g);
+        }
+      });
       return {
         passageNumber: n,
         title: p.title || p.passageTitle || "",
@@ -571,6 +596,23 @@ export function IeltsReadingEditor({
       }
       groups[gIdx] = { ...g, questions: curQuestions };
       return groups;
+    });
+
+  const splitGroup = (pNum: number, gIdx: number) =>
+    mutateGroups(pNum, (groups) => {
+      const g = groups[gIdx];
+      if (!g || g.questions.length <= 2) return groups;
+      const firstChunk = g.questions.slice(0, 2);
+      const secondChunk = g.questions.slice(2);
+      const g1: ReadingGroup = { ...g, questions: firstChunk };
+      const g2: ReadingGroup = {
+        ...g,
+        id: uid("g"),
+        questions: secondChunk,
+      };
+      const nextGroups = [...groups];
+      nextGroups.splice(gIdx, 1, g1, g2);
+      return nextGroups;
     });
 
   const setGroupAnswers = (pNum: number, gIdx: number, selectedLetters: string[]) =>
@@ -862,6 +904,7 @@ export function IeltsReadingEditor({
                 onSetGroupAnswers={(letters) => setGroupAnswers(activePassage, gIdx, letters)}
                 onAddQuestion={() => addQuestion(activePassage, gIdx)}
                 onRemoveQuestion={(qIdx) => removeQuestion(activePassage, gIdx, qIdx)}
+                onSplitGroup={() => splitGroup(activePassage, gIdx)}
                 onChangeQuestion={(qIdx, patch) =>
                   updateQuestion(activePassage, gIdx, qIdx, patch)
                 }
@@ -1108,6 +1151,7 @@ function GroupCard({
   onRemove: () => void;
   onSetGroupSize?: (size: number) => void;
   onSetGroupAnswers?: (letters: string[]) => void;
+  onSplitGroup?: () => void;
   onAddQuestion: () => void;
   onRemoveQuestion: (qIdx: number) => void;
   onChangeQuestion: (qIdx: number, patch: Partial<ReadingQuestion>) => void;
@@ -1159,17 +1203,29 @@ function GroupCard({
 
           {/* Grouped MCQ (Choose TWO/THREE): Quy mô nhóm xác định số câu và số đáp án */}
           {isGroupedMcq && (
-            <label className="flex items-center gap-1.5 text-[11px] text-emerald-800 bg-white px-2.5 py-1 rounded-md border border-emerald-300 shadow-xs">
-              <span className="font-semibold">Quy mô nhóm:</span>
-              <select
-                value={group.questions.length}
-                onChange={(e) => onSetGroupSize?.(Number(e.target.value))}
-                className="px-2 py-0.5 border border-gray-300 rounded text-xs bg-white font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
-              >
-                <option value={2}>2 câu (Choose TWO - 2 điểm)</option>
-                <option value={3}>3 câu (Choose THREE - 3 điểm)</option>
-              </select>
-            </label>
+            <div className="flex items-center gap-2 flex-wrap">
+              <label className="flex items-center gap-1.5 text-[11px] text-emerald-800 bg-white px-2.5 py-1 rounded-md border border-emerald-300 shadow-xs">
+                <span className="font-semibold">Quy mô nhóm:</span>
+                <select
+                  value={group.questions.length >= 3 ? 3 : 2}
+                  onChange={(e) => onSetGroupSize?.(Number(e.target.value))}
+                  className="px-2 py-0.5 border border-gray-300 rounded text-xs bg-white font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                >
+                  <option value={2}>2 câu (Choose TWO - 2 điểm)</option>
+                  <option value={3}>3 câu (Choose THREE - 3 điểm)</option>
+                </select>
+              </label>
+              {group.questions.length > 2 && onSplitGroup && (
+                <button
+                  type="button"
+                  onClick={onSplitGroup}
+                  className="px-2 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[11px] font-semibold border border-emerald-300 transition-colors cursor-pointer"
+                  title="Tách nhóm này thành các nhóm 2 câu riêng"
+                >
+                  ✂️ Tách thành các nhóm 2 câu
+                </button>
+              )}
+            </div>
           )}
 
           {/* Completion: giới hạn từ */}
@@ -1499,7 +1555,7 @@ function QuestionRow({
               <div className="space-y-2">
                 <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-50/80 border border-emerald-200 text-xs">
                   <span className="font-semibold text-emerald-950">
-                    Tích chọn đúng {groupSize} đáp án cho nhóm câu {leadNumber}–{groupEndNumber} (Choose {groupSize === 2 ? "TWO" : "THREE"}):
+                    Tích chọn đúng {groupSize} đáp án cho nhóm câu {leadNumber}–{groupEndNumber} (Choose {groupSize === 2 ? "TWO" : groupSize === 3 ? "THREE" : `${groupSize}`}):
                   </span>
                   <span
                     className={`px-2.5 py-0.5 rounded font-bold text-xs ${
@@ -1511,6 +1567,12 @@ function QuestionRow({
                     Đã chọn {groupSelectedLetters.length}/{groupSize} đáp án
                   </span>
                 </div>
+
+                {(groupSize ?? 2) > 3 && (
+                  <div className="p-2 rounded bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                    ⚠️ Nhóm này đang gồm {groupSize} câu (vượt chuẩn Cambridge IELTS 2-3 câu). Hãy bấm nút &quot;Tách thành các nhóm 2 câu&quot; ở trên để chia nhỏ.
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-2">
                   {optionKeys.map((k) => {

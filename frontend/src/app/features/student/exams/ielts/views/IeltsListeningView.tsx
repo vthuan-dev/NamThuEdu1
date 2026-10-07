@@ -634,12 +634,25 @@ function McqBlock({
         undefined;
 
       const last = res[res.length - 1];
+      const qGroupId = (q.data?.groupId as string) || (q.data?.group_id as string);
+      const lastGroupId =
+        (last?.questions[0]?.data?.groupId as string) ||
+        (last?.questions[0]?.data?.group_id as string);
+
+      const maxGroupSize =
+        Number((last?.questions[0]?.data?.groupSize as number) || (last?.questions[0]?.data?.group_size as number)) || 2;
+
       const sameGroup =
         last &&
-        last.title === title &&
-        JSON.stringify(last.options) === JSON.stringify(qOptions) &&
+        normalizeQuestionType(q.questionType) === "multiple_choice_group" &&
+        normalizeQuestionType(last.questions[0].questionType) === "multiple_choice_group" &&
         Object.keys(qOptions).length > 0 &&
-        normalizeQuestionType(q.questionType) === "multiple_choice_group";
+        (qGroupId && lastGroupId
+          ? qGroupId === lastGroupId
+          : (last.title === title &&
+             last.stem === stem &&
+             JSON.stringify(last.options) === JSON.stringify(qOptions) &&
+             last.questions.length < Math.min(3, maxGroupSize)));
 
       if (sameGroup) {
         last.questions.push(q);

@@ -31,6 +31,7 @@ import type {
 import { IeltsAudioOnce } from "../components/IeltsAudioOnce";
 import { type QuestionMeta } from "../components/IeltsBottomNav";
 import { IeltsQuestionNavigator } from "../components/IeltsQuestionNavigator";
+import { GroupedChooseManyBlock } from "../components/GroupedChooseManyBlock";
 
 interface Props {
   payload: IeltsListeningPayload;
@@ -307,6 +308,8 @@ export function IeltsListeningFullTestView({
             correctAnswers={correctAnswers}
             isCorrectMap={isCorrectMap}
             reviewMode={reviewMode}
+            flagged={flagged}
+            onToggleFlag={onToggleFlag}
           />
         </section>
 
@@ -352,6 +355,8 @@ function SectionBody({
   correctAnswers = {},
   isCorrectMap = {},
   reviewMode = false,
+  flagged = {},
+  onToggleFlag = () => {},
 }: {
   section: IeltsListeningSection;
   answers: AnswerMap;
@@ -359,6 +364,8 @@ function SectionBody({
   correctAnswers?: Record<number, string>;
   isCorrectMap?: Record<number, boolean>;
   reviewMode?: boolean;
+  flagged?: Record<number, boolean>;
+  onToggleFlag?: (qId: number) => void;
 }) {
   const isImageTask = (q: IeltsListeningSection["questions"][number]) =>
     q.questionType === "image-completion" ||
@@ -372,15 +379,17 @@ function SectionBody({
   const allMcq = !hasImgCompletion && section.questions.every(
     (q) => hasRealOptions(q)
   );
+  const distinctKinds = new Set(section.questions.map(questionRenderKind));
+  const hasMixedQuestionTypes = distinctKinds.size > 1;
 
   if (allImgCompletion) {
     return <ImageCompletionBody section={section} answers={answers} onAnswer={onAnswer} correctAnswers={correctAnswers} isCorrectMap={isCorrectMap} reviewMode={reviewMode} />;
   }
   if (allMcq) {
-    return <McqBody section={section} answers={answers} onAnswer={onAnswer} correctAnswers={correctAnswers} isCorrectMap={isCorrectMap} reviewMode={reviewMode} />;
+    return <McqBody section={section} answers={answers} onAnswer={onAnswer} correctAnswers={correctAnswers} isCorrectMap={isCorrectMap} reviewMode={reviewMode} flagged={flagged} onToggleFlag={onToggleFlag} />;
   }
   if (hasMixedQuestionTypes) {
-    return <MixedQuestionBody section={section} answers={answers} onAnswer={onAnswer} correctAnswers={correctAnswers} isCorrectMap={isCorrectMap} reviewMode={reviewMode} />;
+    return <MixedQuestionBody section={section} answers={answers} onAnswer={onAnswer} correctAnswers={correctAnswers} isCorrectMap={isCorrectMap} reviewMode={reviewMode} flagged={flagged} onToggleFlag={onToggleFlag} />;
   }
   return <CompletionBody section={section} answers={answers} onAnswer={onAnswer} correctAnswers={correctAnswers} isCorrectMap={isCorrectMap} reviewMode={reviewMode} />;
 }
@@ -402,6 +411,8 @@ function MixedQuestionBody({
   correctAnswers = {},
   isCorrectMap = {},
   reviewMode = false,
+  flagged = {},
+  onToggleFlag = () => {},
 }: {
   section: IeltsListeningSection;
   answers: AnswerMap;
@@ -409,6 +420,8 @@ function MixedQuestionBody({
   correctAnswers?: Record<number, string>;
   isCorrectMap?: Record<number, boolean>;
   reviewMode?: boolean;
+  flagged?: Record<number, boolean>;
+  onToggleFlag?: (qId: number) => void;
 }) {
   return (
     <div className="space-y-5">
@@ -437,6 +450,8 @@ function MixedQuestionBody({
               correctAnswers={correctAnswers}
               isCorrectMap={isCorrectMap}
               reviewMode={reviewMode}
+              flagged={flagged}
+              onToggleFlag={onToggleFlag}
             />
           );
         }
@@ -600,6 +615,8 @@ function McqBody({
   correctAnswers = {},
   isCorrectMap = {},
   reviewMode = false,
+  flagged = {},
+  onToggleFlag = () => {},
 }: {
   section: IeltsListeningSection;
   answers: AnswerMap;
@@ -607,10 +624,83 @@ function McqBody({
   correctAnswers?: Record<number, string>;
   isCorrectMap?: Record<number, boolean>;
   reviewMode?: boolean;
+  flagged?: Record<number, boolean>;
+  onToggleFlag?: (qId: number) => void;
 }) {
+  type McqGroupItem =
+    | { kind: "grouped"; questions: IeltsListeningSection["questions"] }
+    | { kind: "single"; question: IeltsListeningSection["questions"][number] };
+
+  const items = useMemo(() => {
+    const list: McqGroupItem[] = [];
+    section.questions.forEach((q) => {
+      const isGroupType =
+        q.questionType === "multiple_choice_group" ||
+        q.questionType === "multiple-choice-group";
+
+      const qGroupId = (q.data?.groupId as string) || (q.data?.group_id as string);
+      const qOptions = q.options ?? {};
+      const stem = cleanQuestionText(q.questionText || "", q.questionNumber).trim();
+
+      const last = list[list.length - 1];
+      if (isGroupType && last && last.kind === "grouped") {
+        const firstInGroup = last.questions[0];
+        const lastGroupId = (firstInGroup.data?.groupId as string) || (firstInGroup.data?.group_id as string);
+        const maxGroupSize =
+          Number((firstInGroup.data?.groupSize as number) || (firstInGroup.data?.group_size as number)) || 2;
+        const firstStem = cleanQuestionText(firstInGroup.questionText || "", firstInGroup.questionNumber).trim();
+
+        const canAppend =
+          qGroupId && lastGroupId
+            ? qGroupId === lastGroupId
+            : (firstStem === stem &&
+               JSON.stringify(firstInGroup.options ?? {}) === JSON.stringify(qOptions) &&
+               last.questions.length < Math.min(3, maxGroupSize));
+
+        if (canAppend) {
+          last.questions.push(q);
+          return;
+        }
+      }
+
+      if (isGroupType) {
+        list.push({ kind: "grouped", questions: [q] });
+      } else {
+        list.push({ kind: "single", question: q });
+      }
+    });
+    return list;
+  }, [section.questions]);
+
+  const explanationsMap = useMemo(() => {
+    const map: Record<number, string> = {};
+    section.questions.forEach((q) => {
+      if (q.explanation) map[q.qId] = q.explanation;
+    });
+    return map;
+  }, [section.questions]);
+
   return (
     <div className="space-y-5">
-      {section.questions.map((q) => {
+      {items.map((item, idx) => {
+        if (item.kind === "grouped") {
+          return (
+            <GroupedChooseManyBlock
+              key={`gmcq-${item.questions[0].qId}-${idx}`}
+              questions={item.questions as any}
+              answers={answers}
+              onAnswer={onAnswer}
+              flagged={flagged}
+              onToggleFlag={onToggleFlag}
+              reviewMode={reviewMode}
+              correctAnswers={correctAnswers}
+              isCorrectMap={isCorrectMap}
+              explanations={explanationsMap}
+            />
+          );
+        }
+
+        const q = item.question;
         const answered = answers[q.qId] != null && String(answers[q.qId]).trim() !== "";
         // Dùng server-graded isCorrectMap; fallback text-compare nếu chưa có
         const isCorrectQ = reviewMode && answered && (

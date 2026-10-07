@@ -43,6 +43,10 @@ interface ListeningQuestion {
   taskImage?: string;
   taskImageFileName?: string;
   explanation?: string;
+  /** Nhóm riêng biệt cho câu gom cụm (Choose TWO/THREE) */
+  groupId?: string;
+  /** Quy mô nhóm dự kiến (2 hoặc 3 câu) */
+  groupSize?: number;
 }
 
 const isImageCompletion = (t: string) => t === "image-completion";
@@ -282,6 +286,62 @@ const buildEmptySection = (n: 1 | 2 | 3 | 4): ListeningSection => {
   };
 };
 
+function normalizeIncomingQuestions(
+  rawList: any[],
+  emptyList: ListeningQuestion[]
+): ListeningQuestion[] {
+  const mapped: ListeningQuestion[] = (rawList ?? emptyList).map((q: any) => {
+    const qType = q.questionType ?? "multiple-choice";
+    const isMcq = qType === "multiple-choice" || qType === "multiple-choice-group";
+    const imgComp = isImageCompletion(qType);
+    const correctAnswer = q.correctAnswer ?? (isMcq ? "A" : "");
+    return {
+      ...q,
+      questionType: qType,
+      questionText: q.questionText ?? "",
+      taskTitle: q.taskTitle ?? "",
+      taskInstruction: q.taskInstruction ?? "",
+      taskImage: q.taskImage ?? "",
+      taskImageFileName: q.taskImageFileName ?? "",
+      correctAnswer: isMcq && !correctAnswer.trim() ? "A" : correctAnswer,
+      options: imgComp ? undefined : (q.options ?? { A: "", B: "", C: "", D: "" }),
+      explanation: q.explanation || q.qExplanation || "",
+      groupId: q.groupId ?? q.group_id ?? undefined,
+      groupSize: q.groupSize ?? q.group_size ?? undefined,
+    };
+  });
+
+  // Tự động phân bổ groupId riêng nếu có các câu multiple-choice-group liền kề mà chưa có groupId
+  let i = 0;
+  while (i < mapped.length) {
+    const q = mapped[i];
+    if (q.questionType === "multiple-choice-group") {
+      if (!q.groupId) {
+        const targetGid = `mcq-g-${q.id || i}`;
+        let groupLen = 1;
+        // Gom tối đa 2 câu (hoặc 3 nếu có 3 câu cùng options)
+        while (
+          i + groupLen < mapped.length &&
+          mapped[i + groupLen].questionType === "multiple-choice-group" &&
+          !mapped[i + groupLen].groupId &&
+          groupLen < (mapped[i].groupSize || 2)
+        ) {
+          groupLen++;
+        }
+        for (let k = 0; k < groupLen; k++) {
+          mapped[i + k].groupId = targetGid;
+          mapped[i + k].groupSize = groupLen;
+        }
+        i += groupLen;
+        continue;
+      }
+    }
+    i++;
+  }
+
+  return mapped;
+}
+
 export function IeltsListeningEditor({
   examId,
   initialData,
@@ -307,23 +367,7 @@ export function IeltsListeningEditor({
         audioUrl: incoming.audioUrl ?? "",
         audioFileName: incoming.audioFileName ?? "",
         transcript: incoming.transcript ?? "",
-        questions: (incoming.questions ?? emptySec.questions).map((q: any) => {
-          const qType = q.questionType ?? "multiple-choice";
-          const isMcq = qType === "multiple-choice" || qType === "multiple-choice-group";
-          const imgComp = isImageCompletion(qType);
-          const correctAnswer = q.correctAnswer ?? (isMcq ? "A" : "");
-          return {
-            ...q,
-            questionText: q.questionText ?? "",
-            taskTitle: q.taskTitle ?? "",
-            taskInstruction: q.taskInstruction ?? "",
-            taskImage: q.taskImage ?? "",
-            taskImageFileName: q.taskImageFileName ?? "",
-            correctAnswer: isMcq && !correctAnswer.trim() ? "A" : correctAnswer,
-            options: imgComp ? undefined : (q.options ?? { A: "", B: "", C: "", D: "" }),
-            explanation: q.explanation || q.qExplanation || "",
-          };
-        }),
+        questions: normalizeIncomingQuestions(incoming.questions, emptySec.questions),
       };
     });
   });
@@ -417,14 +461,101 @@ export function IeltsListeningEditor({
    */
   const groupRangeOf = useCallback(
     (questions: ListeningQuestion[], qIdx: number): [number, number] => {
-      const type = questions[qIdx]?.questionType;
+      const target = questions[qIdx];
+      if (!target) return [qIdx, qIdx];
+      const type = target.questionType;
+
+      // Grouped MCQ (Choose TWO/THREE): phân định nhóm CHẶT CHẼ theo groupId!
+      if (type === "multiple-choice-group") {
+        const gid = target.groupId;
+        if (gid) {
+          let start = qIdx;
+          let end = qIdx;
+          while (
+            start - 1 >= 0 &&
+            questions[start - 1]?.questionType === type &&
+            questions[start - 1]?.groupId === gid
+          ) {
+            start--;
+          }
+          while (
+            end + 1 < questions.length &&
+            questions[end + 1]?.questionType === type &&
+            questions[end + 1]?.groupId === gid
+          ) {
+            end++;
+          }
+          return [start, end];
+        }
+
+        // Nếu chưa có groupId: nhóm tối đa 2 câu (hoặc 3 nếu có cùng options)
+        let start = qIdx;
+        let end = qIdx;
+        const targetOptKeys = Object.keys(target.options || {}).sort().join(",");
+        while (
+          start - 1 >= 0 &&
+          questions[start - 1]?.questionType === type &&
+          Object.keys(questions[start - 1]?.options || {}).sort().join(",") === targetOptKeys &&
+          qIdx - start < (target.groupSize ?? 2)
+        ) {
+          start--;
+        }
+        while (
+          end + 1 < questions.length &&
+          questions[end + 1]?.questionType === type &&
+          Object.keys(questions[end + 1]?.options || {}).sort().join(",") === targetOptKeys &&
+          end - start + 1 < (target.groupSize ?? 2)
+        ) {
+          end++;
+        }
+        return [start, end];
+      }
+
       let start = qIdx;
       let end = qIdx;
-      while (start - 1 >= 0 && questions[start - 1].questionType === type) start--;
-      while (end + 1 < questions.length && questions[end + 1].questionType === type) end++;
+      while (start - 1 >= 0 && questions[start - 1]?.questionType === type) start--;
+      while (end + 1 < questions.length && questions[end + 1]?.questionType === type) end++;
       return [start, end];
     },
     []
+  );
+
+  /**
+   * Tách nhóm: cho phép người dùng tách một câu (hoặc nhóm câu từ qIdx) thành nhóm mới riêng biệt.
+   */
+  const splitGroupAt = useCallback(
+    (secNum: number, qIdx: number) => {
+      setSections((prev) =>
+        prev.map((s) => {
+          if (s.sectionNumber !== secNum) return s;
+          const [start, end] = groupRangeOf(s.questions, qIdx);
+          if (qIdx <= start || qIdx > end) return s;
+          const newGid = `mcq-g-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+          const newSize = end - qIdx + 1;
+          const oldSize = qIdx - start;
+          return {
+            ...s,
+            questions: s.questions.map((q, i) => {
+              if (i >= qIdx && i <= end) {
+                return {
+                  ...q,
+                  groupId: newGid,
+                  groupSize: newSize,
+                };
+              }
+              if (i >= start && i < qIdx) {
+                return {
+                  ...q,
+                  groupSize: oldSize,
+                };
+              }
+              return q;
+            }),
+          };
+        })
+      );
+    },
+    [groupRangeOf]
   );
 
   const patchGroupAt = useCallback(
@@ -656,10 +787,13 @@ export function IeltsListeningEditor({
           if (targetSize === currentSize) return s;
 
           const baseQ = s.questions[start];
+          const targetGid = baseQ.groupId || `mcq-g-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
           const baseOptions =
             baseQ?.options && Object.keys(baseQ.options).length >= 5
               ? baseQ.options
-              : { A: "", B: "", C: "", D: "", E: "" };
+              : targetSize === 3
+                ? { A: "", B: "", C: "", D: "", E: "", F: "", G: "" }
+                : { A: "", B: "", C: "", D: "", E: "" };
 
           let nextQuestions = [...s.questions];
           if (targetSize > currentSize) {
@@ -668,19 +802,33 @@ export function IeltsListeningEditor({
               nextQuestions[i] = {
                 ...nextQuestions[i],
                 questionType: "multiple-choice-group",
+                groupId: targetGid,
+                groupSize: targetSize,
                 questionText: baseQ.questionText,
                 taskTitle: baseQ.taskTitle,
-                taskInstruction: baseQ.taskInstruction,
+                taskInstruction:
+                  targetSize === 3
+                    ? "Choose THREE letters, A-G."
+                    : (baseQ.taskInstruction || "Choose TWO letters, A-E."),
                 options: { ...baseOptions },
                 correctAnswer: nextQuestions[i].correctAnswer?.trim() || (LETTERS[i - start] ?? "A"),
                 selectCount: undefined,
               };
             }
           } else {
+            for (let i = start; i < start + targetSize; i++) {
+              nextQuestions[i] = {
+                ...nextQuestions[i],
+                groupId: targetGid,
+                groupSize: targetSize,
+              };
+            }
             for (let i = start + targetSize; i <= end; i++) {
               nextQuestions[i] = {
                 ...nextQuestions[i],
                 questionType: "multiple-choice",
+                groupId: undefined,
+                groupSize: undefined,
                 options: { A: "", B: "", C: "", D: "" },
                 correctAnswer: "A",
                 selectCount: undefined,
@@ -758,7 +906,7 @@ export function IeltsListeningEditor({
                   : undefined,
           });
 
-          // Nếu chọn multiple-choice-group: Tự động gom ít nhất 2 câu (qIdx và qIdx+1 nếu có)
+          // Nếu chọn multiple-choice-group: Tự động gom đúng 2 câu (qIdx và qIdx+1 nếu có)
           if (newType === "multiple-choice-group") {
             const nextIdx = qIdx + 1 < s.questions.length ? qIdx + 1 : null;
             const q0 = s.questions[qIdx];
@@ -766,6 +914,7 @@ export function IeltsListeningEditor({
               q0.options && Object.keys(q0.options).length >= 5
                 ? q0.options
                 : { A: "", B: "", C: "", D: "", E: "" };
+            const newGid = `mcq-g-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
             return {
               ...s,
@@ -774,6 +923,9 @@ export function IeltsListeningEditor({
                   return {
                     ...q,
                     questionType: "multiple-choice-group",
+                    groupId: newGid,
+                    groupSize: 2,
+                    taskInstruction: q.taskInstruction?.trim() || "Choose TWO letters, A-E.",
                     selectCount: undefined,
                     options: baseOptions,
                     correctAnswer: q.correctAnswer?.trim() || "A",
@@ -783,10 +935,12 @@ export function IeltsListeningEditor({
                   return {
                     ...q,
                     questionType: "multiple-choice-group",
+                    groupId: newGid,
+                    groupSize: 2,
                     selectCount: undefined,
                     questionText: q0.questionText,
                     taskTitle: q0.taskTitle,
-                    taskInstruction: q0.taskInstruction,
+                    taskInstruction: q0.taskInstruction?.trim() || "Choose TWO letters, A-E.",
                     options: { ...baseOptions },
                     correctAnswer: "B",
                   };
@@ -1366,20 +1520,7 @@ export function IeltsListeningEditor({
 
         <div className="space-y-3">
           {current.questions.map((q, idx) => {
-            let groupStart = idx;
-            let groupEnd = idx;
-            while (
-              groupStart - 1 >= 0 &&
-              current.questions[groupStart - 1].questionType === q.questionType
-            ) {
-              groupStart--;
-            }
-            while (
-              groupEnd + 1 < current.questions.length &&
-              current.questions[groupEnd + 1].questionType === q.questionType
-            ) {
-              groupEnd++;
-            }
+            const [groupStart, groupEnd] = groupRangeOf(current.questions, idx);
             const isGroupStart = idx === groupStart;
             const groupSize = groupEnd - groupStart + 1;
             const groupQuestions = current.questions.slice(groupStart, groupEnd + 1);
@@ -1424,6 +1565,7 @@ export function IeltsListeningEditor({
                   onRemoveOption={removeOptionAt}
                   onSetGroupSize={setGroupSizeAt}
                   onGroupAnswersChange={setGroupAnswersAt}
+                  onSplitGroup={splitGroupAt}
                   groupQuestions={groupQuestions}
                 />
               </Fragment>
@@ -1531,6 +1673,7 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
   onRemoveOption?: (secNum: number, qIdx: number, key: string) => void;
   onSetGroupSize?: (secNum: number, qIdx: number, size: number) => void;
   onGroupAnswersChange?: (secNum: number, qIdx: number, answers: string[]) => void;
+  onSplitGroup?: (secNum: number, qIdx: number) => void;
 }) {
   const isMcq = question.questionType === "multiple-choice" || question.questionType === "multiple-choice-group";
   const isGroupedMcq = question.questionType === "multiple-choice-group";
@@ -1975,14 +2118,22 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
           ) : isGroupedMcq ? (
             isGroupedMcqFollower ? (
               // Câu thành viên trong nhóm Choose TWO/THREE: hiển thị banner gọn, không lặp lại bộ đáp án
-              <div className="flex items-center justify-between p-3 rounded-lg border border-indigo-200 bg-indigo-50/60 text-xs">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between p-3 rounded-lg border border-indigo-200 bg-indigo-50/60 text-xs flex-wrap gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="px-2 py-0.5 rounded bg-indigo-600 text-white font-bold text-[11px]">
                     Thuộc nhóm {groupStartNumber}–{groupEndNumber}
                   </span>
                   <span className="text-gray-700">
                     Kế thừa đề bài & lựa chọn A–{LETTERS[optionKeys.length - 1]} từ <strong>Câu {groupStartNumber}</strong>
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => onSplitGroup?.(sectionNumber, index)}
+                    className="text-[11px] font-semibold text-indigo-700 underline hover:text-indigo-900 cursor-pointer"
+                    title="Tách câu này thành nhóm Choose TWO/THREE riêng biệt mới"
+                  >
+                    [Tách thành nhóm mới]
+                  </button>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-gray-700">Đáp án của câu này:</span>
@@ -2008,6 +2159,21 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
             ) : (
               // Câu ĐẦU của nhóm Choose TWO/THREE: hiển thị bộ checkbox để tích đủ số lượng đáp án
               <div className="space-y-2">
+                {groupSize > 3 && (
+                  <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-300 text-xs text-amber-900 flex items-center justify-between gap-2">
+                    <span>
+                      ⚠️ Nhóm này hiện có {groupSize} câu (vượt chuẩn Cambridge Choose TWO/THREE). Bạn có muốn tách thành các nhóm 2 câu riêng không?
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onSplitGroup?.(sectionNumber, index + 2)}
+                      className="px-2.5 py-1 rounded bg-amber-600 text-white font-bold text-xs hover:bg-amber-700 cursor-pointer flex-shrink-0"
+                    >
+                      Tách từ câu {(groupStartNumber ?? 0) + 2}
+                    </button>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between p-2.5 rounded-lg bg-indigo-50/80 border border-indigo-200 text-xs">
                   <span className="font-semibold text-indigo-950">
                     Tích chọn đúng {groupSize} đáp án cho nhóm câu {groupStartNumber}–{groupEndNumber} (Choose {groupSize === 2 ? "TWO" : "THREE"}):
