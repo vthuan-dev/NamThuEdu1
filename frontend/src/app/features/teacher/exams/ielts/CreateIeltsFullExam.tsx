@@ -209,6 +209,7 @@ export function CreateIeltsFullExam() {
       const id = String(res.data?.data?.eId || res.data?.eId || "");
       if (!id) throw new Error("Không lấy được ID cho IELTS Full Test");
       setExamId(id);
+      window.history.replaceState(null, "", `/giao-vien/de-thi/ielts/full/edit/${id}`);
       setStep(1);
       success("Đã khởi tạo IELTS Full Test — bắt đầu nhập 4 kỹ năng.");
     } catch (err: any) {
@@ -222,12 +223,13 @@ export function CreateIeltsFullExam() {
     setSkillData((prev) => ({ ...prev, [skill]: data }));
   };
 
-  const handleSaveDraftAll = async (showToast = true) => {
+  const handleSaveDraftAll = async (showToast = true, overrideSkillData?: Record<IeltsSkill, any>) => {
     if (!examId) return;
     setIsSaving(true);
+    const currentSkillData = overrideSkillData ?? skillData;
     try {
       const ieltsData = SKILLS.reduce((acc, skill) => {
-        const items = extractSkillItems(skill, skillData[skill]);
+        const items = extractSkillItems(skill, currentSkillData[skill]);
         acc[skill] = { [getDataKey(skill)]: items };
         return acc;
       }, {} as Record<IeltsSkill, any>);
@@ -245,13 +247,19 @@ export function CreateIeltsFullExam() {
           play_modes: DEFAULT_PLAY_MODE,
         },
       });
-      if (showToast) success("Đã lưu nháp 4 kỹ năng");
+      if (showToast) success("Đã lưu nháp vào hệ thống");
     } catch (err: any) {
       if (showToast) error(err?.response?.data?.message || "Lưu nháp thất bại");
       throw err;
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSaveSkillAndDraft = async (skill: IeltsSkill, data: any) => {
+    handleSaveSkill(skill, data);
+    const updated = { ...skillData, [skill]: data };
+    await handleSaveDraftAll(true, updated);
   };
 
   const handlePublishAll = async () => {
@@ -537,9 +545,10 @@ export function CreateIeltsFullExam() {
           <div className="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
-              onClick={() => navigate("/giao-vien/de-thi")}
+              onClick={() => navigate("/giao-vien/de-thi?status=draft")}
               className="p-1.5 hover:bg-slate-100 rounded-lg transition-all cursor-pointer"
-              aria-label="Quay lại"
+              aria-label="Quay lại danh sách đề thi"
+              title="Quay lại danh sách đề thi"
             >
               <ArrowLeft className="w-4 h-4 text-slate-600" />
             </button>
@@ -646,6 +655,7 @@ export function CreateIeltsFullExam() {
               testType={testType}
               initialData={skillData.listening}
               onSave={(d) => handleSaveSkill("listening", d)}
+              onSaveDraft={(d) => handleSaveSkillAndDraft("listening", d)}
               isFullTest
             />
           )}
@@ -655,6 +665,7 @@ export function CreateIeltsFullExam() {
               testType={testType}
               initialData={skillData.reading}
               onSave={(d) => handleSaveSkill("reading", d)}
+              onSaveDraft={(d) => handleSaveSkillAndDraft("reading", d)}
               isFullTest
             />
           )}
@@ -664,6 +675,7 @@ export function CreateIeltsFullExam() {
               testType={testType}
               initialData={skillData.writing}
               onSave={(d) => handleSaveSkill("writing", d)}
+              onSaveDraft={(d) => handleSaveSkillAndDraft("writing", d)}
               isFullTest
             />
           )}
@@ -673,6 +685,7 @@ export function CreateIeltsFullExam() {
               testType={testType}
               initialData={skillData.speaking}
               onSave={(d) => handleSaveSkill("speaking", d)}
+              onSaveDraft={(d) => handleSaveSkillAndDraft("speaking", d)}
               isFullTest
             />
           )}

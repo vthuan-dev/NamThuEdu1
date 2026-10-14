@@ -24,6 +24,7 @@ interface Props {
   testType: IeltsTestType;
   initialData?: any;
   onSave: (data: any) => void;
+  onSaveDraft?: (data: any) => void | Promise<void>;
   isFullTest?: boolean;
 }
 
@@ -83,6 +84,7 @@ const buildEmptyParts = (): SpeakingPart[] => [
 export function IeltsSpeakingEditor({
   initialData,
   onSave,
+  onSaveDraft,
   isFullTest = false,
 }: Props) {
   const { success } = useToastContext();
@@ -303,9 +305,14 @@ export function IeltsSpeakingEditor({
       <div className="flex items-center justify-end bg-white rounded-2xl border border-gray-200 p-4 sticky bottom-0">
         <button
           type="button"
-          onClick={() => {
-            onSave({ parts: parts.filter((p) => activeParts.has(p.partNumber)) });
-            success("Đã cập nhật nội dung Speaking");
+          onClick={async () => {
+            const dataToSave = { parts: parts.filter((p) => activeParts.has(p.partNumber)) };
+            onSave(dataToSave);
+            if (onSaveDraft) {
+              await onSaveDraft(dataToSave);
+            } else {
+              success("Đã cập nhật nội dung Speaking");
+            }
           }}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700 transition-all cursor-pointer shadow-sm hover:shadow"
         >

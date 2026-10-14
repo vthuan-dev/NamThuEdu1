@@ -236,6 +236,7 @@ interface Props {
   testType: IeltsTestType;
   initialData?: any;
   onSave: (data: any) => void;
+  onSaveDraft?: (data: any) => void | Promise<void>;
   isFullTest?: boolean;
 }
 
@@ -346,6 +347,7 @@ export function IeltsListeningEditor({
   examId,
   initialData,
   onSave,
+  onSaveDraft,
   isFullTest = false,
 }: Props) {
   const { success } = useToastContext();
@@ -1613,11 +1615,16 @@ export function IeltsListeningEditor({
         </div>
         <button
           type="button"
-          onClick={() => {
-            onSave({
+          onClick={async () => {
+            const dataToSave = {
               sections: sections.filter((s) => activeSections.has(s.sectionNumber)),
-            });
-            success("Đã cập nhật nội dung Listening");
+            };
+            onSave(dataToSave);
+            if (onSaveDraft) {
+              await onSaveDraft(dataToSave);
+            } else {
+              success("Đã cập nhật nội dung Listening");
+            }
           }}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-all cursor-pointer shadow-sm hover:shadow"
         >
@@ -1652,6 +1659,7 @@ const ListeningQuestionRow = memo(function ListeningQuestionRow({
   onRemoveOption,
   onSetGroupSize,
   onGroupAnswersChange,
+  onSplitGroup,
 }: {
   question: ListeningQuestion;
   sectionNumber: number;

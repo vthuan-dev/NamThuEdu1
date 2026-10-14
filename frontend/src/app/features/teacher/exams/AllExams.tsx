@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { usePageTitle, PAGE_TITLES } from "../../../../hooks/usePageTitle";
 import {
   FileText,
@@ -305,7 +305,16 @@ export function AllExams() {
   const [filterType, setFilterType] = useState<string>("all");
   const [filterAgeGroup, setFilterAgeGroup] = useState<string>("all");
   const [filterOwner, setFilterOwner] = useState<"all" | "mine" | "others">("all");
-  const [filterStatus, setFilterStatus] = useState<"published" | "draft">("published");
+  const [searchParams] = useSearchParams();
+  const [filterStatus, setFilterStatus] = useState<"published" | "draft">(() =>
+    searchParams.get("status") === "draft" ? "draft" : "published"
+  );
+
+  useEffect(() => {
+    const s = searchParams.get("status");
+    if (s === "draft") setFilterStatus("draft");
+    else if (s === "published") setFilterStatus("published");
+  }, [searchParams]);
   const [sortBy, setSortBy] = useState<"updated_desc" | "created_desc" | "created_asc" | "title_asc" | "questions_desc" | "questions_asc">("updated_desc");
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -609,7 +618,12 @@ export function AllExams() {
   const matchesStatusFn = (exam: KidsExam) => {
     // Đề chưa có câu hỏi → luôn coi là nháp (không thể giao/làm bài).
     // eStatus có thể là 'draft', 'published', 'active', 'inactive', 'archived', 'pending'
-    if (isEffectiveDraft(exam)) return filterStatus === "draft";
+    const isDraft = isEffectiveDraft(exam);
+    if (filterStatus === "draft") {
+      return isDraft;
+    }
+    // filterStatus === "published"
+    if (isDraft) return false;
     const status = (exam.eStatus || "").toLowerCase();
     return status === "published" || status === "active" || status === "pending";
   };
@@ -731,7 +745,12 @@ export function AllExams() {
     const group = (exam as any)._group || "";
 
     // IELTS: detect qua eType hoặc _group, cần biết skill để route đúng
-    if (eType === "IELTS" || group === "ielts") {      const skill = (
+    if (eType === "IELTS" || group === "ielts") {
+      const isFull = (exam as any).eScope === "full" || (exam.eSkill || "").toLowerCase() === "mixed";
+      if (isFull) {
+        return `/giao-vien/de-thi/ielts/full/edit/${exam.eId}`;
+      }
+      const skill = (
         exam.ielts_skill ||
         (exam.eSkill || "").toLowerCase()
       ).toLowerCase();

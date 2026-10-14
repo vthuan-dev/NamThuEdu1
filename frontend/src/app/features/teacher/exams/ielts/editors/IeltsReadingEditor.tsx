@@ -64,6 +64,7 @@ interface Props {
   testType: IeltsTestType;
   initialData?: any;
   onSave: (data: any) => void;
+  onSaveDraft?: (data: any) => void | Promise<void>;
   isFullTest?: boolean;
 }
 
@@ -383,6 +384,7 @@ export function IeltsReadingEditor({
   examId,
   initialData,
   onSave,
+  onSaveDraft,
   testType,
   isFullTest = false,
 }: Props) {
@@ -927,12 +929,17 @@ export function IeltsReadingEditor({
       <div className="flex items-center justify-end bg-white rounded-2xl border border-gray-200 p-4 sticky bottom-0">
         <button
           type="button"
-          onClick={() => {
+          onClick={async () => {
             const activePassageList = flattenPassages(
               passages.filter((p) => activePassages.has(p.passageNumber))
             );
-            onSave({ passages: activePassageList });
-            success("Đã cập nhật nội dung Reading");
+            const dataToSave = { passages: activePassageList };
+            onSave(dataToSave);
+            if (onSaveDraft) {
+              await onSaveDraft(dataToSave);
+            } else {
+              success("Đã cập nhật nội dung Reading");
+            }
           }}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-all cursor-pointer shadow-sm hover:shadow"
         >
@@ -1139,6 +1146,7 @@ function GroupCard({
   onRemove,
   onSetGroupSize,
   onSetGroupAnswers,
+  onSplitGroup,
   onAddQuestion,
   onRemoveQuestion,
   onChangeQuestion,

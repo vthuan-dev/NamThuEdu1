@@ -23,6 +23,7 @@ interface Props {
   testType: IeltsTestType;
   initialData?: any;
   onSave: (data: any) => void;
+  onSaveDraft?: (data: any) => void | Promise<void>;
   /** Full Test luôn giữ đủ 2 task; đề đơn kỹ năng cho phép thêm/bớt task. */
   isFullTest?: boolean;
 }
@@ -32,7 +33,7 @@ const buildEmptyTasks = (): WritingTask[] => [
   { taskNumber: 2, prompt: "", essayType: "opinion" },
 ];
 
-export function IeltsWritingEditor({ initialData, onSave, testType, isFullTest = false }: Props) {
+export function IeltsWritingEditor({ initialData, onSave, onSaveDraft, testType, isFullTest = false }: Props) {
   const { success } = useToastContext();
   // Luôn giữ cấu hình đầy đủ 2 task trong state để bật/tắt không mất dữ liệu đã nhập.
   const [tasks, setTasks] = useState<WritingTask[]>(() => {
@@ -406,9 +407,14 @@ export function IeltsWritingEditor({ initialData, onSave, testType, isFullTest =
       <div className="flex items-center justify-end bg-white rounded-2xl border border-gray-200 p-4 sticky bottom-0">
         <button
           type="button"
-          onClick={() => {
-            onSave({ tasks: tasks.filter((t) => activeTasks.has(t.taskNumber)) });
-            success("Đã cập nhật nội dung Writing");
+          onClick={async () => {
+            const dataToSave = { tasks: tasks.filter((t) => activeTasks.has(t.taskNumber)) };
+            onSave(dataToSave);
+            if (onSaveDraft) {
+              await onSaveDraft(dataToSave);
+            } else {
+              success("Đã cập nhật nội dung Writing");
+            }
           }}
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700 transition-all cursor-pointer shadow-sm hover:shadow"
         >

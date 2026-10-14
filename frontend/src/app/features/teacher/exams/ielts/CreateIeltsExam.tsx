@@ -34,6 +34,7 @@ import {
   AlertTriangle,
   AlertCircle,
   ChevronRight,
+  Check,
 } from "lucide-react";
 import { useToastContext } from "../../../../../contexts/ToastContext";
 import { api } from "../../../../../services/api";
@@ -104,6 +105,8 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
   const [activeTab, setActiveTab] = useState<ViewTab>("edit");
   const [isPublishing, setIsPublishing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   // Bump version để force remount editor mỗi khi skillData được thay nguyên cục
   // (sau khi load draft). Editor dùng `useState(() => initialData)` nên
@@ -260,7 +263,11 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
           age_group: ageGroup,
         });
         const newId = res.data?.data?.eId || res.data?.eId;
-        if (mounted && newId) setExamId(String(newId));
+        if (mounted && newId) {
+          setExamId(String(newId));
+          // Đồng bộ URL ngay lập tức sang /edit/:id để refresh hoặc rời đi không bị mất
+          window.history.replaceState(null, "", `/giao-vien/de-thi/ielts/${skill}/edit/${newId}`);
+        }
       } catch (err) {
         console.warn("[CreateIeltsExam] failed to create draft:", err);
       }
@@ -271,9 +278,7 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Save skill data (draft) ────────────────────────────────────────────
-  // Editors gọi onSave từ useEffect mỗi lần state thay đổi → KHÔNG toast
-  // ở đây để tránh spam. Toast chỉ hiển thị khi bấm "Lưu nháp" (backend save).
+  // ── Save skill data (local state sync) ──────────────────────────────────
   const handleSaveSkill = (data: any) => {
     let clean = data;
     if (skill === "reading" && Array.isArray(data?.passages)) {
@@ -292,14 +297,17 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
     setHasUnsavedChanges(true);
   };
 
-  // ── Save draft to backend ──────────────────────────────────────────────
-  // Nháp = lưu tự do, không chặn dù thiếu gì. Validation chỉ áp dụng cho Xuất bản.
-  const handleSaveDraft = async () => {
+  // ── Core Save draft to backend ──────────────────────────────────────────
+  const saveDraftToBackend = async (
+    customSkillData?: any,
+    options?: { silent?: boolean; exitAfterSave?: boolean; message?: string }
+  ) => {
     if (!examId) return;
+    const targetData = customSkillData ?? skillData;
     setIsSaving(true);
     try {
       await api.put(`/teacher/exams/${examId}/ielts`, {
-        eTitle: examTitle,
+        eTitle: examTitle.trim() || `IELTS ${testType} - ${meta.label} Practice`,
         eDescription: examDescription,
         ielts_test_type: testType,
         eScope: "skill",
@@ -309,22 +317,81 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
           skill,
           play_modes: playMode,
         },
-        ielts_data: skillData ? { [getDataKey(skill)]: extractSkillItems(skill, skillData) } : null,
+        ielts_data: targetData ? { [getDataKey(skill)]: extractSkillItems(skill, targetData) } : null,
       });
       setHasUnsavedChanges(false);
-      if (validationEnabled && errorCount > 0) {
-        success(`Đã lưu nháp · còn ${errorCount} lỗi cần sửa trước khi xuất bản`);
-      } else {
-        success("Đã lưu nháp");
+      setLastSavedAt(new Date());
+
+      if (!options?.silent) {
+        if (options?.message) {
+          success(options.message);
+        } else if (validationEnabled && errorCount > 0) {
+          success(`Đã lưu nháp · còn ${errorCount} lỗi cần sửa trước khi xuất bản`);
+        } else {
+          success("Đã lưu nháp thành công");
+        }
       }
-      // Sau khi lưu nháp xong → quay về danh sách đề thi
-      setTimeout(() => navigate("/giao-vien/de-thi"), 600);
+
+      if (options?.exitAfterSave) {
+        setTimeout(() => navigate("/giao-vien/de-thi?status=draft"), 600);
+      }
     } catch (err: any) {
-      error(err?.response?.data?.message || "Lưu nháp thất bại");
+      if (!options?.silent) {
+        error(err?.response?.data?.message || "Lưu nháp thất bại");
+      }
+      throw err;
     } finally {
       setIsSaving(false);
     }
   };
+
+  // Lưu từ nút ở editor (VD: "Lưu Listening") → lưu thật vào DB và giữ nguyên trên trang
+  const handleEditorSaveDraft = async (data: any) => {
+    handleSaveSkill(data);
+    await saveDraftToBackend(data, {
+      silent: false,
+      exitAfterSave: false,
+      message: `Đã lưu nội dung ${meta.label} vào hệ thống`,
+    });
+  };
+
+  // Lưu từ nút "Lưu nháp" ở header → lưu thật vào DB và giữ nguyên trên trang
+  const handleSaveDraft = async () => {
+    await saveDraftToBackend(skillData, {
+      silent: false,
+      exitAfterSave: false,
+    });
+  };
+
+  // Debounced auto-save sau 2.5s khi có thay đổi chưa lưu
+  useEffect(() => {
+    if (!examId || !hasUnsavedChanges || isSaving || isPublishing) return;
+    const timer = setTimeout(async () => {
+      try {
+        setIsAutoSaving(true);
+        await saveDraftToBackend(skillData, { silent: true });
+      } catch (err) {
+        console.warn("[CreateIeltsExam] auto-save draft failed:", err);
+      } finally {
+        setIsAutoSaving(false);
+      }
+    }, 2500);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [examId, hasUnsavedChanges, skillData, examTitle, testType, ageGroup, isSaving, isPublishing]);
+
+  // Cảnh báo người dùng khi đóng tab trình duyệt nếu chưa lưu
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   // ── Publish ─────────────────────────────────────────────────────────────
   const handlePublish = async () => {
@@ -405,9 +472,24 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <button
             type="button"
-            onClick={() => navigate("/giao-vien/de-thi/tao-moi")}
+            onClick={async () => {
+              if (hasUnsavedChanges) {
+                const confirmSave = window.confirm(
+                  "Bạn có thay đổi chưa lưu. Bạn có muốn lưu nháp trước khi thoát không?"
+                );
+                if (confirmSave) {
+                  try {
+                    await saveDraftToBackend(skillData, { silent: false });
+                  } catch {
+                    return;
+                  }
+                }
+              }
+              navigate("/giao-vien/de-thi?status=draft");
+            }}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-            aria-label="Quay lại"
+            aria-label="Quay lại danh sách đề thi"
+            title="Quay lại danh sách đề thi"
           >
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </button>
@@ -449,7 +531,15 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
               </span>
               <span className="text-gray-300">•</span>
               <span>{totalQuestions} câu</span>
-              {hasUnsavedChanges && (
+              {isSaving || isAutoSaving ? (
+                <>
+                  <span className="text-gray-300">•</span>
+                  <span className="text-blue-600 font-medium inline-flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Đang lưu...
+                  </span>
+                </>
+              ) : hasUnsavedChanges ? (
                 <>
                   <span className="text-gray-300">•</span>
                   <span className="text-orange-500 font-medium inline-flex items-center gap-1">
@@ -457,7 +547,18 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
                     Chưa lưu
                   </span>
                 </>
-              )}
+              ) : lastSavedAt ? (
+                <>
+                  <span className="text-gray-300">•</span>
+                  <span
+                    className="text-emerald-600 font-medium inline-flex items-center gap-1"
+                    title={lastSavedAt.toLocaleTimeString()}
+                  >
+                    <Check className="w-3 h-3" />
+                    Đã lưu {lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </>
+              ) : null}
             </div>
           </div>
         </div>
@@ -667,6 +768,7 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
                   testType={testType}
                   initialData={skillData}
                   onSave={handleSaveSkill}
+                  onSaveDraft={handleEditorSaveDraft}
                 />
               )}
               {skill === "reading" && (
@@ -676,6 +778,7 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
                   testType={testType}
                   initialData={skillData}
                   onSave={handleSaveSkill}
+                  onSaveDraft={handleEditorSaveDraft}
                 />
               )}
               {skill === "writing" && (
@@ -685,6 +788,7 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
                   testType={testType}
                   initialData={skillData}
                   onSave={handleSaveSkill}
+                  onSaveDraft={handleEditorSaveDraft}
                 />
               )}
               {skill === "speaking" && (
@@ -694,6 +798,7 @@ export function CreateIeltsExam({ initialSkill = "listening" }: CreateIeltsExamP
                   testType={testType}
                   initialData={skillData}
                   onSave={handleSaveSkill}
+                  onSaveDraft={handleEditorSaveDraft}
                 />
               )}
             </>

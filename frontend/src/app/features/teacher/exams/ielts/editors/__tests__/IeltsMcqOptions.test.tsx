@@ -57,6 +57,7 @@ describe("IeltsListeningEditor - MCQ Options Independence", () => {
     render(
       <ToastProvider>
         <IeltsListeningEditor
+          testType="Academic"
           initialData={initialData}
           onSave={handleSave}
           isFullTest={false}
@@ -125,6 +126,7 @@ describe("IeltsReadingEditor - MCQ Options Independence", () => {
     render(
       <ToastProvider>
         <IeltsReadingEditor
+          testType="Academic"
           initialData={initialData}
           onSave={handleSave}
         />
